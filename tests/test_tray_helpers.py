@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from core.server.runner import (
+from core.server.tray_launcher import (
     _is_tray_already_running,
     _is_tray_supported,
     _kill_stale_tray,
@@ -124,17 +124,17 @@ class TestMaybeLaunchTray:
 
     def test_skips_all_when_already_running(self):
         """If NEXE_TRAY_PID is set, _is_tray_supported is never called."""
-        with patch("core.server.runner._is_tray_already_running", return_value=True), \
-             patch("core.server.runner._is_tray_supported") as mock_supported:
+        with patch("core.server.tray_launcher._is_tray_already_running", return_value=True), \
+             patch("core.server.tray_launcher._is_tray_supported") as mock_supported:
             _maybe_launch_tray()
             mock_supported.assert_not_called()
 
     def test_skips_kill_and_launch_when_not_supported(self):
         """If not supported, _kill_stale_tray and _launch_tray_process are not called."""
-        with patch("core.server.runner._is_tray_already_running", return_value=False), \
-             patch("core.server.runner._is_tray_supported", return_value=False), \
-             patch("core.server.runner._kill_stale_tray") as mock_kill, \
-             patch("core.server.runner._launch_tray_process") as mock_launch:
+        with patch("core.server.tray_launcher._is_tray_already_running", return_value=False), \
+             patch("core.server.tray_launcher._is_tray_supported", return_value=False), \
+             patch("core.server.tray_launcher._kill_stale_tray") as mock_kill, \
+             patch("core.server.tray_launcher._launch_tray_process") as mock_launch:
             _maybe_launch_tray()
             mock_kill.assert_not_called()
             mock_launch.assert_not_called()
@@ -142,10 +142,10 @@ class TestMaybeLaunchTray:
     def test_calls_kill_and_launch_with_project_root(self):
         """When supported, delegates to _kill_stale_tray and _launch_tray_process."""
         project_root = Path("/fake/root")
-        with patch("core.server.runner._is_tray_already_running", return_value=False), \
-             patch("core.server.runner._is_tray_supported", return_value=True), \
-             patch("core.server.runner._kill_stale_tray") as mock_kill, \
-             patch("core.server.runner._launch_tray_process") as mock_launch:
+        with patch("core.server.tray_launcher._is_tray_already_running", return_value=False), \
+             patch("core.server.tray_launcher._is_tray_supported", return_value=True), \
+             patch("core.server.tray_launcher._kill_stale_tray") as mock_kill, \
+             patch("core.server.tray_launcher._launch_tray_process") as mock_launch:
             _maybe_launch_tray(project_root)
             mock_kill.assert_called_once()
             mock_launch.assert_called_once_with(project_root)

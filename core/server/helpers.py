@@ -47,25 +47,7 @@ def setup_signal_handlers():
   signal.signal(signal.SIGINT, signal_handler)
   signal.signal(signal.SIGTERM, signal_handler)
 
-def translate(i18n, key: str, fallback: str, **kwargs) -> str:
-  """
-  Translate a key with fallback support and format parameters.
-
-  Args:
-    i18n: I18n manager instance (can be None)
-    key: Translation key
-    fallback: Fallback text if key not found
-    **kwargs: Format parameters for string interpolation
-
-  Returns:
-    Translated text or fallback (with formatting applied)
-  """
-  if not i18n:
-    return fallback.format(**kwargs) if kwargs else fallback
-
-  value = i18n.t(key, **kwargs)
-
-  if value == key:
-    return fallback.format(**kwargs) if kwargs else fallback
-
-  return value
+# translate() viu ara a core.i18n_utils (font canònica).
+# Re-exportem aquí perquè els call-sites (`from .helpers import translate`)
+# segueixin funcionant amb la mateixa signatura.
+from core.i18n_utils import translate  # noqa: E402,F401

@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 
 from core.messages import get_message
+from core.i18n_utils import translate
 
 from core.bootstrap_tokens import create_session_token
 from plugins.security.core.auth_dependencies import require_api_key
@@ -29,16 +30,14 @@ router = APIRouter(tags=["bootstrap"])
 
 def _t(request: Request, key: str, fallback: str, **kwargs) -> str:
   """Translate helper with fallback from request.app.state"""
+  # la resolució + maneig d'error viu a core.i18n_utils.translate.
+  # getattr es manté dins el try via translate (defensiu), però aquí
+  # l'accés a request.app.state també pot fallar, així que el cobrim.
   try:
     i18n = getattr(request.app.state, 'i18n', None)
-    if not i18n:
-      return fallback.format(**kwargs) if kwargs else fallback
-    value = i18n.t(key, **kwargs)
-    if value == key:
-      return fallback.format(**kwargs) if kwargs else fallback
-    return value
   except Exception:
-    return fallback.format(**kwargs) if kwargs else fallback
+    i18n = None
+  return translate(i18n, key, fallback, **kwargs)
 
 VPN_ALLOWED_IPS = set(
   ip.strip() for ip in os.getenv('NEXE_VPN_ALLOWED_IPS', os.getenv('VPN_ALLOWED_IPS', '')).split(',') if ip.strip()
@@ -97,20 +96,11 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
 
 def _validate_bootstrap_env() -> None:
   """Raise 503 if NEXE_ENV is not 'development'."""
-  # SidecarConfig.is_production is the canonical source for
-  # produccio vs no-produccio. Mantenim raw env per distingir "development"
-  # de valors no-produccio com "staging"/"test" que han de bloquejar bootstrap.
-  core_env = os.getenv('NEXE_ENV', 'production').lower()
-  try:
-    from core.sidecar_config import get_sidecar_config
-    if get_sidecar_config().is_production:
-      core_env = "production"
-  except Exception as exc:
-    logger.debug(
-      "F2.3 part 2: SidecarConfig unavailable in _validate_bootstrap_env, "
-      "using raw NEXE_ENV: %s",
-      exc,
-    )
+  # el guard try/except viu ara a resolve_core_env (sidecar_config).
+  # Mantenim raw env per distingir "development" de valors no-produccio com
+  # "staging"/"test" que han de bloquejar bootstrap.
+  from core.sidecar_config import resolve_core_env
+  core_env = resolve_core_env('production', '_validate_bootstrap_env', logger)
   if core_env != 'development':
     logger.error("Bootstrap attempt in non-development environment (NEXE_ENV=%s)", core_env)
     raise HTTPException(status_code=503, detail="Bootstrap not available in this environment")
@@ -182,7 +172,7 @@ async def bootstrap_session(
   check_rate_limit(client_ip, request)
   _validate_bootstrap_token(token, client_ip)
 
-  session_ttl = 900
+  session_ttl = int(os.getenv("NEXE_SESSION_TTL", "900"))
   session_token = create_session_token(ttl_seconds=session_ttl)
 
   log_data = {
@@ -298,20 +288,11 @@ async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
   from core.bootstrap_tokens import get_bootstrap_token
   from datetime import datetime
 
-  # SidecarConfig.is_production is the canonical source for
-  # produccio vs no-produccio. Mantenim raw env per distingir "development"
-  # de valors no-produccio com "staging"/"test".
-  core_env = os.getenv('NEXE_ENV', 'production').lower()
-  try:
-    from core.sidecar_config import get_sidecar_config
-    if get_sidecar_config().is_production:
-      core_env = "production"
-  except Exception as exc:
-    logger.debug(
-      "F2.3 part 2: SidecarConfig unavailable in bootstrap info endpoint, "
-      "using raw NEXE_ENV: %s",
-      exc,
-    )
+  # el guard try/except viu ara a resolve_core_env (sidecar_config).
+  # Mantenim raw env per distingir "development" de valors no-produccio com
+  # "staging"/"test".
+  from core.sidecar_config import resolve_core_env
+  core_env = resolve_core_env('production', 'bootstrap info endpoint', logger)
   bootstrap_enabled = (core_env == 'development')
 
   info = get_bootstrap_token()

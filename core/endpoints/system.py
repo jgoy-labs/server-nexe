@@ -18,6 +18,7 @@ from typing import Dict, Any
 
 from core.paths import get_logs_dir
 from core.version import __version__
+from core.i18n_utils import translate
 from plugins.security.core.auth import require_api_key
 
 router_admin = APIRouter(prefix="/admin/system", tags=["system-admin"])
@@ -33,16 +34,8 @@ def _get_i18n():
 
 def _t(key: str, fallback: str, **kwargs) -> str:
   """Helper to translate with fallback."""
-  i18n = _get_i18n()
-  if not i18n:
-    return fallback.format(**kwargs) if kwargs else fallback
-  try:
-    value = i18n.t(key, **kwargs)
-    if value == key:
-      return fallback.format(**kwargs) if kwargs else fallback
-    return value
-  except Exception:
-    return fallback.format(**kwargs) if kwargs else fallback
+  # la resolució + maneig d'error viu a core.i18n_utils.translate.
+  return translate(_get_i18n(), key, fallback, **kwargs)
 
 _logs_dir = get_logs_dir()
 SUPERVISOR_PID_FILE = _logs_dir / 'core_supervisor.pid'
@@ -179,17 +172,13 @@ async def restart_server(
   """
   # the sidecar MUST NOT try to restart itself —
   # és Tauri host qui en gestiona el cicle de vida (spawn_sidecar_process).
-  try:
-    from core.sidecar_config import get_sidecar_config
-    if get_sidecar_config().is_sidecar:
-      raise HTTPException(
-        status_code=501,
-        detail="Restart is managed by host application in sidecar mode",
-      )
-  except HTTPException:
-    raise
-  except Exception as exc:
-    logger.debug("restart_server: get_sidecar_config() failed (%s); proceeding non-sidecar", exc)
+  # el guard try/except viu ara a is_sidecar_mode (sidecar_config).
+  from core.sidecar_config import is_sidecar_mode
+  if is_sidecar_mode("restart_server", logger):
+    raise HTTPException(
+      status_code=501,
+      detail="Restart is managed by host application in sidecar mode",
+    )
 
   try:
     supervisor_pid = get_supervisor_pid()

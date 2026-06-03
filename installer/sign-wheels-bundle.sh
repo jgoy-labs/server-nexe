@@ -123,7 +123,7 @@ out_whl = Path(sys.argv[2])
 # have entries with mtime == 0 (epoch 1970). Clamp to the ZIP floor
 # so zipfile.write() doesn't raise ValueError on repack. Content is
 # unaffected — pip install does not inspect mtime.
-ZIP_EPOCH = 315532800  # 1980-01-01T00:00:00 UTC
+ZIP_FLOOR_1980 = 315532800  # 1980-01-01T00:00:00 UTC
 
 record_paths = list(work.glob("*.dist-info/RECORD"))
 if record_paths:
@@ -150,8 +150,8 @@ with zipfile.ZipFile(out_whl, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
         if not f.is_file():
             continue
         st = f.stat()
-        if st.st_mtime < ZIP_EPOCH:
-            os.utime(f, (ZIP_EPOCH, ZIP_EPOCH))
+        if st.st_mtime < ZIP_FLOOR_1980:
+            os.utime(f, (ZIP_FLOOR_1980, ZIP_FLOOR_1980))
         zf.write(f, f.relative_to(work).as_posix())
 PY
 

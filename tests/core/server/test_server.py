@@ -111,7 +111,7 @@ class TestMaybeLaunchTray:
         """If NEXE_TRAY_PID is present → launches nothing."""
         from core.server.runner import _maybe_launch_tray
         with patch.dict("os.environ", {"NEXE_TRAY_PID": "12345"}):
-            with patch("core.server.runner.subprocess") as mock_sub:
+            with patch("core.server.tray_launcher.subprocess") as mock_sub:
                 _maybe_launch_tray()
                 mock_sub.Popen.assert_not_called()
 
@@ -122,9 +122,9 @@ class TestMaybeLaunchTray:
         env = {k: v for k, v in os.environ.items()
                if k not in ("NEXE_TRAY_PID", "NEXE_DOCKER", "CONTAINER", "NEXE_NO_TRAY")}
         with patch.dict("os.environ", env, clear=True):
-            with patch("core.server.runner.sys") as mock_sys:
+            with patch("core.server.tray_launcher.sys") as mock_sys:
                 mock_sys.platform = "linux"
-                with patch("core.server.runner.subprocess") as mock_sub:
+                with patch("core.server.tray_launcher.subprocess") as mock_sub:
                     _maybe_launch_tray()
                     mock_sub.Popen.assert_not_called()
 
@@ -132,7 +132,7 @@ class TestMaybeLaunchTray:
         """If NEXE_NO_TRAY is present → launches nothing."""
         from core.server.runner import _maybe_launch_tray
         with patch.dict("os.environ", {"NEXE_NO_TRAY": "1"}):
-            with patch("core.server.runner.subprocess") as mock_sub:
+            with patch("core.server.tray_launcher.subprocess") as mock_sub:
                 _maybe_launch_tray()
                 mock_sub.Popen.assert_not_called()
 
@@ -140,7 +140,7 @@ class TestMaybeLaunchTray:
         """If NEXE_DOCKER is present → launches nothing."""
         from core.server.runner import _maybe_launch_tray
         with patch.dict("os.environ", {"NEXE_DOCKER": "1"}):
-            with patch("core.server.runner.subprocess") as mock_sub:
+            with patch("core.server.tray_launcher.subprocess") as mock_sub:
                 _maybe_launch_tray()
                 mock_sub.Popen.assert_not_called()
 
@@ -152,8 +152,8 @@ class TestMaybeLaunchTray:
                if k not in ("NEXE_TRAY_PID", "NEXE_DOCKER", "CONTAINER", "NEXE_NO_TRAY")}
         mock_popen = MagicMock()
         with patch.dict("os.environ", env, clear=True), \
-                patch("core.server.runner.sys") as mock_sys, \
-                patch("core.server.runner.subprocess") as mock_sub, \
+                patch("core.server.tray_launcher.sys") as mock_sys, \
+                patch("core.server.tray_launcher.subprocess") as mock_sub, \
                 patch.dict("sys.modules", {"rumps": MagicMock()}):
             mock_sys.platform = "darwin"
             mock_sys.executable = "/usr/bin/python3"
@@ -178,8 +178,8 @@ class TestMaybeLaunchTray:
                if k not in ("NEXE_TRAY_PID", "NEXE_DOCKER", "CONTAINER", "NEXE_NO_TRAY")}
         mock_popen = MagicMock()
         with patch.dict("os.environ", env, clear=True), \
-                patch("core.server.runner.sys") as mock_sys, \
-                patch("core.server.runner.subprocess") as mock_sub, \
+                patch("core.server.tray_launcher.sys") as mock_sys, \
+                patch("core.server.tray_launcher.subprocess") as mock_sub, \
                 patch.dict("sys.modules", {"rumps": MagicMock()}):
             mock_sys.platform = "darwin"
             mock_sys.executable = "/usr/bin/python3"

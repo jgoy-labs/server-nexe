@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends
 
 from core.version import __version__
+from core.i18n_utils import translate
 
 logger = logging.getLogger(__name__)
 
@@ -109,26 +110,28 @@ async def _module_health_status(instance) -> str:
 @limiter.limit("30/minute")
 async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
   """Root endpoint with system information"""
+  # usem translate() canònica en comptes de l'inline ternari.
   return SystemResponse(
     system=f"Nexe {__version__}",
-    description=i18n.t('server_core.api.welcome.description') if i18n else
-          "Module orchestration system running",
-    status=i18n.t('server_core.api.welcome.ready') if i18n else
-        "System ready and operational",
+    description=translate(i18n, 'server_core.api.welcome.description',
+          "Module orchestration system running"),
+    status=translate(i18n, 'server_core.api.welcome.ready',
+        "System ready and operational"),
     version=__version__,
-    type=i18n.t('server_core.api.server_type') if i18n else "basic_server"
+    type=translate(i18n, 'server_core.api.server_type', "basic_server")
   )
 
 @router.get("/health", response_model=HealthResponse, summary="Basic server health check", operation_id="health_check")
 @limiter.limit("60/minute")
 async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthResponse:
   """System health check"""
+  # usem translate() canònica en comptes de l'inline ternari.
   return HealthResponse(
-    status=i18n.t('server_core.api.health.status') if i18n else "operational",
-    message=i18n.t('server_core.api.health.message') if i18n else
-        "Basic server operational",
+    status=translate(i18n, 'server_core.api.health.status', "operational"),
+    message=translate(i18n, 'server_core.api.health.message',
+        "Basic server operational"),
     version=__version__,
-    uptime=i18n.t('server_core.api.health.uptime') if i18n else "operational"
+    uptime=translate(i18n, 'server_core.api.health.uptime', "operational")
   )
 
 @router.get("/health/ready", summary="Readiness check — verifies required modules", response_model=dict, operation_id="readiness_check")
@@ -211,32 +214,33 @@ async def readiness_check(request: Request) -> dict:
 async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoResponse:
   """Basic system information"""
 
+  # usem translate() canònica en comptes de l'inline ternari.
   endpoints = [
     EndpointInfo(
       path="/",
       method="GET",
-      description=i18n.t('server_core.api.endpoints.root_description') if i18n else
-            "System root endpoint"
+      description=translate(i18n, 'server_core.api.endpoints.root_description',
+            "System root endpoint")
     ),
     EndpointInfo(
       path="/health",
       method="GET",
-      description=i18n.t('server_core.api.endpoints.health_description') if i18n else
-            "System health check"
+      description=translate(i18n, 'server_core.api.endpoints.health_description',
+            "System health check")
     ),
     EndpointInfo(
       path="/api/info",
       method="GET",
-      description=i18n.t('server_core.api.endpoints.info_description') if i18n else
-            "Basic system information"
+      description=translate(i18n, 'server_core.api.endpoints.info_description',
+            "Basic system information")
     )
   ]
 
   return ApiInfoResponse(
     name=f"Nexe {__version__}",
     version=__version__,
-    description=i18n.t('server_core.api.welcome.description') if i18n else
-          "Module orchestration system running",
+    description=translate(i18n, 'server_core.api.welcome.description',
+          "Module orchestration system running"),
     endpoints=endpoints
   )
 

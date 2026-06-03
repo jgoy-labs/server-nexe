@@ -70,17 +70,23 @@ def get_logs_dir() -> Path:
   """
   if core_logs := os.getenv("NEXE_LOGS_DIR"):
     logs_base = Path(core_logs)
-    logs_base.mkdir(parents=True, exist_ok=True)
+    # mode= és modulat per l'umask → chmod posterior per garantir 0o700
+    logs_base.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(logs_base, 0o700)
     return logs_base
 
   if "site-packages" in str(Path(__file__).resolve()):
     logs_base = Path.home() / ".nexe" / "logs"
-    logs_base.mkdir(parents=True, exist_ok=True)
+    # mode= és modulat per l'umask → chmod posterior per garantir 0o700
+    logs_base.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(logs_base, 0o700)
     return logs_base
 
   project_root = get_repo_root()
   logs_base = project_root / "storage" / "system-logs"
-  logs_base.mkdir(parents=True, exist_ok=True)
+  # mode= és modulat per l'umask → chmod posterior per garantir 0o700
+  logs_base.mkdir(parents=True, exist_ok=True, mode=0o700)
+  os.chmod(logs_base, 0o700)
   return logs_base
 
 def get_config_dir() -> Path:
@@ -111,7 +117,9 @@ def get_data_dir(subdir: Optional[str] = None) -> Path:
   if subdir:
     data_dir = data_dir / subdir
 
-  data_dir.mkdir(parents=True, exist_ok=True)
+  # mode= és modulat per l'umask → chmod posterior per garantir 0o700
+  data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+  os.chmod(data_dir, 0o700)
   return data_dir
 
 def get_cache_dir(subdir: Optional[str] = None) -> Path:
@@ -136,7 +144,9 @@ def get_cache_dir(subdir: Optional[str] = None) -> Path:
   if subdir:
     cache_dir = cache_dir / subdir
 
-  cache_dir.mkdir(parents=True, exist_ok=True)
+  # mode= és modulat per l'umask → chmod posterior per garantir 0o700
+  cache_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+  os.chmod(cache_dir, 0o700)
   return cache_dir
 
 def get_models_dir() -> Path:

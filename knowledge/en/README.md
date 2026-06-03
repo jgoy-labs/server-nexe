@@ -5,7 +5,7 @@ id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest, thinking toggle. Models by RAM tiers (8GB to 32GB, 14 models, 4 tiers), 2 installation methods (offline DMG 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux supported (Ollama, CPU)."
+abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest, thinking toggle. Models by RAM tiers (8GB to 32GB, 13 models, 4 tiers), 2 installation methods (offline DMG 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux supported (Ollama, CPU)."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1

@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import os
 
 from fastapi import FastAPI
 from typing import Any
@@ -37,19 +36,10 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
   # Bug 22 (security): /docs, /redoc, /openapi.json reveal full API map.
   # Disable them outside development mode (NEXE_ENV=development) so production
   # installations don't leak internal endpoint structure.
-  # SidecarConfig.is_production is the canonical source; keep raw
-  # env per distingir "development" vs "test" (ambdós permeten docs).
-  _nexe_env = os.getenv("NEXE_ENV", "production").lower()
-  try:
-    from core.sidecar_config import get_sidecar_config
-    if get_sidecar_config().is_production:
-      _nexe_env = "production"
-  except Exception as exc:
-    logger.debug(
-      "F2.3 part 2: SidecarConfig unavailable in create_fastapi_instance, "
-      "using raw NEXE_ENV: %s",
-      exc,
-    )
+  # el guard try/except viu ara a resolve_core_env (sidecar_config).
+  # Keep raw env per distingir "development" vs "test" (ambdós permeten docs).
+  from core.sidecar_config import resolve_core_env
+  _nexe_env = resolve_core_env("production", "create_fastapi_instance", logger)
   _docs_enabled = _nexe_env in ("development", "test")
 
   app = FastAPI(

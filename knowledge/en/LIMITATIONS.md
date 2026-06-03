@@ -97,7 +97,7 @@ Partially compatible with OpenAI API format:
 - **Default `auto`:** Encryption at rest activates automatically if `sqlcipher3` is available. Can be forced with `NEXE_ENCRYPTION_ENABLED=true` or disabled with `false`.
 - **New feature:** Added in v0.9.0, available since v0.9.7. Tested (68 tests, 0 failures) but not yet battle-tested in production with real users.
 - **Key management:** Master key stored in OS Keyring, env var, or file. If the key is lost, encrypted data cannot be recovered.
-- **SQLCipher dependency:** Requires `sqlcipher3` package. Falls back to plaintext SQLite with a warning if not installed.
+- **SQLCipher dependency:** Requires the `sqlcipher3` Python package — install `sqlcipher3-binary` (prebuilt wheel, recommended) or `sqlcipher3` (needs `libsqlcipher`, e.g. via Homebrew on macOS). Falls back to plaintext SQLite with a warning if not installed.
 - **Migration:** Migrating large datasets (many memories, many sessions) can take time. Backup before migrating.
 
 ## Functional Gaps

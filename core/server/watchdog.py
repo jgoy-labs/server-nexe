@@ -44,7 +44,8 @@ def start_parent_watchdog(poll_interval: float = 30.0) -> None:
 
     def _watchdog() -> None:
         while True:
-            time.sleep(poll_interval)
+            # Check immediately on first iteration (no initial sleep window where
+            # a parent that died right after spawn would leave us orphaned).
             try:
                 os.kill(tray_pid, 0)  # Signal 0 = check if alive, no actual signal
             except ProcessLookupError:
@@ -56,6 +57,7 @@ def start_parent_watchdog(poll_interval: float = 30.0) -> None:
                 return
             except PermissionError:
                 pass  # Process exists but we can't signal it — still alive
+            time.sleep(poll_interval)
 
     t = threading.Thread(target=_watchdog, daemon=True)
     t.start()

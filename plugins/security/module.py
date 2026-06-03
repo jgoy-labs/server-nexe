@@ -66,7 +66,10 @@ class SecurityModule:
         try:
             # Create logs directory if it doesn't exist
             log_path = MODULE_PATH.parent.parent / "storage" / "system-logs" / "security"
-            log_path.mkdir(parents=True, exist_ok=True)
+            log_path.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+            # Prominent, human-visible startup warning when auth is in bypass.
+            self._warn_if_auth_bypass_active()
 
             self._initialized = True
             logger.info("SecurityModule initialized successfully")
@@ -74,6 +77,46 @@ class SecurityModule:
         except Exception as e:
             logger.error(f"Failed to initialize SecurityModule: {e}")
             return False
+
+    def _warn_if_auth_bypass_active(self) -> None:
+        """
+        Emit a prominent startup warning when authentication is in BYPASS.
+
+        Bypass is only ever active when dev mode is enabled AND no valid API key
+        is configured. The underlying auth path stays fail-closed and defense-in-depth
+        (loopback-only, blocked in production); this method does NOT change that logic
+        — it only makes the active bypass humanly visible at boot.
+
+        Severity escalates to error when NEXE_DEV_MODE_ALLOW_REMOTE is active, since
+        remote bypass is far more dangerous than loopback-only bypass.
+        """
+        try:
+            import os
+            from .core.auth_config import is_dev_mode, load_api_keys
+
+            if not is_dev_mode():
+                return
+
+            keys = load_api_keys()
+            if keys.has_any_valid_key:
+                return
+
+            allow_remote = os.getenv("NEXE_DEV_MODE_ALLOW_REMOTE", "false").lower() == "true"
+            log = logger.error if allow_remote else logger.warning
+            scope = "ANY REMOTE IP (NEXE_DEV_MODE_ALLOW_REMOTE=true)" if allow_remote else "loopback only"
+
+            log(
+                "================================================================\n"
+                "  AUTHENTICATION IS IN BYPASS (DEV MODE, NO API KEY)\n"
+                "  All authenticated endpoints accept requests WITHOUT an API key.\n"
+                "  Bypass scope: %s\n"
+                "  Cause: NEXE_DEV_MODE=true and no valid API key configured.\n"
+                "  This is NOT safe for production. Set NEXE_PRIMARY_API_KEY to disable.\n"
+                "================================================================",
+                scope,
+            )
+        except Exception as e:  # never let the warning break startup
+            logger.error(f"Could not evaluate auth bypass status at startup: {e}")
 
     async def shutdown(self) -> None:
         """Cleanup — idempotent"""

@@ -33,6 +33,16 @@
     --success: #e62020;
     --error:   #f44;
 
+    /* Colors semantics d'estat (abans hardcoded en cossos de regla) */
+    --color-success: #22c55e;
+    --color-warn:    #eab308;
+    --color-danger:  #ef4444;
+    --color-low:     #f97316;
+    --color-accent:  #a78bfa;
+    --icon-sun:      #f59e0b;
+    --icon-moon:     #818cf8;
+    --on-accent:     #0a0a0a;  /* text fosc sobre fons d'accent (no canvia amb tema) */
+
     /* Marc animat NEXE */
     --frame-color: #c00;
     --frame-width: 10px;
@@ -510,8 +520,8 @@ body.frame-hidden { padding: 0; }
     height: 12px;
 }
 
-.icon-sun  { display: block; color: #f59e0b; } /* stylelint-disable-line declaration-block-single-line-max-declarations */
-.icon-moon { display: none;  color: #818cf8; } /* stylelint-disable-line declaration-block-single-line-max-declarations */
+.icon-sun  { display: block; color: var(--icon-sun); } /* stylelint-disable-line declaration-block-single-line-max-declarations */
+.icon-moon { display: none;  color: var(--icon-moon); } /* stylelint-disable-line declaration-block-single-line-max-declarations */
 
 /* stylelint-disable no-descending-specificity */
 body.light .icon-sun,
@@ -738,7 +748,7 @@ body.light .icon-moon,
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #22c55e;
+    background: var(--color-success);
     flex-shrink: 0;
     box-shadow: 0 0 4px rgb(34 197 94 / 50%);
 }
@@ -798,7 +808,7 @@ body.light .icon-moon,
 }
 
 .status-dot.active {
-    background: #22c55e;
+    background: var(--color-success);
     box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px rgb(34 197 94 / 25%);
     animation: status-pulse 2.5s ease-in-out infinite;
 }
@@ -1173,7 +1183,7 @@ html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar 
     margin-bottom: 0.5rem;
     border-radius: 4px;
     background: rgb(234 179 8 / 12%);
-    border-left: 3px solid #eab308;
+    border-left: 3px solid var(--color-warn);
     color: var(--text-secondary);
     font-size: 0.82rem;
 }
@@ -1229,16 +1239,16 @@ html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar 
 }
 
 .model-loading-indicator.loaded {
-    border-left-color: #22c55e;
+    border-left-color: var(--color-success);
     background: rgb(34 197 94 / 6%);
-    color: #22c55e;
+    color: var(--color-success);
     animation: none;
 }
 
 .model-loading-indicator.error {
-    border-left-color: #ef4444;
+    border-left-color: var(--color-danger);
     background: rgb(239 68 68 / 6%);
-    color: #ef4444;
+    color: var(--color-danger);
     animation: none;
 }
 
@@ -1429,11 +1439,11 @@ html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar 
 
 /* Memory delete badge (red, same pattern as save badge) */
 .stat-mem-del {
-    color: #ef4444;
+    color: var(--color-danger);
 }
 
 .stat-mem-del svg {
-    color: #ef4444;
+    color: var(--color-danger);
 }
 
 .mem-del-tooltip {
@@ -1507,7 +1517,7 @@ html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar 
 }
 
 .stat-rag {
-    color: #a78bfa;
+    color: var(--color-accent);
     opacity: 0.85;
     gap: 4px;
     position: relative;
@@ -1566,12 +1576,12 @@ html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar 
     opacity: 0.8;
 }
 
-.rag-high { color: #22c55e; }
-.rag-mid { color: #eab308; }
-.rag-low { color: #f97316; }
+.rag-high { color: var(--color-success); }
+.rag-mid { color: var(--color-warn); }
+.rag-low { color: var(--color-low); }
 
 .stat-mem {
-    color: #22c55e;
+    color: var(--color-success);
     opacity: 0.85;
     gap: 4px;
 }
@@ -1702,7 +1712,7 @@ html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar 
 
 .btn-stop:hover {
     background: rgb(255 90 0 / 100%);
-    color: #0a0a0a;
+    color: var(--on-accent);
     animation: none;
 }
 

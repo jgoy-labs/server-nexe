@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import os
 import secrets
 import threading
 import sqlite3
@@ -49,7 +50,9 @@ class BootstrapTokenManager:
       return
 
     storage_dir = project_root / "storage"
-    storage_dir.mkdir(parents=True, exist_ok=True)
+    # mode= és modulat per l'umask → chmod posterior per garantir 0o700
+    storage_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(storage_dir, 0o700)
     self._db_path = storage_dir / "system_core.db"
 
     conn = sqlite3.connect(str(self._db_path))
@@ -76,7 +79,10 @@ class BootstrapTokenManager:
     """)
     conn.commit()
     conn.close()
-    
+
+    # El fitxer .db conté tokens en plaintext → restringeix lectura a l'usuari
+    os.chmod(self._db_path, 0o600)
+
     self._initialized = True
     logger.info("BootstrapTokenManager initialized with persistent storage: %s", self._db_path)  # nosemgrep: python-logger-credential-disclosure
 

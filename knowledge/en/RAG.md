@@ -293,6 +293,6 @@ storage/vectors/
 ## Main Endpoints for RAG
 
 - `POST /v1/chat/completions` — Chat with RAG (use_rag: true by default)
-- `POST /v1/memory/store` — Save text to a collection
+- `POST /v1/memory/store` — Save text to a collection (uses MemoryService when initialised, otherwise falls back to a direct Qdrant write for resilience)
 - `POST /v1/memory/search` — Direct semantic search in a collection
 - `DELETE /v1/rag/documents/{id}` — Delete a specific entry

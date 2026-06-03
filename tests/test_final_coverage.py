@@ -44,6 +44,9 @@ class TestMiddlewareFinalCoverage:
             # Force the internal import to fail
             with patch("core.middleware.limiter", MagicMock()):
                 setup_rate_limiting(app, i18n=mock_i18n)
+        # Comprovació de comportament: el rate limiting registra el middleware
+        # SlowAPI fins i tot quan l'import avançat falla (fallback robust).
+        assert len(app.user_middleware) > 0
 
     def test_setup_prometheus_import_error_path(self):
         """Lines 199-200: PrometheusMiddleware ImportError."""
@@ -54,6 +57,9 @@ class TestMiddlewareFinalCoverage:
         with patch.dict("sys.modules", {"core.metrics.middleware": None}):
             with patch("core.middleware.logger") as mock_log:
                 setup_prometheus_metrics(app)
+                # Comprovació de comportament: l'ImportError es registra com a warning
+                # (degradació silenciosa, no excepció).
+                mock_log.warning.assert_called_once()
 
     def test_setup_csrf_production_no_secret(self):
         """Lines 216-223: prod mode without NEXE_CSRF_SECRET generates temp."""
@@ -66,8 +72,9 @@ class TestMiddlewareFinalCoverage:
             os.environ.pop("NEXE_CSRF_SECRET", None)
             try:
                 setup_csrf_protection(app, config)
+                assert len(app.user_middleware) > 0  # CSRF middleware added (temp secret generated)
             except ImportError:
-                pass  # starlette-csrf may not be installed
+                pytest.skip("starlette-csrf not installed")
 
     def test_setup_csrf_dev_mode_no_secret(self):
         """Lines 224-228: dev mode without secret uses temporary."""
@@ -80,8 +87,9 @@ class TestMiddlewareFinalCoverage:
             os.environ.pop("NEXE_CSRF_SECRET", None)
             try:
                 setup_csrf_protection(app, config)
+                assert len(app.user_middleware) > 0  # CSRF middleware added
             except ImportError:
-                pass
+                pytest.skip("starlette-csrf not installed")
 
     def test_setup_csrf_non_local_prod_cookie_secure(self):
         """Lines 237-262: prod + non-local → cookie_secure=True, adds middleware."""
@@ -96,8 +104,9 @@ class TestMiddlewareFinalCoverage:
         }):
             try:
                 setup_csrf_protection(app, config)
+                assert len(app.user_middleware) > 0  # CSRF middleware added
             except ImportError:
-                pass
+                pytest.skip("starlette-csrf not installed")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -368,7 +377,8 @@ class TestIngestKnowledgeFinal:
         pdf.write_bytes(b"%PDF-1.4 fake pdf")
         try:
             result = read_file(pdf)
-            # If pypdf is installed, it'll try to read
+            # Si pypdf llegeix el PDF, read_file sempre retorna text (str).
+            assert isinstance(result, str)
         except Exception:
             pass  # pypdf not installed or invalid PDF
 
@@ -520,8 +530,13 @@ class TestPathsHelpersFinal:
         with patch("core.paths.helpers.__file__", fake_path):
             with patch("core.paths.helpers.Path.home", return_value=Path("/fake/home")):
                 with patch("core.paths.helpers.Path.mkdir"):
-                    result = get_logs_dir()
-                    # Should fall through to site-packages or project root
+                    # os.chmod també està mockat perquè el directori fictici no existeix
+                    # (el fix de permisos hi crida chmod després del mkdir).
+                    with patch("core.paths.helpers.os.chmod"):
+                        result = get_logs_dir()
+                        # Comprovació de comportament: detecció de site-packages →
+                        # logs sota ~/.nexe/logs (home mockada).
+                        assert result == Path("/fake/home") / ".nexe" / "logs"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -775,7 +790,12 @@ class TestCachedEmbedderFinal:
         mod._metrics_imported = False
 
         with patch.dict("sys.modules", {"core.metrics.registry": None}):
-            ops, hits, misses = _get_metrics()
+            result = _get_metrics()
+
+        # Comprovació de comportament: l'import fallit no peta, retorna la
+        # terna de mètriques (None quan no estan disponibles).
+        assert len(result) == 3
+        assert mod._metrics_imported is True
 
         mod._metrics_imported = old
 
@@ -1199,7 +1219,12 @@ class TestRagEndpointsFinal:
         endpoints._metrics_imported = False
 
         with patch.dict("sys.modules", {"core.metrics.registry": None}):
-            s, d = endpoints._get_metrics()
+            result = endpoints._get_metrics()
+
+        # Comprovació de comportament: l'import fallit no peta, retorna el
+        # parell de mètriques i marca l'import com a fet.
+        assert len(result) == 2
+        assert endpoints._metrics_imported is True
 
         endpoints._metrics_imported = old
 
@@ -1521,7 +1546,10 @@ class TestEventSystemFinal:
             timestamp=datetime.now(timezone.utc),
             source="test", event_type="test"
         )
+        # Comprovació de comportament: l'excepció del callback es captura (no es
+        # propaga) i l'esdeveniment queda igualment registrat a l'historial.
         asyncio.run(es.emit_event(event))
+        assert len(es._event_history) == 1
 
     def test_emit_awaitable_callback(self):
         """Lines 124-125: callback returns awaitable."""

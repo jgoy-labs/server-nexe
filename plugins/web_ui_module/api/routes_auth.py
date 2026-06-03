@@ -84,8 +84,8 @@ def get_server_lang() -> str:
 # In-memory dict: {ip: [monotonic timestamps of failures within the window]}.
 # server-nexe is single-worker (uvicorn workers=1) — no lock needed.
 _ui_auth_failures: dict[str, list[float]] = {}
-_UI_RATE_LIMIT: int = 20   # maximum failed attempts within the window
-_UI_RATE_WINDOW: float = 60.0  # window in seconds
+_UI_RATE_LIMIT: int = int(_os.getenv("NEXE_UI_RATE_LIMIT", "20"))   # maximum failed attempts within the window
+_UI_RATE_WINDOW: float = float(_os.getenv("NEXE_UI_RATE_WINDOW", "60.0"))  # window in seconds
 
 
 def _check_ui_rate_limit(ip: str) -> bool:

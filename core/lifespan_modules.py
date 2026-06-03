@@ -258,6 +258,8 @@ async def _startup_module_discovery(app, server_state, _translate) -> None:
         try:
             cycle_warnings = server_state.module_manager.get_cycle_warnings()
         except Exception:
+            # AP-G01: log diagnòstic sense canviar el fallback (cap warning de cicle)
+            logger.debug("Could not read module cycle warnings", exc_info=True)
             cycle_warnings = []
         for cycle_chain in cycle_warnings:
             logger.warning("[WARN] Module dependency cycle: %s", cycle_chain)
@@ -331,6 +333,8 @@ async def start_memory_service_v1(app, server_state) -> None:
                     else:
                         vectors_dir = Path(project_root) / "storage" / "vectors"
                 except Exception:
+                    # AP-G01: log diagnòstic sense canviar el fallback al path per defecte
+                    logger.debug("SidecarConfig unavailable resolving vectors_dir", exc_info=True)
                     vectors_dir = Path(project_root) / "storage" / "vectors"
                 vectors_dir.mkdir(parents=True, exist_ok=True)
                 db_path = vectors_dir / "memory_v1.db"

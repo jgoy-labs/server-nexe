@@ -153,7 +153,7 @@ class OllamaClient:
         # Previously we used `open -a Ollama` which launches the full GUI (Dock + window)
         # and constantly bothers the user. The serve binary lives inside the
         # Ollama.app bundle and can be invoked directly without raising the GUI.
-        macos_ollama_bin = "/Applications/Ollama.app/Contents/Resources/ollama"
+        macos_ollama_bin = os.getenv("NEXE_OLLAMA_BIN") or "/Applications/Ollama.app/Contents/Resources/ollama"
         if is_macos and os.path.exists(macos_ollama_bin):
             try:
                 self._ollama_process = subprocess.Popen(  # nosec B603: macos_ollama_bin is hardcoded absolute path "/Applications/Ollama.app/Contents/Resources/ollama"; literal `serve`

@@ -104,7 +104,10 @@ async def _launch_ollama(client, ollama_url: str, server_state) -> None:
         process = subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; system tool resolved via PATH (mono-user local)
             ["ollama", "serve"],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            # nova sessió/grup de procés perquè el shutdown pugui
+            # senyalar el grup sencer (os.killpg) i propagar als runners-fills.
+            start_new_session=True,
         )
         server_state.ollama_process = process
         # Wait for Ollama to be ready (non-blocking)
@@ -142,6 +145,21 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path, serve
             await _launch_ollama(client, ollama_url, server_state)
 
 
+def _signal_process(process, sig: int, direct) -> None:
+    """Senyala el grup de procés (os.killpg) amb fallback al procés directe.
+
+    si el procés es va llançar amb start_new_session=True, el seu
+    PID és líder de grup; senyalar el grup propaga als runners-fills. Si el
+    grup no es pot resoldre (ProcessLookupError/OSError), recau al senyal
+    directe sobre el procés pare per no trencar el shutdown actual.
+    """
+    try:
+        os.killpg(os.getpgid(process.pid), sig)
+    except (ProcessLookupError, OSError) as e:
+        logger.debug("killpg(%s) failed, falling back to direct signal: %s", sig, e)
+        direct()
+
+
 def _stop_process(process, name: str) -> None:
     """Send SIGINT → terminate → kill to a subprocess. Safe to call in finally blocks."""
     if not process:
@@ -150,16 +168,17 @@ def _stop_process(process, name: str) -> None:
         return
     try:
         logger.info("Stopping %s process...", name)
-        process.send_signal(_signal.SIGINT)
+        _signal_process(process, _signal.SIGINT, lambda: process.send_signal(_signal.SIGINT))
         process.wait(timeout=10)
     except Exception as e:
         logger.debug("SIGINT failed for %s: %s", name, e)
         try:
-            process.terminate()
+            _signal_process(process, _signal.SIGTERM, process.terminate)
             process.wait(timeout=3)
         except Exception as e2:
             logger.debug("Terminate failed for %s: %s", name, e2)
             try:
-                process.kill()
+                _signal_process(process, _signal.SIGKILL, process.kill)
             except Exception:
-                logger.debug("Failed to force-stop %s process", name)
+                # AP-G01: log diagnòstic sense canviar el flux (force-stop best-effort)
+                logger.debug("Failed to force-stop %s process", name, exc_info=True)

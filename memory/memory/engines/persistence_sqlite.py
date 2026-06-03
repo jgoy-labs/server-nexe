@@ -15,6 +15,7 @@ www.jgoy.net · https://server-nexe.org
 import asyncio
 import json
 import logging
+import os
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -176,7 +177,9 @@ class SqliteStorageMixin:
 
     def _init_sqlite(self):
         """Initialize the SQLite DB with WAL mode."""
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        # mode= és modulat per l'umask → chmod posterior per garantir 0o700
+        self.db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.db_path.parent, 0o700)
 
         if self._crypto and SQLCIPHER_AVAILABLE:
             self._migrate_to_encrypted()

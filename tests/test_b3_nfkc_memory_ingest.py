@@ -3,74 +3,81 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/test_b3_nfkc_memory_ingest.py
-Description: Blind TDD — B3 NFKC asymmetry: memory-API ingest path does not normalise
-             text to NFKC. Commit 3469964 fixed the query but not the ingest
-             via MemoryService.remember(). Fix: add NFKC to remember() (Option b).
-             / xfail strict pre-fix.
+Description: B3 NFKC symmetry — the memory-API ingest path must normalise text to
+             NFKC so that fullwidth/halfwidth variants are indexed canonically.
+             Behavioural test: exercises MemoryService.remember()/recall() for
+             real, instead of statically grepping the source for the literal.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
-from pathlib import Path
+import unicodedata
 
 import pytest
 
-_MEMORY_SERVICE_FILE = Path(__file__).parents[1] / "memory" / "memory" / "memory_service.py"
-_MEMORY_API_V1_FILE = Path(__file__).parents[1] / "memory" / "memory" / "api" / "v1.py"
+from memory.memory.memory_service import MemoryService
 
 
-def _remember_fn_src() -> str:
-    src = _MEMORY_SERVICE_FILE.read_text()
-    fn_start = src.find("async def remember(")
-    if fn_start < 0:
-        fn_start = src.find("def remember(")
-    next_fn = src.find("\n    async def ", fn_start + 1)
-    if next_fn < 0:
-        next_fn = src.find("\n    def ", fn_start + 1)
-    return src[fn_start:next_fn] if next_fn > fn_start > 0 else src[fn_start:]
+@pytest.fixture
+def svc(tmp_path):
+    """MemoryService amb SQLite temporal i sense Qdrant (mateix patró que
+    tests/memory/memory/test_memory_service.py)."""
+    return MemoryService(db_path=tmp_path / "test.db", qdrant_path=None)
 
 
-def _has_nfkc(src: str) -> bool:
-    return (
-        'unicodedata.normalize("NFKC"' in src
-        or "unicodedata.normalize('NFKC'" in src
-    )
+def _has_fullwidth(text: str) -> bool:
+    """True si el text conté caràcters fullwidth/compat (no NFKC-canònics)."""
+    return text != unicodedata.normalize("NFKC", text)
 
 
-def test_memory_store_nfkc_fullwidth_to_halfwidth():
-    """MemoryService.remember() must apply NFKC to the ingest text.
+@pytest.mark.asyncio
+async def test_memory_store_nfkc_fullwidth_to_halfwidth(svc):
+    """remember() ha d'aplicar NFKC al text d'ingest.
 
-    Post-fix: unicodedata.normalize("NFKC", text) must appear in remember()
-    before passing the text to embedders/extractor.
-    Guarantees symmetry: fullwidth indexed ↔ halfwidth query and vice versa.
+    Es guarda text fullwidth i es comprova que el contingut emmagatzemat queda
+    normalitzat a halfwidth (canònic), de manera que una consulta halfwidth el
+    troba. Garanteix la simetria fullwidth indexat ↔ halfwidth consulta.
     """
-    remember_src = _remember_fn_src()
-    assert _has_nfkc(remember_src), (
-        "B3: MemoryService.remember() must apply unicodedata.normalize('NFKC', text) "
-        "to the ingest text (additive fix — do NOT remove NFKC from the query path)"
-    )
+    await svc.initialize()
+
+    fullwidth = "My favourite city is Ｂａｒｃｅｌｏｎａ"
+    assert _has_fullwidth(fullwidth), "el text de prova ha de ser fullwidth"
+
+    entry_id = await svc.remember(user_id="u1", text=fullwidth, force=True)
+    assert entry_id is not None
+
+    # Consulta halfwidth → ha de trobar el text indexat fullwidth (post-NFKC).
+    cards = await svc.recall(user_id="u1", query="favourite city")
+    assert len(cards) >= 1
+
+    # El contingut emmagatzemat ha de ser NFKC-canònic (sense fullwidth).
+    matched = [c for c in cards if "Barcelona" in c.content]
+    assert matched, "el contingut indexat no s'ha normalitzat a halfwidth (NFKC)"
+    assert all(not _has_fullwidth(c.content) for c in matched)
 
 
-def test_memory_store_nfkc_bidirectional():
-    """Anti-regression B3: bidirectional NFKC symmetry ingest↔query.
+@pytest.mark.asyncio
+async def test_memory_store_nfkc_bidirectional(svc):
+    """Simetria NFKC bidireccional ingest↔consulta (anti-regressió B3).
 
-    Verifies that BOTH the ingest path (MemoryService.remember) AND the query
-    path (memory/api/v1.py) apply NFKC, guaranteeing:
-      fullwidth indexed → halfwidth query → match
-      halfwidth indexed → fullwidth query → match
-    dev removes the xfail once the fix is applied. Remains as a permanent guard.
+    Comprova el comportament real en les dues direccions:
+      fullwidth indexat → consulta halfwidth → match
+      halfwidth indexat → consulta fullwidth → match
     """
-    remember_src = _remember_fn_src()
-    api_src = _MEMORY_API_V1_FILE.read_text()
+    await svc.initialize()
 
-    # Query path (commit 3469964 — already present, must not regress)
-    assert _has_nfkc(api_src), (
-        "Anti-reg query path (commit 3469964): memory/api/v1.py has lost NFKC "
-        "(regression)"
+    # Direcció 1: indexat fullwidth, consulta halfwidth.
+    await svc.remember(user_id="a", text="My favourite city is Ｂａｒｃｅｌｏｎａ", force=True)
+    cards_a = await svc.recall(user_id="a", query="favourite city")
+    assert any("Barcelona" in c.content for c in cards_a), (
+        "ingest fullwidth no trobable amb consulta halfwidth (NFKC ingest perdut)"
     )
 
-    # Ingest path (post-fix B3 — must exist in remember())
-    assert _has_nfkc(remember_src), (
-        "Anti-reg ingest path B3: MemoryService.remember() must keep NFKC "
-        "— bidirectional symmetry indexed↔query"
+    # Direcció 2: indexat halfwidth, consulta fullwidth.
+    await svc.remember(user_id="b", text="My favourite city is Barcelona", force=True)
+    fullwidth_query = "favourite ｃｉｔｙ"
+    assert _has_fullwidth(fullwidth_query), "la consulta de prova ha de ser fullwidth"
+    cards_b = await svc.recall(user_id="b", query=fullwidth_query)
+    assert any("Barcelona" in c.content for c in cards_b), (
+        "consulta fullwidth no troba l'index halfwidth (NFKC consulta perdut)"
     )

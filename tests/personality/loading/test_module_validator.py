@@ -1,6 +1,9 @@
 """
 Tests for personality/loading/module_validator.py
-Covers uncovered lines: 27, 44-56, 69-88, 93-102, 109-116, 130-162, 166-185
+
+Covers: __init__, validate_module, _validate_api, _validate_ui,
+_validate_dependencies. Manifest integrity validation is not implemented
+(removed dead no-op), so it is not tested here.
 """
 import warnings
 import pytest
@@ -21,50 +24,17 @@ def _make_module_info(name="test_module", manifest=None, path=None):
 
 
 class TestModuleValidatorInit:
-    """Tests for __init__ (lines 44-56)"""
+    """Tests for __init__"""
 
-    @patch("personality.loading.module_validator.INTEGRITY_CHECKER_AVAILABLE", False)
-    def test_init_without_integrity_checker(self):
+    def test_init_default(self):
         v = ModuleValidator()
-        assert v._integrity_checker is None
+        assert v.i18n is None
 
-    @patch("personality.loading.module_validator.INTEGRITY_CHECKER_AVAILABLE", True)
-    @patch("personality.loading.module_validator.IntegrityChecker")
-    def test_init_with_integrity_checker_default_root(self, mock_ic_cls):
-        """Lines 44-53: IntegrityChecker available, no core_root, no env"""
-        mock_ic_cls.return_value = MagicMock()
-        with patch.dict("os.environ", {}, clear=False):
-            # Remove NEXE_ROOT if present
-            import os
-            os.environ.pop("NEXE_ROOT", None)
-            v = ModuleValidator()
-        assert v._integrity_checker is not None
-
-    @patch("personality.loading.module_validator.INTEGRITY_CHECKER_AVAILABLE", True)
-    @patch("personality.loading.module_validator.IntegrityChecker")
-    def test_init_with_integrity_checker_env_root(self, mock_ic_cls):
-        """Lines 45-47: NEXE_ROOT env var is set"""
-        mock_ic_cls.return_value = MagicMock()
-        with patch.dict("os.environ", {"NEXE_ROOT": "/custom/root"}):
-            v = ModuleValidator()
-        expected_lock = Path("/custom/root") / "storage" / ".auto_clean" / "manifests.lock"
-        mock_ic_cls.assert_called_with(expected_lock)
-
-    @patch("personality.loading.module_validator.INTEGRITY_CHECKER_AVAILABLE", True)
-    @patch("personality.loading.module_validator.IntegrityChecker")
-    def test_init_with_integrity_checker_custom_root(self, mock_ic_cls):
-        """Line 49: core_root provided explicitly"""
-        mock_ic_cls.return_value = MagicMock()
+    def test_init_with_core_root(self):
+        # core_root is accepted for signature compatibility; manifest integrity
+        # validation is not implemented (see TODO in module_validator).
         v = ModuleValidator(core_root=Path("/explicit/root"))
-        expected_lock = Path("/explicit/root") / "storage" / ".auto_clean" / "manifests.lock"
-        mock_ic_cls.assert_called_with(expected_lock)
-
-    @patch("personality.loading.module_validator.INTEGRITY_CHECKER_AVAILABLE", True)
-    @patch("personality.loading.module_validator.IntegrityChecker", side_effect=Exception("init fail"))
-    def test_init_integrity_checker_fails(self, mock_ic_cls):
-        """Lines 55-56: IntegrityChecker init fails"""
-        v = ModuleValidator(core_root=Path("/root"))
-        assert v._integrity_checker is None
+        assert v.i18n is None
 
 
 class TestValidateModule:
@@ -171,71 +141,6 @@ class TestValidateUi:
         assert len(validations) == 1
         # The message uses the fallback key with {file} placeholder
         assert len(validations[0]) > 0
-
-
-class TestValidateManifestIntegrity:
-    """Tests for _validate_manifest_integrity (lines 130-162)"""
-
-    def test_no_integrity_checker(self):
-        """Line 130-131: no integrity checker"""
-        v = ModuleValidator()
-        v._integrity_checker = None
-        validations = []
-        info = _make_module_info()
-        v._validate_manifest_integrity(info, validations)
-        assert len(validations) == 0
-
-    def test_manifest_not_exists(self):
-        """Lines 133-135: manifest path doesn't exist"""
-        v = ModuleValidator()
-        v._integrity_checker = MagicMock()
-        validations = []
-        info = _make_module_info()
-        with patch.object(Path, 'exists', return_value=False):
-            v._validate_manifest_integrity(info, validations)
-        assert len(validations) == 0
-
-    @patch("personality.loading.module_validator.INTEGRITY_CHECKER_AVAILABLE", False)
-    def test_manifest_integrity_valid(self):
-        """Lines 137-138: verification passes"""
-        v = ModuleValidator()
-        mock_checker = MagicMock()
-        mock_checker.verify.return_value = (True, "OK")
-        v._integrity_checker = mock_checker
-        validations = []
-        info = _make_module_info()
-        with patch.object(Path, 'exists', return_value=True):
-            v._validate_manifest_integrity(info, validations)
-        assert len(validations) == 0
-
-    @patch("personality.loading.module_validator.INTEGRITY_CHECKER_AVAILABLE", False)
-    def test_manifest_integrity_invalid(self):
-        """Lines 139-159: verification fails"""
-        v = ModuleValidator()
-        mock_checker = MagicMock()
-        mock_checker.verify.return_value = (False, "checksum mismatch")
-        v._integrity_checker = mock_checker
-        validations = []
-        info = _make_module_info()
-        with patch.object(Path, 'exists', return_value=True):
-            with patch("personality.loading.module_validator.logger"):
-                v._validate_manifest_integrity(info, validations)
-        assert len(validations) == 1
-        assert "SECURITY" in validations[0]
-
-    @patch("personality.loading.module_validator.INTEGRITY_CHECKER_AVAILABLE", False)
-    def test_manifest_integrity_tofu(self):
-        """Lines 160-162: new manifest TOFU"""
-        v = ModuleValidator()
-        mock_checker = MagicMock()
-        mock_checker.verify.return_value = (True, "New manifest (TOFU)")
-        v._integrity_checker = mock_checker
-        validations = []
-        info = _make_module_info()
-        with patch.object(Path, 'exists', return_value=True):
-            v._validate_manifest_integrity(info, validations)
-        mock_checker.trust.assert_called_once()
-        assert len(validations) == 0
 
 
 class TestValidateDependencies:

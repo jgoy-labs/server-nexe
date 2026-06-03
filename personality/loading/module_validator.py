@@ -10,22 +10,14 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import importlib
-import os
 import warnings
-from pathlib import Path
 from typing import Any, List, Optional
+from pathlib import Path
 from ..data.models import ModuleInfo
 from .messages import get_message
 
 from personality._logger import get_logger
 logger = get_logger(__name__)
-
-try:
-  from personality.auto_clean.core.registry import IntegrityChecker
-  INTEGRITY_CHECKER_AVAILABLE = True
-except ImportError:
-  INTEGRITY_CHECKER_AVAILABLE = False
-  IntegrityChecker = None
 
 class ModuleValidationError(Exception):
   """Module validation error."""
@@ -36,22 +28,6 @@ class ModuleValidator:
 
   def __init__(self, i18n=None, core_root: Optional[Path] = None):
     self.i18n = i18n
-    self._integrity_checker: Optional["IntegrityChecker"] = None  # pyright: ignore[reportInvalidTypeForm]  # IntegrityChecker falls back to None when import fails; forward ref still valid at runtime
-
-    if INTEGRITY_CHECKER_AVAILABLE:
-      if core_root is None:
-        core_root_str = os.environ.get("NEXE_ROOT")
-        if core_root_str:
-          core_root = Path(core_root_str)
-        else:
-          core_root = Path(__file__).parent.parent.parent.parent
-
-      lock_path = core_root / "storage" / ".auto_clean" / "manifests.lock"
-      try:
-        self._integrity_checker = IntegrityChecker(lock_path)  # pyright: ignore[reportOptionalCall]  # guarded by INTEGRITY_CHECKER_AVAILABLE above
-        logger.debug("IntegrityChecker initialized for manifest validation")
-      except Exception as e:
-        logger.warning(f"Failed to initialize IntegrityChecker: {e}")
 
   def validate_module(self, instance: Any, module_info: ModuleInfo) -> None:
     """
@@ -66,7 +42,11 @@ class ModuleValidator:
     """
     validations: list[str] = []
 
-    self._validate_manifest_integrity(module_info, validations)
+    # TODO(security): manifest integrity validation (TOFU + checksum lock) is
+    # not implemented. A previous IntegrityChecker hook was always a no-op
+    # (the backing module never existed) and has been removed to avoid the
+    # false impression that manifest signatures are verified here. Out of
+    # scope for now; if added, wire it in before the checks below.
 
     if instance is None:
       validations.append(get_message(self.i18n, 'validation.instance_missing'))
@@ -115,49 +95,6 @@ class ModuleValidator:
           get_message(self.i18n, 'validation.ui_file_missing',
                file=str(main_file))
         )
-
-  def _validate_manifest_integrity(
-    self, module_info: ModuleInfo, validations: List[str]
-  ) -> None:
-    """
-    SECURITY: Validate manifest integrity (TOFU - Trust On First Use).
-
-    If the manifest is not in the lock, add it automatically (TOFU).
-    If it is in the lock but the checksum does not match, reject the module.
-    """
-    if not self._integrity_checker:
-      return
-
-    manifest_path = module_info.path / "manifest.toml"
-    if not manifest_path.exists():
-      return
-
-    is_valid, message = self._integrity_checker.verify(manifest_path)
-
-    if not is_valid:
-      error_msg = f"SECURITY: Manifest integrity check failed for '{module_info.name}': {message}"
-      logger.error(error_msg)
-
-      try:
-        from plugins.security.security_logger import (
-          get_security_logger,
-          SecurityEventType,
-          SecuritySeverity,
-        )
-        security_logger = get_security_logger()
-        security_logger.log_event(
-          event_type=SecurityEventType.MODULE_REJECTED,
-          severity=SecuritySeverity.CRITICAL,
-          message=f"Manifest integrity check failed for module '{module_info.name}'",
-          details={"module": module_info.name, "reason": message},
-        )
-      except ImportError:
-        pass
-
-      validations.append(error_msg)
-    elif "New manifest (TOFU)" in message:
-      self._integrity_checker.trust(manifest_path)
-      logger.info(f"TOFU: Trusted new manifest for module '{module_info.name}'")
 
   def _validate_dependencies(self, module_info: ModuleInfo) -> None:
     """Validate external dependencies (warning only)."""

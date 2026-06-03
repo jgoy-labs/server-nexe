@@ -66,6 +66,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -402,3 +403,64 @@ def reset_sidecar_config() -> None:
     """Reset the global singleton — for tests only."""
     global _config
     _config = None
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Import-guard helpers
+# ─────────────────────────────────────────────────────────────────────
+#
+# Aquests helpers encapsulen el patró try/except que estava duplicat a
+# bootstrap.py, system.py, factory_app.py i factory_security.py: importar
+# get_sidecar_config() de forma defensiva i degradar amb gràcia si la
+# config no està disponible. Repliquen EXACTAMENT la lògica/logs previs.
+
+def resolve_core_env(raw_default: str, context: str, logger: "logging.Logger") -> str:
+    """
+    Resolve the canonical environment string, deferring to SidecarConfig.
+
+    SidecarConfig.is_production is the canonical source for produccio vs
+    no-produccio. Es manté el raw NEXE_ENV per distingir "development" de
+    valors no-produccio com "staging"/"test".
+
+    Args:
+      raw_default: Default value for NEXE_ENV when the env var is unset
+        (replicates the per-call-site os.getenv default).
+      context: Function name used in the fallback debug log line.
+      logger: Caller's logger, so the log record keeps the original name.
+
+    Returns:
+      "production" if SidecarConfig reports production, otherwise the
+      lowercased raw NEXE_ENV value.
+    """
+    core_env = os.getenv("NEXE_ENV", raw_default).lower()
+    try:
+        if get_sidecar_config().is_production:
+            core_env = "production"
+    except Exception as exc:
+        logger.debug(
+            "F2.3 part 2: SidecarConfig unavailable in %s, using raw NEXE_ENV: %s",
+            context,
+            exc,
+        )
+    return core_env
+
+
+def is_sidecar_mode(context: str, logger: "logging.Logger") -> bool:
+    """
+    Return whether the process runs as a sidecar, degrading to False on error.
+
+    Encapsula el guard defensiu: si get_sidecar_config() falla per qualsevol
+    motiu, assumim que NO som sidecar (comportament previ de system.py).
+
+    Args:
+      context: Caller label used in the fallback debug log line.
+      logger: Caller's logger, so the log record keeps the original name.
+
+    Returns:
+      True if running as sidecar, False otherwise (including on error).
+    """
+    try:
+        return get_sidecar_config().is_sidecar
+    except Exception as exc:
+        logger.debug("%s: get_sidecar_config() failed (%s); proceeding non-sidecar", context, exc)
+        return False

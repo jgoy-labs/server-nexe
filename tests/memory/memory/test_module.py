@@ -164,7 +164,7 @@ class TestMemoryModule:
 
   @pytest.mark.xfail(
     reason="MemoryModule uses user-relative paths and may ignore the real repo root in certain environments",
-    strict=False,
+    strict=True,
   )
   async def test_storage_paths_follow_repo_root(self, monkeypatch, tmp_path):
     """Persistence should live in storage/memory but is written to Path.home"""
