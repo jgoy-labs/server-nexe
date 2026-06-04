@@ -233,7 +233,7 @@ class TestMlxStreamGenerator:
         chunks = asyncio.run(_collect_async_gen(gen))
         # The error gets caught and yields an error chunk
         error_chunks = [c for c in chunks if "error" in c.lower() or "MLX" in c]
-        assert len(error_chunks) > 0 or len(chunks) >= 0  # Exception path taken
+        assert len(error_chunks) > 0  # Exception path taken: error chunk must be emitted
 
 
 # ─── Test _llama_cpp_stream_generator uncovered branches ───────────────

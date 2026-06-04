@@ -34,7 +34,7 @@ The test suite has **6723 passing tests with ~85% code coverage** (of 6938 total
 
 ```bash
 # Fast unit tests (no external services needed)
-pytest core memory personality plugins \
+pytest tests \
   -m "not integration and not e2e and not slow" \
   --tb=short -q
 
@@ -42,7 +42,7 @@ pytest core memory personality plugins \
 NEXE_AUTOSTART_OLLAMA=true pytest -m "integration" -q
 
 # With coverage report
-pytest core memory personality plugins \
+pytest tests \
   -m "not integration and not e2e and not slow" \
   --cov=core --cov=memory --cov=personality --cov=plugins \
   --cov-report=term -q
