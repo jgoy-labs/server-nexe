@@ -215,7 +215,7 @@ def _seed_fastembed_cache(bundle_embeddings_dir, cache_dir):
     SHA256 weight pinning (internal security review AUD-INT-001 §2.7): before copying, validate the bundle's
     integrity manifest (``embeddings.manifest.json``). On mismatch,
     ``DownloadIntegrityError`` propagates so the installer aborts before
-    poisoning the user's fastembed cache. Legacy DMGs (built before F4.1)
+    poisoning the user's fastembed cache. Legacy DMGs
     do not ship a manifest — the verifier logs a WARNING and we copy the
     bundle as-is to stay compatible with existing 1.0.2-beta installs.
 

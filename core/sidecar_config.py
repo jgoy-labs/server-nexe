@@ -438,7 +438,7 @@ def resolve_core_env(raw_default: str, context: str, logger: "logging.Logger") -
             core_env = "production"
     except Exception as exc:
         logger.debug(
-            "F2.3 part 2: SidecarConfig unavailable in %s, using raw NEXE_ENV: %s",
+            "SidecarConfig unavailable in %s, using raw NEXE_ENV: %s",
             context,
             exc,
         )

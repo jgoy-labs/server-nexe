@@ -41,7 +41,7 @@ def _setup_qdrant(project_root: Path, server_state) -> None:
             qdrant_url = cfg.qdrant_url
             qdrant_path_str = str(cfg.vectors_dir)
     except Exception as exc:
-        logger.debug("F2.1 S3 part 2: SidecarConfig unavailable in _setup_qdrant: %s", exc)
+        logger.debug("SidecarConfig unavailable in _setup_qdrant: %s", exc)
 
     if qdrant_url is None:
         qdrant_url = os.getenv("NEXE_QDRANT_URL")
@@ -72,7 +72,7 @@ def _resolve_ollama_url() -> str:
         if cfg.is_sidecar and cfg.ollama_host:
             return cfg.ollama_host.rstrip("/")
     except Exception as exc:
-        logger.debug("F2.1 S3 part 2: SidecarConfig unavailable in _resolve_ollama_url: %s", exc)
+        logger.debug("SidecarConfig unavailable in _resolve_ollama_url: %s", exc)
 
     _nexe_ollama = os.getenv("NEXE_OLLAMA_HOST")
     if _nexe_ollama:

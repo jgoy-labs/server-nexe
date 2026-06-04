@@ -7,7 +7,7 @@ Description: Installation of the Ollama runtime (app/binary) on macOS and
              bundled offline zip inside the DMG.
 
 This module was split out of ``installer_setup_models.py`` on 2026-04-23
-to keep the parent under the 500-line rule after the F4.1 SHA256
+to keep the parent under the 500-line rule SHA256
 verification code landed. The model-download functions stay in the old
 file; anything that concerns *bringing Ollama to the system* lives here.
 ────────────────────────────────────

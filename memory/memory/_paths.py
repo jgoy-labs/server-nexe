@@ -48,7 +48,7 @@ def resolve_qdrant_path(default: Union[Path, str, None] = None) -> Path:
             return cfg.vectors_dir
     except Exception as exc:  # pragma: no cover — fallback when SidecarConfig unavailable
         logger.debug(
-            "F2.2: SidecarConfig unavailable, using legacy default %r: %s",
+            "SidecarConfig unavailable, using legacy default %r: %s",
             default if default is not None else _LEGACY_DEFAULT,
             exc,
         )

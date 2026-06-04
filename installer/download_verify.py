@@ -388,7 +388,7 @@ def verify_embedding_bundle(bundle_dir: Path) -> bool:
     bool
         * ``True``  — manifest present, every listed file found, every
           SHA256 matches.
-        * ``False`` — bundle missing, manifest absent (pre-F4.1 DMG) or
+        * ``False`` — bundle missing, manifest absent (legacy DMG) or
           the ``files`` map is empty. A WARNING is logged in those cases
           so operators see the gap.
 
@@ -406,7 +406,7 @@ def verify_embedding_bundle(bundle_dir: Path) -> bool:
     if not manifest_path.is_file():
         logger.warning(
             "Embedding bundle at %s has no integrity manifest (%s) — "
-            "legacy DMG (pre-F4.1). Proceeding without SHA256 enforcement.",
+            "legacy DMG. Proceeding without SHA256 enforcement.",
             bundle_dir, _BUNDLE_MANIFEST_FILENAME,
         )
         return False

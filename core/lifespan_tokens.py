@@ -57,7 +57,7 @@ def setup_bootstrap_tokens(server_state, _translate) -> None:
     if cfg.is_sidecar:
       bootstrap_ttl = cfg.bootstrap_ttl
   except Exception as exc:
-    logger.debug("F2.1 S3 part 2: SidecarConfig unavailable in setup_bootstrap_tokens: %s", exc)  # nosemgrep: python-logger-credential-disclosure
+    logger.debug("SidecarConfig unavailable in setup_bootstrap_tokens: %s", exc)  # nosemgrep: python-logger-credential-disclosure
   if bootstrap_ttl is None:
     bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
 
@@ -85,7 +85,7 @@ def setup_bootstrap_tokens(server_state, _translate) -> None:
     sidecar_is_production = get_sidecar_config().is_production
   except Exception as exc:
     logger.debug(
-      "F2.3 part 2: SidecarConfig unavailable in setup_bootstrap_tokens (env check), "
+      "SidecarConfig unavailable in setup_bootstrap_tokens (env check), "
       "using NEXE_ENV fallback: %s",
       exc,
     )

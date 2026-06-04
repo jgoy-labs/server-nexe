@@ -89,7 +89,7 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
         from core.sidecar_config import get_sidecar_config
         _sidecar_cfg = get_sidecar_config()
         logger.info(
-          "F2.3: SidecarConfig validated early (is_sidecar=True, port=%d, env=%s)",
+          "SidecarConfig validated early (is_sidecar=True, port=%d, env=%s)",
           _sidecar_cfg.port,
           "production" if _sidecar_cfg.is_production else "development",
         )

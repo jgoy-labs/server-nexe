@@ -194,7 +194,7 @@ async def readiness_check(request: Request) -> dict:
   # only the minimal payload below (no per-module details exposed).
   if overall != "healthy":
     logger.warning(
-      "F5.6 A6 readiness=%s missing=%s unhealthy=%s degraded=%s required=%s statuses=%s",
+      "readiness=%s missing=%s unhealthy=%s degraded=%s required=%s statuses=%s",
       overall,
       sorted(missing),
       sorted(unhealthy),

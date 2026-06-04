@@ -55,7 +55,7 @@ def test_fallback_when_sidecar_config_raises(caplog):
         with caplog.at_level("DEBUG"):
             result = resolve_qdrant_path()
     assert result == _LEGACY_DEFAULT
-    assert any("F2.2" in rec.message for rec in caplog.records)
+    assert any("SidecarConfig unavailable" in rec.message for rec in caplog.records)
 
 
 def test_legacy_default_value():

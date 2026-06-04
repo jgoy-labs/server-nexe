@@ -422,7 +422,7 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
       csrf_secret = cfg.csrf_secret
   except Exception as exc:
     logger.debug(
-      "F2.3 part 2: SidecarConfig unavailable in setup_csrf, using NEXE_ENV fallback: %s",
+      "SidecarConfig unavailable in setup_csrf, using NEXE_ENV fallback: %s",
       exc,
     )
   is_prod = sidecar_is_prod or raw_is_prod or config_mode == "production"

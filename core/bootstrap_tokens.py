@@ -101,7 +101,7 @@ class BootstrapTokenManager:
           fallback_root = Path(cfg.data_dir)
       except Exception as exc:
         logger.debug(  # nosemgrep: python-logger-credential-disclosure
-          "F2.6: SidecarConfig unavailable in BootstrapTokenManager._get_conn: %s",
+          "SidecarConfig unavailable in BootstrapTokenManager._get_conn: %s",
           exc,
         )
       if fallback_root is None:
@@ -110,7 +110,7 @@ class BootstrapTokenManager:
           fallback_root = get_repo_root()
         except Exception as exc:
           logger.debug(
-            "F2.6: get_repo_root() unavailable in BootstrapTokenManager._get_conn, "
+            "get_repo_root() unavailable in BootstrapTokenManager._get_conn, "
             "falling back to Path.cwd(): %s",
             exc,
           )

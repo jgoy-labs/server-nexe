@@ -98,7 +98,7 @@ def _safe_repo_root() -> Path:
     except Exception as exc:
         logger = logging.getLogger(__name__)
         logger.debug(
-            "F2.6: get_repo_root() unavailable in find_config_path/load_config, "
+            "get_repo_root() unavailable in find_config_path/load_config, "
             "falling back to Path.cwd(): %s",
             exc,
         )
@@ -355,7 +355,7 @@ def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[se
         sidecar_is_prod = get_sidecar_config().is_production
     except Exception as exc:
         logger.debug(
-            "F2.3 part 2: SidecarConfig unavailable in get_module_allowlist, "
+            "SidecarConfig unavailable in get_module_allowlist, "
             "using NEXE_ENV fallback: %s",
             exc,
         )

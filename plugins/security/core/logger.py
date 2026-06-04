@@ -31,7 +31,7 @@ def _ensure_log_dir() -> None:
   try:
     SECURITY_LOG_PATH.mkdir(parents=True, exist_ok=True)
   except OSError as exc:  # noqa: BLE001 — fallback explicit
-    logger.debug("F2.6: lazy mkdir failed for %s: %s", SECURITY_LOG_PATH, exc)
+    logger.debug("lazy mkdir failed for %s: %s", SECURITY_LOG_PATH, exc)
 
 def log_security_event(
   event_type: str,

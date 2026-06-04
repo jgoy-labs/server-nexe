@@ -132,7 +132,7 @@ class CLIRouter:
     except Exception as exc:
       import logging
       logging.getLogger(__name__).debug(
-        "F2.6: get_repo_root() unavailable in cli._detect_project_root, "
+        "get_repo_root() unavailable in cli._detect_project_root, "
         "falling back to Path.cwd(): %s",
         exc,
       )

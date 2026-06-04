@@ -32,7 +32,7 @@ def _resolve_storage_root(server_state):
             return cfg.data_dir
     except Exception as exc:
         logger.debug(
-            "F2.6: SidecarConfig unavailable in _resolve_storage_root; "
+            "SidecarConfig unavailable in _resolve_storage_root; "
             "falling back to project_root/storage: %s",
             exc,
         )

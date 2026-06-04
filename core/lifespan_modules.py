@@ -169,7 +169,7 @@ async def auto_ingest_knowledge(server_state):
                 auto_ingest_enabled = cfg.auto_ingest_knowledge
         except Exception as exc:
             logger.debug(
-                "F2.3 part 2: SidecarConfig unavailable in auto_ingest_knowledge, "
+                "SidecarConfig unavailable in auto_ingest_knowledge, "
                 "falling back to NEXE_ENV: %s",
                 exc,
             )
@@ -384,7 +384,7 @@ async def start_memory_service_v1(app, server_state) -> None:
                     logger.warning(
                         "DreamingCycle NOT started (embedder=missing). "
                         "Semantic search disabled until the fastembed model "
-                        "is downloaded via the installer wizard (F5.4 Bug A). "
+                        "is downloaded via the installer wizard . "
                         "Restart the app after the wizard completes to enable "
                         "DreamingCycle and vector sync."
                     )
