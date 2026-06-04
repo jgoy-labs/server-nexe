@@ -98,27 +98,6 @@ STARTUP_TIMEOUT = _resolve_startup_timeout()
 _PID_SUBPATH = Path("storage") / "run" / "server.pid"
 
 
-def _resolve_encryption_enabled(env_value: str, *, sqlcipher_available: bool) -> bool:
-  """P1-D: Determine whether encryption should be enabled given the env config and availability.
-
-  - 'auto' or '' (empty/legacy): enable if sqlcipher3 is available, otherwise OFF
-  - 'true': always ON (caller checks SQLCIPHER_AVAILABLE and raises RuntimeError if needed)
-  - 'false': always OFF
-  - any other value: OFF (safe default behaviour)
-
-  Pure function (no side effects) so it can be tested directly.
-  Logging is done by the caller (lifespan startup).
-  """
-  normalized = env_value.strip().lower()
-  if normalized in ('', 'auto'):
-    return sqlcipher_available
-  if normalized == 'true':
-    return True
-  if normalized == 'false':
-    return False
-  return False  # unknown value → OFF
-
-
 def _write_pid_file(project_root: Path, port: int) -> bool:
   """Write the PID file atomically (O_CREAT|O_EXCL). B06, B07, B10.
 

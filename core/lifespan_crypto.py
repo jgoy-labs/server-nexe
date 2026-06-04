@@ -12,6 +12,8 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 
+from core.config import _resolve_encryption_enabled
+
 logger = logging.getLogger(__name__)
 
 
@@ -98,8 +100,6 @@ def _apply_crypto_provider(server_state, crypto_enabled: bool, normalized_env: s
 
 async def _startup_encryption(server_state) -> None:
     """Initialize encryption-at-rest (opt-in). Modifies server_state.crypto_provider."""
-    from core.lifespan import _resolve_encryption_enabled  # avoid circular at module level
-
     try:
         from core.crypto import check_encryption_status
         from memory.memory.engines.persistence import SQLCIPHER_AVAILABLE

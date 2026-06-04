@@ -7,7 +7,7 @@ contradicting the "privacy-first" message in the README.
 Fix: default 'auto' — if sqlcipher3 is available: enable encryption;
 if not: continue in plain text with an explicit WARNING.
 
-Testable helper: _resolve_encryption_enabled(env_value, sqlcipher_available) → bool
+Testable helper: core.config._resolve_encryption_enabled(env_value, sqlcipher_available) → bool
 
 www.jgoy.net · https://server-nexe.org
 """
@@ -15,7 +15,7 @@ www.jgoy.net · https://server-nexe.org
 import pytest
 
 try:
-    from core.lifespan import _resolve_encryption_enabled
+    from core.config import _resolve_encryption_enabled
 except ImportError:
     pytest.skip("_resolve_encryption_enabled helper not available", allow_module_level=True)
 

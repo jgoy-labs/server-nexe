@@ -50,6 +50,29 @@ def _apply_env_overrides(merged: Dict[str, Any]) -> Dict[str, Any]:
     return merged
 
 
+def _resolve_encryption_enabled(env_value: str, *, sqlcipher_available: bool) -> bool:
+    """P1-D: Determine whether encryption should be enabled given the env config and availability.
+
+    - 'auto' or '' (empty/legacy): enable if sqlcipher3 is available, otherwise OFF
+    - 'true': always ON (caller checks SQLCIPHER_AVAILABLE and raises RuntimeError if needed)
+    - 'false': always OFF
+    - any other value: OFF (safe default behaviour)
+
+    Pure function (no side effects) so it can be tested directly.
+    Logging is done by the caller (lifespan startup). Lives here (a leaf config
+    module without internal imports) so both core.lifespan and core.lifespan_crypto
+    can import it without a circular dependency.
+    """
+    normalized = env_value.strip().lower()
+    if normalized in ('', 'auto'):
+        return sqlcipher_available
+    if normalized == 'true':
+        return True
+    if normalized == 'false':
+        return False
+    return False  # unknown value → OFF
+
+
 # Default configuration
 DEFAULT_CONFIG = {
     'core': {

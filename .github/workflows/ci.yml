@@ -56,7 +56,7 @@ jobs:
           NEXE_PRIMARY_API_KEY: ${{ secrets.NEXE_CI_API_KEY || 'nexe-ci-test-key' }}
           NEXE_CSRF_SECRET: ${{ secrets.NEXE_CI_CSRF_SECRET || 'nexe-ci-csrf-secret' }}
         run: >
-          pytest core memory personality plugins
+          pytest tests
           -m "not integration and not e2e and not slow"
           --cov=core --cov=memory --cov=personality --cov=plugins
           --cov-report=term
