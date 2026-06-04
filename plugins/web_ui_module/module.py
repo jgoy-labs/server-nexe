@@ -110,6 +110,13 @@ class WebUIModule:
                             "before web_ui_module init runs. Aborting to prevent plaintext "
                             "session storage."
                         )
+                    else:
+                        logger.warning(
+                            "WebUIModule: crypto_provider is None in %s mode — "
+                            "sessions will be stored as plaintext .json on disk. "
+                            "Set NEXE_ENV=production or ensure lifespan_crypto runs first.",
+                            _env,
+                        )
                 # Resolve sessions dir via get_data_dir() so sidecar mode
                 # writes to NEXE_DATA_DIR/sessions (writable Application Support)
                 # instead of "storage/sessions" relative to cwd (which may be /

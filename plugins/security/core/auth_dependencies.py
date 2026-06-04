@@ -200,7 +200,11 @@ async def require_api_key(
   if not keys_config.has_any_valid_key:
     return _check_dev_mode(request, dev_mode)
 
-  # Sidecar fallback: accept Authorization: Bearer <key> when X-API-Key is absent
+  # Sidecar fallback (by design): nexe-app Tauri sidecar injects the API key as
+  # "Authorization: Bearer <key>" rather than "X-API-Key" to avoid exposing the
+  # raw key to the webview (security C25). When X-API-Key is absent but a valid
+  # Bearer token is present, treat it as the API key. This is intentional and
+  # audited — not a bypass. Logging/auditing systems should expect either header.
   if not x_api_key and authorization:
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() == "bearer" and token:
