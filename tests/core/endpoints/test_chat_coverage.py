@@ -63,6 +63,9 @@ class TestSaveConversationToMemory:
              patch.dict("sys.modules", {"core.metrics.registry": MagicMock(MEMORY_OPERATIONS=MagicMock(labels=MagicMock(side_effect=Exception("fail"))))}):
             asyncio.run(_save_conversation_to_memory(MagicMock(), "user", "assistant"))
 
+        # The metrics failure must be swallowed: the conversation is still stored.
+        mock_memory.store.assert_awaited_once()
+
     def test_save_exception_logged(self):
         """Lines 435-436: exception in save is caught and logged."""
         from core.endpoints.chat import _save_conversation_to_memory
@@ -281,8 +284,8 @@ class TestLlamaCppStreamGenerator:
 
         gen = _llama_cpp_stream_generator(mock_llama, [], "system", "model")
         chunks = asyncio.run(_collect_async_gen(gen))
-        # Exception path produces error chunks or empty (task failure)
-        assert isinstance(chunks, list)
+        # Exception path must surface an error chunk to the client (not end silently)
+        assert any("error" in c.lower() for c in chunks)
 
 
 # ─── Test chat_completions endpoint uncovered branches ─────────────────

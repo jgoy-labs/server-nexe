@@ -108,6 +108,17 @@ async def _llama_cpp_stream_generator(
 
         await llama_task
 
+        # If the engine task failed, surface the error to the client instead of
+        # closing with a normal "done". Previously the error was only logged
+        # (bridge.error) and the stream ended clean → the user saw nothing.
+        # This mirrors the Ollama path, which emits an error chunk on failure.
+        if bridge.error:
+            logger.error("Llama.cpp streaming error surfaced to client: %s", bridge.error)
+            error_chunk = {"error": _sanitize_sse_token(str(bridge.error))}
+            yield f"data: {json.dumps(error_chunk)}\n\n"
+            yield SSE_DONE
+            return
+
         yield format_sse_done(model_name, "llamacpp")
         yield SSE_DONE
 
