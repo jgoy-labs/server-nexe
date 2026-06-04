@@ -18,9 +18,90 @@ import os
 import secrets
 import shutil
 import subprocess
+import sys
 import time
+import types
+from dataclasses import dataclass, field
+from typing import Any
 
 import pytest
+
+
+def _install_nexe_flow_mock():
+    """Font ÚNICA de veritat del mock de `nexe_flow` (paquet no instal·lat → sempre mockejat).
+
+    Viu al conftest ARREL perquè s'instal·li a sys.modules abans de qualsevol col·lecció en
+    QUALSEVOL invocació de pytest (sota tests/, sobre l'arbre font, o la comanda de CI
+    `pytest core memory personality plugins`). Abans (E-002) el mock vivia DIVERGENT en 14
+    llocs (7 fitxers inline + 4 conftests sota tests/ + 3 conftests morts a l'arbre font), amb
+    estratègies barrejades (guard/setdefault/force-replace) i un Node sense validate_inputs al
+    sanitizer → hazard d'ordre de col·lecció (OllamaNode.execute crida validate_inputs).
+
+    El contracte és un SUPERCONJUNT que satisfà tots els consumidors del codi font:
+      - Node.validate_inputs        → l'invoca OllamaNode.execute (ollama_node.py)
+      - NodeMetadata.config_schema   → l'usa RAGSearchNode (rag_search_node.py)
+      - NodeInput.json_schema/default
+      - NodeOutput.json_schema
+    """
+
+    @dataclass
+    class NodeMetadata:
+        node_type: str = ""
+        id: str = ""
+        name: str = ""
+        version: str = "1.0.0"
+        description: str = ""
+        category: str = ""
+        inputs: Any = field(default_factory=list)
+        outputs: Any = field(default_factory=dict)
+        icon: str = ""
+        color: str = ""
+        config_schema: Any = field(default_factory=dict)
+
+    @dataclass
+    class NodeInput:
+        name: str = ""
+        type: str = "string"
+        required: bool = False
+        description: str = ""
+        default: Any = None
+        json_schema: Any = field(default_factory=dict)
+
+    @dataclass
+    class NodeOutput:
+        name: str = ""
+        type: str = "string"
+        description: str = ""
+        json_schema: Any = field(default_factory=dict)
+
+    class Node:
+        def __init__(self):
+            pass
+        def get_metadata(self):
+            raise NotImplementedError
+        async def execute(self, inputs):
+            raise NotImplementedError
+        def validate_inputs(self, inputs):
+            metadata = self.get_metadata()
+            for inp in metadata.inputs:
+                if inp.required and inp.name not in inputs:
+                    raise ValueError(f"Missing required input: '{inp.name}'")
+
+    nf = types.ModuleType("nexe_flow")
+    nfc = types.ModuleType("nexe_flow.core")
+    nfcn = types.ModuleType("nexe_flow.core.node")
+    nfcn.Node = Node
+    nfcn.NodeMetadata = NodeMetadata
+    nfcn.NodeInput = NodeInput
+    nfcn.NodeOutput = NodeOutput
+    nf.core = nfc
+    nfc.node = nfcn
+    sys.modules["nexe_flow"] = nf
+    sys.modules["nexe_flow.core"] = nfc
+    sys.modules["nexe_flow.core.node"] = nfcn
+
+
+_install_nexe_flow_mock()
 
 # Configure environment for tests
 os.environ.setdefault("NEXE_ENV", "test")
