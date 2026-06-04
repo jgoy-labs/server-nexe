@@ -16,13 +16,13 @@ class TestEncryptionStatus:
 
     def test_status_command_runs(self, tmp_path):
         runner = CliRunner()
-        with patch("core.crypto.cli._get_storage_path", return_value=tmp_path):
+        with patch("core.crypto.cli.get_storage_path", return_value=tmp_path):
             result = runner.invoke(encryption, ["status"])
         assert result.exit_code == 0
 
     def test_status_shows_no_db(self, tmp_path):
         runner = CliRunner()
-        with patch("core.crypto.cli._get_storage_path", return_value=tmp_path):
+        with patch("core.crypto.cli.get_storage_path", return_value=tmp_path):
             result = runner.invoke(encryption, ["status"])
         assert "NOT FOUND" in result.output
 

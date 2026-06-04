@@ -54,7 +54,7 @@ external_services = []
 
 [module.endpoints]
 router_prefix = "/security"
-public_routes = ["/health", "/info", "/ui", "/ui/assets/{path:path}"]
+public_routes = ["/ui", "/ui/assets/{path:path}"]
 protected_routes = ["/scan", "/report"]
 
 # ───────────────────────────────────────────

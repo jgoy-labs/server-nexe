@@ -268,17 +268,3 @@ async def test_module_multiple_documents_search(clean_rag_module):
 
   assert len(results) > 0
   assert results[0].score > 0.0
-
-def test_summary():
-  """Generate test summary."""
-  print("\n" + "="*60)
-  print("RAG Module Integration Tests Summary")
-  print("="*60)
-  print("✓ Module initialization tests")
-  print("✓ Add document E2E tests")
-  print("✓ Search E2E tests")
-  print("✓ Error handling tests")
-  print("✓ Stats tracking tests")
-  print("✓ Health check tests")
-  print("="*60)
-  assert True

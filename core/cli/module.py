@@ -107,7 +107,7 @@ class CLIModule:
     Reuses the canonical `NEXE_LOGO` defined in `core.cli.output`
     (the one that `print_banner()` already shows at all other CLI entry
     points), avoiding two diverging banners. The previous banner in this
-    function was a residue of "NAT 7" inherited from the original project
+    function previously used a legacy banner from an earlier project version
     and did not match the canonical `server-nexe` logo.
 
     Returns:

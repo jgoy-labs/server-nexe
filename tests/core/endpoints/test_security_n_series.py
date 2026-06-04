@@ -187,11 +187,11 @@ class TestStaticFilePathTraversal:
         source = inspect.getsource(routes_static)
         assert ".resolve()" in source
 
-    def test_serve_static_checks_startswith(self):
+    def test_serve_static_checks_containment(self):
         """serve_static checks that the resulting path is inside static_dir."""
         from plugins.web_ui_module.api import routes_static
         source = inspect.getsource(routes_static)
-        assert "startswith" in source
+        assert "is_relative_to" in source
 
     def test_serve_static_returns_403_on_traversal(self):
         """The code returns HTTP 403 (not 404) if the path is outside the directory."""

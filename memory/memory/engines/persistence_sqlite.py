@@ -106,6 +106,7 @@ class SqliteStorageMixin:
 
             backup_path = self.db_path.with_suffix(".db.bak")
             self.db_path.rename(backup_path)
+            backup_path.chmod(0o600)
             tmp_path.rename(self.db_path)
             logger.info("Migration complete. Backup at %s", backup_path)
         except Exception as e:
@@ -314,18 +315,20 @@ class SqliteStorageMixin:
 
         def _sync_stats():
             conn = self._connect_sqlite()
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM memory_entries")
-            total = cursor.fetchone()[0]
-            cursor.execute(
-                "SELECT COUNT(*) FROM memory_entries WHERE entry_type = 'episodic'"
-            )
-            episodic = cursor.fetchone()[0]
-            cursor.execute(
-                "SELECT COUNT(*) FROM memory_entries WHERE entry_type = 'semantic'"
-            )
-            semantic = cursor.fetchone()[0]
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM memory_entries")
+                total = cursor.fetchone()[0]
+                cursor.execute(
+                    "SELECT COUNT(*) FROM memory_entries WHERE entry_type = 'episodic'"
+                )
+                episodic = cursor.fetchone()[0]
+                cursor.execute(
+                    "SELECT COUNT(*) FROM memory_entries WHERE entry_type = 'semantic'"
+                )
+                semantic = cursor.fetchone()[0]
+            finally:
+                conn.close()
             return {
                 "total_entries": total,
                 "episodic_count": episodic,
@@ -351,18 +354,20 @@ class SqliteStorageMixin:
 
         def _sync_get_recent():
             conn = self._connect_sqlite()
-            cursor = conn.cursor()
-            placeholders = ",".join(["?" for _ in types_filter])
-            query = f"""
+            try:
+                cursor = conn.cursor()
+                placeholders = ",".join(["?" for _ in types_filter])
+                query = f"""
                 SELECT id, entry_type, content, source, timestamp, ttl_seconds, metadata_json
                 FROM memory_entries
                 WHERE entry_type IN ({placeholders})
                 ORDER BY timestamp DESC
                 LIMIT ?
             """  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
-            cursor.execute(query, (*types_filter, limit * 2))  # nosemgrep: sqlalchemy-execute-raw-query — parameterized with '?' placeholders
-            rows = cursor.fetchall()
-            conn.close()
+                cursor.execute(query, (*types_filter, limit * 2))  # nosemgrep: sqlalchemy-execute-raw-query — parameterized with '?' placeholders
+                rows = cursor.fetchall()
+            finally:
+                conn.close()
 
             entries = []
             now_ts = datetime.now(timezone.utc).timestamp()

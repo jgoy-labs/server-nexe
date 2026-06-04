@@ -55,7 +55,7 @@ external_services = ["Ollama (configurable host)"]
 
 [module.endpoints]
 router_prefix = "/ollama"
-public_routes = ["/health", "/info", "/api/models", "/ui"]
+public_routes = ["/ui"]
 protected_routes = ["/api/pull", "/api/models/{name}"]
 removed_direct_routes = ["/api/chat"]  # /api/chat is removed → no s'inclou a protected_routes
 

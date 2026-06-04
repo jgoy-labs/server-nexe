@@ -821,7 +821,7 @@ class MemoryHelper:
         Save document chunks individually to user_knowledge.
         Each chunk gets its own embedding — enables semantic search within the document.
 
-        Pattern: NAT UBIK process_chunks — one embed+upsert per chunk, progress every 25.
+        Pattern: process_chunks — one embed+upsert per chunk, progress every 25.
         """
         import time
         memory = await self.get_memory_api()

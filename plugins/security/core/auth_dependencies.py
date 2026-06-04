@@ -266,6 +266,8 @@ async def optional_api_key(
     if secrets.compare_digest(x_api_key, keys_config.secondary.key):
       return x_api_key
 
+  # admin_key has no expiry by design: it is the bootstrap key set at first install.
+  # Primary/secondary keys use is_valid (expiry-aware); admin_key does not.
   if admin_key and secrets.compare_digest(x_api_key, admin_key):
     return x_api_key
 

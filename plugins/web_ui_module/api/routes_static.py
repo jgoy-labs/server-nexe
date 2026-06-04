@@ -56,7 +56,7 @@ def register_static_routes(router: APIRouter, *, module_ref):
     async def serve_static(filename: str, i18n=Depends(get_i18n)):
         """Serve CSS/JS"""
         file_path = (module_ref.ui_dir / filename).resolve()
-        if not str(file_path).startswith(str(module_ref.ui_dir.resolve())):
+        if not file_path.is_relative_to(module_ref.ui_dir.resolve()):
             raise HTTPException(status_code=403, detail=get_message(i18n, "webui.static.forbidden"))
         if not file_path.exists():
             raise HTTPException(status_code=404, detail=get_message(i18n, "webui.static.file_not_found"))

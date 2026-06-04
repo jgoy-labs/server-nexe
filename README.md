@@ -225,7 +225,7 @@ The installer auto-detects your hardware and recommends the best backend. You ca
 
 ## Available Models by RAM Tier
 
-The installer organizes the 13 catalog models by the RAM available on your machine (4 tiers):
+The installer organizes the 15 catalog models by the RAM available on your machine (4 tiers):
 
 | Tier | Models | Origin |
 |------|--------|--------|
@@ -293,7 +293,7 @@ Server Nexe uses a duck typing protocol (NexeModule Protocol) — no class inher
 
 ## AI-Ready Documentation
 
-The `knowledge/` folder contains 14 thematic documents × 3 languages = 42 files, structured with YAML frontmatter for RAG ingestion:
+The `knowledge/` folder contains 15 thematic documents × 3 languages = 45 files, structured with YAML frontmatter for RAG ingestion:
 
 API, Architecture, Use Cases, Errors, Identity, Installation, Limitations, Plugins, RAG, README, Security, Testing, Threat Model, Usage.
 

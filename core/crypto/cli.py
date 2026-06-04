@@ -13,16 +13,12 @@ www.jgoy.net · https://server-nexe.org
 # .command accesses on `encryption` are valid (mypy accepts).
 
 import logging
-from pathlib import Path
 
 import click
 
+from core.paths import get_storage_path
+
 logger = logging.getLogger(__name__)
-
-
-def _get_storage_path() -> Path:
-    """Get the storage path relative to project root."""
-    return Path(__file__).parent.parent.parent / "storage"
 
 
 def _get_crypto_provider():
@@ -48,7 +44,7 @@ def encrypt_all(force):
     - Session .json files → .enc (AES-256-GCM)
     - Qdrant payloads: removes text fields from existing entries
     """
-    storage = _get_storage_path()
+    storage = get_storage_path()
 
     if not force:
         click.echo("This will encrypt all data in storage/.")
@@ -124,7 +120,7 @@ def export_key(as_hex):
 @encryption.command("status")
 def encryption_status():
     """Show encryption status of storage."""
-    storage = _get_storage_path()
+    storage = get_storage_path()
     crypto_available = True
 
     try:

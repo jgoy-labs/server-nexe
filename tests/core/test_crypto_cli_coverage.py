@@ -9,8 +9,8 @@ class TestCryptoCLI:
         assert encryption is not None
 
     def test_get_storage_path(self):
-        from core.crypto.cli import _get_storage_path
-        path = _get_storage_path()
+        from core.paths import get_storage_path
+        path = get_storage_path()
         assert isinstance(path, Path)
         assert "storage" in str(path)
 
