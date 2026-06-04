@@ -60,6 +60,7 @@ def _normalize_base_url(raw: str) -> str:
     parts = urlsplit(url)
     host = parts.hostname
     if not host:  # unparseable netloc → fall back to a safe default
+        logger.warning("OLLAMA_HOST %r has no parseable host; falling back to %s", raw, DEFAULT_BASE_URL)
         return DEFAULT_BASE_URL
 
     # Bind-all addresses mean "listen everywhere"; they are not a client target.
