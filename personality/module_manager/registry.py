@@ -322,11 +322,14 @@ class ModuleRegistry:
   def find_modules_with_tag(self, tag: str) -> List[ModuleRegistration]:
     """Find modules that have endpoints with specific tag"""
     with self._lock:
-      matching_modules = set()
-      
+      # ModuleRegistration is an unfrozen dataclass with mutable fields, so it
+      # is unhashable — a set() here raised TypeError on every match. De-dupe
+      # by module name with a dict (insertion-ordered) instead.
+      matching_modules: Dict[str, ModuleRegistration] = {}
+
       for endpoint in self._endpoints.values():
         if tag in endpoint.tags:
           if endpoint.module_name in self._modules:
-            matching_modules.add(self._modules[endpoint.module_name])
-      
-      return list(matching_modules)
+            matching_modules[endpoint.module_name] = self._modules[endpoint.module_name]
+
+      return list(matching_modules.values())

@@ -186,6 +186,11 @@ async def test_stats_tracking(cached_embedder):
   assert stats.total_encodings == 8, "Should have 8 total requests"
   assert stats.cache_hit_rate == 3/8, "Hit rate should be 3/8"
   assert stats.avg_latency_ms >= 0, "Latency should be >= 0"
+  # MEM-005: EncoderStats must expose cache_hits / cache_misses (the CLI
+  # `stats` subcommand reads them; without these fields it crashes).
+  assert stats.cache_hits == 3, "Should report 3 cache hits"
+  assert stats.cache_misses == 5, "Should report 5 cache misses"
+  assert stats.cache_hits + stats.cache_misses == stats.total_requests
 
 @pytest.mark.asyncio
 async def test_clear_cache(cached_embedder):

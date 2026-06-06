@@ -19,12 +19,14 @@ logger = get_logger(__name__)
 
 class OpenAPIMerger:
   """
-  Merges OpenAPI specifications from multiple modules.
+  Tracks per-module OpenAPI metadata for introspection.
 
-  Features:
-  - Combines schemas from multiple modules
-  - Avoids naming conflicts
-  - Maintains unified documentation
+  NOTE (PERS-007): this class does NOT build a merged OpenAPI document.
+  FastAPI generates the unified ``/openapi.json`` natively from every route
+  registered on ``main_app`` (the RouteManager includes module routers /
+  mounts module apps onto it), so a manual merge is unnecessary. What this
+  class provides is a lightweight per-module spec registry (prefix + component
+  names) exposed via :meth:`get_unified_spec` for introspection/debugging.
   """
   
   def __init__(self, main_app: FastAPI, i18n_manager=None):
@@ -128,8 +130,14 @@ class OpenAPIMerger:
     }
   
   def _regenerate_unified_openapi(self) -> None:
-    """Regenerate the unified OpenAPI specification."""
-    pass
+    """No-op by design.
+
+    The unified OpenAPI document is produced by FastAPI itself from the routes
+    registered on ``main_app`` — there is nothing to regenerate here. Kept as
+    an explicit extension hook (and so callers/tests have a stable seam) rather
+    than implying a merge step that does not exist (PERS-007).
+    """
+    return None
   
   def get_unified_spec(self) -> Dict[str, Any]:
     """Return the unified OpenAPI specification."""

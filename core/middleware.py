@@ -204,9 +204,7 @@ def setup_rate_limiting(app: FastAPI, i18n = None) -> None:
 
       logger.info("Advanced rate limiting enabled")
       logger.info("  - IP rate limiting: OK")
-      logger.info("  - API key rate limiting: OK")
-      logger.info("  - Composite rate limiting: OK")
-      logger.info("  - X-RateLimit-* headers: OK")
+      logger.info("  - API key / composite limiters available on app.state")
 
     except Exception as e:
       msg1 = _translate(i18n, "core.middleware.rate_limit_advanced_failed", "Advanced rate limiting setup failed: {error}", error=str(e))

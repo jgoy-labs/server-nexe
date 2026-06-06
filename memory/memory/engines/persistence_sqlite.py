@@ -80,6 +80,8 @@ class SqliteStorageMixin:
 
         logger.info("Migrating plain SQLite to SQLCipher: %s", self.db_path)
         tmp_path = self.db_path.with_suffix(".db.encrypted")
+        plain_conn = None
+        enc_conn = None
         try:
             plain_conn = sqlite3.connect(str(self.db_path))
             plain_conn.execute("PRAGMA busy_timeout = 5000")
@@ -97,7 +99,9 @@ class SqliteStorageMixin:
             enc_conn.commit()
 
             plain_conn.close()
+            plain_conn = None
             enc_conn.close()
+            enc_conn = None
 
             for suffix in (".db-wal", ".db-shm"):
                 wal_file = self.db_path.with_suffix(suffix)
@@ -113,6 +117,20 @@ class SqliteStorageMixin:
             logger.error("SQLCipher migration failed: %s. Keeping plain DB.", e)
             if tmp_path.exists():
                 tmp_path.unlink()
+        finally:
+            # Always close both connections so handles (and the tmp WAL) are
+            # released on every path; a leaked handle can block tmp cleanup
+            # (notably on Windows).
+            if plain_conn is not None:
+                try:
+                    plain_conn.close()
+                except Exception as close_err:
+                    logger.debug("plain_conn close failed: %s", close_err)
+            if enc_conn is not None:
+                try:
+                    enc_conn.close()
+                except Exception as close_err:
+                    logger.debug("enc_conn close failed: %s", close_err)
 
     # ── Initialization ────────────────────────────────────────────────────────
 

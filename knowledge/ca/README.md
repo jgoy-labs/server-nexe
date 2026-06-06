@@ -160,8 +160,7 @@ cd server-nexe
 
 ```bash
 ./nexe go                    # Arrencar servidor -> http://127.0.0.1:9119
-./nexe chat                  # Xat interactiu per CLI
-./nexe chat --rag            # Xat amb memoria RAG
+./nexe chat                  # Xat interactiu per CLI (memoria RAG activa per defecte)
 ./nexe memory store "text"   # Guardar a memoria
 ./nexe memory recall "query" # Recuperar de memoria
 ./nexe status                # Estat del sistema

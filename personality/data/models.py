@@ -139,7 +139,11 @@ class SystemEvent(BaseModel):
   event_type: str
   details: Dict[str, Any] = Field(default_factory=dict)
 
-  level: str = _t('core_models.event_levels.info')
+  # Event level is a functional identity value ("info"/"warning"/"error"/
+  # "critical"), not a translatable display string. It must NOT be routed through
+  # _t() — and especially not at class-definition (import) time, when
+  # _i18n_manager is always None, which froze the value regardless of later setup.
+  level: str = "info"
   user_id: Optional[str] = None
   session_id: Optional[str] = None
 
@@ -335,10 +339,11 @@ def create_system_event(source: str, event_type: str, level: Optional[str] = Non
     SystemEvent instance
   """
   from datetime import datetime, timezone
-  
+
   if level is None:
-    level = _t('core_models.event_levels.info')
-  
+    # Functional identity value, never translated (see SystemEvent.level).
+    level = "info"
+
   return SystemEvent(
     timestamp=datetime.now(timezone.utc),
     source=source,

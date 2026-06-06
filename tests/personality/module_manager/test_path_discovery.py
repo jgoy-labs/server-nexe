@@ -162,14 +162,24 @@ class TestPathDiscoveryAutoDiscover:
     assert pycache_dir.resolve() not in discovery._discovered_paths
 
   def test_auto_discover_respects_limit(self, tmp_path):
-    """Should respect MAX_DIRS limit."""
+    """Should respect MAX_DIRS limit (100): stops scanning and warns."""
+    # 110 first-level dirs > MAX_DIRS (100) so the guard must trigger.
     for i in range(110):
       (tmp_path / f"dir_{i}").mkdir()
 
     discovery = PathDiscovery()
     discovery.base_path = tmp_path
 
-    discovery._auto_discover_paths()
+    with patch("personality.module_manager.path_discovery.logger") as mock_logger:
+      discovery._auto_discover_paths()
+
+    # The max-dirs warning MUST have fired (proves the break was hit).
+    warning_msgs = [
+      call.args[0] for call in mock_logger.warning.call_args_list if call.args
+    ]
+    assert any("Maximum directory limit reached" in str(m) for m in warning_msgs), (
+      f"Expected max-dirs warning, got warnings: {warning_msgs}"
+    )
 
 class TestPathDiscoveryConfiguredPaths:
   """Tests for configured path handling."""
@@ -217,10 +227,33 @@ class TestPathDiscoveryConfiguredPaths:
     assert extra_path.resolve() in discovery._discovered_paths
 
   def test_add_configured_paths_empty_config(self):
-    """Should handle empty config gracefully."""
+    """The `if not self.config: return` guard must short-circuit before any
+    path-adding work happens. We assert the observable difference of the guard:
+    with empty config the path-adding helpers are NOT invoked, whereas with a
+    non-empty config they ARE. If the guard is removed the empty-config branch
+    would fall through and call the helpers -> this test fails."""
+    # Empty config -> guard fires -> helpers must NOT be called.
     discovery = PathDiscovery()
+    assert discovery.config == {}
 
-    discovery._add_configured_paths()
+    with patch.object(discovery, '_add_modules_path') as mock_modules, \
+         patch.object(discovery, '_add_additional_paths') as mock_additional:
+      discovery._add_configured_paths()
+
+    mock_modules.assert_not_called()
+    mock_additional.assert_not_called()
+
+    # Control: non-empty config -> guard does NOT fire -> helpers ARE called.
+    # This proves the assertions above are exercising the guard, not a method
+    # that simply never runs.
+    discovery_full = PathDiscovery(config={"personality": {"orchestrator": {}}})
+
+    with patch.object(discovery_full, '_add_modules_path') as mock_modules_full, \
+         patch.object(discovery_full, '_add_additional_paths') as mock_additional_full:
+      discovery_full._add_configured_paths()
+
+    mock_modules_full.assert_called_once()
+    mock_additional_full.assert_called_once()
 
 class TestPathDiscoveryModuleDetection:
   """Tests for module detection."""

@@ -336,6 +336,8 @@ class CachedEmbedder:
       device=self.encoder.device,
       total_encodings=self._total_requests,
       total_requests=self._total_requests,
+      cache_hits=self._cache_hits,
+      cache_misses=self._total_requests - self._cache_hits,
       cache_hit_rate=hit_rate,
       avg_latency_ms=avg_latency,
       p90_latency_ms=p90_latency,

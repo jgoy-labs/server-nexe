@@ -615,4 +615,17 @@ class TestSetupEnvironmentOfflineBundle:
 
         hw = {"is_apple_silicon": False}
         from installer.installer_setup_env import setup_environment
-        setup_environment(project_root, hw, engine="auto")
+        result = setup_environment(project_root, hw, engine="auto")
+
+        # No bundle -> offline helpers return False but must NOT abort.
+        # The online fallback must still drive pip to install requirements.txt.
+        assert result is not None  # returns the venv python path
+        run_calls = mock_subprocess.run.call_args_list
+        assert run_calls, "subprocess.run was never invoked"
+        # At least one pip invocation installs the requirements file.
+        installed_reqs = any(
+            "-r" in (c.args[0] if c.args else [])
+            and any("requirements.txt" in str(arg) for arg in (c.args[0] if c.args else []))
+            for c in run_calls
+        )
+        assert installed_reqs, f"requirements.txt install not invoked; calls={run_calls}"

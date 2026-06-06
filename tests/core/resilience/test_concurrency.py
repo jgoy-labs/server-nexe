@@ -161,18 +161,71 @@ class TestMemoryManagement:
 
   @pytest.mark.asyncio
   async def test_no_task_accumulation(self):
-    """Completed tasks do not accumulate"""
+    """Completed tasks do not accumulate in the event loop task registry.
+
+    A coroutine that is *awaited* directly never becomes an asyncio.Task and
+    therefore never enters asyncio.all_tasks() — counting those is a tautology
+    (the registry stays empty no matter what). To make the invariant real we
+    must spawn genuine tasks with asyncio.create_task(), let the loop register
+    them, drain them, and then prove the not-done set returns to the baseline.
+    If a producer kept appending tasks to a list it never awaited/discarded,
+    this test must FAIL.
+    """
+    import asyncio
     import gc
 
     gc.collect()
 
     async def ephemeral_task():
+      # A real yield so the task is genuinely scheduled on the loop before
+      # completing — guarantees it appears in all_tasks() while alive.
+      await asyncio.sleep(0)
       return "done"
 
-    for _ in range(1000):
-      await ephemeral_task()
+    baseline_pending = len([t for t in asyncio.all_tasks() if not t.done()])
 
+    # Spawn real tasks in batches so they actually register with the loop.
+    # Hold strong references while alive to defeat the weak-ref task set GC,
+    # which would otherwise hide an accumulation leak.
+    N = 1000
+    BATCH = 50
+    spawned_total = 0
+    peak_live = baseline_pending
+    spawned = []
+    for _ in range(N // BATCH):
+      spawned = [asyncio.create_task(ephemeral_task()) for _ in range(BATCH)]
+      spawned_total += BATCH
+
+      # Sanity: the tasks really entered the loop registry (proves we are not
+      # measuring an always-empty set like a direct await would).
+      live_now = [t for t in asyncio.all_tasks() if not t.done()]
+      peak_live = max(peak_live, len(live_now))
+
+      # Drain this batch. A correct, leak-free pattern awaits/discards them.
+      await asyncio.gather(*spawned)
+      # Drop strong refs so completed tasks can be collected.
+      spawned = []
+
+    del spawned
     gc.collect()
+    # Yield once so the loop finalizes any just-completed task bookkeeping.
+    await asyncio.sleep(0)
+    gc.collect()
+
+    # Discriminating guards:
+    # 1) We must have observed real tasks while running (not a no-op tautology).
+    assert peak_live > baseline_pending, (
+      "no real tasks ever entered the registry — test is not exercising "
+      f"task creation (peak_live={peak_live}, baseline={baseline_pending})"
+    )
+
+    # 2) After draining all spawned tasks, the live (not-done) set must return
+    #    to the baseline. Accumulated/forgotten tasks would keep it elevated.
+    pending = [t for t in asyncio.all_tasks() if not t.done()]
+    assert len(pending) <= baseline_pending, (
+      f"tasks accumulated: baseline={baseline_pending}, now={len(pending)}, "
+      f"spawned={spawned_total}"
+    )
 
   @pytest.mark.asyncio
   async def test_batch_processing_yields(self):

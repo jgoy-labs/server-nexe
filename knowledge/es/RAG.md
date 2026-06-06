@@ -33,7 +33,7 @@ expires: null
 - [Subida de documentos con aislamiento de sesion](#subida-de-documentos-con-aislamiento-de-sesion)
 - [Ingestion de documentos](#ingestion-de-documentos)
   - [Documentacion del sistema (nexe_documentation)](#documentacion-del-sistema-nexe_documentation)
-  - [Conocimiento de usuario (user_knowledge via CLI)](#conocimiento-de-usuario-user_knowledge-via-cli)
+  - [Documentacion del sistema via CLI (nexe_documentation)](#documentacion-del-sistema-via-cli-nexe_documentation)
 - [Construccion del contexto](#construccion-del-contexto)
 - [Visualizacion de pesos RAG](#visualizacion-de-pesos-rag)
 - [Poda inteligente (coleccion personal_memory)](#poda-inteligente-coleccion-personal_memory)
@@ -215,8 +215,9 @@ Los documentos subidos via la Web UI se indexan en la coleccion `user_knowledge`
 - Ingestada via `core/ingest/ingest_docs.py`
 - Recrea la coleccion en cada ingestion (inicio limpio)
 
-### Conocimiento de usuario (user_knowledge via CLI)
+### Documentacion del sistema via CLI (nexe_documentation)
 - Fuente: carpeta `knowledge/` (subcarpetas ca/en/es)
+- Coleccion destino: `nexe_documentation` (por defecto desde el fix F7; la API `ingest_knowledge` aun acepta `target_collection="user_knowledge"` para docs ad-hoc)
 - Chunking: 1500 caracteres por chunk por defecto (configurable via cabecera RAG chunk_size), overlap = max(50, chunk_size/10)
 - Ingestado via `core/ingest/ingest_knowledge.py`
 - Soporta cabeceras RAG con metadatos (`#!RAG id=..., priority=...`)

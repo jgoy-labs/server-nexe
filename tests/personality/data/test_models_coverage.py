@@ -151,6 +151,37 @@ class TestCreateModuleInfo:
         assert "manifest.toml" in str(mi.manifest_path)
 
 
+class TestSystemEventLevelDefault:
+    """PERS-003 regression: SystemEvent.level is a functional identity value and
+    must NOT be routed through _t() (which, at import time with _i18n_manager
+    None, froze it). The default must be the literal 'info' regardless of any
+    i18n manager state."""
+
+    def test_default_level_is_info_literal(self):
+        event = SystemEvent(
+            timestamp=datetime.now(timezone.utc),
+            source="s", event_type="t",
+        )
+        assert event.level == "info"
+
+    def test_default_level_unaffected_by_i18n_manager(self):
+        """Even with an i18n manager returning a different string, the level
+        default stays 'info' (it is not translated)."""
+        mock_i18n = MagicMock()
+        mock_i18n.t.return_value = "TRANSLATED-LEVEL"
+        set_i18n_manager(mock_i18n)
+        try:
+            event = SystemEvent(
+                timestamp=datetime.now(timezone.utc),
+                source="s", event_type="t",
+            )
+            assert event.level == "info"
+            ev2 = create_system_event("s", "t")
+            assert ev2.level == "info"
+        finally:
+            set_i18n_manager(None)
+
+
 class TestCreateSystemEvent:
 
     def test_create_with_defaults(self):

@@ -189,7 +189,7 @@ ollama pull qwen3.5:35b-a3b     # tier_32 MoE, ~21 GB
 ollama pull deepseek-r1:32b     # tier_32, ~19 GB
 ```
 
-Una vez descargado, configuralo en `storage/config/server.toml`:
+Una vez descargado, configuralo en `server.toml` en la raiz del repo (el fichero de override; los valores por defecto estan en `personality/server.toml`):
 
 ```toml
 [plugins.models]
@@ -197,7 +197,7 @@ primary = "qwen3.5:9b"          # o el que hayas elegido
 preferred_engine = "ollama"     # obligatorio para estos modelos
 ```
 
-Reinicia el servidor (`./nexe restart` o via el tray) para que tome el cambio.
+Reinicia el servidor (`./nexe stop && ./nexe go`, o via el tray) para que tome el cambio.
 
 ### Alternativa GGUF para DeepSeek R1
 
@@ -213,7 +213,7 @@ Modelos personalizados: Ollama (por nombre) o Hugging Face (URL de repositorio G
 ollama pull nombre-modelo:tag
 
 # 2. Configura server-nexe para usarlo
-# Edita storage/config/server.toml:
+# Edita server.toml en la raiz del repo:
 # [plugins.models]
 # primary = "nombre-modelo:tag"
 ```
@@ -243,7 +243,7 @@ cp /ruta/al/modelo.gguf storage/models/
 # preferred_engine = "llama_cpp"
 ```
 
-Reinicia el servidor para aplicar los cambios: `./nexe restart`
+Reinicia el servidor para aplicar los cambios: `./nexe stop && ./nexe go`
 
 ## Verificacion de integridad (SHA256)
 

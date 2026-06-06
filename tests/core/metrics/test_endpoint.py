@@ -120,69 +120,127 @@ class TestMetricsHealthUnhealthy:
     assert "broken" in result["error"]
 
 
+class _RealHealthModule:
+  """Minimal live module instance: health lives on the instance (like real
+  plugin module instances stored on app.state.modules)."""
+
+  def __init__(self, name, status):
+    self.name = name
+    self._status = status
+
+  def get_health(self):
+    return {"status": self._status}
+
+
+class _FakeRequest:
+  """Stand-in for fastapi.Request exposing app.state.modules."""
+
+  def __init__(self, modules):
+    class _State:
+      pass
+
+    class _App:
+      pass
+
+    self.app = _App()
+    self.app.state = _State()
+    self.app.state.modules = modules
+
+
 class TestUpdateModuleHealth:
-  """Tests for _update_module_health (lines 122-128)."""
+  """Tests for _update_module_health: reads live instances from
+  app.state.modules and calls instance.get_health() (CORE2-002)."""
 
-  def test_update_module_health_with_modules(self):
-    """Lines 121-128: modules with get_health method."""
-    from unittest.mock import patch, MagicMock
-    from core.metrics.endpoint import _update_module_health
-    import asyncio
+  def test_update_module_health_reads_live_instances(self):
+    """CORE2-002 regression: health must come from the LIVE module instances
+    on app.state.modules, calling instance.get_health(), and feed the gauge.
 
-    mock_module = MagicMock()
-    mock_module.name = "test_mod"
-    mock_module.get_health.return_value = {"status": "healthy"}
-
-    mock_mm = MagicMock()
-    mock_mm.list_modules.return_value = [mock_module]
-
-    with patch("personality.module_manager.module_manager.ModuleManager", return_value=mock_mm):
-      asyncio.run(_update_module_health())
-    mock_module.get_health.assert_called_once()
-
-  def test_update_module_health_get_health_exception(self):
-    """Line 127-128: get_health raises -> set unhealthy."""
-    from unittest.mock import patch, MagicMock
-    from core.metrics.endpoint import _update_module_health
-    import asyncio
-
-    mock_module = MagicMock()
-    mock_module.name = "broken_mod"
-    mock_module.get_health.side_effect = RuntimeError("fail")
-
-    mock_mm = MagicMock()
-    mock_mm.list_modules.return_value = [mock_module]
-
-    with patch("personality.module_manager.module_manager.ModuleManager", return_value=mock_mm), \
-         patch("core.metrics.endpoint.set_module_health") as mock_set:
-      asyncio.run(_update_module_health())
-    mock_set.assert_called_with("broken_mod", "unhealthy")
-
-  def test_update_module_health_import_error(self):
-    """Line 130: ImportError is silently caught."""
+    Fails with the old code, which built a fresh empty ModuleManager()
+    (list_modules() -> []) and checked module_info.get_health (ModuleInfo has
+    none) -> set_module_health never called.
+    """
     from unittest.mock import patch
     from core.metrics.endpoint import _update_module_health
     import asyncio
-    import sys
 
-    # Temporarily make the import fail
-    saved = sys.modules.get('personality.module_manager.module_manager')
-    sys.modules['personality.module_manager.module_manager'] = None
-    try:
-      asyncio.run(_update_module_health())
-    finally:
-      if saved is not None:
-        sys.modules['personality.module_manager.module_manager'] = saved
-      else:
-        sys.modules.pop('personality.module_manager.module_manager', None)
+    healthy = _RealHealthModule("alpha", "healthy")
+    degraded = _RealHealthModule("beta", "degraded")
+    request = _FakeRequest({"alpha": healthy, "beta": degraded})
 
-  def test_update_module_health_generic_exception(self):
-    """Line 132-133: Generic exception is caught and logged."""
-    from unittest.mock import patch, MagicMock
+    with patch("core.metrics.endpoint.set_module_health") as mock_set:
+      asyncio.run(_update_module_health(request))
+
+    calls = {args[0]: args[1] for args, _ in mock_set.call_args_list}
+    assert calls == {"alpha": "healthy", "beta": "degraded"}
+
+  def test_update_module_health_dedupes_aliased_instances(self):
+    """app.state.modules registers an instance under both module_id and .name;
+    each module must be reported exactly once."""
+    from unittest.mock import patch
     from core.metrics.endpoint import _update_module_health
     import asyncio
 
-    mock_mm_class = MagicMock(side_effect=RuntimeError("unexpected"))
-    with patch("personality.module_manager.module_manager.ModuleManager", mock_mm_class):
-      # Should not raise
-      asyncio.run(_update_module_health())
+    inst = _RealHealthModule("web_ui_module", "healthy")
+    # Same instance under two keys (module_id + name), as lifespan does.
+    request = _FakeRequest({"web_ui": inst, "web_ui_module": inst})
+
+    with patch("core.metrics.endpoint.set_module_health") as mock_set:
+      asyncio.run(_update_module_health(request))
+
+    assert mock_set.call_count == 1
+    assert mock_set.call_args[0] == ("web_ui_module", "healthy")
+
+  def test_update_module_health_get_health_exception(self):
+    """get_health raises -> module marked unhealthy."""
+    from unittest.mock import patch
+    from core.metrics.endpoint import _update_module_health
+    import asyncio
+
+    class _Broken:
+      name = "broken_mod"
+
+      def get_health(self):
+        raise RuntimeError("fail")
+
+    request = _FakeRequest({"broken_mod": _Broken()})
+
+    with patch("core.metrics.endpoint.set_module_health") as mock_set:
+      asyncio.run(_update_module_health(request))
+    mock_set.assert_called_with("broken_mod", "unhealthy")
+
+  def test_update_module_health_skips_instances_without_get_health(self):
+    """Instances lacking get_health (e.g. ModuleInfo dataclass) are skipped,
+    not crashed on."""
+    from unittest.mock import patch
+    from core.metrics.endpoint import _update_module_health
+    import asyncio
+
+    class _NoHealth:
+      name = "plain"
+
+    request = _FakeRequest({"plain": _NoHealth()})
+
+    with patch("core.metrics.endpoint.set_module_health") as mock_set:
+      asyncio.run(_update_module_health(request))
+    mock_set.assert_not_called()
+
+  def test_update_module_health_no_state_modules(self):
+    """Missing app.state.modules is handled gracefully (no raise)."""
+    from core.metrics.endpoint import _update_module_health
+    import asyncio
+
+    class _State:
+      pass
+
+    class _App:
+      pass
+
+    class _Req:
+      pass
+
+    req = _Req()
+    req.app = _App()
+    req.app.state = _State()  # no .modules attribute
+
+    # Should not raise.
+    asyncio.run(_update_module_health(req))

@@ -176,14 +176,20 @@ class TestModularI18n:
 class TestLoadingModules:
 
     def test_loader_load_module(self):
+        import tempfile
         from personality.loading.loader import ModuleLoader
         loader = ModuleLoader()
-        mod = ModuleInfo(name="test", path=Path("."), manifest_path=Path("."))
-        # Load will likely fail, but exercise the path
-        try:
-            asyncio.run(loader.load_module(mod))
-        except Exception:
-            pass  # Expected to fail for non-existent module
+        # Use an empty dir (NOT ".") so the result is deterministic and not
+        # dependent on stray api.py/conftest.py in the test CWD: no api file
+        # exists, so the loader must raise ImportError (loader.py:118) rather
+        # than swallow the failure, and must not leave a half-loaded module.
+        with tempfile.TemporaryDirectory() as td:
+            mod = ModuleInfo(
+                name="test", path=Path(td), manifest_path=Path(td)
+            )
+            with pytest.raises(ImportError):
+                asyncio.run(loader.load_module(mod))
+        assert "test" not in loader._loaded_modules
 
     def test_loader_unload_module(self):
         from personality.loading.loader import ModuleLoader

@@ -45,50 +45,55 @@ class ModelProfile(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-# Profile definitions
+# Profile definitions.
+# Aligned with the v1.0.5 installer catalog (installer/installer_catalog_data.py):
+#   MICRO    -> catalog "small"  (8 GB)  : Qwen3.5 4B (the small-tier default)
+#   CONSUMER -> catalog "medium" (16 GB) : Qwen3.5 9B / Mistral Nemo 12B
+#   PRO      -> catalog "large"  (24 GB) : Qwen3.5 27B / Mistral Small 3.2 24B
+#   ULTRA    -> catalog "xlarge" (32 GB+): Qwen3.5 35B-A3B / Mixtral 8x7B
 PROFILES = {
     HardwareTier.MICRO: ModelProfile(
         tier=HardwareTier.MICRO,
-        primary_model="qwen2:0.5b",
-        secondary_model="tinyllama",
+        primary_model="qwen3.5:4b",       # Qwen3.5 4B — multimodal, thinking, excellent Catalan
+        secondary_model="qwen3.5:4b",
         embedding_model=DEFAULT_EMBEDDING_MODEL,
         preferred_engine=EngineType.LLAMA_CPP,
         max_tokens=1024,
         context_window=2048,
         description="Perfil lleuger per equips amb poca RAM (<8GB).",
-        mlx_model_id="mlx-community/Qwen2-0.5B-Instruct-4bit"
+        mlx_model_id="mlx-community/Qwen3.5-4B-MLX-4bit"
     ),
     HardwareTier.CONSUMER: ModelProfile(
         tier=HardwareTier.CONSUMER,
-        primary_model="phi3.5",         # Phi-3.5 Mini 3.8B — fast, good at following instructions
-        secondary_model="llama3.2:3b",
+        primary_model="qwen3.5:9b",       # Qwen3.5 9B — thinking, vision, tool calling
+        secondary_model="mistral-nemo:12b",
         embedding_model=DEFAULT_EMBEDDING_MODEL,
         preferred_engine=EngineType.MLX,
         max_tokens=2048,
         context_window=8192,
         description="Equilibri velocitat/qualitat per ús diari (8-16GB).",
-        mlx_model_id="mlx-community/Phi-3.5-mini-instruct-4bit"
+        mlx_model_id="mlx-community/Qwen3.5-9B-MLX-4bit"
     ),
     HardwareTier.PRO: ModelProfile(
         tier=HardwareTier.PRO,
-        primary_model="llama3.1:8b",    # Llama 3.1 8B — better quality for 16-32GB
-        secondary_model="mistral:7b",
+        primary_model="qwen3.5:27b",      # Qwen3.5 27B — excellent thinking, vision (16-32GB)
+        secondary_model="mistral-small3.2",
         embedding_model=DEFAULT_EMBEDDING_MODEL,
         preferred_engine=EngineType.MLX,
         max_tokens=4096,
         context_window=32768,
         description="Power for developers and creatives (16-32GB).",
-        mlx_model_id="mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
+        mlx_model_id="mlx-community/Qwen3.5-27B-4bit"
     ),
     HardwareTier.ULTRA: ModelProfile(
         tier=HardwareTier.ULTRA,
-        primary_model="llama3.1:70b",   # Llama 3.1 70B — maximum quality for >32GB
+        primary_model="qwen3.5:35b-a3b",  # Qwen3.5 35B-A3B (MoE) — 9B speed, 35B quality (>32GB)
         secondary_model="mixtral:8x7b",
         embedding_model=DEFAULT_EMBEDDING_MODEL,
         preferred_engine=EngineType.MLX,
         max_tokens=8192,
         context_window=65536,
         description="Maximum capacity for large models (>32GB).",
-        mlx_model_id="mlx-community/Meta-Llama-3.1-70B-Instruct-4bit"
+        mlx_model_id="mlx-community/Qwen3.5-35B-A3B-4bit"
     )
 }

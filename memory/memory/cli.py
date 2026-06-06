@@ -334,9 +334,9 @@ def create_parser() -> argparse.ArgumentParser:
   )
   recall_parser.add_argument(
     "--safe-mode",
-    action="store_true",
+    action=argparse.BooleanOptionalAction,
     default=True,
-    help="Truncate content to avoid info leaks (default: True)"
+    help="Truncate content to avoid info leaks (use --no-safe-mode to disable; default: True)"
   )
 
   stats_p = subparsers.add_parser("stats", help="Show Memory statistics")

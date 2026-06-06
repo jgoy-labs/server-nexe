@@ -54,7 +54,7 @@ class TestMetricsCollectorMessages:
     mock_i18n.t.return_value = "Translated"
     collector = MetricsCollector(i18n_manager=mock_i18n)
 
-    result = collector._get_message('metrics.updated', module='test')
+    result = collector._get_message('core_metrics.collection.updated', module='test')
 
     assert result == "Translated"
     mock_i18n.t.assert_called_once()
@@ -63,9 +63,56 @@ class TestMetricsCollectorMessages:
     """Should use fallback without i18n."""
     collector = MetricsCollector()
 
-    result = collector._get_message('metrics.updated', module='test')
+    result = collector._get_message('core_metrics.collection.updated', module='test')
 
     assert "test" in result
+
+
+class TestMetricsCollectorI18nKeysResolve:
+  """PERS-001 regression: the i18n keys the collector emits must actually
+  resolve against the real translation JSON (component.section.key)."""
+
+  def _live_i18n(self):
+    """Build a ModularI18nManager pointed at the real personality/languages."""
+    from personality.i18n.modular_i18n import ModularI18nManager
+
+    project_root = Path(__file__).resolve().parents[3]
+    i18n = ModularI18nManager(base_path=project_root)
+    i18n.current_language = "en-US"
+    i18n.fallback_language = "en-US"
+    i18n.reload_translations()
+    i18n.current_language = "en-US"
+    i18n.fallback_language = "en-US"
+    return i18n
+
+  def test_updated_key_resolves(self):
+    """'core_metrics.collection.updated' must NOT come back as the raw key.
+
+    Fails with the old code which used the non-existent 'metrics.updated'.
+    """
+    i18n = self._live_i18n()
+    collector = MetricsCollector(i18n_manager=i18n)
+
+    msg = collector._get_message('core_metrics.collection.updated', module='alpha')
+
+    assert msg != 'core_metrics.collection.updated'  # resolved, not raw key
+    assert 'alpha' in msg
+
+  def test_history_cleared_key_resolves(self):
+    """'core_metrics.history.cleared' must resolve via i18n."""
+    i18n = self._live_i18n()
+    collector = MetricsCollector(i18n_manager=i18n)
+
+    msg = collector._get_message('core_metrics.history.cleared', count=7)
+
+    assert msg != 'core_metrics.history.cleared'
+    assert '7' in msg
+
+  def test_old_metrics_keys_are_dead(self):
+    """The previously-used keys do not exist in the catalog (would return raw)."""
+    i18n = self._live_i18n()
+    assert i18n.t('metrics.updated', module='x') == 'metrics.updated'
+    assert i18n.t('metrics.history_cleared', count=1) == 'metrics.history_cleared'
 
 class TestMetricsCollectorUpdateModule:
   """Tests for update_module_metrics."""

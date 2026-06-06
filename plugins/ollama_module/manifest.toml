@@ -91,8 +91,13 @@ framework = "typer"
 # ───────────────────────────────────────────
 
 [module.integration]
-workflow_engine = true
-workflow_node = "plugins.ollama_module.workflow.nodes.ollama_node.OllamaNode"
+# workflow_engine integration is gated on the nexe_flow package, which is not
+# yet shipped. Until then the workflow node degrades to None on real installs
+# (see workflow/nodes/ollama_node.py) and is not loaded. Set to false so the
+# manifest does not advertise a node that cannot be loaded.
+workflow_engine = false
+# workflow_node (plugins.ollama_module.workflow.nodes.ollama_node.OllamaNode)
+# re-enable together with workflow_engine once nexe_flow ships.
 ui_control_center = true
 
 # ───────────────────────────────────────────

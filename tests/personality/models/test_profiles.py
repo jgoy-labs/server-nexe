@@ -111,12 +111,12 @@ class TestModelRegistry:
         assert len(MODEL_REGISTRY) > 0
 
     def test_get_model_entry_exists(self):
-        entry = get_model_entry("phi3.5")
+        entry = get_model_entry("qwen3.5:4b")
         assert entry is not None
-        assert entry.short_name == "phi3.5"
+        assert entry.short_name == "qwen3.5:4b"
 
     def test_get_model_entry_case_insensitive(self):
-        entry = get_model_entry("PHI3.5")
+        entry = get_model_entry("ALIA-40B")
         assert entry is not None
 
     def test_get_model_entry_not_found(self):
@@ -124,7 +124,7 @@ class TestModelRegistry:
         assert entry is None
 
     def test_model_entry_fields(self):
-        entry = get_model_entry("llama3.1-8b")
+        entry = get_model_entry("qwen3.5:9b")
         assert entry is not None
         assert entry.ollama_tag is not None
         assert entry.mlx_hf_id is not None
@@ -137,15 +137,15 @@ class TestModelRegistry:
 
     def test_list_models_table_contains_models(self):
         table = list_models_table()
-        assert "phi3.5" in table
+        assert "qwen3.5:4b" in table
 
     def test_iberian_models_present(self):
-        assert "salamandra2b" in MODEL_REGISTRY
         assert "salamandra7b" in MODEL_REGISTRY
+        assert "alia-40b" in MODEL_REGISTRY
 
-    def test_micro_models_present(self):
-        assert "qwen0.5" in MODEL_REGISTRY
-        assert "tinyllama" in MODEL_REGISTRY
+    def test_v105_models_present(self):
+        assert "qwen3.5:4b" in MODEL_REGISTRY
+        assert "gpt-oss:20b" in MODEL_REGISTRY
 
 
 class TestModelSelector:

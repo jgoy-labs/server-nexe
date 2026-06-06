@@ -20,11 +20,6 @@ from plugins.security.core.rate_limiting import (
     get_api_key_identifier,
     get_composite_identifier,
     get_endpoint_identifier,
-    rate_limit_public,
-    rate_limit_authenticated,
-    rate_limit_admin,
-    rate_limit_health,
-    get_rate_limit_stats,
     DEFAULT_RATE_LIMITS,
 )
 
@@ -177,28 +172,8 @@ class TestRateLimitTracker:
         assert len(tracker._counters) <= tracker.MAX_TRACKED_IDENTIFIERS + 1
 
 
-class TestRateLimitFunctions:
-    """Tests for the rate limit functions."""
-
-    def test_rate_limit_public_returns_decorator(self):
-        decorator = rate_limit_public()
-        assert decorator is not None
-
-    def test_rate_limit_public_custom_limit(self):
-        decorator = rate_limit_public("50/minute")
-        assert decorator is not None
-
-    def test_rate_limit_authenticated_returns_decorator(self):
-        decorator = rate_limit_authenticated()
-        assert decorator is not None
-
-    def test_rate_limit_admin_returns_decorator(self):
-        decorator = rate_limit_admin()
-        assert decorator is not None
-
-    def test_rate_limit_health_returns_decorator(self):
-        decorator = rate_limit_health()
-        assert decorator is not None
+class TestDefaultRateLimits:
+    """Tests for the DEFAULT_RATE_LIMITS table."""
 
     def test_default_rate_limits_exist(self):
         assert "global" in DEFAULT_RATE_LIMITS
@@ -208,61 +183,32 @@ class TestRateLimitFunctions:
         assert "health" in DEFAULT_RATE_LIMITS
 
 
-class TestGetRateLimitStats:
-    """Tests for get_rate_limit_stats."""
+class TestDeadHelpersRemoved:
+    """A-001: dead decorator factories and the never-registered
+    add_rate_limit_headers middleware were removed because they had no
+    production call-sites (only docstring examples + tests exercised them).
+    Re-adding them without wiring them to real endpoints/middleware would
+    resurrect the misleading 'X-RateLimit-* headers: OK' boot log.
+    """
 
-    def test_returns_dict_with_active_identifiers(self):
-        stats = get_rate_limit_stats()
-        assert "active_identifiers" in stats
-        assert isinstance(stats["active_identifiers"], int)
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "rate_limit_public",
+            "rate_limit_authenticated",
+            "rate_limit_admin",
+            "rate_limit_health",
+            "add_rate_limit_headers",
+            "get_rate_limit_stats",
+        ],
+    )
+    def test_dead_helper_is_absent(self, name):
+        import plugins.security.core.rate_limiting as rl
 
-    def test_returns_trackers_dict(self):
-        stats = get_rate_limit_stats()
-        assert "trackers" in stats
-        assert isinstance(stats["trackers"], dict)
-
-
-class TestAddRateLimitHeaders:
-    """Tests for add_rate_limit_headers middleware."""
-
-    def test_adds_rate_limit_headers(self):
-        from plugins.security.core.rate_limiting import add_rate_limit_headers
-
-        request = make_mock_request()
-
-        mock_response = MagicMock()
-        mock_response.headers = {}
-
-        async def mock_call_next(req):
-            return mock_response
-
-        asyncio.run(add_rate_limit_headers(request, mock_call_next))
-
-        assert "X-RateLimit-Limit" in mock_response.headers
-        assert "X-RateLimit-Remaining" in mock_response.headers
-        assert "X-RateLimit-Reset" in mock_response.headers
-        assert "X-RateLimit-Used" in mock_response.headers
-
-    def test_uses_custom_identifier_func(self):
-        from plugins.security.core.rate_limiting import add_rate_limit_headers
-
-        request = make_mock_request()
-        mock_response = MagicMock()
-        mock_response.headers = {}
-
-        async def mock_call_next(req):
-            return mock_response
-
-        def custom_func(r):
-            return "custom-id"
-        asyncio.run(add_rate_limit_headers(
-            request, mock_call_next,
-            identifier_func=custom_func,
-            limit=50,
-            window_seconds=30
-        ))
-
-        assert mock_response.headers["X-RateLimit-Limit"] == "50"
+        assert not hasattr(rl, name), (
+            f"{name} was removed as dead code (no production call-site); "
+            "wire it to a real endpoint/middleware before re-adding it."
+        )
 
 
 class TestStartRateLimitCleanupTask:
@@ -271,7 +217,6 @@ class TestStartRateLimitCleanupTask:
     def test_cleanup_task_can_be_cancelled(self):
         """Verifies that the background task can be cancelled."""
         from plugins.security.core.rate_limiting import start_rate_limit_cleanup_task
-        import asyncio
 
         async def run_with_timeout():
             task = asyncio.create_task(start_rate_limit_cleanup_task())

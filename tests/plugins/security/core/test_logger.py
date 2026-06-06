@@ -56,11 +56,10 @@ class TestLogSecurityEvent:
         from plugins.security.core.logger import log_security_event
 
         with patch.object(Path, 'open', side_effect=PermissionError("No access")):
-            # Should not raise
-            try:
-                log_security_event("test", {})
-            except Exception:
-                pass  # May raise from other causes
+            # Production swallows the write error internally; this call must
+            # complete without propagating. If it ever raises, fail loudly.
+            result = log_security_event("test", {})
+            assert result is None
 
 
 class TestLogVulnerabilityDetected:

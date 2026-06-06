@@ -266,7 +266,7 @@ class TestCmdRecall:
 # ─── _handle_user_message ────────────────────────────────────────────────────
 
 class TestHandleUserMessage:
-    async def test_streams_text_chunks(self):
+    async def test_streams_text_chunks(self, capsys):
         client = MagicMock()
 
         async def _fake_stream(*args, **kwargs):
@@ -280,7 +280,13 @@ class TestHandleUserMessage:
                 mock_click.style.return_value = ""
                 await _handle_user_message("pregunta", client, "sess", {}, verbose=False)
 
-    async def test_metadata_chunks_processed(self):
+        # The streamed text chunks must reach stdout (print(chunk)).
+        out = capsys.readouterr().out
+        assert "hola món" in out
+        # The "Nexe: " prefix is emitted exactly once on the first text chunk.
+        mock_click.echo.assert_any_call(mock_click.style.return_value, nl=False)
+
+    async def test_metadata_chunks_processed(self, capsys):
         client = MagicMock()
 
         async def _fake_stream(*args, **kwargs):
@@ -292,4 +298,20 @@ class TestHandleUserMessage:
         with patch("core.cli.chat_cli._stream_with_spinner", side_effect=lambda g: g):
             with patch("core.cli.chat_cli.click") as mock_click:
                 mock_click.style.return_value = ""
-                await _handle_user_message("query", client, "sess", {}, verbose=False)
+                with patch(
+                    "core.cli.chat_cli._process_metadata_chunk",
+                    wraps=_process_metadata_chunk,
+                ) as spy_meta:
+                    await _handle_user_message("query", client, "sess", {}, verbose=False)
+
+        # The dict metadata chunk must be routed to _process_metadata_chunk...
+        spy_meta.assert_called_once()
+        chunk_arg = spy_meta.call_args.args[0]
+        assert chunk_arg == {"MODEL": "llama3"}
+        # ...and it must record the model name into the shared state dict.
+        state_arg = spy_meta.call_args.args[1]
+        assert state_arg["model_name"] == "llama3"
+        # The non-dict text chunk is printed (metadata is consumed, not printed).
+        out = capsys.readouterr().out
+        assert "resposta" in out
+        assert "llama3" not in out

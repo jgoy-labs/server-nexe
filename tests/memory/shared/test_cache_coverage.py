@@ -253,3 +253,44 @@ class TestMultiLevelCacheAsync:
             await cache.put("text", "model", [1.0], "v1")
             cache.conn = original_conn
         run_async(run())
+
+
+class TestL2SizeEviction:
+    """MEM-010: the L2 SQLite store must be bounded by l2_max_size_bytes."""
+
+    def test_put_evicts_oldest_when_over_budget(self, tmp_path):
+        async def run():
+            from memory.shared.cache import MultiLevelCache
+
+            cache = MultiLevelCache(cache_dir=str(tmp_path / "evict"))
+            cache._l2_eviction_interval = 4
+
+            # Each embedding serialises to a few hundred bytes of JSON.
+            big_vec = [0.123456789] * 64
+            one_row_bytes = len(cache._serialize_embedding(big_vec))
+            # Budget that should hold a small handful of rows, not all 40.
+            cache.l2_max_size_bytes = one_row_bytes * 5
+
+            for i in range(40):
+                await cache.put(f"text-{i}", "model", big_vec, "v1")
+
+            # Without eviction the DB would hold all 40 rows and far exceed the
+            # budget. With eviction the stored payload stays bounded.
+            cursor = cache.conn.cursor()
+            row_count = cursor.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+            stored = cursor.execute(
+                "SELECT COALESCE(SUM(length(data)), 0) FROM cache"
+            ).fetchone()[0]
+            cursor.close()
+
+            assert 0 < row_count < 40, f"unexpected row_count after eviction: {row_count}"
+            assert stored <= cache.l2_max_size_bytes, (
+                f"stored {stored} bytes exceeds budget {cache.l2_max_size_bytes}"
+            )
+
+            # A freshly written key survives eviction; older ones are dropped.
+            cache.l1_cache.clear()
+            assert await cache.get("text-0", "model", "v1") is None
+            await cache.shutdown()
+
+        run_async(run())

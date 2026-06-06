@@ -394,6 +394,20 @@ class TestCreateParser:
         assert args.type is None
         assert args.safe_mode is True
 
+    def test_recall_no_safe_mode_toggle(self):
+        """MEM-008: --no-safe-mode must be able to turn safe_mode off.
+
+        Before the fix the flag was store_true + default=True, so safe_mode
+        could never become False from the CLI.
+        """
+        parser = create_parser()
+        args = parser.parse_args(["recall", "--no-safe-mode"])
+        assert args.safe_mode is False
+
+        # --safe-mode still works explicitly.
+        args_on = parser.parse_args(["recall", "--safe-mode"])
+        assert args_on.safe_mode is True
+
     def test_stats_subcommand(self):
         """Test stats subcommand."""
         parser = create_parser()

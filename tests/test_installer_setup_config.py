@@ -12,6 +12,9 @@ Description: Tests for installer_setup_config.py façade helpers — CCN reducti
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
+import os
+import stat
+
 import pytest
 from pathlib import Path
 
@@ -21,6 +24,7 @@ from installer.installer_setup_config import (
     _append_missing_env_keys,
     _atomic_write_env,
     _update_env_model_config,
+    generate_env_file,
 )
 
 
@@ -334,3 +338,108 @@ class TestUpdateEnvModelConfig:
         assert "NEXE_PRIMARY_API_KEY=secret" in content
         # Model written
         assert "NEXE_DEFAULT_MODEL=llama3:8b" in content
+
+
+# ── generate_env_file: secret tmp file is born 0o600 (INST-004 TOCTOU) ──────
+
+
+class TestGenerateEnvFileTmpPermissions:
+    """The fresh .env is written to a tmp file FIRST, then renamed. The tmp
+    file holds NEXE_PRIMARY_API_KEY + NEXE_CSRF_SECRET. If it is created with
+    the default umask (0o644) and only chmod'd after the rename, the secrets
+    are world-readable during the TOCTOU window. INST-004 fix: the tmp file
+    must be created with mode 0o600 from the start (os.open O_CREAT|O_EXCL)."""
+
+    def test_tmp_file_created_with_0600_mode(self, tmp_path, monkeypatch):
+        """Spy on os.open: the .env tmp file must be opened with mode 0o600.
+
+        Fails with the old code, which used builtin open() (no mode arg →
+        umask-derived 0o644). Passes once os.open(..., 0o600) is used."""
+        captured_modes: dict[str, int] = {}
+        real_os_open = os.open
+
+        def _spy_open(path, flags, mode=0o777, *args, **kwargs):
+            spath = os.fspath(path)
+            if ".env.tmp." in spath:
+                captured_modes[spath] = mode
+            return real_os_open(path, flags, mode, *args, **kwargs)
+
+        monkeypatch.setattr(os, "open", _spy_open)
+
+        generate_env_file(tmp_path)
+
+        assert captured_modes, (
+            "the .env tmp file must be created via os.open with an explicit "
+            "mode (INST-004): no os.open call for a .env.tmp.* path was seen"
+        )
+        for spath, mode in captured_modes.items():
+            assert mode == 0o600, (
+                f"tmp file {spath} opened with mode {oct(mode)}; "
+                "secrets must be born 0o600, not exposed via umask"
+            )
+
+    def test_final_env_is_0600(self, tmp_path):
+        generate_env_file(tmp_path)
+        env_file = tmp_path / ".env"
+        assert env_file.exists()
+        mode = stat.S_IMODE(env_file.stat().st_mode)
+        assert mode == 0o600, f"final .env expected 0o600, got {oct(mode)}"
+
+    def test_no_tmp_left_behind(self, tmp_path):
+        generate_env_file(tmp_path)
+        assert list(tmp_path.glob(".env.tmp.*")) == []
+
+
+# ── _sha256_check: unexpected verification error fails CLOSED (INST-003) ────
+#
+# Placed here (rather than test_installer_endpoints.py, which is edited by a
+# parallel agent) because both modules cover installer-side security. The unit
+# under test is core.endpoints.installer._sha256_check.
+
+
+class TestSha256CheckFailClosed:
+    """A security integrity check must NOT silently skip on an unexpected
+    error. Before INST-003, the catch-all `except Exception` logged "skipped"
+    and returned None → the caller treated it as success and continued the
+    install with an unverified model (fail-open). The fix makes the catch-all
+    return an error event (fail-closed)."""
+
+    def _run(self):
+        import asyncio
+        from core.endpoints import installer as inst_mod
+        return asyncio.run(inst_mod._sha256_check("gguf", "repo/model.gguf"))
+
+    def test_unexpected_error_returns_error_event(self, monkeypatch):
+        """An unforeseen RuntimeError (not DownloadIntegrityError) inside the
+        verification path must yield an error event, aborting the install."""
+        import installer.download_verify as dv
+
+        def _boom(*args, **kwargs):
+            raise RuntimeError("simulated hashing-chain bug")
+
+        monkeypatch.setattr(dv, "verify_download_integrity", _boom)
+        # Avoid touching the real model dir during the gguf branch.
+        from core.endpoints import installer as inst_mod
+        monkeypatch.setattr(inst_mod, "_resolve_model_path", lambda e, m: "/nonexistent")
+
+        result = self._run()
+        assert result is not None, (
+            "an unexpected error in the SHA256 check must NOT be swallowed as "
+            "skip→None (fail-open); it must return an error event (fail-closed)"
+        )
+        assert result.get("type") == "error"
+        assert result.get("code") == "SHA256_FAIL"
+
+    def test_unpinned_digest_still_skips(self, monkeypatch):
+        """Legitimate 'not pinned' (verify returns False) still skips → None.
+
+        Guards against over-correcting INST-003: the fail-closed change must
+        only fire on UNEXPECTED errors, not on the normal unpinned path."""
+        import installer.download_verify as dv
+
+        monkeypatch.setattr(dv, "verify_download_integrity", lambda *a, **k: False)
+        from core.endpoints import installer as inst_mod
+        monkeypatch.setattr(inst_mod, "_resolve_model_path", lambda e, m: "/nonexistent")
+
+        result = self._run()
+        assert result is None, "unpinned digest (verify→False) must still skip, not error"

@@ -1,96 +1,94 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: personality/loading/patterns.py
 Description: Search patterns and naming conventions for Module Loader. Defines priorities
+             and conventions (file patterns, method/attribute names) as plain Python
+             constants.
+
+NOTE (PERS-006):
+  File-name patterns ("api_{module_name}.py", "main.py", "__init__.py"…) and
+  method/attribute names ("init", "cleanup", "router"…) are FUNCTIONAL
+  identifiers, not user-facing strings. They must NOT be routed through i18n:
+  if the i18n manager failed to resolve a key it would return the key itself
+  (e.g. "loader.patterns.api_module"), and the loader would then look for files
+  / methods named after the i18n key. They are therefore defined as module-level
+  constants. The constructor still accepts an ``i18n`` argument for backwards
+  compatibility (callers construct LoaderPatterns(i18n)), but it is unused.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from .messages import get_message
+# Functional constants — never translated.
+API_FILE_PATTERNS = [
+  'api_{module_name}.py',
+  'api.py',
+  'main.py',
+  '__init__.py',
+  '{module_name}.py',
+  'module.py',
+  'app.py',
+]
+
+INIT_METHODS = ['init', 'initialize', 'setup', 'start_up', 'on_load']
+
+CLEANUP_METHODS = ['cleanup', 'shutdown', 'teardown', 'dispose', 'on_unload']
+
+FACTORY_FUNCTIONS = ['create_module', 'create_app', 'create', 'init']
+
+COMMON_ATTRIBUTES = ['app', 'router', 'api', 'module', 'instance', 'main']
+
+PRIORITY_KEYWORDS = ['module', 'api', 'app', 'service', 'handler', 'manager']
+
+IGNORE_PREFIXES = ('test_', '_', '.')
+
+PYTHON_EXTENSION = '.py'
+
+MODULE_NAME_PREFIX = 'module_{module_name}_{id}'
+
 
 class LoaderPatterns:
   """Manages file search patterns and naming conventions."""
 
   def __init__(self, i18n=None):
+    # i18n kept for backwards-compatible construction; intentionally unused —
+    # these are functional identifiers, not translatable messages (PERS-006).
     self.i18n = i18n
 
   def get_api_file_patterns(self) -> list:
     """Return API file search patterns in priority order."""
-    return [
-      get_message(self.i18n, 'loader.patterns.api_module'),
-      get_message(self.i18n, 'loader.patterns.api_generic'),
-      get_message(self.i18n, 'loader.patterns.main'),
-      get_message(self.i18n, 'loader.patterns.init'),
-      get_message(self.i18n, 'loader.patterns.module_name'),
-      get_message(self.i18n, 'loader.patterns.module_generic'),
-      get_message(self.i18n, 'loader.patterns.app')
-    ]
+    return list(API_FILE_PATTERNS)
 
   def get_init_methods(self) -> list:
     """Return list of possible initialization method names."""
-    return [
-      get_message(self.i18n, 'loader.init_methods.init'),
-      get_message(self.i18n, 'loader.init_methods.initialize'),
-      get_message(self.i18n, 'loader.init_methods.setup'),
-      get_message(self.i18n, 'loader.init_methods.start_up'),
-      get_message(self.i18n, 'loader.init_methods.on_load')
-    ]
+    return list(INIT_METHODS)
 
   def get_cleanup_methods(self) -> list:
     """Return list of possible cleanup method names."""
-    return [
-      get_message(self.i18n, 'loader.cleanup_methods.cleanup'),
-      get_message(self.i18n, 'loader.cleanup_methods.shutdown'),
-      get_message(self.i18n, 'loader.cleanup_methods.teardown'),
-      get_message(self.i18n, 'loader.cleanup_methods.dispose'),
-      get_message(self.i18n, 'loader.cleanup_methods.on_unload')
-    ]
+    return list(CLEANUP_METHODS)
 
   def get_factory_functions(self) -> list:
     """Return list of possible factory functions."""
-    return [
-      get_message(self.i18n, 'loader.factory_functions.create_module'),
-      get_message(self.i18n, 'loader.factory_functions.create_app'),
-      get_message(self.i18n, 'loader.factory_functions.create'),
-      get_message(self.i18n, 'loader.factory_functions.init')
-    ]
+    return list(FACTORY_FUNCTIONS)
 
   def get_common_attributes(self) -> list:
     """Return list of common attributes to search for instances."""
-    return [
-      get_message(self.i18n, 'loader.common_attributes.app'),
-      get_message(self.i18n, 'loader.common_attributes.router'),
-      get_message(self.i18n, 'loader.common_attributes.api'),
-      get_message(self.i18n, 'loader.common_attributes.module'),
-      get_message(self.i18n, 'loader.common_attributes.instance'),
-      get_message(self.i18n, 'loader.common_attributes.main')
-    ]
+    return list(COMMON_ATTRIBUTES)
 
   def get_priority_keywords(self) -> list:
     """Return priority keywords for detecting main classes."""
-    return [
-      get_message(self.i18n, 'loader.common_attributes.module'),
-      get_message(self.i18n, 'loader.common_attributes.api'),
-      get_message(self.i18n, 'loader.common_attributes.app'),
-      'service', 'handler', 'manager'
-    ]
+    return list(PRIORITY_KEYWORDS)
 
   def get_ignore_prefixes(self) -> tuple:
     """Return file prefixes to ignore."""
-    return (
-      get_message(self.i18n, 'loader.ignore_prefixes.test'),
-      get_message(self.i18n, 'loader.ignore_prefixes.underscore'),
-      get_message(self.i18n, 'loader.ignore_prefixes.dot')
-    )
+    return IGNORE_PREFIXES
 
   def get_python_extension(self) -> str:
     """Return the Python file extension."""
-    return get_message(self.i18n, 'loader.file_extensions.python')
+    return PYTHON_EXTENSION
 
   def get_module_name_prefix(self, module_name: str, file_id: int) -> str:
     """Generate a unique prefix for a module name."""
-    return get_message(self.i18n, 'loader.module_name_prefix',
-             module_name=module_name, id=file_id)
+    return MODULE_NAME_PREFIX.format(module_name=module_name, id=file_id)

@@ -353,3 +353,35 @@ Més contingut amb `codi inline` i altres elements."""
 
     assert result.total_chunks >= 1
     assert result.chunker_id == "chunker.text"
+
+class TestMergeSmallChunksFinal:
+  """MEM-006: a trailing chunk below min_chunk_size must be merged, not emitted raw."""
+
+  def setup_method(self):
+    self.chunker = TextChunker()
+    self.min_size = self.chunker.config["min_chunk_size"]
+
+  def test_trailing_small_chunk_is_folded_into_previous(self):
+    """A small chunk that follows a large one (and is last) must not survive raw."""
+    big_text = "x" * (self.min_size + 50)
+    small_text = "tiny"
+    chunks = [
+      Chunk.create(text=big_text, start=0, end=len(big_text), index=0),
+      Chunk.create(
+        text=small_text,
+        start=len(big_text),
+        end=len(big_text) + len(small_text),
+        index=1,
+      ),
+    ]
+
+    merged = self.chunker._merge_small_chunks(chunks)
+
+    # No chunk may remain below min_chunk_size: the small trailing chunk
+    # must have been folded into its predecessor.
+    assert all(len(c.text) >= self.min_size for c in merged), [
+      len(c.text) for c in merged
+    ]
+    assert len(merged) == 1
+    assert small_text in merged[0].text
+    assert merged[0].chunk_type == "merged"

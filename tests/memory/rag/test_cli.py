@@ -250,14 +250,21 @@ class TestCLICoverage:
 
   @pytest.mark.asyncio
   async def test_initialize_success(self):
-    """Test CLI initialization success."""
+    """Test CLI initialization success.
+
+    Exercises the REAL RAGCLI.initialize(): patches RAGModule so
+    get_instance() returns a module whose initialize() resolves True,
+    then asserts initialize() returns True and stores the module.
+    """
     cli = RAGCLI()
-    mock_module = MagicMock()
-    mock_module.initialize = MagicMock(return_value=True)
-    with patch.object(RAGCLI, 'initialize') as mock_init:
-      mock_init.return_value = True
+    mock_mod = MagicMock()
+    mock_mod.initialize = AsyncMock(return_value=True)
+    with patch("memory.rag.cli.RAGModule") as MockRAGModule:
+      MockRAGModule.get_instance.return_value = mock_mod
       result = await cli.initialize()
-      # The patched version returns True
+      assert result is True
+      assert cli.module is mock_mod
+      mock_mod.initialize.assert_awaited_once()
 
   @pytest.mark.asyncio
   async def test_initialize_failure(self):

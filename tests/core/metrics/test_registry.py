@@ -143,5 +143,13 @@ class TestIncrementRateLimit:
     increment_rate_limit("composite", "/memory/store")
 
   def test_path_normalized(self):
-    """Test path is normalized in rate limit."""
-    increment_rate_limit("ip", "/users/550e8400-e29b-41d4-a716-446655440000")
+    """Test path is normalized in rate limit (UUID collapsed -> low cardinality)."""
+    raw_uuid = "550e8400-e29b-41d4-a716-446655440000"
+    increment_rate_limit("ip", f"/users/{raw_uuid}")
+
+    # The recorded label must be the normalized form, NOT the raw UUID, or
+    # every request would explode metric cardinality.
+    samples = RATE_LIMIT_HITS.collect()[0].samples
+    paths = [s.labels.get("path", "") for s in samples]
+    assert "/users/{id}" in paths, f"expected normalized path, got: {paths}"
+    assert all(raw_uuid not in p for p in paths), f"raw UUID leaked into labels: {paths}"

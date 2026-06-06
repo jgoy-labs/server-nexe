@@ -281,6 +281,24 @@ class TextChunker(BaseChunker):
         current = chunk
 
     if current:
+      # A trailing chunk below min_chunk_size is never folded by the loop above
+      # (the loop only merges when the *accumulated* chunk is small). Fold it
+      # back into its predecessor so the "merge small chunks" guarantee holds.
+      if (
+          merged
+          and len(current.text) < self.config["min_chunk_size"]
+      ):
+        prev = merged.pop()
+        current = Chunk.create(
+          text=prev.text + "\n\n" + current.text,
+          start=prev.start_char,
+          end=current.end_char,
+          index=prev.chunk_index,
+          document_id=prev.document_id,
+          section_title=prev.section_title or current.section_title,
+          chunk_type="merged",
+          metadata=prev.metadata,
+        )
       merged.append(current)
 
     for idx, chunk in enumerate(merged):

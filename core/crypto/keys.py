@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/crypto/keys.py
-Description: Master key management with fallback chain: keyring → env var → file.
+Description: Master key management with fallback chain: file → keyring → env var → generate.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

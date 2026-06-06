@@ -139,6 +139,38 @@ class TestDeduplicatorCoverage:
         dedup.clear_cache()
         assert len(dedup._seen_ids) == 0
 
+    def test_clear_cache_resets_semantic_cache(self):
+        """MEM-007: clear_cache() must also drop _seen_semantic.
+
+        Without the fix, a re-ingested entry with the same semantic key is
+        wrongly flagged as a duplicate after a reset.
+        """
+        from memory.memory.pipeline.deduplicator import Deduplicator
+        from memory.memory.models.memory_entry import MemoryEntry
+        from memory.memory.models.memory_types import MemoryType
+
+        dedup = Deduplicator()
+        entry = MemoryEntry(
+            entry_type=MemoryType.SEMANTIC,
+            content="Visc a Barcelona.",
+            source="test",
+        )
+
+        # First sighting: not a duplicate, populates the semantic cache.
+        assert dedup.is_duplicate(entry) is False
+        assert len(dedup._seen_semantic) == 1
+
+        dedup.clear_cache()
+        assert len(dedup._seen_semantic) == 0
+
+        # After a reset the same content must be ingestible again.
+        entry2 = MemoryEntry(
+            entry_type=MemoryType.SEMANTIC,
+            content="Visc a Barcelona.",
+            source="test",
+        )
+        assert dedup.is_duplicate(entry2) is False
+
     def test_compute_content_hash(self):
         from memory.memory.pipeline.deduplicator import Deduplicator
         hash1 = Deduplicator.compute_content_hash("test content")

@@ -10,7 +10,8 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import os
+
+from core.lifespan_services import _resolve_ollama_url
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,9 @@ async def cleanup_ollama_startup(server_state, _translate, health_timeout: float
   """Unload any Ollama models left from previous sessions during startup."""
   try:
     import httpx
-    ollama_url = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    # C-001: share the single resolver so autostart, health and cleanup
+    # all target the same host (honours sidecar → NEXE_OLLAMA_HOST → OLLAMA_HOST).
+    ollama_url = _resolve_ollama_url().rstrip("/")
 
     async with httpx.AsyncClient() as client:
       try:
@@ -78,7 +81,9 @@ async def cleanup_ollama_shutdown(health_timeout: float, unload_timeout: float) 
   """Unload Ollama models from RAM during server shutdown."""
   try:
     import httpx
-    ollama_url = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    # C-001: same resolver as startup/autostart to avoid leaving models in RAM
+    # on the real host when only OLLAMA_HOST (not NEXE_OLLAMA_HOST) is set.
+    ollama_url = _resolve_ollama_url().rstrip("/")
 
     async with httpx.AsyncClient() as client:
       ps_response = await client.get(f"{ollama_url}/api/ps", timeout=health_timeout)

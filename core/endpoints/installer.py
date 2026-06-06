@@ -766,8 +766,17 @@ async def _sha256_check(engine: str, model_id: str) -> "dict | None":
         logger.error("installer: SHA256 verify hard error for %s/%s: %s", engine, model_id, exc)
         return {"type": "error", "code": "SHA256_FAIL", "message": f"Integrity check error: {exc}"}
     except Exception as exc:  # noqa: BLE001
-        logger.warning("installer: SHA256 verify skipped for %s/%s (%s)", engine, model_id, exc)
-        return None
+        # Fail-CLOSED. This is a security check: an unexpected error in the
+        # verification path (a bug in the hashing chain, an unforeseen runtime
+        # error) must NOT be silently treated as "skip → continue". Doing so
+        # would disable integrity enforcement without anyone noticing. The
+        # download library already returns None/False for legitimate
+        # infrastructure conditions (digest not pinned, ollama unavailable,
+        # older daemon) — those reach the `if not matched` branch above and
+        # continue. Anything that reaches HERE is genuinely unexpected, so we
+        # abort the install rather than ship an unverified model.
+        logger.error("installer: SHA256 verify unexpected error for %s/%s: %s", engine, model_id, exc)
+        return {"type": "error", "code": "SHA256_FAIL", "message": f"Integrity check error: {exc}"}
 
 
 @router.get("/download", operation_id="installer_download_model")

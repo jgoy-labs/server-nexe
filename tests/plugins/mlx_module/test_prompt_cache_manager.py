@@ -125,8 +125,9 @@ class TestMLXPromptCacheManager:
     def test_fetch_nearest_cache_longer_with_trim(self):
         """Test fetch with longer match requiring trim."""
         mgr = MLXPromptCacheManager()
-        # Insert a longer cache
-        mgr.insert_cache("m1", [1, 2, 3, 4, 5], ["kv_long"])
+        # Insert a longer cache (keep a handle on the exact stored object)
+        original_cache = ["kv_long"]
+        mgr.insert_cache("m1", [1, 2, 3, 4, 5], original_cache)
 
         # Mock the trim functions
         mock_can_trim = MagicMock(return_value=True)
@@ -140,26 +141,40 @@ class TestMLXPromptCacheManager:
                 trim_prompt_cache=mock_trim,
             ),
         }):
-            # Search with partial overlap but no cache at that exact prefix
-            # Need tokens that share a prefix with cached tokens
-            # but don't have a cache entry at the shared point
+            # [1, 2] has no exact/shorter cache but the trie holds the longer
+            # entry [1, 2, 3, 4, 5], so fetch must take the longer/trim branch.
             prompt_cache, remaining = mgr.fetch_nearest_cache("m1", [1, 2])
-            # Might or might not find depending on trie structure
+
+        # Trim branch returns the trimmed (deepcopied) cache, not None.
+        assert prompt_cache is not None
+        assert prompt_cache is not original_cache  # deepcopy, not the trie's object
+        assert prompt_cache == ["kv_long"]
+        # common_prefix=2 but prefix=min(len(tokens)-1, 2)=1, so rest=tokens[1:].
+        assert remaining == [2]
+        # The trim path was actually exercised: num_to_trim = len(longer) - prefix = 5 - 1.
+        mock_can_trim.assert_called_once()
+        mock_trim.assert_called_once_with(["kv_long"], 4)
 
     def test_fetch_nearest_cache_longer_trim_fails(self):
         """Test fetch with longer match when trim fails."""
         mgr = MLXPromptCacheManager()
         mgr.insert_cache("m1", [1, 2, 3, 4, 5], ["kv"])
 
+        mock_can_trim = MagicMock(side_effect=RuntimeError("trim fail"))
         with patch.dict("sys.modules", {
             "mlx_lm": MagicMock(),
             "mlx_lm.models": MagicMock(),
             "mlx_lm.models.cache": MagicMock(
-                can_trim_prompt_cache=MagicMock(side_effect=RuntimeError("trim fail")),
+                can_trim_prompt_cache=mock_can_trim,
             ),
         }):
             prompt_cache, remaining = mgr.fetch_nearest_cache("m1", [1, 2])
-            # Should fall through to no match
+
+        # The longer branch was entered (can_trim invoked) but raised, so the
+        # except handler swallows it and execution falls through to "no match".
+        mock_can_trim.assert_called_once()
+        assert prompt_cache is None
+        assert remaining == [1, 2]
 
     def test_insert_updates_existing(self):
         """Test inserting to same key updates count."""

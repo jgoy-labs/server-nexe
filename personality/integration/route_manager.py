@@ -167,12 +167,26 @@ class RouteManager:
     
     return registered_routes
   
-  def _register_endpoint_routes(self, module_name: str, endpoints: List[Any], 
+  def _register_endpoint_routes(self, module_name: str, endpoints: List[Any],
                 prefix: str) -> List[Dict[str, Any]]:
-    """Register individual endpoints."""
-    registered_routes: List[Dict[str, Any]] = []
-    
-    return registered_routes
+    """Individually-decorated endpoint methods are NOT supported.
+
+    Modules expose their API as an ``APIRouter`` ("router") or a ``FastAPI``
+    sub-app ("app"); those paths register routes properly. The "endpoints"
+    component type (bare decorated methods) has no registration logic, so this
+    returns an empty list. Previously it did so SILENTLY, dropping such
+    endpoints without trace (PERS-007). It now logs a visible warning so the
+    capability gap is not mistaken for a successful registration.
+    """
+    if endpoints:
+      logger.warning(
+        "RouteManager: %d 'endpoints' component(s) for module '%s' were NOT "
+        "registered — expose an APIRouter ('router') or FastAPI app ('app') "
+        "instead.",
+        len(endpoints), module_name,
+        component="route_manager",
+      )
+    return []
   
   def _check_route_conflict(self, path: str, module_name: str) -> bool:
     """

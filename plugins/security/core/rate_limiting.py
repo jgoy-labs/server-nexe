@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from typing import Callable, Any, DefaultDict, Dict
+from typing import Any, DefaultDict, Dict
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 import asyncio
@@ -223,112 +223,6 @@ class RateLimitTracker:
         del self._counters[key]
 
 rate_limit_tracker = RateLimitTracker()
-
-async def add_rate_limit_headers(
-  request: Request,
-  call_next,
-  identifier_func: Callable[[Request], str] = get_remote_address,
-  limit: int = 100,
-  window_seconds: int = 60
-):
-  """
-  Middleware to add X-RateLimit-* headers to responses
-
-  Args:
-    request: FastAPI Request
-    call_next: Next middleware in chain
-    identifier_func: Function to get rate limit identifier
-    limit: Max requests per window
-    window_seconds: Time window in seconds
-
-  Returns:
-    Response with rate limit headers
-  """
-  identifier = identifier_func(request)
-
-  state = await rate_limit_tracker.record_request(identifier, limit, window_seconds)
-
-  response = await call_next(request)
-
-  response.headers["X-RateLimit-Limit"] = str(state["limit"])
-  response.headers["X-RateLimit-Remaining"] = str(state["remaining"])
-  response.headers["X-RateLimit-Reset"] = str(state["reset"])
-  response.headers["X-RateLimit-Used"] = str(state["used"])
-
-  return response
-
-def rate_limit_public(limit: str = None):  # type: ignore[assignment]  # no_implicit_optional
-  """
-  Rate limit for public endpoints (no auth)
-
-  Usage:
-    @router.get("/public")
-    @rate_limit_public("30/minute")
-    async def public_endpoint():
-      return {"status": "ok"}
-  """
-  return limiter_global.limit(limit or DEFAULT_RATE_LIMITS["public"])
-
-def rate_limit_authenticated(limit: str = None):  # type: ignore[assignment]  # no_implicit_optional
-  """
-  Rate limit for authenticated endpoints
-
-  Higher limits than public endpoints.
-
-  Usage:
-    @router.post("/api/data")
-    @rate_limit_authenticated("300/minute")
-    async def authenticated_endpoint(api_key: str = Depends(require_api_key)):
-      return {"data": "sensitive"}
-  """
-  return limiter_by_key.limit(limit or DEFAULT_RATE_LIMITS["authenticated"])
-
-def rate_limit_admin(limit: str = None):  # type: ignore[assignment]  # no_implicit_optional
-  """
-  Rate limit for admin operations
-
-  Usage:
-    @router.post("/admin/config")
-    @rate_limit_admin("100/minute")
-    async def admin_endpoint(api_key: str = Depends(require_api_key)):
-      return {"status": "updated"}
-  """
-  return limiter_composite.limit(limit or DEFAULT_RATE_LIMITS["admin"])
-
-def rate_limit_health(limit: str = None):  # type: ignore[assignment]  # no_implicit_optional
-  """
-  Rate limit for health check endpoints
-
-  Very high limits to allow monitoring systems to check frequently.
-
-  Usage:
-    @router.get("/health")
-    @rate_limit_health("1000/minute")
-    async def health_check():
-      return {"status": "healthy"}
-  """
-  return limiter_global.limit(limit or DEFAULT_RATE_LIMITS["health"])
-
-def get_rate_limit_stats() -> dict:
-  """
-  Get current rate limit statistics
-
-  Useful for monitoring and debugging.
-
-  Returns:
-    Dict with stats about current rate limit state
-  """
-  return {
-    "active_identifiers": len(rate_limit_tracker._counters),
-    "trackers": {
-      identifier: {
-        "count": data["count"],
-        "limit": data["limit"],
-        "reset": data["reset"].isoformat() if data["reset"] else None
-      }
-      for identifier, data in rate_limit_tracker._counters.items()
-    }
-  }
 
 async def start_rate_limit_cleanup_task():
   """

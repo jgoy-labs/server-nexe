@@ -74,7 +74,7 @@ class I18nManager:
     """Load translation files"""
     try:
       loc_config = self.config.get('personality', {}).get('location', {})
-      translations_path = loc_config.get('path_traduccions', 'personality/core/languages')
+      translations_path = loc_config.get('path_traduccions', 'personality/languages')
       
       if not Path(translations_path).is_absolute():
         translations_path = self.base_path / translations_path
@@ -89,10 +89,16 @@ class I18nManager:
         self.translations[self.current_language] = {}
   
   def _load_language_files(self, lang_path: Path, language: str) -> None:
-    """Load JSON files for a specific language"""
+    """Load JSON files for a specific language.
+
+    Loads the legacy flat ``messages.json`` (if present) plus the real
+    per-component ``messages_*.json`` catalog files. Each ``messages_<comp>.json``
+    is nested under its component prefix (``core_metrics``, ``core_events`` …) so
+    keys resolve as ``component.section.key``, matching ModularI18nManager.
+    """
     if language not in self.translations:
       self.translations[language] = {}
-    
+
     core_messages = lang_path / 'messages.json'
     if core_messages.exists():
       try:
@@ -103,8 +109,20 @@ class I18nManager:
           self.translations[language].update(data)
       except (IOError, KeyError):
         pass
-    
-    modules_base = self.base_path / 'plugins' / 'moduls'
+
+    if lang_path.exists():
+      for comp_file in sorted(lang_path.glob('messages_*.json')):
+        try:
+          with open(comp_file, 'r', encoding='utf-8') as f:
+            comp_data = json.load(f)
+          if '_meta' in comp_data:
+            del comp_data['_meta']
+          component = comp_file.stem[len('messages_'):]
+          self.translations[language][component] = comp_data
+        except (IOError, KeyError, ValueError):
+          pass
+
+    modules_base = self.base_path / 'plugins'
     if modules_base.exists():
       self._load_module_translations(modules_base, language)
     

@@ -148,10 +148,21 @@ class TestHeaderParser:
 
     def test_tags_parsed_as_list(self):
         from memory.rag.header_parser import parse_rag_header
-        text = "# === METADATA RAG ===\nid: t\ntags: [a, b, c]\n---\nCos"
+        # Fully valid header (id + abstract + >=MIN_TAGS tags) so the parser
+        # actually runs validation and the tag-parsing result is observable.
+        text = (
+            "# === METADATA RAG ===\n"
+            "id: t\n"
+            "abstract: Un document de prova\n"
+            "tags: [a, b, c]\n"
+            "---\n"
+            "Cos"
+        )
         header, _ = parse_rag_header(text)
-        if header.is_valid:
-            assert isinstance(header.tags, list)
+        assert header.is_valid, header.validation_errors
+        # The bracketed YAML-like list must be split into the exact items,
+        # not kept as a single string or mangled.
+        assert header.tags == ["a", "b", "c"]
 
     def test_knowledge_readme_has_valid_header(self):
         """The README.md in the knowledge/ folder must have a valid header."""

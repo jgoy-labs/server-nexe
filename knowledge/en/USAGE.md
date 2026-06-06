@@ -81,7 +81,7 @@ On macOS with tray app installed, the server starts automatically at login.
 |---------|-------------|
 | `./nexe go` | Start server (Qdrant + FastAPI + tray) |
 | `./nexe chat` | Interactive CLI chat |
-| `./nexe chat --rag` | Chat with RAG memory enabled |
+| `./nexe chat` | RAG memory is enabled by default (there is no `--rag` flag; `--no-rag` is accepted but ignored — the pipeline always manages context) |
 | `./nexe chat --verbose` | Chat with RAG weight details per source |
 | `./nexe status` | Server status |
 | `./nexe modules` | List loaded modules and CLIs |

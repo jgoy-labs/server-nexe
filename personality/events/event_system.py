@@ -90,10 +90,10 @@ class EventSystem:
     try:
       # Side-effect call: raises RuntimeError if no running loop (caught below).
       asyncio.get_running_loop()
-      msg = self.i18n.t('sync.called_from_active_loop') if self.i18n else "emit_event_sync() called from active event loop"
+      msg = self.i18n.t('core_events.sync.called_from_active_loop') if self.i18n else "emit_event_sync() called from active event loop"
       logger.warning(msg, component="event_system")
       self._add_to_history(event)
-      msg = self.i18n.t('sync.added_to_history_only', event_type=event.event_type) if self.i18n else f"Event {event.event_type} added to history but not emitted (in active loop)"
+      msg = self.i18n.t('core_events.sync.added_to_history_only', event_type=event.event_type) if self.i18n else f"Event {event.event_type} added to history but not emitted (in active loop)"
       logger.info(msg, component="event_system")
       return
     except RuntimeError:
@@ -125,7 +125,7 @@ class EventSystem:
         error_msg = "Error in event callback"
         
         if self.i18n:
-          error_msg = self.i18n.t('module_manager.events.callback_error', error=str(e))
+          error_msg = self.i18n.t('core_events.events.callback_error', error=str(e))
         
         logger.warning(error_msg, 
                component="event_system", 
@@ -160,7 +160,7 @@ class EventSystem:
     
     callback_name = getattr(callback, '__name__', 'anonymous')
     logger.debug(
-      self.i18n.t('module_manager.events.callback_registered', callback_name=callback_name) 
+      self.i18n.t('core_events.events.callback_registered', callback_name=callback_name)
       if self.i18n else f"Event callback registered: {callback_name}",
       component="event_system", 
       callback_name=callback_name,
@@ -190,7 +190,7 @@ class EventSystem:
       
       callback_name = getattr(callback, '__name__', 'anonymous')
       logger.debug(
-        self.i18n.t('module_manager.events.callback_removed', callback_name=callback_name)
+        self.i18n.t('core_events.events.callback_removed', callback_name=callback_name)
         if self.i18n else f"Event callback removed: {callback_name}",
         component="event_system",
         callback_name=callback_name,
@@ -222,7 +222,7 @@ class EventSystem:
       self._event_callbacks.clear()
       self._typed_callbacks.clear()
     
-    msg = self.i18n.t('module_manager.events.callbacks_cleared', count=count) if self.i18n else f"Cleared {count} event callbacks"
+    msg = self.i18n.t('core_events.events.callbacks_cleared', count=count) if self.i18n else f"Cleared {count} event callbacks"
     logger.info(msg, component="event_system", cleared=count, event_type=event_type or "all")
     
     return count

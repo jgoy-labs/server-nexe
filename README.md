@@ -188,8 +188,7 @@ nexe go         # start server on port 9119
 Once running:
 
 ```bash
-nexe chat               # interactive chat
-nexe chat --rag         # chat with RAG memory
+nexe chat               # interactive chat (RAG memory on by default)
 nexe memory store "Barcelona is the capital of Catalonia"
 nexe memory recall "capital Catalonia"
 nexe status             # system status

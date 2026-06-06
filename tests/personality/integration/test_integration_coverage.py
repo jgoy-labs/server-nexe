@@ -130,6 +130,31 @@ class TestRouteManager:
         routes = rm.register_module_routes(RouteRegistration(module_name="test", api_component=[], prefix="/api", component_type="endpoints"))
         assert routes == []
 
+    def test_register_endpoint_routes_warns_when_dropping(self, rm):
+        """PERS-007: 'endpoints' is unsupported. Dropping endpoints must NOT be
+        silent — a warning must be logged when endpoints are actually passed."""
+        endpoints = [lambda: None, lambda: None]
+        with patch("personality.integration.route_manager.logger") as mock_logger:
+            routes = rm.register_module_routes(RouteRegistration(
+                module_name="mod_with_endpoints", api_component=endpoints,
+                prefix="/api", component_type="endpoints",
+            ))
+        assert routes == []
+        # The drop is visible: a warning was emitted mentioning the module.
+        assert mock_logger.warning.called
+        warned_text = " ".join(str(a) for a in mock_logger.warning.call_args[0])
+        assert "mod_with_endpoints" in warned_text
+
+    def test_register_endpoint_routes_no_warning_when_empty(self, rm):
+        """No warning when there is nothing to drop (empty endpoints)."""
+        with patch("personality.integration.route_manager.logger") as mock_logger:
+            routes = rm.register_module_routes(RouteRegistration(
+                module_name="m", api_component=[], prefix="/api",
+                component_type="endpoints",
+            ))
+        assert routes == []
+        assert not mock_logger.warning.called
+
     def test_route_conflict_detection(self, rm):
         router = APIRouter()
 

@@ -105,3 +105,22 @@ def test_file_set_round_trip_with_get(tmp_path):
     crypto_keys._try_file_set(key, path=key_path)
     loaded = crypto_keys._try_file_get(key_path)
     assert loaded == key
+
+
+def test_module_docstring_states_file_first_fallback_order():
+    """KN-06: the module docstring must describe the file-first fallback order.
+
+    The pre-v0.9.9 order (keyring-first) was the bug that silently regenerated
+    the MEK and rendered encrypted data unrecoverable. The implementation
+    (get_or_create_master_key) and SECURITY.md both say file → keyring → env
+    → generate; the module docstring must not contradict that.
+
+    Fails with the stale 'keyring → env var → file' docstring, passes with the
+    corrected 'file → keyring → env var → generate'."""
+    doc = (crypto_keys.__doc__ or "").lower()
+    assert "file → keyring → env" in doc, (
+        "module docstring must state the file-first fallback order "
+        "(file → keyring → env var → generate)"
+    )
+    # The reversed keyring-first order is the historic bug — it must be gone.
+    assert "keyring → env var → file" not in doc

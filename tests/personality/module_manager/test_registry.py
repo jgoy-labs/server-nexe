@@ -315,16 +315,16 @@ class TestFindModulesWithTag:
     def test_finds_modules_with_tag_returns_list(self):
         from personality.module_manager.registry import ModuleRegistry
         r = ModuleRegistry()
-        instance = make_instance_with_router()
+        instance = make_instance_with_router()  # router exposes a route tagged "test"
         r.register_module("test_mod", instance, make_manifest())
 
-        # ModuleRegistration is not hashable, so this may raise TypeError
-        # Just verify the method exists and we can call it safely
-        try:
-            result = r.find_modules_with_tag("test")
-            assert isinstance(result, list)
-        except TypeError:
-            pass  # Known limitation with unhashable ModuleRegistration dataclass
+        # Must not raise (regression: unhashable ModuleRegistration in a set)
+        # and must actually return the module that owns the tagged endpoint.
+        result = r.find_modules_with_tag("test")
+        assert isinstance(result, list)
+        assert any(m.name == "test_mod" for m in result), (
+            f"expected test_mod in results, got: {[m.name for m in result]}"
+        )
 
     def test_empty_when_no_match(self):
         from personality.module_manager.registry import ModuleRegistry

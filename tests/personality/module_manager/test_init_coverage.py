@@ -32,13 +32,25 @@ class TestGetDefaultConfigPath:
     """Tests for get_default_config_path (lines 88-106)"""
 
     def test_finds_config_in_parent(self, tmp_path):
-        """Lines 88-93: walks up directory tree to find server.toml"""
+        """Lines 87-93: walks up directory tree from __file__ to find server.toml"""
+        # Arrange a directory tree: <tmp>/server.toml and a nested module dir.
         config_file = tmp_path / "server.toml"
         config_file.write_text("[server]")
+        nested = tmp_path / "personality" / "module_manager"
+        nested.mkdir(parents=True)
+        fake_module_file = nested / "__init__.py"
+        fake_module_file.write_text("")
+
         from personality.module_manager import get_default_config_path
-        with patch("personality.module_manager.Path") as MockPath:
-            # This is tricky since it uses __file__, let's just test the fallback paths
-            pass
+        # The function starts at Path(__file__).parent and walks up. Point
+        # __file__ at our nested fake module so it must climb to tmp_path.
+        with patch("personality.module_manager.__file__", str(fake_module_file)):
+            result = get_default_config_path()
+
+        # It must find the server.toml we wrote in the parent tree, not fall
+        # through to the relative fallback paths.
+        assert result == config_file
+        assert result.exists()
 
     def test_fallback_search_paths(self):
         """Lines 96-106: fallback paths searched"""

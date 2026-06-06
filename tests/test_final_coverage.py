@@ -196,7 +196,11 @@ class TestChatFinalCoverage:
             mock_llama, [], "system", "model"
         )
         chunks = asyncio.run(_async_gen_collect(gen))
-        assert isinstance(chunks, list)
+        # The engine task fails, so the generator MUST surface an error SSE
+        # chunk to the client and then close the stream with [DONE]
+        # (llama_cpp.py:117-119). A silent swallow is the regression we guard.
+        assert any("error" in c for c in chunks)
+        assert any("[DONE]" in c for c in chunks)
 
     def test_mlx_stream_exception_line_710_713(self):
         """Lines 710-713: MLX streaming general exception."""
@@ -207,7 +211,11 @@ class TestChatFinalCoverage:
 
         gen = _mlx_stream_generator(mock_mlx, [], "sys", "model")
         chunks = asyncio.run(_async_gen_collect(gen))
-        assert isinstance(chunks, list)
+        # The engine task fails, so the generator MUST surface an error SSE
+        # chunk to the client and then close the stream with [DONE]
+        # (mlx.py:76-78). A silent swallow is the regression we guard.
+        assert any("error" in c for c in chunks)
+        assert any("[DONE]" in c for c in chunks)
 
     def test_llama_cpp_stream_token_enqueue_fail_line_948_949(self):
         """Lines 948-949: token enqueue failure in llama.cpp stream."""
@@ -1747,7 +1755,13 @@ class TestRouteManagerFinal:
         routes = rm.register_module_routes(RouteRegistration(
             module_name="mod", api_component=sub_app, prefix="/prefix", component_type="app"
         ))
-        assert isinstance(routes, list)
+        # The sub_app exposes exactly one APIRoute (/sub); mounting under
+        # /prefix must register it as /prefix/sub (route_manager.py:146-156).
+        # The except branch returns [] on failure, so asserting the concrete
+        # path/count is what distinguishes success from a silent mount failure.
+        assert len(routes) == 1
+        assert routes[0]["path"] == "/prefix/sub"
+        assert routes[0]["module"] == "mod"
 
     def test_register_endpoint_routes(self):
         """Lines 179-184: register individual endpoints."""

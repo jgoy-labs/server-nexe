@@ -108,7 +108,6 @@ def app(ctx: click.Context, version: bool, no_banner: bool):
   Examples:
    nexe go
    nexe chat
-   nexe chat --rag
    nexe memory store "data"
    nexe model list
   """

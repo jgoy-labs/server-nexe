@@ -145,6 +145,7 @@ class Deduplicator:
   def clear_cache(self):
     """Clear in-memory cache (for testing or reset)"""
     self._seen_ids.clear()
+    self._seen_semantic.clear()
     logger.info("Deduplicator cache cleared")
 
   def get_stats(self) -> dict:

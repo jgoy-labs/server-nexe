@@ -49,6 +49,40 @@ path_traduccions = "languages"
     assert i18n.current_language == "ca-ES"
     assert i18n.fallback_language == "ca-ES"
 
+class TestI18nManagerProductionDefaults:
+  """PERS-002 regression: with no config (production defaults) the manager must
+  load the real personality/languages catalog (messages_*.json), not the
+  non-existent personality/core/languages + messages.json layout."""
+
+  def _project_root(self):
+    return Path(__file__).resolve().parents[3]
+
+  def test_default_translations_path_points_at_real_dir(self):
+    """The default path_traduccions must be the real languages dir."""
+    root = self._project_root()
+    i18n = I18nManager(config_path=Path("/nonexistent/path.toml"), base_path=root)
+    i18n.current_language = "en-US"
+    i18n.fallback_language = "en-US"
+    # Resolves a real catalog key -> NOT raw passthrough.
+    msg = i18n.t("core_metrics.collection.updated", module="m")
+    assert msg != "core_metrics.collection.updated"
+    assert "m" in msg
+
+  def test_default_loads_component_catalog_files(self):
+    """messages_*.json component files must be discovered and nested by prefix.
+
+    Fails with the old code which only loaded singular 'messages.json' under a
+    non-existent default directory -> empty translations.
+    """
+    root = self._project_root()
+    i18n = I18nManager(config_path=Path("/nonexistent/path.toml"), base_path=root)
+    i18n.current_language = "en-US"
+    i18n.fallback_language = "en-US"
+    assert i18n.t("core_events.events.callbacks_cleared", count=3) != \
+      "core_events.events.callbacks_cleared"
+    assert "en-US" in i18n.get_available_languages()
+
+
 class TestI18nTranslation:
   """Tests for translation functionality."""
 

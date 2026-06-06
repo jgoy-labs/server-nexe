@@ -50,6 +50,10 @@ class MultiLevelCache:
         self.l2_max_size_bytes = int(l2_max_size_gb * 1024 * 1024 * 1024)
         self.l2_ttl_seconds = l2_ttl_hours * 3600
         self._lock = asyncio.Lock()
+        # Run a size-based eviction sweep every N L2 writes so the disk store
+        # stays bounded without paying the cost on every single put().
+        self._l2_eviction_interval = 64
+        self._l2_writes_since_eviction = 0
         
         # L1 Cache (Python dict; OrderedDict with LRU would be better,
         # but using plain dict + simple eviction for simplicity)
@@ -223,13 +227,64 @@ class MultiLevelCache:
                     )
                     self.conn.commit()
 
-                    # Check cleanup (low probability or by size)
-                    # Simplified: skip cleanup on every write for performance
+                    # Periodic size-based eviction: amortise the cost over many
+                    # writes instead of sweeping on every put().
+                    self._l2_writes_since_eviction += 1
+                    if self._l2_writes_since_eviction >= self._l2_eviction_interval:
+                        self._l2_writes_since_eviction = 0
+                        self._evict_l2_by_size(cursor)
 
                 except Exception as e:
                     logger.warning(f"L2 cache write error: {e}")
                 finally:
                     cursor.close()
+
+    def _evict_l2_by_size(self, cursor: "sqlite3.Cursor") -> None:
+        """Evict the least-recently-accessed L2 rows until the stored payload
+        is back under ``l2_max_size_bytes``.
+
+        Size is estimated from the logical payload (``length(data)``) rather
+        than ``PRAGMA page_count``: deleted SQLite pages stay allocated until a
+        VACUUM, so a page-based estimate would never shrink within the loop and
+        could over-evict. The logical estimate decreases as rows are removed.
+
+        Must be called while holding ``self._lock`` with a live cursor on the
+        same connection (it does not re-acquire the lock).
+        """
+        if not self.conn:
+            return
+        try:
+            row = cursor.execute(
+                "SELECT COALESCE(SUM(length(data)), 0) FROM cache"
+            ).fetchone()
+            stored_bytes = row[0] if row else 0
+            if stored_bytes <= self.l2_max_size_bytes:
+                return
+
+            # Drop the oldest rows in batches until we are under budget (or the
+            # table is empty).
+            batch = max(1, self._l2_eviction_interval)
+            while stored_bytes > self.l2_max_size_bytes:
+                cursor.execute(
+                    """
+                    DELETE FROM cache
+                    WHERE key IN (
+                        SELECT key FROM cache
+                        ORDER BY last_accessed ASC
+                        LIMIT ?
+                    )
+                    """,
+                    (batch,)
+                )
+                if cursor.rowcount == 0:
+                    break
+                self.conn.commit()
+                row = cursor.execute(
+                    "SELECT COALESCE(SUM(length(data)), 0) FROM cache"
+                ).fetchone()
+                stored_bytes = row[0] if row else 0
+        except Exception as e:
+            logger.warning(f"L2 cache eviction error: {e}")
 
     def _add_to_l1(self, key: str, data: Any):
         """Add to L1 managing capacity."""

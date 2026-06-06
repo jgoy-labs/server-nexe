@@ -231,7 +231,12 @@ async def validate_all_request_inputs(request: Request) -> bool:
   """
   Complete request validation (headers, params, path).
 
-  This is the main validation dependency to use in FastAPI endpoints.
+  OPT-IN helper, not a globally-applied dependency. The primary injection
+  defense for user content runs inside the chat pipeline (prompt sanitizer);
+  this function is an additional defense-in-depth check that an endpoint can
+  attach explicitly via Depends() when it wants header/param/path validation.
+  It is NOT registered as a global middleware/dependency, so adding it to an
+  endpoint is the only way it runs.
 
   Args:
     request: FastAPI Request object

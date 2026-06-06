@@ -103,7 +103,7 @@ def print_modules_table(clis: List[CLIInfo]):
     console.print(table)
     console.print()
     console.print("[dim]Usage: nexe <alias> <command> [args][/dim]")
-    console.print("[dim]Example: nexe chat --rag[/dim]")
+    console.print("[dim]Example: nexe chat[/dim]")
 
   else:
     print("\nAvailable CLI Modules")

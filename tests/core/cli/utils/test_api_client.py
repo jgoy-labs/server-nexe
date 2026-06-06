@@ -52,8 +52,14 @@ class TestNexeAPIClientInit:
         from core.cli.utils.api_client import NexeAPIClient
         import logging
         with caplog.at_level(logging.WARNING):
-            client = NexeAPIClient()
-        # No crash, just a warning
+            with patch("dotenv.load_dotenv"):  # Prevent .env from re-injecting a key
+                client = NexeAPIClient()
+        # The "no key" path must actually emit the warning and leave api_key empty.
+        assert client.api_key is None
+        assert any(
+            r.levelno == logging.WARNING and "No API Key" in r.getMessage()
+            for r in caplog.records
+        ), f"expected a 'No API Key' warning, got: {[r.getMessage() for r in caplog.records]}"
 
     def test_headers_include_api_key(self, monkeypatch):
         monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-key-789")

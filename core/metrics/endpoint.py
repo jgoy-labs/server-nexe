@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 from typing import Dict, Any
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from prometheus_client import (
   generate_latest,
   CONTENT_TYPE_LATEST,
@@ -41,14 +41,14 @@ metrics_router = APIRouter(tags=["metrics"])
   },
   operation_id="get_metrics",
 )
-async def get_metrics() -> Response:
+async def get_metrics(request: Request) -> Response:
   """
   Returns metrics in Prometheus format.
 
   Returns:
     Response with text/plain metrics
   """
-  await _update_module_health()
+  await _update_module_health(request)
 
   metrics_output = generate_latest(REGISTRY)
 
@@ -115,27 +115,36 @@ async def get_metrics_json() -> Dict[str, Any]:
     },
   }
 
-async def _update_module_health() -> None:
+async def _update_module_health(request: Request) -> None:
   """
   Updates module health status before exposing metrics.
+
+  Reads the *live* module instances stored on ``app.state.modules`` by the
+  lifespan startup (each value is a loaded module instance, not a ModuleInfo
+  dataclass) and calls ``instance.get_health()`` on them. A fresh
+  ``ModuleManager()`` would be empty (it does not discover on __init__) and
+  ``ModuleInfo`` exposes no ``get_health`` — the health lives on ``.instance``.
   """
   try:
-    from personality.module_manager.module_manager import ModuleManager
+    modules = getattr(request.app.state, "modules", None) or {}
 
-    mm = ModuleManager()
-    modules = mm.list_modules()
+    seen: set = set()
+    for instance in modules.values():
+      module_name = getattr(instance, "name", None)
+      if not module_name or module_name in seen:
+        # app.state.modules can register an instance under both its module_id
+        # and its .name; only report each module once.
+        continue
+      seen.add(module_name)
+      get_health = getattr(instance, "get_health", None)
+      if not callable(get_health):
+        continue
+      try:
+        health = get_health()
+        status = health.get("status", "unknown")
+        set_module_health(module_name, status)
+      except Exception:
+        set_module_health(module_name, "unhealthy")
 
-    for module_info in modules:
-      module_name = module_info.name
-      if hasattr(module_info, "get_health"):
-        try:
-          health = module_info.get_health()  # pyright: ignore[reportAttributeAccessIssue]  # duck-typed via hasattr
-          status = health.get("status", "unknown")
-          set_module_health(module_name, status)
-        except Exception:
-          set_module_health(module_name, "unhealthy")
-
-  except ImportError:
-    pass
   except Exception as e:
     logger.debug("module_health_update_skipped", extra={"reason": str(e)})

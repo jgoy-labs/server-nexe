@@ -379,6 +379,54 @@ class TestEventSystemSyncEmit:
 
     assert len(event_system._event_history) == 1
 
+class TestEventSystemI18nKeysResolve:
+  """PERS-001 regression: the i18n keys the event system emits must resolve
+  against the real translation catalog (component.section.key = core_events.*)."""
+
+  def _live_i18n(self):
+    from pathlib import Path
+    from personality.i18n.modular_i18n import ModularI18nManager
+
+    project_root = Path(__file__).resolve().parents[3]
+    i18n = ModularI18nManager(base_path=project_root)
+    i18n.current_language = "en-US"
+    i18n.fallback_language = "en-US"
+    i18n.reload_translations()
+    i18n.current_language = "en-US"
+    i18n.fallback_language = "en-US"
+    return i18n
+
+  def test_callback_lifecycle_keys_resolve(self):
+    """Register/remove/clear keys must resolve (not raw passthrough).
+
+    Fails with old keys 'module_manager.events.*' which do not exist.
+    """
+    i18n = self._live_i18n()
+    for key in (
+      'core_events.events.callback_error',
+      'core_events.events.callback_registered',
+      'core_events.events.callback_removed',
+      'core_events.events.callbacks_cleared',
+    ):
+      assert i18n.t(key, error='E', callback_name='cb', count=1) != key
+
+  def test_sync_keys_resolve(self):
+    """emit_event_sync warning keys must resolve under core_events.sync.*."""
+    i18n = self._live_i18n()
+    for key in (
+      'core_events.sync.called_from_active_loop',
+      'core_events.sync.added_to_history_only',
+    ):
+      assert i18n.t(key, event_type='t') != key
+
+  def test_old_event_keys_are_dead(self):
+    """The previously used keys do not exist (would return raw)."""
+    i18n = self._live_i18n()
+    assert i18n.t('module_manager.events.callback_error', error='x') == \
+      'module_manager.events.callback_error'
+    assert i18n.t('sync.called_from_active_loop') == 'sync.called_from_active_loop'
+
+
 class TestCreateSystemEvent:
   """Tests for create_system_event helper."""
 

@@ -70,10 +70,18 @@ class TestConfig:
 
     def test_get_config_path(self):
         """Line 222: get_config_path initializes if needed."""
+        from pathlib import Path
         from core.config import get_config_path, reset_config
         reset_config()
         result = get_config_path()
-        assert result is not None or result is None  # May be None if no config found
+        # get_config_path() triggers get_config() initialization and returns
+        # either the resolved config path (a Path) or None when no config file
+        # was found — never a garbage/other type.
+        assert result is None or isinstance(result, Path)
+        if result is not None:
+            # When a path is returned it must be the real, existing file that
+            # get_config() loaded (not a stale or fabricated value).
+            assert result.exists()
 
 
 # ─── core/metrics/registry.py ─────────────────────────────────────────

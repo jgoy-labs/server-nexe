@@ -32,7 +32,20 @@ def generate_env_file(project_root, model_config=None):
         lang = get_lang()
         env_tmp = env_file.parent / f".env.tmp.{os.getpid()}"
         try:
-            with open(env_tmp, "w") as f:
+            # Create the tmp file with 0o600 FROM THE START. Writing the
+            # secrets (NEXE_PRIMARY_API_KEY, NEXE_CSRF_SECRET) into a
+            # default-umask file (typically 0o644, group/world readable) and
+            # only chmod'ing the final file after the rename leaves a TOCTOU
+            # window where the secrets are world-readable. os.open with
+            # O_CREAT|O_WRONLY|O_EXCL and mode 0o600 guarantees the file is
+            # born with restrictive permissions. Same defence as
+            # core/crypto/keys.py::_try_file_set.
+            tmp_fd = os.open(
+                env_tmp,
+                os.O_CREAT | os.O_WRONLY | os.O_EXCL,
+                0o600,
+            )
+            with os.fdopen(tmp_fd, "w") as f:
                 f.write(f"NEXE_PRIMARY_API_KEY={secure_key}\n")
                 f.write(f"NEXE_CSRF_SECRET={csrf_secret}\n")
                 f.write("NEXE_ENV=production\n")

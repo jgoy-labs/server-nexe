@@ -12,11 +12,12 @@ description = "Interfície web estil Ollama per demostrar el sistema modular de 
 location = "plugins/web_ui_module/"
 permanent = false
 note = "Plugin de demostració del sistema modular"
-# El mòdul s'activa també en sidecar mode, exposant només els JSON
-# endpoints (/ui/info, /ui/backends, /ui/sessions, /ui/chat, etc.). Les
-# rutes HTML/static (/, /static/*) es salten condicionalment a routes.py
-# perquè la webview Tauri serveix la seva pròpia UI. Era massa
-# agressiva — desactivava la lògica JSON que la Tauri necessita.
+# El mòdul s'activa també en sidecar mode. Revert (2026-05-21, vegeu
+# api/routes.py): el sidecar torna a servir la UI completa, així que
+# register_static_routes() registra les rutes HTML/static (/, /static/*)
+# SEMPRE, sense condició de sidecar. L'split anterior (saltar-les en
+# sidecar perquè Tauri servís una UI local) es va revertir; la webview
+# Tauri apunta a http://127.0.0.1:{port}/ quan el sidecar està llest.
 disabled_in_sidecar = false
 
 [module.metadata]

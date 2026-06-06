@@ -33,7 +33,7 @@ expires: null
 - [Document Upload with Session Isolation](#document-upload-with-session-isolation)
 - [Document Ingestion](#document-ingestion)
   - [System documentation (nexe_documentation)](#system-documentation-nexe_documentation)
-  - [User knowledge (user_knowledge via CLI)](#user-knowledge-user_knowledge-via-cli)
+  - [System documentation via CLI (nexe_documentation)](#system-documentation-via-cli-nexe_documentation)
 - [Context Building](#context-building)
 - [RAG Weight Visualization](#rag-weight-visualization)
 - [Smart Pruning (personal_memory collection)](#smart-pruning-personal_memory-collection)
@@ -215,8 +215,9 @@ Documents uploaded via the Web UI are indexed into `user_knowledge` collection w
 - Ingested via `core/ingest/ingest_docs.py`
 - Recreates the collection on each ingestion (fresh start)
 
-### User knowledge (user_knowledge via CLI)
+### System documentation via CLI (nexe_documentation)
 - Source: `knowledge/` folder (ca/en/es subfolders)
+- Target collection: `nexe_documentation` (default since the F7 fix; the `ingest_knowledge` API still accepts `target_collection="user_knowledge"` for ad-hoc docs)
 - Chunking: 1500 characters per chunk by default (configurable via RAG header chunk_size), overlap = max(50, chunk_size/10)
 - Ingested via `core/ingest/ingest_knowledge.py`
 - Supports RAG headers with metadata (`#!RAG id=..., priority=...`)

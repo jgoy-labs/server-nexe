@@ -185,3 +185,9 @@ class TestLoadModuleTranslations:
         mgr = I18nManager(config_path=config, base_path=tmp_path)
         mgr.translations["en-US"] = {}
         mgr._load_module_translations(tmp_path / "plugins" / "moduls", "en-US")
+
+        loaded = mgr.translations["en-US"]["test_mod"]
+        # The reserved "_meta" key must be stripped during load...
+        assert "_meta" not in loaded
+        # ...while real keys are loaded intact.
+        assert loaded["key"] == "val"

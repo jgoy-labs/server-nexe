@@ -190,8 +190,7 @@ nexe go         # arrenca el servidor al port 9119
 Un cop en marxa:
 
 ```bash
-nexe chat               # xat interactiu
-nexe chat --rag         # xat amb memòria RAG
+nexe chat               # xat interactiu (memòria RAG activa per defecte)
 nexe memory store "Barcelona és la capital de Catalunya"
 nexe memory recall "capital Catalunya"
 nexe status             # estat del sistema

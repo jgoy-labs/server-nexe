@@ -184,9 +184,15 @@ class TestModuleManagerAsync:
             from personality.module_manager.module_manager import ModuleManager
             return ModuleManager(config_path=config_file)
 
-    def test_load_module_not_found(self):
-        """Lines 176-182: load_module for non-existent module."""
-        pass  # Tested via discover_modules flow
+    def test_load_module_not_found(self, mm):
+        """Lines 202-207: load_module returns False for a module that is not
+        present and is not discovered."""
+        # No modules registered and discovery finds nothing -> must return False.
+        mm.discovery.discover = AsyncMock(return_value=[])
+        result = asyncio.run(mm.load_module("definitely_missing_module"))
+        assert result is False
+        # The early-return path must NOT have reached the lifecycle loader.
+        assert "definitely_missing_module" not in mm._modules
 
     def test_start_system_and_shutdown(self, mm):
         """Lines 193-208: start_system and shutdown_system."""

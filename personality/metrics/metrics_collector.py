@@ -44,11 +44,11 @@ class MetricsCollector:
       return self.i18n.t(key, **kwargs)
     
     fallbacks = {
-      'metrics.updated': f"Metrics updated for {kwargs.get('module', 'unknown')}",
-      'metrics.history_cleared': f"Metrics history cleared: {kwargs.get('count', 0)} entries",
-      'metrics.snapshot_created': "Metrics snapshot created"
+      'core_metrics.collection.updated': f"Metrics updated for {kwargs.get('module', 'unknown')}",
+      'core_metrics.history.cleared': f"Metrics history cleared: {kwargs.get('count', 0)} entries",
+      'core_metrics.collection.snapshot_created': "Metrics snapshot created"
     }
-    
+
     return fallbacks.get(key, key)
   
   def update_module_metrics(self, modules: Dict[str, ModuleInfo], 
@@ -71,7 +71,7 @@ class MetricsCollector:
         
         module_info.last_activity = datetime.now(timezone.utc)
       
-      msg = self._get_message('metrics.updated', module=module_name)
+      msg = self._get_message('core_metrics.collection.updated', module=module_name)
       logger.debug(msg,
             component="metrics",
             module=module_name,
@@ -240,7 +240,7 @@ class MetricsCollector:
       count = len(self._metrics_history)
       self._metrics_history.clear()
       
-      msg = self._get_message('metrics.history_cleared', count=count)
+      msg = self._get_message('core_metrics.history.cleared', count=count)
       logger.info(msg, component="metrics")
       
       return count

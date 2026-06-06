@@ -85,8 +85,9 @@ async def ingest_documentation():
             # Add file header for context
             header = f"[Document: {filename}]\n\n"
 
-            # Chunk the content
-            chunks = chunk_text(content)
+            # Chunk the content (AP-04: pass module constants explicitly so the
+            # ingest config is the source of truth, not chunk_text's own defaults).
+            chunks = chunk_text(content, CHUNK_SIZE, CHUNK_OVERLAP)
 
             for i, chunk in enumerate(chunks):
                 # SECURITY: Filter RAG injection patterns before storing

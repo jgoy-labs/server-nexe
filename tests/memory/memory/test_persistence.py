@@ -446,7 +446,13 @@ class TestPersistenceManagerAdditional:
         pm.close()
 
     async def test_get_recent_timeout(self, tmp_path):
-        """Lines 533-535: get_recent timeout returns empty list."""
+        """get_recent returns [] when the SQLite read exceeds the preload timeout.
+
+        get_recent wraps run_in_executor in asyncio.wait_for with
+        self._sqlite_preload_timeout (persistence_sqlite.py); on
+        asyncio.TimeoutError it must swallow the error and return [].
+        """
+        import time
         from unittest.mock import patch
 
         db_path = tmp_path / "test.db"
@@ -459,28 +465,19 @@ class TestPersistenceManagerAdditional:
             vector_size=768
         )
 
-        with patch("memory.memory.engines.persistence.SQLITE_PRELOAD_TIMEOUT", 0.001):
-            # Make executor block for longer than timeout
-            import time
-            original_run = pm.executor.submit
+        # Force the timeout to fire: tiny budget + a blocking _connect_sqlite
+        # so the executor task can never finish in time.
+        pm._sqlite_preload_timeout = 0.05
 
-            def slow_fn(*args, **kwargs):
-                time.sleep(0.5)
-                return []
+        def _slow_connect(*args, **kwargs):
+            time.sleep(1.0)
+            raise AssertionError("should have timed out before connecting")
 
-            with patch.object(pm, 'executor') as mock_exec:
-                import concurrent.futures
-                future = concurrent.futures.Future()
-                future.set_result([])
+        with patch.object(pm, '_connect_sqlite', side_effect=_slow_connect):
+            result = await pm.get_recent(limit=10)
 
-                async def slow_get_recent():
-                    await asyncio.sleep(10)
-
-                # Simpler approach: directly call and let timeout happen
-                import asyncio
-                result = await pm.get_recent(limit=10)
-                # Either returns results or empty list (both valid)
-                assert isinstance(result, list)
+        # Must hit the asyncio.TimeoutError branch -> empty list, not raise.
+        assert result == []
 
         pm.close()
 
@@ -505,10 +502,13 @@ class TestPersistenceManagerAdditional:
 
         pm.close()
 
-    async def test_close_with_qdrant_error(self, tmp_path):
-        """Lines 546-547: close handles qdrant close error."""
-        from unittest.mock import MagicMock
+    async def test_close_releases_resources(self, tmp_path):
+        """close() shuts down the executor and drops the Qdrant reference.
 
+        The QdrantClient is shared via the pool, so close() intentionally
+        does NOT call qdrant.close(); it only shuts the executor and clears
+        self.qdrant. This asserts that documented behavior.
+        """
         db_path = tmp_path / "test.db"
         qdrant_path = tmp_path / "qdrant"
 
@@ -519,9 +519,15 @@ class TestPersistenceManagerAdditional:
             vector_size=768
         )
 
-        # Make qdrant.close() fail
-        pm.qdrant.close = MagicMock(side_effect=Exception("close error"))
-        pm.close()  # Should not raise
+        executor = pm.executor
+
+        pm.close()  # Must not raise
+
+        # Qdrant reference dropped (shared client is NOT closed here).
+        assert pm.qdrant is None
+        # Executor was shut down: submitting new work must raise.
+        with pytest.raises(RuntimeError):
+            executor.submit(lambda: None)
 
     async def test_collection_already_exists(self, tmp_path):
         """Line 173: collection already exists at init."""

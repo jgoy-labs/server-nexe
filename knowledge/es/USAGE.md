@@ -81,7 +81,7 @@ En macOS con la app de bandeja instalada, el servidor arranca automaticamente al
 |---------|-------------|
 | `./nexe go` | Iniciar servidor (Qdrant + FastAPI + bandeja) |
 | `./nexe chat` | Chat interactivo por CLI |
-| `./nexe chat --rag` | Chat con memoria RAG activada |
+| `./nexe chat` | La memoria RAG esta activada por defecto (no existe ningun flag `--rag`; `--no-rag` se acepta pero se ignora — el pipeline siempre gestiona el contexto) |
 | `./nexe chat --verbose` | Chat con detalles de peso RAG por fuente |
 | `./nexe status` | Estado del servidor |
 | `./nexe modules` | Listar modulos y CLIs cargados |

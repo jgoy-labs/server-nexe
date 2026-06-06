@@ -160,8 +160,7 @@ cd server-nexe
 
 ```bash
 ./nexe go                    # Arrancar servidor -> http://127.0.0.1:9119
-./nexe chat                  # Chat interactivo por CLI
-./nexe chat --rag            # Chat con memoria RAG
+./nexe chat                  # Chat interactivo por CLI (memoria RAG activa por defecto)
 ./nexe memory store "texto"  # Guardar en memoria
 ./nexe memory recall "query" # Recuperar de memoria
 ./nexe status                # Estado del sistema

@@ -323,3 +323,33 @@ class TestLoadTranslationFile:
         result = mgr._load_translation_file(test_file)
         assert result is True
         assert mgr.translations["en-US"]["mycomp"]["nested_key"] == "nested_value"
+
+
+class TestNoOrphanTranslationFiles:
+    """PERS-004 regression: the real personality/languages catalog must contain
+    only loader-discoverable messages_*.json files. Any other .json (e.g. the
+    deleted integration/route_manager.json and loading/loader.json orphans) is
+    never loaded and must not exist."""
+
+    def _languages_root(self):
+        project_root = Path(__file__).resolve().parents[3]
+        return project_root / "personality" / "languages"
+
+    def test_only_messages_glob_json_present(self):
+        root = self._languages_root()
+        assert root.is_dir()
+        orphans = [
+            str(p.relative_to(root))
+            for p in root.rglob("*.json")
+            if not p.name.startswith("messages_")
+        ]
+        assert orphans == [], f"Orphan (non-loadable) translation files: {orphans}"
+
+    def test_no_orphan_subdirectories(self):
+        """The integration/ and loading/ subdirs must not exist (orphan layout)."""
+        root = self._languages_root()
+        for lang_dir in root.iterdir():
+            if not lang_dir.is_dir():
+                continue
+            assert not (lang_dir / "integration").exists()
+            assert not (lang_dir / "loading").exists()

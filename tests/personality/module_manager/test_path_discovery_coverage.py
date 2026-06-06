@@ -112,12 +112,52 @@ class TestAddConfiguredPaths:
         pd._add_configured_paths()
 
     def test_additional_paths_not_dict(self, tmp_path):
-        """Lines 210-211: add_paths_cfg not a dict."""
+        """Lines 202-205: malformed (scalar string) additional_paths must coerce to []
+        and add NOTHING. This is discriminating: tmp_path is seeded with real dirs whose
+        names match the characters of the malformed string ("invalid" -> i,n,v,a,l,i,d),
+        so if the isinstance guard is removed the string would be iterated char-by-char
+        and each existing single-char dir WOULD be added. The correct guard adds none."""
         from personality.module_manager.path_discovery import PathDiscovery
+        # Seed dirs matching every char of the malformed value "invalid".
+        for ch in set("invalid"):
+            (tmp_path / ch).mkdir()
         config = {"personality": {"orchestrator": {"additional_paths": "invalid"}}}
         pd = PathDiscovery(config=config)
         pd.base_path = tmp_path
         pd._add_configured_paths()
+        # Correct guard: scalar coerced to [] -> nothing added despite matching dirs.
+        # Broken guard (no isinstance): "invalid" iterated -> seeded char dirs added.
+        assert pd._discovered_paths == set()
+
+    def test_add_additional_paths_coercion_unit(self, tmp_path):
+        """Unit test of _add_additional_paths coercion: list vs dict vs scalar.
+        Pins exactly what each input shape contributes, so removing the isinstance
+        branches changes the discovered set and fails this test."""
+        from personality.module_manager.path_discovery import PathDiscovery
+        target = tmp_path / "real"
+        target.mkdir()
+        resolved = target.resolve()
+
+        # 1) list shape: paths taken directly -> existing dir added.
+        pd_list = PathDiscovery()
+        pd_list.base_path = tmp_path
+        pd_list._add_additional_paths({"additional_paths": ["real"]})
+        assert resolved in pd_list._discovered_paths
+
+        # 2) dict shape: paths read from the 'paths' key -> existing dir added.
+        pd_dict = PathDiscovery()
+        pd_dict.base_path = tmp_path
+        pd_dict._add_additional_paths({"additional_paths": {"paths": ["real"]}})
+        assert resolved in pd_dict._discovered_paths
+
+        # 3) scalar string shape whose chars match a seeded dir: must add NOTHING.
+        #    A broken guard would iterate "real" and add the seeded char dirs below.
+        for ch in set("real"):
+            (tmp_path / ch).mkdir()
+        pd_scalar = PathDiscovery()
+        pd_scalar.base_path = tmp_path
+        pd_scalar._add_additional_paths({"additional_paths": "real"})
+        assert pd_scalar._discovered_paths == set()
 
     def test_additional_paths_not_list(self, tmp_path):
         """Lines 214-215: paths value is not a list."""
@@ -299,57 +339,54 @@ class TestPathDiscoveryLoggerAvailable:
         with patch.object(pdm, "logger") as mock_log:
             yield mock_log
 
-    def test_discover_all_paths_with_logger(self, tmp_path):
+    def test_discover_all_paths_with_logger(self, tmp_path, mock_logger):
         """Lines 134-138: LOGGER_AVAILABLE True branch."""
         from personality.module_manager.path_discovery import PathDiscovery
-        import personality.module_manager.path_discovery as pdm
-        try:
-            pd = PathDiscovery(strict=True)
-            pd.base_path = tmp_path
-            paths = pd.discover_all_paths()
-            assert isinstance(paths, list)
-        finally:
-            pass
+        pd = PathDiscovery(strict=True)
+        pd.base_path = tmp_path
+        paths = pd.discover_all_paths()
+        # Empty tmp_path in strict mode: no known/auto/configured paths discovered.
+        assert paths == []
+        # The discovery summary must be logged with the (zero) path count.
+        mock_logger.info.assert_called_once()
+        _, kwargs = mock_logger.info.call_args
+        assert kwargs.get("count") == 0
 
     def test_add_known_paths_with_logger(self, tmp_path):
         """Lines 149-150: LOGGER_AVAILABLE True for _add_known_paths."""
         from personality.module_manager.path_discovery import PathDiscovery
-        import personality.module_manager.path_discovery as pdm
-        try:
-            (tmp_path / "plugins" / "core").mkdir(parents=True)
-            pd = PathDiscovery(strict=True)
-            pd.base_path = tmp_path
-            pd._add_known_paths()
-        finally:
-            pass
+        (tmp_path / "plugins" / "core").mkdir(parents=True)
+        pd = PathDiscovery(strict=True)
+        pd.base_path = tmp_path
+        pd._add_known_paths()
+        # The existing known path must be discovered (resolved).
+        assert (tmp_path / "plugins" / "core").resolve() in pd._discovered_paths
 
-    def test_auto_discover_with_logger_max_dirs(self, tmp_path):
+    def test_auto_discover_with_logger_max_dirs(self, tmp_path, mock_logger):
         """Lines 166-167: max dirs with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
-        import personality.module_manager.path_discovery as pdm
-        try:
-            for i in range(105):
-                (tmp_path / f"dir_{i:03d}").mkdir()
-            pd = PathDiscovery(strict=False)
-            pd.base_path = tmp_path
-            pd._auto_discover_paths()
-        finally:
-            pass
+        for i in range(105):
+            (tmp_path / f"dir_{i:03d}").mkdir()
+        pd = PathDiscovery(strict=False)
+        pd.base_path = tmp_path
+        pd._auto_discover_paths()
+        # Exceeding MAX_DIRS (100) must trip the max_dirs_reached warning branch.
+        assert mock_logger.warning.called
+        warning_msgs = [str(c.args[0]) for c in mock_logger.warning.call_args_list]
+        assert any("100" in m for m in warning_msgs)
 
     def test_auto_discover_with_logger_module_found(self, tmp_path):
         """Lines 184-185: auto-discovered path with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
-        import personality.module_manager.path_discovery as pdm
-        try:
-            parent = tmp_path / "plugins"
-            parent.mkdir()
-            mod = parent / "modules"
-            mod.mkdir()
-            pd = PathDiscovery(strict=False)
-            pd.base_path = tmp_path
-            pd._auto_discover_paths()
-        finally:
-            pass
+        parent = tmp_path / "plugins"
+        parent.mkdir()
+        mod = parent / "modules"
+        mod.mkdir()
+        pd = PathDiscovery(strict=False)
+        pd.base_path = tmp_path
+        pd._auto_discover_paths()
+        # The subdir matching a module pattern ('module' in 'modules') must be discovered.
+        assert mod.resolve() in pd._discovered_paths
 
     def test_auto_discover_permission_with_logger(self, tmp_path):
         """Lines 188-189: permission error with logger."""
@@ -366,32 +403,28 @@ class TestPathDiscoveryLoggerAvailable:
     def test_add_configured_paths_with_logger(self, tmp_path):
         """Lines 206-207: configured path added with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
-        import personality.module_manager.path_discovery as pdm
-        try:
-            modules_dir = tmp_path / "custom_modules"
-            modules_dir.mkdir()
-            config = {"personality": {"orchestrator": {"modules_path": str(modules_dir)}}}
-            pd = PathDiscovery(config=config)
-            pd.base_path = tmp_path
-            pd._add_configured_paths()
-        finally:
-            pass
+        modules_dir = tmp_path / "custom_modules"
+        modules_dir.mkdir()
+        config = {"personality": {"orchestrator": {"modules_path": str(modules_dir)}}}
+        pd = PathDiscovery(config=config)
+        pd.base_path = tmp_path
+        pd._add_configured_paths()
+        # The configured existing modules_path must be discovered (resolved).
+        assert modules_dir.resolve() in pd._discovered_paths
 
     def test_add_configured_additional_paths_with_logger(self, tmp_path):
         """Lines 222-223: additional paths with logger."""
         from personality.module_manager.path_discovery import PathDiscovery
-        import personality.module_manager.path_discovery as pdm
-        try:
-            extra = tmp_path / "extra"
-            extra.mkdir()
-            config = {"personality": {"orchestrator": {
-                "additional_paths": {"paths": [str(extra)]}
-            }}}
-            pd = PathDiscovery(config=config)
-            pd.base_path = tmp_path
-            pd._add_configured_paths()
-        finally:
-            pass
+        extra = tmp_path / "extra"
+        extra.mkdir()
+        config = {"personality": {"orchestrator": {
+            "additional_paths": {"paths": [str(extra)]}
+        }}}
+        pd = PathDiscovery(config=config)
+        pd.base_path = tmp_path
+        pd._add_configured_paths()
+        # The configured existing additional path must be discovered (resolved).
+        assert extra.resolve() in pd._discovered_paths
 
     def test_scan_for_modules_with_logger(self, tmp_path):
         """Lines 245-247: modules found with logger."""

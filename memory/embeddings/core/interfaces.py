@@ -281,6 +281,8 @@ class EncoderStats(BaseModel):
     device: Device (cpu, mps, cuda)
     total_encodings: Total encodings generated
     total_requests: Alias for total_encodings (compatibility)
+    cache_hits: Number of requests served from cache
+    cache_misses: Number of requests that missed the cache
     cache_hit_rate: Cache hit ratio (0.0-1.0)
     avg_latency_ms: Average latency
     p90_latency_ms: P90 latency
@@ -291,6 +293,8 @@ class EncoderStats(BaseModel):
   device: str
   total_encodings: int = 0
   total_requests: int = 0
+  cache_hits: int = 0
+  cache_misses: int = 0
   cache_hit_rate: float = 0.0
   avg_latency_ms: float = 0.0
   p90_latency_ms: float = 0.0

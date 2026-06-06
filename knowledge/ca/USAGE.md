@@ -81,7 +81,7 @@ A macOS amb l'app de safata instal·lada, el servidor arrenca automaticament en 
 |---------|-------------|
 | `./nexe go` | Arrencar servidor (Qdrant + FastAPI + safata) |
 | `./nexe chat` | Xat interactiu per CLI |
-| `./nexe chat --rag` | Xat amb memoria RAG activada |
+| `./nexe chat` | La memoria RAG esta activada per defecte (no existeix cap flag `--rag`; `--no-rag` s'accepta pero s'ignora — el pipeline sempre gestiona el context) |
 | `./nexe chat --verbose` | Xat amb detall de pesos RAG per font |
 | `./nexe status` | Estat del servidor |
 | `./nexe modules` | Llistar moduls carregats i CLIs |
