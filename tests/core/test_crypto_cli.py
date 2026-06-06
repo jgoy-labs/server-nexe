@@ -55,9 +55,9 @@ class TestCheckEncryptionStatus:
         import logging
         from core.crypto import check_encryption_status
 
-        db_dir = tmp_path / "memory"
+        db_dir = tmp_path / "vectors"
         db_dir.mkdir()
-        (db_dir / "memories.db").write_bytes(b"SQLite format 3\x00" + b"\x00" * 100)
+        (db_dir / "memory_v1.db").write_bytes(b"SQLite format 3\x00" + b"\x00" * 100)
 
         with caplog.at_level(logging.WARNING, logger="core.crypto"):
             check_encryption_status(tmp_path)
@@ -87,9 +87,9 @@ class TestCheckEncryptionStatus:
         import logging
         from core.crypto import check_encryption_status
 
-        db_dir = tmp_path / "memory"
+        db_dir = tmp_path / "vectors"
         db_dir.mkdir()
-        (db_dir / "memories.db").write_bytes(os.urandom(100))
+        (db_dir / "memory_v1.db").write_bytes(os.urandom(100))
 
         with caplog.at_level(logging.WARNING, logger="core.crypto"):
             check_encryption_status(tmp_path)

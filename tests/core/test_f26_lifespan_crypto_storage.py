@@ -61,3 +61,26 @@ def test_no_project_root_returns_none():
     result = _resolve_storage_root(_make_state(None))
 
   assert result is None
+
+
+def test_check_plaintext_db_does_not_disable_crypto_forat1(tmp_path):
+  """FORAT #1 regression: a plaintext memory_v1.db must NOT disable crypto.
+
+  Disabling it (the historical behaviour) would skip the store's auto-migration
+  and, on the next boot, open the already-encrypted metadata_memory.db without a
+  key → "file is not a database" → broken memory subsystem. The check must be
+  purely informational and return crypto_enabled unchanged.
+  """
+  from core.lifespan_crypto import _check_plaintext_db_exists
+
+  vectors = tmp_path / "storage" / "vectors"
+  vectors.mkdir(parents=True)
+  (vectors / "memory_v1.db").write_bytes(b"SQLite format 3\x00" + b"\x00" * 100)
+
+  fake_cfg = SimpleNamespace(is_sidecar=False, data_dir=tmp_path / "unused")
+  with patch("core.sidecar_config.get_sidecar_config", return_value=fake_cfg):
+    result = _check_plaintext_db_exists(
+      _make_state(tmp_path), crypto_enabled=True, normalized_env="auto"
+    )
+
+  assert result is True  # crypto stays ON → the store auto-migrates the plaintext DB

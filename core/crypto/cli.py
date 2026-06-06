@@ -27,6 +27,19 @@ def _get_crypto_provider():
     return CryptoProvider()
 
 
+def _resolve_memory_dbs():
+    """Return (memory_v1_db, metadata_memory_db) under the live vectors/ dir.
+
+    D-001: the tooling used to point at storage/memory/memories.db — a path the
+    server never writes. The real SQLite DBs are memory_v1.db (SQLiteStore) and
+    metadata_memory.db (PersistenceManager). resolve_qdrant_path is given an
+    ABSOLUTE default so the CLI works when run outside the repo root.
+    """
+    from memory.memory._paths import resolve_qdrant_path
+    vectors_dir = resolve_qdrant_path(get_storage_path("vectors"))
+    return vectors_dir / "memory_v1.db", vectors_dir / "metadata_memory.db"
+
+
 @click.group()
 def encryption():
     """Encryption management commands."""
@@ -56,23 +69,37 @@ def encrypt_all(force):
     crypto = _get_crypto_provider()
     click.echo("Master key loaded.")
 
-    # 1. SQLite migration
-    db_path = storage / "memory" / "memories.db"
-    if db_path.exists():
-        from memory.memory.engines.persistence import PersistenceManager
-        if PersistenceManager._is_plaintext_sqlite(db_path):
-            click.echo(f"Migrating {db_path} to SQLCipher...")
+    # 1. SQLite migration — the two live DBs under vectors/ (D-001).
+    from memory.memory.engines.persistence import PersistenceManager
+    from memory.memory.storage.sqlite_store import SQLiteStore
+    memory_v1_db, metadata_db = _resolve_memory_dbs()
+
+    # 1a. memory_v1.db (SQLiteStore) — migrates in its constructor.
+    if memory_v1_db.exists():
+        if SQLiteStore._is_plaintext_sqlite(memory_v1_db):
+            click.echo(f"Migrating {memory_v1_db} to SQLCipher...")
+            SQLiteStore(memory_v1_db, crypto_provider=crypto).close()
+            click.echo("  memory_v1.db migration complete.")
+        else:
+            click.echo(f"  {memory_v1_db} already encrypted.")
+    else:
+        click.echo("  No memory_v1.db found (will be created encrypted on first use).")
+
+    # 1b. metadata_memory.db (PersistenceManager) — migrates in its constructor.
+    if metadata_db.exists():
+        if PersistenceManager._is_plaintext_sqlite(metadata_db):
+            click.echo(f"Migrating {metadata_db} to SQLCipher...")
             pm = PersistenceManager(
-                db_path=db_path,
+                db_path=metadata_db,
                 collection_name="nexe_memory",
                 crypto_provider=crypto,
             )
             pm.close()
-            click.echo("  SQLite migration complete.")
+            click.echo("  metadata_memory.db migration complete.")
         else:
-            click.echo(f"  {db_path} already encrypted.")
+            click.echo(f"  {metadata_db} already encrypted.")
     else:
-        click.echo("  No memories.db found (will be created encrypted on first use).")
+        click.echo("  No metadata_memory.db found.")
 
     # 2. Session migration
     sessions_path = storage / "sessions"
@@ -139,15 +166,15 @@ def encryption_status():
     except ImportError:
         click.echo("SQLCipher: NOT INSTALLED (pip install sqlcipher3)")
 
-    # Check DB
-    db_path = storage / "memory" / "memories.db"
-    if db_path.exists():
-        from memory.memory.engines.persistence import PersistenceManager
-        is_plain = PersistenceManager._is_plaintext_sqlite(db_path)
-        status = "PLAIN (unencrypted)" if is_plain else "ENCRYPTED"
-        click.echo(f"memories.db: {status}")
-    else:
-        click.echo("memories.db: NOT FOUND")
+    # Check the live DBs under vectors/ (D-001).
+    from memory.memory.engines.persistence import PersistenceManager
+    for _db in _resolve_memory_dbs():
+        if _db.exists():
+            is_plain = PersistenceManager._is_plaintext_sqlite(_db)
+            state = "PLAIN (unencrypted)" if is_plain else "ENCRYPTED"
+            click.echo(f"{_db.name}: {state}")
+        else:
+            click.echo(f"{_db.name}: NOT FOUND")
 
     # Check sessions
     sessions_path = storage / "sessions"

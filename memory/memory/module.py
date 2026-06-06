@@ -198,6 +198,7 @@ class MemoryModule:
         self._memory_service = MemoryService(
           db_path=vectors_path / "memory_v1.db",
           qdrant_path=str(qdrant_path),
+          crypto_provider=crypto,
         )
         await self._memory_service.initialize()
         logger.info("MemoryService initialized")

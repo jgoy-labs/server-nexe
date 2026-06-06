@@ -42,6 +42,7 @@ class MemoryService:
         config: Optional[MemoryConfig] = None,
         db_path: Optional[Path] = None,
         qdrant_path: Optional[str] = None,
+        crypto_provider=None,
     ):
         """Initialize pipeline components and storage backends."""
         # resol path via SidecarConfig en sidecar mode
@@ -67,7 +68,7 @@ class MemoryService:
         # so all callers share the same RLock-protected SQLiteStore. Any
         # future refactor that drops the singleton must also coordinate
         # SQLiteStore access across instances (file lock or per-call conn).
-        self._store = SQLiteStore(self._db_path)
+        self._store = SQLiteStore(self._db_path, crypto_provider=crypto_provider)
         self._vector_index = None  # Lazy init to avoid Qdrant dependency in tests
         self._initialized = False
 
@@ -91,7 +92,10 @@ class MemoryService:
             return True
         self._ensure_vector_index()
         self._initialized = True
-        logger.info("MemoryService initialized (db=%s)", self._db_path)
+        logger.info(
+            "MemoryService initialized (db=%s, encrypted=%s)",
+            self._db_path, self._store._encrypted,
+        )
         return True
 
     # ── Write path ──

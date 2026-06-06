@@ -50,7 +50,7 @@ Six asset categories are identified. They drive the threats in §6.
 
 Conversation history, uploaded documents, RAG embeddings and the long-term memories written by MEM_SAVE. Stored in:
 
-- `storage/memory/memories.db` (SQLite; SQLCipher-encrypted when `NEXE_ENCRYPTION_ENABLED` is not `false` and `sqlcipher3` is available).
+- `storage/vectors/memory_v1.db` (SQLiteStore) and `storage/vectors/metadata_memory.db` (PersistenceManager) (SQLite; SQLCipher-encrypted when `NEXE_ENCRYPTION_ENABLED` is not `false` and `sqlcipher3` is available; an existing plaintext DB is migrated automatically on first open).
 - Chat sessions on disk: `.enc` files (encrypted) or `.json` files (plaintext fallback when encryption is off), managed by `SessionManager` (`plugins/web_ui_module/module.py`).
 - RAG Qdrant collection `user_knowledge` for uploaded documents. The document text itself lives in the `TextStore` (separated from the vector payload so Qdrant payloads do not leak full text).
 

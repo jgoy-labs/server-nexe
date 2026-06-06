@@ -63,14 +63,22 @@ def check_encryption_status(storage_path=None):
 
     warnings = []
 
-    # Check SQLite
-    db_path = storage_path / "memory" / "memories.db"
-    if db_path.exists():
+    # Check the real SQLite DBs under vectors/ (D-001: storage/memory/memories.db
+    # was a phantom path the server never writes).
+    try:
+        from memory.memory._paths import resolve_qdrant_path
+        vectors_dir = resolve_qdrant_path(storage_path / "vectors")
+    except Exception:  # nosec B110: best-effort resolution; fall back to legacy layout
+        vectors_dir = storage_path / "vectors"
+    for _db_name in ("memory_v1.db", "metadata_memory.db"):
+        db_path = vectors_dir / _db_name
+        if not db_path.exists():
+            continue
         try:
             with open(db_path, 'rb') as f:
                 header = f.read(16)
             if header == b'SQLite format 3\x00':
-                warnings.append("memories.db is unencrypted")
+                warnings.append(f"{_db_name} is unencrypted")
         except (PermissionError, OSError) as e:  # nosec B110: best-effort SQLite header probe at startup
             logger.debug("check_encryption_status: could not read %s: %s", db_path, e)
 

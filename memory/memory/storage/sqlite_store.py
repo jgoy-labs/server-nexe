@@ -13,6 +13,7 @@ import functools
 import hashlib
 import json
 import logging
+import os
 import sqlite3
 import threading
 import uuid
@@ -23,6 +24,17 @@ from typing import Any, Dict, List, Optional
 from .sqlite_migrations import init_db
 
 logger = logging.getLogger(__name__)
+
+# SQLCipher: try to import, fall back to plain sqlite3 (mirror of
+# engines/persistence_sqlite.py). Typed as Any so calls type-check in both
+# branches; runtime guards on SQLCIPHER_AVAILABLE protect against None.
+sqlcipher: Any
+try:
+    from sqlcipher3 import dbapi2 as sqlcipher  # type: ignore[no-redef]  # pyright: ignore[reportMissingImports]
+    SQLCIPHER_AVAILABLE = True
+except ImportError:
+    sqlcipher = None
+    SQLCIPHER_AVAILABLE = False
 
 VALID_TABLES = frozenset({
     "profile", "profile_history", "episodic", "staging",
@@ -68,9 +80,14 @@ class SQLiteStore:
     user_id is mandatory on all tables from day 1.
     """
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, crypto_provider: Any = None):
         self._db_path = Path(db_path)
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        # mode= is modulated by the umask → explicit chmod to guarantee 0o700 on
+        # the dir holding PII (parity with engines/persistence_sqlite.py).
+        self._db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self._db_path.parent, 0o700)
+        self._crypto = crypto_provider
+        self._encrypted = False
         self._conn: Optional[sqlite3.Connection] = None
         # Reentrant so that an operation can call _connect() under the lock
         # and then call into a helper that also takes the lock without
@@ -104,21 +121,223 @@ class SQLiteStore:
                     self._conn = None
 
             if self._conn is None:
-                self._conn = sqlite3.connect(
-                    str(self._db_path),
-                    check_same_thread=False,
-                )
+                if self._encrypted and SQLCIPHER_AVAILABLE:
+                    # Re-apply the key on EVERY (re)open: DreamingCycle closes the
+                    # cached connection after each cycle, and a SQLCipher handle
+                    # opened without the key fails with "file is not a database".
+                    # PRAGMA key must run first, before any other statement.
+                    self._conn = sqlcipher.connect(
+                        str(self._db_path),
+                        check_same_thread=False,
+                    )
+                    dek = self._crypto.derive_key("sqlite")
+                    self._conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is an internal crypto key
+                    self._conn.execute("PRAGMA cipher_compatibility = 4")
+                else:
+                    self._conn = sqlite3.connect(
+                        str(self._db_path),
+                        check_same_thread=False,
+                    )
                 self._conn.execute("PRAGMA busy_timeout = 5000")
                 self._conn.execute("PRAGMA journal_mode=WAL")
                 self._conn.execute("PRAGMA foreign_keys = ON")
-                self._conn.row_factory = sqlite3.Row
+                self._conn.row_factory = (
+                    sqlcipher.Row
+                    if (self._encrypted and SQLCIPHER_AVAILABLE)
+                    else sqlite3.Row
+                )
             return self._conn
 
     def _init_db(self):
-        """Create all tables if they don't exist."""
+        """Create all tables if they don't exist.
+
+        When a crypto provider is present, migrate any plaintext DB to SQLCipher
+        and quarantine an encrypted DB that no longer opens with the current key
+        BEFORE opening the connection (parity with SqliteStorageMixin._init_sqlite).
+        """
+        if self._crypto and SQLCIPHER_AVAILABLE:
+            self._migrate_to_encrypted()
+            # A failed migration leaves the file plaintext: only treat the DB as
+            # encrypted if it genuinely is now. Marking a still-plaintext file as
+            # encrypted would make _quarantine rename the plaintext PII to
+            # .unrecoverable-* (data loss + PII left in clear).
+            if self._db_path.exists() and self._is_plaintext_sqlite(self._db_path):
+                self._encrypted = False
+                logger.error(
+                    "memory_v1.db remains plaintext after migration; opening in "
+                    "plaintext mode. PII is NOT encrypted — check sqlcipher3 and disk space."
+                )
+            else:
+                self._encrypted = True
+                self._quarantine_unreadable_encrypted_db()
+            self._sweep_plaintext_leftovers()
+        elif self._crypto and not SQLCIPHER_AVAILABLE:
+            logger.warning(
+                "CryptoProvider provided but sqlcipher3 not installed. "
+                "memory_v1.db will NOT be encrypted. Install sqlcipher3 for encryption."
+            )
         conn = self._connect()
         init_db(conn)
-        logger.info("SQLiteStore initialized at %s", self._db_path)
+        logger.info(
+            "SQLiteStore initialized at %s (encrypted=%s)",
+            self._db_path, self._encrypted,
+        )
+
+    # ── SQLCipher migration / quarantine (parity with SqliteStorageMixin) ──
+
+    @staticmethod
+    def _is_plaintext_sqlite(path: Path) -> bool:
+        """Check if a file is an unencrypted SQLite DB (plaintext header)."""
+        if not path.exists() or path.stat().st_size == 0:
+            return False
+        with open(path, "rb") as f:
+            header = f.read(16)
+        return header == b"SQLite format 3\x00"
+
+    @staticmethod
+    def _table_row_counts(conn) -> Dict[str, int]:
+        """Row count per user table — used to verify a migration lost no data."""
+        cur = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name NOT LIKE 'sqlite_%'"
+        )
+        counts: Dict[str, int] = {}
+        for (name,) in cur.fetchall():
+            counts[name] = conn.execute(
+                f'SELECT COUNT(*) FROM "{name}"'  # nosec B608: name from sqlite_master, not user input
+            ).fetchone()[0]
+        return counts
+
+    def _migrate_to_encrypted(self) -> None:
+        """Migrate an existing plaintext DB to SQLCipher, in place.
+
+        Verifies the encrypted copy opens and preserves every table's row count
+        before swapping it in, then removes the plaintext backup (Decision B:
+        leaving memory_v1.db.bak in clear would keep open the stolen-device hole
+        this change closes). On any failure the plaintext DB is left untouched.
+        """
+        if not self._crypto or not SQLCIPHER_AVAILABLE:
+            return
+        if not self._is_plaintext_sqlite(self._db_path):
+            return
+
+        logger.info("Migrating plain SQLite to SQLCipher: %s", self._db_path)
+        tmp_path = self._db_path.with_name(self._db_path.name + ".encrypted")
+        if tmp_path.exists():
+            # Discard a partial .encrypted left by a prior crashed migration so we
+            # always start from a clean target (else iterdump's CREATE TABLE would
+            # collide with the stale tables).
+            tmp_path.unlink()
+        try:
+            plain_conn = sqlite3.connect(str(self._db_path))
+            plain_conn.execute("PRAGMA busy_timeout = 5000")
+
+            enc_conn = sqlcipher.connect(str(tmp_path))
+            dek = self._crypto.derive_key("sqlite")
+            enc_conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is an internal crypto key
+            enc_conn.execute("PRAGMA cipher_compatibility = 4")
+            enc_conn.execute("PRAGMA busy_timeout = 5000")
+
+            for line in plain_conn.iterdump():
+                if line.strip() in ("BEGIN TRANSACTION;", "COMMIT;"):
+                    continue
+                enc_conn.execute(line)
+            enc_conn.commit()
+
+            # Verify no data was lost before destroying the plaintext.
+            plain_counts = self._table_row_counts(plain_conn)
+            enc_counts = self._table_row_counts(enc_conn)
+            plain_conn.close()
+            enc_conn.close()
+            if plain_counts != enc_counts:
+                raise RuntimeError(
+                    f"row-count mismatch after migration: {plain_counts} != {enc_counts}"
+                )
+
+            for suffix in ("-wal", "-shm"):
+                sidecar = self._db_path.with_name(self._db_path.name + suffix)
+                if sidecar.exists():
+                    sidecar.unlink()
+
+            backup_path = self._db_path.with_name(self._db_path.name + ".bak")
+            self._db_path.rename(backup_path)
+            backup_path.chmod(0o600)
+            tmp_path.rename(self._db_path)
+            # Decision B: encrypted copy verified in place → drop the plaintext PII.
+            backup_path.unlink()
+            logger.info("Migration complete and verified; plaintext backup removed.")
+        except Exception as e:
+            logger.error("SQLCipher migration failed: %s. Keeping plain DB.", e)
+            if tmp_path.exists():
+                tmp_path.unlink()
+
+    def _quarantine_unreadable_encrypted_db(self) -> bool:
+        """Archive an encrypted DB that won't open with the current key.
+
+        A DB left by a previous install with a different MASTER_KEY raises
+        "file is not a database" on first use and would break the whole memory
+        subsystem; quarantining keeps it recoverable while letting the app boot.
+        """
+        if not (self._encrypted and SQLCIPHER_AVAILABLE):
+            return False
+        if not self._db_path.exists() or self._db_path.stat().st_size == 0:
+            return False
+
+        db_error_cls = (
+            sqlcipher.DatabaseError if SQLCIPHER_AVAILABLE else sqlite3.DatabaseError
+        )
+        try:
+            conn = sqlcipher.connect(str(self._db_path))
+            dek = self._crypto.derive_key("sqlite")
+            conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is an internal crypto key
+            conn.execute("PRAGMA cipher_compatibility = 4")
+            try:
+                conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+            finally:
+                conn.close()
+            return False
+        except db_error_cls as e:
+            if "file is not a database" not in str(e).lower():
+                raise
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            quarantine = self._db_path.with_name(
+                f"{self._db_path.name}.unrecoverable-{ts}"
+            )
+            logger.warning(
+                "SQLCipher DB %s cannot be opened with the current MASTER_KEY "
+                "(likely a previous install with a different key). Quarantining "
+                "to %s and starting fresh.",
+                self._db_path, quarantine.name,
+            )
+            self._db_path.rename(quarantine)
+            for suffix in ("-wal", "-shm"):
+                sidecar = self._db_path.with_name(self._db_path.name + suffix)
+                if sidecar.exists():
+                    sidecar.unlink()
+            return True
+
+    def _sweep_plaintext_leftovers(self) -> None:
+        """Remove a stale plaintext .bak left by a crash mid-migration.
+
+        _migrate_to_encrypted renames the plaintext DB to <db>.bak and unlinks it
+        only after swapping in the encrypted copy; a SIGKILL/power-cut in that
+        window leaves a plaintext .bak with all the PII, which nothing else would
+        ever clean (the second boot sees an already-encrypted DB and skips
+        migration). Once the live DB is encrypted, that .bak is pure leak with no
+        recovery value → delete it.
+        """
+        if not self._encrypted:
+            return
+        bak = self._db_path.with_name(self._db_path.name + ".bak")
+        try:
+            if bak.exists() and self._is_plaintext_sqlite(bak):
+                bak.unlink()
+                logger.warning(
+                    "Removed orphan plaintext backup %s (crash-window leftover).",
+                    bak.name,
+                )
+        except OSError as e:  # nosec B110: best-effort cleanup
+            logger.debug("Could not sweep plaintext leftover %s: %s", bak, e)
 
     # ── Profile CRUD ──
 
@@ -407,4 +626,4 @@ class SQLiteStore:
         return [row["name"] for row in cursor.fetchall()]
 
 
-__all__ = ["SQLiteStore"]
+__all__ = ["SQLiteStore", "SQLCIPHER_AVAILABLE"]

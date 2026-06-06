@@ -54,9 +54,17 @@ def _check_sqlcipher_required(normalized_env: str, sqlcipher_available: bool) ->
 
 
 def _check_plaintext_db_exists(server_state, crypto_enabled: bool, normalized_env: str) -> bool:
-    """P1-D: In auto mode, disable encryption if an existing plain-text DB is detected.
+    """In auto mode, LOG (never disable) when a plaintext memory DB is present.
 
-    Returns the (possibly updated) crypto_enabled flag.
+    D-001/Decision A (2026-06-06): the SQLite stores now auto-migrate a plaintext
+    DB to SQLCipher on first open (SQLiteStore._migrate_to_encrypted /
+    SqliteStorageMixin._migrate_to_encrypted), so encryption must stay ENABLED for
+    the migration to run. Disabling it here would (a) skip the migration and leave
+    PII in clear, and (b) on the next boot open the ALREADY-encrypted
+    metadata_memory.db without a key → "file is not a database" → broken memory
+    subsystem. The previous code pointed at storage/memory/memories.db (a path the
+    server never writes), so it never fired; it now inspects the real vectors/ DBs
+    and only surfaces an informational log. Returns crypto_enabled unchanged.
     """
     if not (crypto_enabled and normalized_env in ('', 'auto')):
         return crypto_enabled
@@ -65,22 +73,27 @@ def _check_plaintext_db_exists(server_state, crypto_enabled: bool, normalized_en
     if not storage_path_check:
         return crypto_enabled
 
-    db_path = storage_path_check / "memory" / "memories.db"
-    if not db_path.exists():
-        return crypto_enabled
-
     try:
-        with open(db_path, 'rb') as _f:
-            _header = _f.read(16)
-        if _header == b'SQLite format 3\x00':
-            logger.warning(
-                "Encryption auto=ON skipped: existing plain-text memories.db detected. "
-                "Run 'nexe encryption encrypt-all' to migrate data, then restart. "
-                "Set NEXE_ENCRYPTION_ENABLED=false to suppress this warning."
-            )
-            return False
+        from memory.memory._paths import resolve_qdrant_path
+        vectors_dir = resolve_qdrant_path(storage_path_check / "vectors")
     except Exception:  # nosec B110
-        pass
+        vectors_dir = storage_path_check / "vectors"
+
+    for name in ("memory_v1.db", "metadata_memory.db"):
+        db_path = vectors_dir / name
+        try:
+            if not db_path.exists() or db_path.stat().st_size == 0:
+                continue
+            with open(db_path, 'rb') as _f:
+                _header = _f.read(16)
+            if _header == b'SQLite format 3\x00':
+                logger.info(
+                    "Encryption auto=ON: %s is plaintext and will be migrated to "
+                    "SQLCipher on first open (a verified plaintext backup is removed "
+                    "after migration).", name,
+                )
+        except Exception:  # nosec B110
+            pass
 
     return crypto_enabled
 
@@ -114,10 +127,17 @@ async def _startup_encryption(server_state) -> None:
         crypto_enabled = _check_plaintext_db_exists(server_state, crypto_enabled, normalized_env)
         _apply_crypto_provider(server_state, crypto_enabled, normalized_env, SQLCIPHER_AVAILABLE)
 
+        # The informational status check must never undo the crypto provider we
+        # just set: a failure here would otherwise fall into the outer handler and
+        # null crypto_provider, leaving an already-encrypted DB to be opened
+        # without a key on the next boot ("file is not a database").
         warn_unencrypted = encryption_config.get('warn_unencrypted', True)
         if warn_unencrypted:
-            storage_path = _resolve_storage_root(server_state)
-            check_encryption_status(storage_path)
+            try:
+                storage_path = _resolve_storage_root(server_state)
+                check_encryption_status(storage_path)
+            except Exception as warn_exc:  # nosec B110: informational only, must not disable crypto
+                logger.debug("check_encryption_status failed (non-fatal): %s", warn_exc)
 
     except Exception as e:
         if isinstance(e, RuntimeError):
