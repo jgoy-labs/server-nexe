@@ -11,18 +11,23 @@
 class NexeUI {
     constructor() {
         this.apiKey = localStorage.getItem('nexe_api_key') || null;
-        // Cross-origin handoff: when Tauri navigates the webview to
-        // http://127.0.0.1:{port}/?nexe_api_key=K (post-revert), the
-        // splash's localStorage at tauri://localhost is not visible here.
-        // Persist the key into the sidecar-origin localStorage and scrub
-        // the URL so the secret doesn't linger in history. No-op when the
-        // query param is absent (standalone browser / manual login flow).
-        const _qsApiKey = new URLSearchParams(window.location.search).get('nexe_api_key');
+        // Cross-origin handoff: when Tauri (splash) or the onboarding wizard
+        // navigates the webview to http://127.0.0.1:{port}/ui/#nexe_api_key=K,
+        // the splash's localStorage at tauri://localhost is not visible here.
+        // The key travels in the URL *fragment* so it is never sent to the
+        // server and never reaches uvicorn's access log (K-001). Persist it
+        // into the sidecar-origin localStorage and scrub the URL so the secret
+        // doesn't linger in history. A legacy ?nexe_api_key= query is still
+        // honoured for backward compatibility. No-op when both are absent
+        // (standalone browser / manual login flow).
+        const _hashApiKey = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('nexe_api_key');
+        const _qsApiKey = _hashApiKey || new URLSearchParams(window.location.search).get('nexe_api_key');
         if (_qsApiKey) {
             localStorage.setItem('nexe_api_key', _qsApiKey);
             this.apiKey = _qsApiKey;
             const _clean = new URL(window.location.href);
             _clean.searchParams.delete('nexe_api_key');
+            _clean.hash = '';
             window.history.replaceState(null, '', _clean.toString());
         }
         // Language: server (injected data-attr) > html lang > browser > english
@@ -2237,6 +2242,41 @@ class NexeUI {
                 renderer.html = function(token) {
                     const raw = typeof token === 'string' ? token : (token.text || '');
                     return _escape(raw);
+                };
+                // I-001: marked v15 dropped scheme sanitization, so a model-emitted
+                // [click](javascript:…) (e.g. via RAG/web poisoning) would render as a
+                // live, clickable anchor. Override link/image to allow only safe schemes
+                // (http/https/mailto); anything else degrades to plain text.
+                const _isSafeHref = function(href) {
+                    if (!href) return false;
+                    try {
+                        return ['http:', 'https:', 'mailto:'].includes(
+                            new URL(href, 'http://localhost').protocol
+                        );
+                    } catch (_) {
+                        return false;
+                    }
+                };
+                renderer.link = function(token) {
+                    const href = (token && typeof token === 'object') ? (token.href || '') : token;
+                    let text;
+                    try {
+                        text = (token && token.tokens && this.parser)
+                            ? this.parser.parseInline(token.tokens)
+                            : _escape((token && token.text) || '');
+                    } catch (_) {
+                        text = _escape((token && token.text) || '');
+                    }
+                    if (!_isSafeHref(href)) return text;
+                    const title = (token && token.title) ? ` title="${_escape(token.title)}"` : '';
+                    return `<a href="${_escape(href)}"${title} target="_blank" rel="noopener noreferrer">${text}</a>`;
+                };
+                renderer.image = function(token) {
+                    const href = (token && typeof token === 'object') ? (token.href || '') : token;
+                    const alt = _escape((token && token.text) || '');
+                    if (!_isSafeHref(href)) return alt;
+                    const title = (token && token.title) ? ` title="${_escape(token.title)}"` : '';
+                    return `<img src="${_escape(href)}" alt="${alt}"${title}>`;
                 };
                 return marked.parse(cleaned, { breaks: true, gfm: true, renderer });
             } catch (e) {

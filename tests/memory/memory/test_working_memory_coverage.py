@@ -9,6 +9,15 @@ class TestWorkingMemory:
         entry_id = wm.add("user1", "sess1", "Hello world")
         assert entry_id.startswith("wm-")
 
+    def test_ids_unique_across_flush_mem002(self):
+        """MEM-002 regression: ids must stay unique across flushes. The old
+        'wm-{len(entries)}' reset to 0 after _do_flush cleared the list, so ids
+        collided with already-flushed entries."""
+        from memory.memory.working_memory import WorkingMemory
+        wm = WorkingMemory(flush_interval=5)  # flush (and clear) every 5 adds
+        ids = [wm.add("u", "s", f"fact {i}") for i in range(12)]
+        assert len(set(ids)) == 12, f"id collision after flush: {ids}"
+
     def test_get_all_empty(self):
         from memory.memory.working_memory import WorkingMemory
         wm = WorkingMemory()

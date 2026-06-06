@@ -990,6 +990,12 @@ async def finalize_post(body: FinalizeBody) -> JSONResponse:
     state is written atomically to `$NEXE_DATA_DIR/onboarding.json`; the next
     sidecar restart will pick it up and configure the right engine.
     """
+    # Symmetric guard with GET /finalize (INST-001): once onboarding has
+    # completed, this unauthenticated, repeatable endpoint must not keep
+    # re-serving NEXE_PRIMARY_API_KEY to any local process. A clean re-install
+    # wipes the data dir, which resets is_completed().
+    if OnboardingState.is_completed():
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
     try:
         model_path = _resolve_model_path(body.engine, body.model_id)
     except ValueError as exc:

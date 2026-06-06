@@ -49,6 +49,20 @@ class TestFlashMemory:
     result = await flash.get("nonexistent_id")
     assert result is None
 
+  async def test_restore_does_not_evict_refreshed_entry_mem001(self):
+    """MEM-001 regression: a stale (expiry, id) tuple left behind by an earlier
+    store() must NOT evict the live, refreshed entry. _cleanup_expired now
+    re-validates the entry's current expiry before deleting (lazy-delete)."""
+    import heapq
+    flash = FlashMemory(default_ttl_seconds=3600)  # long TTL → not expired
+    entry = MemoryEntry(entry_type=MemoryType.EPISODIC, content="x", source="t")
+    await flash.store(entry)  # pushes a fresh, far-future tuple
+    # Simulate the leftover tuple from a prior, shorter-lived store of the same id.
+    heapq.heappush(flash._expiry_heap, (0.0, entry.id))  # epoch → "expired" tuple
+    removed = await flash.cleanup_expired()
+    assert removed == 0                                # stale tuple ignored
+    assert await flash.get(entry.id) is not None       # live entry survives
+
   async def test_ttl_expiration(self):
     """Entry expires after TTL"""
     flash = FlashMemory(default_ttl_seconds=60)

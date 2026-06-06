@@ -110,6 +110,26 @@ class TestFinalize:
         resp = client.get("/installer/finalize")
         assert resp.status_code == 404
 
+    def test_post_returns_404_when_onboarding_already_completed(
+        self, client, isolated_data_dir
+    ):
+        """INST-001: once onboarding is complete, the unauthenticated, repeatable
+        POST must not keep re-serving NEXE_PRIMARY_API_KEY (symmetric with GET).
+        The guard fires before model resolution, so the body need only be valid."""
+        from core.onboarding_state import OnboardingState
+
+        OnboardingState.save(
+            engine="mlx",
+            model_id="mlx-community/test-model",
+            model_path=str(isolated_data_dir / "test-model"),
+            hf_token=None,
+        )
+        resp = client.post(
+            "/installer/finalize",
+            json={"engine": "mlx", "model_id": "mlx-community/test-model"},
+        )
+        assert resp.status_code == 404
+
 
 class TestSafeModelBasename:
     """Basename guard helper used by _resolve_model_path and the streamers."""

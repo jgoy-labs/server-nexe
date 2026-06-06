@@ -40,6 +40,7 @@ class WorkingMemory:
         """
         self._entries: Dict[str, List[Dict[str, Any]]] = {}
         self._turn_counts: Dict[str, int] = {}
+        self._id_counters: Dict[str, int] = {}
         self._flush_callback = flush_callback
         self._flush_interval = flush_interval
         self._lock = threading.Lock()
@@ -62,7 +63,7 @@ class WorkingMemory:
         """
         key = self._session_key(user_id, session_id)
         entry: Dict[str, Any] = {
-            "id": f"wm-{len(self._entries.get(key, []))}",
+            "id": None,  # MEM-002: assigned under the lock (see below)
             "user_id": user_id,
             "session_id": session_id,
             "content": content,
@@ -74,6 +75,12 @@ class WorkingMemory:
             if key not in self._entries:
                 self._entries[key] = []
                 self._turn_counts[key] = 0
+            # MEM-002: derive the id under the lock from a monotonic per-session
+            # counter that _do_flush does NOT reset. 'wm-{len(entries)}' restarted
+            # at 0 after every flush — colliding with already-flushed ids — and the
+            # len() read outside the lock let two concurrent add()s mint the same id.
+            self._id_counters[key] = self._id_counters.get(key, 0) + 1
+            entry["id"] = f"wm-{self._id_counters[key]}"
             self._entries[key].append(entry)
             self._turn_counts[key] += 1
 
@@ -207,10 +214,12 @@ class WorkingMemory:
                 count = len(self._entries.get(key, []))
                 self._entries.pop(key, None)
                 self._turn_counts.pop(key, None)
+                self._id_counters.pop(key, None)
                 return count
             count = sum(len(v) for v in self._entries.values())
             self._entries.clear()
             self._turn_counts.clear()
+            self._id_counters.clear()
             return count
 
     def _atexit_flush(self):

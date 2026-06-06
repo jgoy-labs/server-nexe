@@ -246,6 +246,30 @@ def test_title_ending_with_dot_not_title():
     assert chunker._is_title("1. Introduction")  # Numbered list IS a title even with dot
 
 
+def test_overlap_is_applied_mem003():
+  """MEM-003 regression: with chunk_overlap > 0, consecutive chunks must overlap
+  (a later chunk starts before the previous one ends). Before the fix the param
+  was stored but never applied, so the real overlap was always 0."""
+  chunker = SmartChunker(max_chunk_size=1500, chunk_overlap=50, min_chunk_size=10)
+  # Three paragraphs, each > 80 chars (never mistaken for a title) and below
+  # max_chunk_size (so each becomes its own chunk).
+  para = ("This is a sufficiently long paragraph that comfortably exceeds eighty "
+          "characters so it is never treated as a section title by the heuristic.")
+  content = f"{para}\n\n{para}\n\n{para}"
+  result = chunker.chunk_document(content, "doc-mem003")
+  assert result.chunk_count >= 2
+  overlaps = [
+    result.chunks[i].char_start < result.chunks[i - 1].char_end
+    for i in range(1, len(result.chunks))
+  ]
+  assert any(overlaps), (
+    f"chunk_overlap not applied: {[(c.char_start, c.char_end) for c in result.chunks]}"
+  )
+  for c in result.chunks:
+    assert c.char_start >= 0
+    assert c.char_end > c.char_start
+
+
 """
 Test Coverage SmartChunker:
 ✅ test_empty_document - Empty document

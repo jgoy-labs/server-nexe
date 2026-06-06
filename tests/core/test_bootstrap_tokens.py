@@ -129,6 +129,22 @@ class TestBootstrapMasterToken:
         info = self.manager.get_bootstrap_token()
         assert info["used"] is False
 
+    def test_real_generated_token_round_trip_b001(self):
+        """B-001 regression: a real Nexe-prefixed token validates after the
+        endpoint's .strip() normalization, but the historical .strip().upper()
+        does NOT match — the 'Nexe-' prefix is mixed-case and the SQL lookup is
+        case-sensitive (BINARY). Existing tests used lowercase tokens, so they
+        never exercised this round-trip and the bug shipped silently."""
+        from core.lifespan_tokens import generate_bootstrap_token
+        token = generate_bootstrap_token()
+        assert token.startswith("Nexe-")  # mixed-case prefix
+        # Endpoint normalizes input with .strip() (no .upper()) → must match.
+        self.manager.set_bootstrap_token(token, ttl_minutes=30)
+        assert self.manager.validate_master_bootstrap(token.strip()) is True
+        # The old .strip().upper() corrupts the prefix to 'NEXE-' → never matches.
+        self.manager.set_bootstrap_token(token, ttl_minutes=30)  # reset used flag
+        assert self.manager.validate_master_bootstrap(token.strip().upper()) is False
+
 
 class TestBootstrapRateLimit:
     def setup_method(self):

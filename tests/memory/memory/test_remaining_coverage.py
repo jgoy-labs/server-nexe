@@ -54,7 +54,14 @@ class TestFlashMemoryCoverage:
             from memory.memory.models.memory_entry import MemoryEntry
             from memory.memory.models.memory_types import MemoryType
             flash = FlashMemory(default_ttl_seconds=1800)
-            entry = MemoryEntry(entry_type=MemoryType.EPISODIC, content="Expired entry", source="test")
+            # MEM-001: cleanup now re-validates the entry's real expiry before
+            # deleting, so the entry must be GENUINELY expired (past timestamp +
+            # min TTL of 60s), not merely have a stale heap tuple on a live entry.
+            entry = MemoryEntry(
+                entry_type=MemoryType.EPISODIC, content="Expired entry", source="test",
+                timestamp=datetime.now(timezone.utc) - timedelta(seconds=120),
+                ttl_seconds=60,
+            )
             await flash.store(entry)
             flash._expiry_heap = [(0.0, entry.id)]
             removed = await flash.cleanup_expired()

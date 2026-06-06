@@ -99,6 +99,7 @@ class SmartChunker:
       chunks = self._chunk_by_sentences(content, document_id)
 
     chunks = self._merge_small_chunks(chunks)
+    chunks = self._apply_overlap(chunks)
 
     for i, chunk in enumerate(chunks):
       chunk.chunk_index = i
@@ -297,6 +298,36 @@ class SmartChunker:
         chunk_type="paragraph"
       )
       chunks.append(chunk)
+
+    return chunks
+
+  def _apply_overlap(
+    self,
+    chunks: List[ChunkMetadata]
+  ) -> List[ChunkMetadata]:
+    """
+    Apply chunk_overlap between consecutive chunks (MEM-003).
+
+    SmartChunker is position-based: a chunk's text is content[char_start:char_end].
+    To overlap, each chunk after the first starts chunk_overlap chars earlier, so
+    it carries the tail of the previous chunk as a prefix (mirrors TextChunker's
+    overlap). char_start is clamped to the previous chunk's char_start so a short
+    previous chunk is never swallowed whole, and never goes below 0. Without this
+    the advertised chunk_overlap was stored but never applied (real overlap = 0).
+
+    Args:
+      chunks: List of chunks (after merge)
+
+    Returns:
+      The same list with char_start adjusted for overlap.
+    """
+    if self.chunk_overlap <= 0:
+      return chunks
+
+    for i in range(1, len(chunks)):
+      prev = chunks[i - 1]
+      cur = chunks[i]
+      cur.char_start = max(prev.char_start, max(0, cur.char_start - self.chunk_overlap))
 
     return chunks
 

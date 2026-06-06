@@ -151,7 +151,11 @@ class FlashMemory:
 
       heapq.heappop(self._expiry_heap)
 
-      if entry_id in self._store:
+      # MEM-001: a re-store() pushes a fresh (expiry, id) tuple without purging
+      # the old one, so a stale tuple can surface here while the live entry has
+      # been refreshed. Re-validate the entry's current expiry before deleting
+      # (lazy-delete) — otherwise a refreshed entry is evicted prematurely.
+      if entry_id in self._store and self._is_expired(self._store[entry_id]):
         del self._store[entry_id]
         deleted_count += 1
 

@@ -162,7 +162,10 @@ async def bootstrap_session(
   - Full audit logging
   """
   client_ip = request.client.host if request.client else "unknown"
-  token = bootstrap_data.token.strip().upper()
+  # B-001: no .upper() — the stored token keeps its mixed-case 'Nexe-' prefix
+  # (generate_bootstrap_token) and the SQL lookup is case-sensitive (BINARY),
+  # so uppercasing the input would never match a valid token.
+  token = bootstrap_data.token.strip()
 
   _validate_bootstrap_env()
 
