@@ -176,4 +176,4 @@ Be respectful and constructive. This is a personal project maintained in spare t
 
 ---
 
-*v1.0.5 · Apache 2.0 · Jordi Goy*
+*v1.0.6 · Apache 2.0 · Jordi Goy*

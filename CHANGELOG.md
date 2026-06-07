@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.6] — 2026-06-07
+
+### Security
+
+- **Memory at rest is now encrypted with SQLCipher** (`memory_v1.db`); crypto tooling paths fixed.
+- **Skip the OS keyring in sidecar mode** to avoid a macOS Keychain ACL hang at boot.
+- **Hardened key endpoints and bootstrap-token handling**; fixed several memory/RAG bugs.
+- **Signing identity moved to an environment variable**; info leaks dropped and log hygiene tightened.
+
+### Fixed
+
+- **MLX and Llama.cpp streaming errors are surfaced to the client** instead of failing silently.
+- **Audit P3 batch — 66 fixes with tests** across memory, plugins, personality, installer, docs and CI.
+- Path-traversal and stale-lock fixes; warn on an unparseable `OLLAMA_HOST`; corrected `mlx_module` manifest routes.
+- Broke the `lifespan` / `lifespan_crypto` import cycle; CI now points at `tests/`.
+
+### Changed
+
+- MLX: reuse the KV cache on the VLM generation path; i18n and server modularization.
+- Loader: dropped the unused `module_has_router` / `module_has_specialists` exports.
+- Tests: unified the `nexe_flow` mock into a single root conftest; the live suite now fails (instead of skipping) on a slow sidecar boot.
+
 ## [1.0.5] — 2026-05-29
 
 ### Changed

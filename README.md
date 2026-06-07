@@ -42,7 +42,7 @@
 
 ---
 
-> **v1.0.5 — Desktop App Release.** Server Nexe now ships as a Tauri v2 desktop application with onboarding wizard, system tray, and automatic sidecar management. Available as **macOS DMG** (Apple Silicon) and **Linux AppImage** (ARM64). See [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
+> **v1.0.6 — Security hardening.** Server Nexe now ships as a Tauri v2 desktop application with onboarding wizard, system tray, and automatic sidecar management. Available as **macOS DMG** (Apple Silicon) and **Linux AppImage** (ARM64). See [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
 >
 > **Linux note:** tested on Ubuntu 24.04 ARM64 virtual machines (UTM). CPU inference (Ollama) verified. If you test on native hardware or with GPU acceleration, please [open an issue](https://github.com/jgoy-labs/server-nexe/issues) with your results.
 
@@ -171,8 +171,8 @@ Download the latest package from **[Releases](https://github.com/jgoy-labs/serve
 
 | Platform | Package | Size |
 |----------|---------|------|
-| macOS (Apple Silicon) | `nexe-app_1.0.5_aarch64.dmg` | ~1.3 GB |
-| Linux (ARM64) | `nexe-app_1.0.5_aarch64.AppImage` | ~1.2 GB |
+| macOS (Apple Silicon) | `nexe-app_1.0.6_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.6_aarch64.AppImage` | ~1.2 GB |
 
 The onboarding wizard handles everything: hardware detection, backend selection, model download, and configuration. The app runs server-nexe as a sidecar process with system tray integration.
 
@@ -378,7 +378,7 @@ Server Nexe is actively developed. Here's what's coming:
 - [x] RAG injection sanitization (MEM tags neutralized at ingest and retrieval) (v0.9.9)
 - [x] Offline install bundle — all wheels + embedding model in DMG (~1.2 GB, post-v0.9.9)
 - [x] Thinking toggle endpoint — `PATCH /session/{id}/thinking` (post-v0.9.9)
-- [x] Desktop app (Tauri v2) — macOS DMG + Linux AppImage, onboarding wizard, system tray (v1.0.5)
+- [x] Desktop app (Tauri v2) — macOS DMG + Linux AppImage, onboarding wizard, system tray (v1.0.6)
 - [ ] Configurable inference parameters via UI
 - [ ] Community forum
 
@@ -448,5 +448,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 1.0.5</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
+  <strong>Version 1.0.6</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>
