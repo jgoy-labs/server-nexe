@@ -10,6 +10,7 @@ Description: Fixtures for live server tests (test_live marker).
 Usage:
   pytest tests/test_live/ -m test_live          # auto-start
   NEXE_TEST_URL=http://localhost:9119 pytest ... # reuse external
+  python dev-tools/run_live.py                  # via orchestrator
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -164,13 +165,36 @@ def nexe_server() -> Generator[str, None, None]:
     try:
         _wait_ready(NEXE_TEST_URL, timeout=STARTUP_TIMEOUT)
     except TimeoutError as exc:
+        # CRY-01 lesson: a slow/failed auto-start is a REGRESSION, not a reason
+        # to silently skip. A ~6-min boot (Keychain ACL hang) previously slipped
+        # through here as "skipped" and stayed invisible to CI and review. Fail
+        # loudly with the server-log tail so the cause is on screen. Boot-timing
+        # is a ship gate. Set NEXE_TEST_STARTUP_OPTIONAL=1 only in documented
+        # no-infra environments where live tests are genuinely optional.
+        crashed = proc.poll() is not None
         proc.terminate()
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
         server_log.close()
-        pytest.skip(str(exc))
+        if os.getenv("NEXE_TEST_STARTUP_OPTIONAL") == "1":
+            pytest.skip(f"{exc} (NEXE_TEST_STARTUP_OPTIONAL=1)")
+        log_tail = ""
+        try:
+            log_tail = "\n".join(
+                server_log_path.read_text(errors="ignore").splitlines()[-25:]
+            )
+        except OSError:
+            pass
+        reason = "process exited early" if crashed else "process alive but not ready — boot too slow"
+        pytest.fail(
+            f"BOOT-TIMING REGRESSION: {exc} ({reason}). The sidecar must come up "
+            f"within {STARTUP_TIMEOUT}s; a slow boot is a ship blocker (see CRY-01: "
+            f"macOS Keychain ACL hang). Do NOT mask this with skip — fix the boot "
+            f"or raise NEXE_TEST_STARTUP_TIMEOUT only for known-slow envs.\n"
+            f"--- server log tail ---\n{log_tail}"
+        )
 
     yield NEXE_TEST_URL
 
