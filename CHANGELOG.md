@@ -258,7 +258,7 @@ hardening fixes that landed since.
 
 ### Changed
 
-- Dependency security bumps from gitoss sync: `fastapi`, `python-multipart`, `pytest`.
+- Dependency security bumps from upstream sync: `fastapi`, `python-multipart`, `pytest`.
 - Version metadata bumped from `1.0.0-beta` to `1.0.1-beta` (pyproject, personality/server.toml, READMEs, SECURITY, CONTRIBUTING, installer Info.plist, knowledge base).
 - Plugin-owned versions (`plugins/*/manifest.toml` and `plugins/*/module.py`) untouched: plugins follow their own release cycle (version = codi introduït), independent of product bumps.
 

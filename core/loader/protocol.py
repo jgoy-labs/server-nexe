@@ -276,11 +276,3 @@ def validate_module(module: Any) -> bool:
     return False
 
   return True
-
-def module_has_router(module: Any) -> bool:
-  """Check whether the module has an HTTP router."""
-  return isinstance(module, NexeModuleWithRouter)
-
-def module_has_specialists(module: Any) -> bool:
-  """Check whether the module manages specialists."""
-  return isinstance(module, NexeModuleWithSpecialists)

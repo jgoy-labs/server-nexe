@@ -23,8 +23,6 @@ from .protocol import (
   SpecialistInfo,
   PluginLoadError,
   validate_module,
-  module_has_router,
-  module_has_specialists,
 )
 
 from .manifest_base import (
@@ -43,8 +41,6 @@ __all__ = [
   "SpecialistInfo",
   "PluginLoadError",
   "validate_module",
-  "module_has_router",
-  "module_has_specialists",
   "create_lazy_manifest",
   "install_lazy_manifest",
   "__version__",
