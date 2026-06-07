@@ -5,7 +5,7 @@ id: nexe-architecture
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Internal architecture of server-nexe 1.0.5. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, VLM 3-signal detector, precomputed KB embeddings, thinking toggle, and Mermaid diagrams."
+abstract: "Internal architecture of server-nexe 1.0.6. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, VLM 3-signal detector, precomputed KB embeddings, thinking toggle, and Mermaid diagrams."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Architecture — server-nexe 1.0.5
+# Architecture — server-nexe 1.0.6
 
 ## Table of contents
 
@@ -246,7 +246,7 @@ server-nexe/
 ├── knowledge/                    # Docs for RAG ingestion (ca/es/en × 14 files)
 │   └── .embeddings/              # Precomputed KB embeddings (ONNX, 10.7× startup speedup)
 ├── storage/                      # Runtime data (not in git)
-├── tests/                        # 6723 test functions collected (6938 total)
+├── tests/                        # 6776 test functions collected (6991 total)
 └── nexe                          # CLI executable
 ```
 
@@ -331,7 +331,7 @@ Handles startup and shutdown of the server. Split into 4 submodules.
 ```toml
 [module]
 name = "module_name"
-version = "1.0.5"
+version = "1.0.6"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"
@@ -377,7 +377,7 @@ Embeddings Layer (memory/embeddings/) — vector generation + Qdrant interface
 `POST /v1/chat/completions` is the main endpoint, split into 8 submodules:
 
 1. **chat_schemas.py** — Pydantic models (Message, ChatCompletionRequest with use_rag=True default)
-2. **chat_sanitization.py** — SSE token sanitization (null bytes, control chars), context truncation (MAX_CONTEXT_CHARS=24000)
+2. **chat_sanitization.py** — SSE token sanitization (null bytes, control chars), ratio-based RAG context truncation (MAX_CONTEXT_RATIO=0.3, RAG cap 4000 chars)
 3. **chat_rag.py** — RAG context builder: searches nexe_documentation (0.4), user_knowledge (0.35), personal_memory (0.3)
 4. **chat_memory.py** — MEM_SAVE parsing, save conversation to memory
 5. **chat_engines/routing.py** — Engine selection (auto, ollama, mlx, llama_cpp)
@@ -447,7 +447,7 @@ Differences in sidecar mode:
 
 ## Test Architecture
 
-- 6723 test functions collected (6938 total — 215 deselected by markers), 0 failures in latest run
+- 6776 test functions collected (6991 total — 215 deselected by markers), 0 failures in latest run
 - Actual coverage: ~85% global (honest baseline, not inflated)
 - Tests collocated with modules (each module has tests/ folder)
 - Root conftest.py for shared fixtures

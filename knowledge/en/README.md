@@ -17,9 +17,9 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# server-nexe 1.0.5 — Local AI Server with Persistent Memory
+# server-nexe 1.0.6 — Local AI Server with Persistent Memory
 
-**Version:** 1.0.5
+**Version:** 1.0.6
 **Default port:** 9119
 **Author:** Jordi Goy (Barcelona)
 **License:** Apache 2.0
@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (6723 collected / 6938 total)
+├── tests/                 # Test suite (6776 collected / 6991 total)
 └── nexe                   # Main CLI executable
 ```
 

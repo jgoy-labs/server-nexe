@@ -30,7 +30,7 @@ Aquest document formalitza el threat model que fins a la v1.0.4-beta estava impl
 
 ## 1. Proposit i abast
 
-server-nexe es un **servidor d'IA local, mono-usuari** amb memoria RAG persistent. S'executa a la maquina de l'usuari, bind a `127.0.0.1:9119` per defecte, i assumeix un usuari local de confiança. Aquest threat model cobreix la release 1.0.5 mes el hardening `[Unreleased]` a `main` (hardening de seguretat i el threat model STRIDE).
+server-nexe es un **servidor d'IA local, mono-usuari** amb memoria RAG persistent. S'executa a la maquina de l'usuari, bind a `127.0.0.1:9119` per defecte, i assumeix un usuari local de confiança. Aquest threat model cobreix la release 1.0.6 mes el hardening `[Unreleased]` a `main` (hardening de seguretat i el threat model STRIDE).
 
 Dins l'abast:
 
@@ -81,7 +81,7 @@ Sensibilitat primaria: **confidencialitat**. Secundaria: **integritat** (una mem
 - `NEXE_MASTER_KEY` (MEK, 32 bytes; cadena de fallback fitxer → keyring → env → generar, vegeu `core/crypto/keys.py:get_or_create_master_key` amb helpers `_try_file_get`, `_try_keyring_get`, `_try_env_get`).
 - `NEXE_CSRF_SECRET` (clau de signatura per a starlette-csrf).
 - Bootstrap tokens (un sol us, nomes en memoria; `core/bootstrap_tokens.py`).
-- `NEXE_VPN_ALLOWED_IPS` (decisio de confiança per als callers de `/api/bootstrap`; `core/endpoints/bootstrap.py:43`).
+- `NEXE_VPN_ALLOWED_IPS` (decisio de confiança per als callers de `/api/bootstrap`; `core/endpoints/bootstrap.py:42`).
 
 Sensibilitat primaria: **confidencialitat** del material secret, **integritat** de les decisions de confiança codificades a les allow-lists.
 
@@ -100,7 +100,7 @@ Moduls Python, installer Swift, scripts shell. Qualsevol proces corrent com el m
 ### 4.5 Disponibilitat
 
 - Port TCP 9119 (FastAPI).
-- Daemon Ollama al port 11434 (loopback; `core/config.py:412`).
+- Daemon Ollama al port 11434 (loopback; `core/config.py:526`).
 - Qdrant (embedded, in-process; `memory/embeddings/adapters/qdrant_adapter.py`).
 - Un subproces d'inferencia per backend (MLX in-process, llama.cpp in-process via `llama-cpp-python`, daemon extern Ollama).
 
@@ -147,7 +147,7 @@ Numerats per a la matriu STRIDE:
 5. **Servidor ↔ Hugging Face / registry Ollama / URL GGUF.** HTTPS; nomes es creua a install-time i en descarrega explicita de model.
 6. **Servidor ↔ Filesystem.** `~/.nexe/master.key` (`0o600`), DBs SQLCipher, fitxers de sessio `.enc`.
 7. **Servidor ↔ macOS Keyring.** `Security.framework` via `keyring` (Python). Mirror del MEK.
-8. **LAN ↔ `/api/bootstrap`.** Gated per `NEXE_ENV` (`core/endpoints/bootstrap.py:116-122`): produccio → HTTP 503; development → loopback + RFC1918 + whitelist VPN (`core/endpoints/bootstrap.py:127-140`).
+8. **LAN ↔ `/api/bootstrap`.** Gated per `NEXE_ENV` (`core/endpoints/bootstrap.py:97-106`): produccio → HTTP 503; development → loopback + RFC1918 + whitelist VPN (`core/endpoints/bootstrap.py:109-117`).
 
 ## 6. Analisi STRIDE
 
@@ -168,13 +168,13 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 ### 6.1 Spoofing
 
-**El navegador es fa passar per un usuari autenticat (boundary 1).** Mitigat per validacio dual-key `X-API-Key` amb `secrets.compare_digest` a `plugins/security/core/auth_dependencies.py:require_api_key` (linia 47). Les errades son loggejades amb IP client. El bypass dev-mode esta gated a loopback nomes (la branca `if dev_mode:` a la linia 100 força `_is_loopback_ip` a les linies 102-107 i llança 403 si `NEXE_DEV_MODE_ALLOW_REMOTE` no es `true`).
+**El navegador es fa passar per un usuari autenticat (boundary 1).** Mitigat per validacio dual-key `X-API-Key` amb `secrets.compare_digest` a `plugins/security/core/auth_dependencies.py:require_api_key` (linia 167). Les errades son loggejades amb IP client. El bypass dev-mode esta gated a loopback nomes (la branca `if dev_mode:` a la linia 73 força `_is_loopback_ip` a les linies 76-80 i llança 403 si `NEXE_DEV_MODE_ALLOW_REMOTE` no es `true`).
 
 **Un altre proces de la mateixa maquina envia peticions com si fos el daemon Ollama (boundary 4).** Parcial: Ollama escolta a loopback sense autenticacio. Qualsevol proces local corrent com el mateix usuari pot cridar-lo. Acceptat — el mateix usuari local pot llegir `~/.ollama/` directament. La defensa de server-nexe es que el pipeline de xat sempre passa per `/ui/chat` o `/v1/chat/completions` (tots dos autenticats); els endpoints per-backend directes (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) estan bloquejats pel middleware `RemovedDirectRoutesGuard` (`core/middleware.py`) — una crida directa retorna HTTP 403 amb codi d'error `direct_plugin_endpoint_disabled` abans d'arribar a cap handler. Les rutes es declaren com a `removed_direct_routes` al `manifest.toml` de cada plugin i s'apliquen tant en temps de peticio com en temps de carrega del plugin (vegeu §6.6).
 
 **Atacant serveix un pes de model manipulat des de Hugging Face (boundary 5).** Mitigat pel pinning SHA-256 dels pesos: `installer/download_verify.py` rebutja qualsevol snapshot el hash de directori del qual (`core/integrity/hashing.py:sha256_of_dir`) no coincideix amb el pin del cataleg. Single-file GGUF usa `sha256_of_file`; Ollama usa digests `ollama show --json`.
 
-**Atacant LAN envia un bootstrap token (boundary 8).** Gated per `NEXE_ENV != development` → HTTP 503 (`core/endpoints/bootstrap.py:116-122`), mes allow-list d'IP (loopback + RFC1918 + whitelist VPN; `core/endpoints/bootstrap.py:127-140`), mes rate-limit `3/IP + 10 global / 5 min` (`core/endpoints/bootstrap.py:67-96` `check_rate_limit`, implementacio a `core/bootstrap_tokens.py:check_bootstrap_rate_limit`).
+**Atacant LAN envia un bootstrap token (boundary 8).** Gated per `NEXE_ENV != development` → HTTP 503 (`core/endpoints/bootstrap.py:97-106`), mes allow-list d'IP (loopback + RFC1918 + whitelist VPN; `core/endpoints/bootstrap.py:109-117`), mes rate-limit `3/IP + 10 global / 5 min` (`core/endpoints/bootstrap.py:66-96` `check_rate_limit`, implementacio a `core/bootstrap_tokens.py:check_bootstrap_rate_limit`).
 
 ### 6.2 Tampering
 
@@ -182,7 +182,7 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 **Markdown o HTML injectat i renderitzat al xat (boundary 1).** Detector XSS corre sense condicions (`plugins/security/core/input_sanitizers.py:validate_string_input`, `check_xss=True` en tots els contexts). `sanitize_html` escapa HTML a qualsevol sortida renderitzada a la UI.
 
-**Injeccio a memoria / RAG (boundaries 1 i 6).** L'input de l'usuari es net de tags de rol-memoria (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]`…) per `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:85-102`). Els documents ingestats al RAG i els resultats de retrieval passen per `_filter_rag_injection` i `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:64` i linia 91). Un document malicios no pot incrustar un tag `[MEM_DELETE:]` que el LLM copiaria verbatim.
+**Injeccio a memoria / RAG (boundaries 1 i 6).** L'input de l'usuari es net de tags de rol-memoria (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]`…) per `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:93`). Els documents ingestats al RAG i els resultats de retrieval passen per `_filter_rag_injection` i `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:108` i linia 149). Un document malicios no pot incrustar un tag `[MEM_DELETE:]` que el LLM copiaria verbatim.
 
 **JSON profundament niat com a tampering d'enginyeria de payload (boundary 1).** Acotat per `MAX_NOSQL_DEPTH=100` a `detect_nosql_injection`. Abans feia crashejar el proces amb `RecursionError`; ara retorna "sospitos" en profunditats > 100.
 
@@ -208,9 +208,9 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 ### 6.5 Denial of Service
 
-**Flooding de `/ui/chat` o `/v1/chat/completions` amb peticions concurrents.** Els decorators per-endpoint de `slowapi` forcen 20/min al xat (`core/endpoints/chat.py:318`), 30/min a la familia `/status` (`core/endpoints/root.py:104+`), 2/min en endpoints de seguretat sensibles (`plugins/security/api/routes.py:64`), 10/min en operacions de modul (`plugins/security/api/routes.py:128`).
+**Flooding de `/ui/chat` o `/v1/chat/completions` amb peticions concurrents.** Els decorators per-endpoint de `slowapi` forcen 20/min al xat (`core/endpoints/chat.py:319`), 30/min a la familia `/status` (`core/endpoints/root.py:110+`), 2/min en endpoints de seguretat sensibles (`plugins/security/api/routes.py:117`), 10/min en operacions de modul (`plugins/security/api/routes.py:140`).
 
-**Endpoint bootstrap flooded (boundary 8).** `check_rate_limit` forcia 3/IP + 10 global per 5 min en finestra lliscant (`core/endpoints/bootstrap.py:67-96`). En produccio l'endpoint retorna 503 abans que corri cap logica de rate-limit.
+**Endpoint bootstrap flooded (boundary 8).** `check_rate_limit` forcia 3/IP + 10 global per 5 min en finestra lliscant (`core/endpoints/bootstrap.py:66-96`). En produccio l'endpoint retorna 503 abans que corri cap logica de rate-limit.
 
 **Atacs de recursio il·limitada (payloads forma NoSQL).** Vegeu 6.2; `MAX_NOSQL_DEPTH=100`.
 
@@ -220,13 +220,13 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 ### 6.6 Elevacio de privilegi
 
-**Dev-mode bypass des d'un origen no-loopback.** Bloquejat a la linia 100 de `auth_dependencies.py`: `NEXE_DEV_MODE=true` dona bypass nomes quan la IP client es loopback i `NEXE_DEV_MODE_ALLOW_REMOTE` esta explicitament set.
+**Dev-mode bypass des d'un origen no-loopback.** Bloquejat a la linia 73 de `auth_dependencies.py`: `NEXE_DEV_MODE=true` dona bypass nomes quan la IP client es loopback i `NEXE_DEV_MODE_ALLOW_REMOTE` esta explicitament set.
 
 **Bypass del pipeline canonic de xat.** Mitigat pel middleware `RemovedDirectRoutesGuard` (`core/middleware.py`): qualsevol peticio a `/mlx/chat`, `/llama-cpp/chat` o `/ollama/api/chat` retorna HTTP 403 amb codi d'error `direct_plugin_endpoint_disabled` abans d'arribar a cap handler (s'executa abans de SlowAPI, CORS i el dispatch de rutes). Les rutes estan declarades com a `removed_direct_routes` al `manifest.toml` de cada plugin i s'aplica tant en temps de peticio com en temps de carrega — un plugin que declara una ruta com a eliminada i alhora la registra llanca `PluginLoadError` i es rebutjat. Tot xat ha de passar per `/ui/chat` o `/v1/chat/completions` perque corri el pipeline complet (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip). Tanca el seguiment de la revisio interna de seguretat §2.11.
 
 **Path traversal en session IDs o filenames.** `validate_string_input(context="path")` corre el detector de path-traversal en inputs de tipus path (el context chat l'omet, un trade-off documentat). La validacio de filename en uploads es forçada a servidor.
 
-**Tightening del directori de master-key falla silenciosament.** `core/crypto/keys.py:_try_file_set` (linia 80+) ara logueja un WARNING quan `chmod 0o700` falla a `~/.nexe/`. El fitxer clau segueix naixent `0o600` via `os.open(O_CREAT|O_EXCL)` aixi que aixo es nomes un fix defensa-en-profunditat.
+**Tightening del directori de master-key falla silenciosament.** `core/crypto/keys.py:_try_file_set` (linia 122+) ara logueja un WARNING quan `chmod 0o700` falla a `~/.nexe/`. El fitxer clau segueix naixent `0o600` via `os.open(O_CREAT|O_EXCL)` aixi que aixo es nomes un fix defensa-en-profunditat.
 
 **Intent de jailbreak dins del xat.** 11 patrons regex (detector speed-bump, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, linia 41; cobreix formes imperatives CA/EN i handles coneguts com `DAN mode`, `do anything now`) afegeixen un prefix `[SECURITY NOTICE]` en lloc de rebutjar — els atacs sofisticats l'evaden trivialment i aixo esta documentat explicitament (`SECURITY.md:36`). La proteccio real requereix moderacio a nivell de model (fora d'abast, §7).
 
@@ -279,4 +279,4 @@ Aquest document es revisa:
 
 ---
 
-*server-nexe 1.0.5+ · Apache 2.0 · Jordi Goy · vegeu [SECURITY.md](../../SECURITY.md) per informar de vulnerabilitats.*
+*server-nexe 1.0.6+ · Apache 2.0 · Jordi Goy · vegeu [SECURITY.md](../../SECURITY.md) per informar de vulnerabilitats.*

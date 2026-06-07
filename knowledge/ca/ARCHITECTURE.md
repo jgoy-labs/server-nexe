@@ -5,7 +5,7 @@ id: nexe-architecture
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 1.0.5. Disseny de cinc capes: Interficies, Core (FastAPI factory, endpoints separats, lifespan, crypto), Plugins (5 moduls amb auto-descobriment), Serveis Base (RAG memoria de 3 capes amb TextStore), Emmagatzematge. Cobreix refactoritzacio modular, module manager, i18n, pipeline d'encriptacio, pipeline de sanititzacio de peticions, detector VLM 3-signal, precomputed KB embeddings, thinking toggle i diagrames Mermaid."
+abstract: "Arquitectura interna de server-nexe 1.0.6. Disseny de cinc capes: Interficies, Core (FastAPI factory, endpoints separats, lifespan, crypto), Plugins (5 moduls amb auto-descobriment), Serveis Base (RAG memoria de 3 capes amb TextStore), Emmagatzematge. Cobreix refactoritzacio modular, module manager, i18n, pipeline d'encriptacio, pipeline de sanititzacio de peticions, detector VLM 3-signal, precomputed KB embeddings, thinking toggle i diagrames Mermaid."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Arquitectura — server-nexe 1.0.5
+# Arquitectura — server-nexe 1.0.6
 
 ## Taula de continguts
 
@@ -246,7 +246,7 @@ server-nexe/
 ├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 14 fitxers)
 │   └── .embeddings/              # KB embeddings precomputats (ONNX, 10.7× speedup a l'arrencada)
 ├── storage/                      # Dades en temps d'execucio (no a git)
-├── tests/                        # 6723 funcions de test col·lectades (6938 totals)
+├── tests/                        # 6776 funcions de test col·lectades (6991 totals)
 └── nexe                          # Executable CLI
 ```
 
@@ -331,7 +331,7 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 4 submoduls.
 ```toml
 [module]
 name = "module_name"
-version = "1.0.5"
+version = "1.0.6"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"
@@ -377,7 +377,7 @@ Capa d'Embeddings (memory/embeddings/) — generacio de vectors + interficie Qdr
 `POST /v1/chat/completions` es l'endpoint principal, separat en 8 submoduls:
 
 1. **chat_schemas.py** — Models Pydantic (Message, ChatCompletionRequest amb use_rag=True per defecte)
-2. **chat_sanitization.py** — Sanititzacio de tokens SSE (bytes nuls, caracters de control), truncament de context (MAX_CONTEXT_CHARS=24000)
+2. **chat_sanitization.py** — Sanititzacio de tokens SSE (bytes nuls, caracters de control), truncament de context RAG basat en ràtio (MAX_CONTEXT_RATIO=0.3, límit RAG 4000 caràcters)
 3. **chat_rag.py** — Constructor de context RAG: cerca a nexe_documentation (0.4), user_knowledge (0.35), personal_memory (0.3)
 4. **chat_memory.py** — Parseig de MEM_SAVE, guardar conversa a memoria
 5. **chat_engines/routing.py** — Seleccio de motor (auto, ollama, mlx, llama_cpp)
@@ -447,7 +447,7 @@ Diferencies en mode sidecar:
 
 ## Arquitectura de tests
 
-- 6723 funcions de test col·lectades (6938 totals — 215 deselected per marcadors), 0 errors a l'ultima execucio
+- 6776 funcions de test col·lectades (6991 totals — 215 deselected per marcadors), 0 errors a l'ultima execucio
 - Cobertura real: ~85% global (baseline honest, sense inflar)
 - Tests col·locats amb els moduls (cada modul te una carpeta tests/)
 - conftest.py arrel per a fixtures compartides

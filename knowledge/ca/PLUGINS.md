@@ -5,7 +5,7 @@ id: nexe-plugins-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia completa del sistema de plugins de server-nexe 1.0.5. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (5: MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
+abstract: "Guia completa del sistema de plugins de server-nexe 1.0.6. Cobreix Protocol NexeModule (duck typing, no herencia), format manifest.toml, estructura de fitxers del plugin, cicle de vida (discovery -> loading -> initialization -> integration -> shutdown), objecte context, registre de routers, plugins existents (5: MLX, llama.cpp, Ollama, Security amb normalitzacio Unicode, Web UI amb validacio d'input), com crear un plugin nou pas a pas, errors comuns i bones practiques."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Sistema de plugins — server-nexe 1.0.5
+# Sistema de plugins — server-nexe 1.0.6
 
 server-nexe utilitza una arquitectura de plugins basada en descobriment automatic via fitxers manifest.toml. Els plugins son moduls que afegeixen funcionalitat sense modificar el core. No cal registre manual — el sistema escaneja, descobreix i carrega plugins automaticament.
 
@@ -238,7 +238,7 @@ server-nexe te **tres mecanismes complementaris** per decidir quins plugins s'ac
 
 ### 1. `server.toml` — seccio `[plugins.modules]`
 
-Llista estatica declarativa al fitxer `personality/server.toml` (linia 172). Es la font primaria: indica al servidor quins plugins HA d'activar a l'arrencada.
+Llista estatica declarativa al fitxer `personality/server.toml` (linia 203). Es la font primaria: indica al servidor quins plugins HA d'activar a l'arrencada.
 
 ```toml
 [plugins.modules]
@@ -251,7 +251,7 @@ Per afegir un plugin nou cal incloure'l explicitament aqui.
 
 ### 2. `NEXE_APPROVED_MODULES` — env var (allowlist de seguretat)
 
-Validada per `get_module_allowlist()` a `core/config.py:261`. Es una capa de seguretat addicional sobre la llista de `server.toml`:
+Validada per `get_module_allowlist()` a `core/config.py:355`. Es una capa de seguretat addicional sobre la llista de `server.toml`:
 
 - **Mode desenvolupament** (`NEXE_ENV=development` o no definit): `NEXE_APPROVED_MODULES` es **opcional**. Si no s'ha definit, `get_module_allowlist()` retorna `None` i no filtra res.
 - **Mode produccio** (`NEXE_ENV=production` o `[core.environment].mode = "production"`): `NEXE_APPROVED_MODULES` es **OBLIGATORI**. Si falta, el servidor aborda amb `ValueError("SECURITY ERROR: NEXE_APPROVED_MODULES is required in production")`.
@@ -417,6 +417,6 @@ Ambdos metodes es poden cridar multiples vegades. Posa sempre guard `self._initi
 | Cicle de vida de moduls | `personality/module_manager/module_lifecycle.py` |
 | Gestor de configuracio | `personality/module_manager/config_manager.py` |
 | Registre de moduls | `personality/module_manager/registry.py` |
-| Allowlist de seguretat | `core/config.py:261` (`get_module_allowlist()`) |
+| Allowlist de seguretat | `core/config.py:355` (`get_module_allowlist()`) |
 | Registre de routers | `core/server/factory_modules.py` |
 | Plugin de referencia (el mes net) | `plugins/llama_cpp_module/` |

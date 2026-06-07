@@ -30,7 +30,7 @@ This document formalizes the threat model that until v1.0.4-beta was implicit in
 
 ## 1. Purpose and scope
 
-server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.5 release plus the `[Unreleased]` hardening on `main` (security hardening and the STRIDE threat model).
+server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.6 release plus the `[Unreleased]` hardening on `main` (security hardening and the STRIDE threat model).
 
 In scope:
 
@@ -81,7 +81,7 @@ Primary sensitivity: **confidentiality**. Secondary: **integrity** (a tampered m
 - `NEXE_MASTER_KEY` (MEK, 32 bytes; fallback chain file → keyring → env → generate, see `core/crypto/keys.py:get_or_create_master_key` using helpers `_try_file_get`, `_try_keyring_get`, `_try_env_get`).
 - `NEXE_CSRF_SECRET` (signing key for starlette-csrf).
 - Bootstrap tokens (one-shot, in-memory only; `core/bootstrap_tokens.py`).
-- `NEXE_VPN_ALLOWED_IPS` (trust decision for `/api/bootstrap` callers; `core/endpoints/bootstrap.py:43`).
+- `NEXE_VPN_ALLOWED_IPS` (trust decision for `/api/bootstrap` callers; `core/endpoints/bootstrap.py:42`).
 
 Primary sensitivity: **confidentiality** of the secret material, **integrity** of the trust decisions encoded in the allow-lists.
 
@@ -100,7 +100,7 @@ Python modules, Swift installer, shell scripts. Any process running as the same 
 ### 4.5 Availability
 
 - TCP port 9119 (FastAPI).
-- Ollama daemon on port 11434 (loopback; `core/config.py:412`).
+- Ollama daemon on port 11434 (loopback; `core/config.py:526`).
 - Qdrant (embedded, in-process; `memory/embeddings/adapters/qdrant_adapter.py`).
 - One inference subprocess per backend (MLX in-process, llama.cpp in-process via `llama-cpp-python`, Ollama external daemon).
 
@@ -147,7 +147,7 @@ Numbered for the STRIDE matrix:
 5. **Server ↔ Hugging Face / Ollama registry / GGUF URL.** HTTPS; only crossed at install time and on explicit model download.
 6. **Server ↔ Filesystem.** `~/.nexe/master.key` (`0o600`), SQLCipher DBs, `.enc` session files.
 7. **Server ↔ macOS Keyring.** `Security.framework` via `keyring` (Python). Mirrors the MEK.
-8. **LAN ↔ `/api/bootstrap`.** Gated by `NEXE_ENV` (`core/endpoints/bootstrap.py:116-122`): production → HTTP 503; development → loopback + RFC1918 + VPN allow-list (`core/endpoints/bootstrap.py:127-140`).
+8. **LAN ↔ `/api/bootstrap`.** Gated by `NEXE_ENV` (`core/endpoints/bootstrap.py:97-106`): production → HTTP 503; development → loopback + RFC1918 + VPN allow-list (`core/endpoints/bootstrap.py:109-117`).
 
 ## 6. STRIDE analysis
 
@@ -168,13 +168,13 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 ### 6.1 Spoofing
 
-**Browser pretends to be an authenticated user (boundary 1).** Mitigated by dual-key `X-API-Key` validation with `secrets.compare_digest` in `plugins/security/core/auth_dependencies.py:require_api_key` (line 47). Failure is logged with client IP. Dev-mode bypass is gated to loopback only (the `if dev_mode:` branch at line 100 enforces `_is_loopback_ip` at lines 102-107 and raises 403 unless `NEXE_DEV_MODE_ALLOW_REMOTE=true`).
+**Browser pretends to be an authenticated user (boundary 1).** Mitigated by dual-key `X-API-Key` validation with `secrets.compare_digest` in `plugins/security/core/auth_dependencies.py:require_api_key` (line 167). Failure is logged with client IP. Dev-mode bypass is gated to loopback only (the `if dev_mode:` branch at line 73 enforces `_is_loopback_ip` at lines 76-80 and raises 403 unless `NEXE_DEV_MODE_ALLOW_REMOTE=true`).
 
 **Another process on the same machine sends requests as the Ollama daemon (boundary 4).** Partial: Ollama listens on loopback without authentication. Any local process running as the same user can call it. Accepted — the same local user can read `~/.ollama/` directly. Server-nexe's defense is that the chat pipeline always flows through `/ui/chat` or `/v1/chat/completions` (both authenticated); direct per-backend chat endpoints (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) are blocked by the `RemovedDirectRoutesGuard` middleware (`core/middleware.py`) — a direct call returns HTTP 403 with error code `direct_plugin_endpoint_disabled` before reaching any handler. The routes are declared as `removed_direct_routes` in each plugin's `manifest.toml` and enforced both at request time and at plugin load time (see §6.6).
 
 **Attacker serves a tampered model weight from Hugging Face (boundary 5).** Mitigated by the SHA-256 weight pinning: `installer/download_verify.py` refuses any snapshot whose directory hash (`core/integrity/hashing.py:sha256_of_dir`) disagrees with the catalog pin. Single-file GGUF uses `sha256_of_file`; Ollama uses `ollama show --json` digests.
 
-**LAN attacker submits a bootstrap token (boundary 8).** Gated by `NEXE_ENV != development` → HTTP 503 (`core/endpoints/bootstrap.py:116-122`), plus IP allow-list (loopback + RFC1918 + VPN whitelist; `core/endpoints/bootstrap.py:127-140`), plus rate-limit `3/IP + 10 global / 5 min` (`core/endpoints/bootstrap.py:67-96` `check_rate_limit`, implementation in `core/bootstrap_tokens.py:check_bootstrap_rate_limit`).
+**LAN attacker submits a bootstrap token (boundary 8).** Gated by `NEXE_ENV != development` → HTTP 503 (`core/endpoints/bootstrap.py:97-106`), plus IP allow-list (loopback + RFC1918 + VPN whitelist; `core/endpoints/bootstrap.py:109-117`), plus rate-limit `3/IP + 10 global / 5 min` (`core/endpoints/bootstrap.py:66-96` `check_rate_limit`, implementation in `core/bootstrap_tokens.py:check_bootstrap_rate_limit`).
 
 ### 6.2 Tampering
 
@@ -182,7 +182,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 **Injected markdown or HTML rendered back in chat (boundary 1).** XSS detector runs unconditionally (`plugins/security/core/input_sanitizers.py:validate_string_input`, `check_xss=True` in all contexts). `sanitize_html` escapes HTML on all UI-rendered output.
 
-**Memory / RAG injection (boundary 1 and 6).** User input is scrubbed of memory-role tags (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]` …) by `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:85-102`). RAG-ingested documents and retrieval results pass through `_filter_rag_injection` and `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:64` and line 91). A malicious document cannot embed a `[MEM_DELETE:]` tag that the LLM would copy verbatim.
+**Memory / RAG injection (boundary 1 and 6).** User input is scrubbed of memory-role tags (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]` …) by `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:93`). RAG-ingested documents and retrieval results pass through `_filter_rag_injection` and `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:108` and line 149). A malicious document cannot embed a `[MEM_DELETE:]` tag that the LLM would copy verbatim.
 
 **Deep-nested JSON as a payload-engineering tampering (boundary 1).** Bounded by `MAX_NOSQL_DEPTH=100` in `detect_nosql_injection`. Previously crashed the process with `RecursionError`; now returns "suspicious" at depth > 100.
 
@@ -208,9 +208,9 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 ### 6.5 Denial of Service
 
-**Flood `/ui/chat` or `/v1/chat/completions` with concurrent requests.** Per-endpoint `slowapi` decorators enforce 20/min on chat (`core/endpoints/chat.py:318`), 30/min on `/status` family (`core/endpoints/root.py:104+`), 2/min on sensitive security endpoints (`plugins/security/api/routes.py:64`), 10/min on module operations (`plugins/security/api/routes.py:128`).
+**Flood `/ui/chat` or `/v1/chat/completions` with concurrent requests.** Per-endpoint `slowapi` decorators enforce 20/min on chat (`core/endpoints/chat.py:319`), 30/min on `/status` family (`core/endpoints/root.py:110+`), 2/min on sensitive security endpoints (`plugins/security/api/routes.py:117`), 10/min on module operations (`plugins/security/api/routes.py:140`).
 
-**Bootstrap endpoint flooded (boundary 8).** `check_rate_limit` enforces 3/IP + 10 global per 5 min sliding window (`core/endpoints/bootstrap.py:67-96`). In production the endpoint returns 503 before any rate-limit logic runs.
+**Bootstrap endpoint flooded (boundary 8).** `check_rate_limit` enforces 3/IP + 10 global per 5 min sliding window (`core/endpoints/bootstrap.py:66-96`). In production the endpoint returns 503 before any rate-limit logic runs.
 
 **Unbounded recursion attacks (NoSQL-shape payloads).** See 6.2; `MAX_NOSQL_DEPTH=100`.
 
@@ -220,13 +220,13 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 ### 6.6 Elevation of Privilege
 
-**Dev-mode bypass from a non-loopback origin.** Blocked at line 100 of `auth_dependencies.py`: `NEXE_DEV_MODE=true` grants bypass only when the client IP is loopback and `NEXE_DEV_MODE_ALLOW_REMOTE` is explicitly set.
+**Dev-mode bypass from a non-loopback origin.** Blocked at line 73 of `auth_dependencies.py`: `NEXE_DEV_MODE=true` grants bypass only when the client IP is loopback and `NEXE_DEV_MODE_ALLOW_REMOTE` is explicitly set.
 
 **Bypass of the canonical chat pipeline.** Mitigated by the `RemovedDirectRoutesGuard` middleware (`core/middleware.py`): any request to `/mlx/chat`, `/llama-cpp/chat`, or `/ollama/api/chat` returns HTTP 403 with error code `direct_plugin_endpoint_disabled` before reaching any handler (runs before SlowAPI, CORS, and route dispatch). Routes are declared as `removed_direct_routes` in each plugin's `manifest.toml` and enforced at both request time and plugin load time — a plugin that simultaneously declares a route as removed and registers it raises `PluginLoadError` and is rejected. All chat must flow through `/ui/chat` or `/v1/chat/completions` so the full pipeline (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip) runs. Closes the internal security-review §2.11 follow-up.
 
 **Path traversal in session IDs or filenames.** `validate_string_input(context="path")` runs the path-traversal detector on path-like inputs (chat context skips it, a documented trade-off). Filename validation on uploads is enforced server-side.
 
-**Master-key directory tightening silently fails.** `core/crypto/keys.py:_try_file_set` (line 80+) now logs a WARNING when `chmod 0o700` fails on `~/.nexe/`. The key file itself is still born `0o600` via `os.open(O_CREAT|O_EXCL)` so this is a defense-in-depth fix only.
+**Master-key directory tightening silently fails.** `core/crypto/keys.py:_try_file_set` (line 122+) now logs a WARNING when `chmod 0o700` fails on `~/.nexe/`. The key file itself is still born `0o600` via `os.open(O_CREAT|O_EXCL)` so this is a defense-in-depth fix only.
 
 **Jailbreak attempt inside chat.** 11 regex patterns (speed-bump detector, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, line 41; covers Catalan/English imperative forms and known handles such as `DAN mode`, `do anything now`) prefix a `[SECURITY NOTICE]` instead of refusing — sophisticated attacks evade trivially and this is explicitly documented (`SECURITY.md:36`). Real protection requires model-level moderation (out of scope, §7).
 
@@ -279,4 +279,4 @@ This document is reviewed:
 
 ---
 
-*server-nexe 1.0.5+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](SECURITY.md) for vulnerability reporting.*
+*server-nexe 1.0.6+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](SECURITY.md) for vulnerability reporting.*

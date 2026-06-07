@@ -30,7 +30,7 @@ nexe go
 
 ## Running tests
 
-The test suite has **6723 passing tests with ~85% code coverage** (of 6938 total; 215 deselected by default markers).
+The test suite has **6776 passing tests with ~85% code coverage** (of 6991 total; 215 deselected by default markers).
 
 ```bash
 # Fast unit tests (no external services needed)

@@ -4,7 +4,7 @@ data: 2026-04-16
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identidad de server-nexe: proyecto open-source creado por Jordi Goy en Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que hace (IA local, RAG, multi-backend, encriptacion en reposo), estado actual (1.0.5, macOS 14+ Apple Silicon only), enlaces oficiales y como apoyar."
+abstract: "Identidad de server-nexe: proyecto open-source creado por Jordi Goy en Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que hace (IA local, RAG, multi-backend, encriptacion en reposo), estado actual (1.0.6, macOS 14+ Apple Silicon only), enlaces oficiales y como apoyar."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -23,7 +23,7 @@ expires: null
 
 - **Servidor de IA 100% local** (cero cloud)
 - **Con memoria persistente** (RAG + MEM_SAVE)
-- **macOS 14+ Apple Silicon**, version 1.0.5
+- **macOS 14+ Apple Silicon**, version 1.0.6
 - **Multi-backend:** MLX, llama.cpp, Ollama
 - **Open source** (Apache 2.0), proyecto personal de un desarrollador
 
@@ -67,14 +67,14 @@ server-nexe combina cinco capacidades:
 
 ## Estado actual
 
-- **Version:** 1.0.5
+- **Version:** 1.0.6
 - **Plataforma principal:** macOS 14 Sonoma o superior, **Apple Silicon (M1+) exclusivamente** — probado
 - **macOS Intel:** **NO soportado** (eliminado en v0.9.9 por dependencias arm64-only del stack)
 - **Linux ARM64:** Soportado (backend Ollama, CPU). Testeado en VM Ubuntu 24.04 ARM64 via UTM en Mac Apple Silicon. Instalacion via CLI (`setup.sh`) o nexe-app (Tauri). Rutas XDG-compliant (`~/.local/share/nexe/`).
 - **Linux x86_64:** Soportado (backend Ollama, CPU). Tests unitarios pasan, instalacion CLI validada.
 - **Windows:** En desarrollo (sin ETA pública)
 - **Puerto por defecto:** 9119
-- **Tests:** 6723 funciones de test recopiladas (6938 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
+- **Tests:** 6776 funciones de test recopiladas (6991 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
 
 ## Documentacion AI-Ready
 

@@ -5,8 +5,8 @@ id: nexe-installation-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "How to install server-nexe: 3 methods. (1) macOS DMG with SwiftUI wizard, bundled Python 3.12, models by RAM tier. (2) CLI: git clone + ./setup.sh (macOS/Linux). (3) nexe-app (Tauri, macOS + Linux). Requirements: macOS 14 Sonoma+ Apple Silicon (M1+), 8GB RAM minimum. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Default port: 9119."
-tags: [installation, setup, dmg, swiftui, wizard, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
+abstract: "How to install server-nexe: (1) Desktop App nexe-app (Tauri v2, recommended) — macOS DMG (~1.3 GB) and Linux ARM64 AppImage (~1.2 GB) from Releases, with an onboarding wizard (hardware detection, backend choice, model download) and sidecar mode with system tray. (2) CLI from source: git clone + ./setup.sh (macOS/Linux). (3) Legacy: standalone SwiftUI DMG (superseded by the Desktop App). Requirements: macOS 14+ Apple Silicon (M1+) or Linux ARM64, 8GB RAM. Backends: MLX, llama.cpp, Ollama. Catalog in models.json. Default port: 9119."
+tags: [installation, setup, desktop-app, tauri, appimage, dmg, cli, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, encryption, sidecar, wizard, how-to]
 chunk_size: 600
 priority: P1
 
@@ -17,14 +17,14 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Installation — server-nexe 1.0.5
+# Installation — server-nexe 1.0.6
 
 ## In 30 seconds
 
-- **3 methods:** DMG (macOS, SwiftUI wizard), CLI (`./setup.sh`) or nexe-app (Tauri, macOS + Linux)
-- **DMG ~1.2 GB offline** (wheels + embedding model bundled)
-- **Requires macOS 14 Sonoma + Apple Silicon** (M1+)
-- **Pick a model by RAM** (catalog of 14 models, 4 tiers 8/16/24/32 GB)
+- **3 methods:** Desktop App nexe-app (Tauri, recommended), CLI from source (`./setup.sh`), or the legacy SwiftUI DMG installer
+- **Desktop App:** macOS DMG (~1.3 GB) + Linux ARM64 AppImage (~1.2 GB), from [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest)
+- **Requires macOS 14 Sonoma + Apple Silicon** (M1+) or Linux ARM64
+- **Pick a model by RAM:** the onboarding wizard reads the maintained catalog (`models.json`) and recommends for your RAM
 - **Default port:** 9119
 
 ---
@@ -43,48 +43,24 @@ Three installation methods available. Choose based on your platform and preferen
 
 > **Breaking in v0.9.9:** macOS 13 Ventura and Intel Macs are out of the supported target. The stack (mlx, mlx-vlm, fastembed ONNX, llama-cpp-python with Metal, arm64 wheels) requires macOS 14 Sonoma and Apple Silicon.
 
-## Method 1: macOS DMG Installer (Recommended)
+## Method 1: Desktop App — nexe-app (Tauri v2, Recommended)
 
-Native SwiftUI wizard with 6 screens. Bundles Python 3.12 — no system Python dependency.
+Desktop application that embeds server-nexe as a Python sidecar inside a Tauri v2 shell. This is the recommended method and the public release channel.
 
-### ⚡ 100% offline install (since v0.9.9)
+Download the latest package from the [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest) page:
 
-Starting with this version, the DMG bundles **everything** the installer needs:
+| Platform | Package | Size |
+|----------|---------|------|
+| macOS (Apple Silicon) | `nexe-app_1.0.6_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.6_aarch64.AppImage` | ~1.2 GB |
 
-- Python 3.12 runtime (~45 MB)
-- **All Python wheels** pre-compiled for arm64 macOS 14+ (~220 MB): fastapi, pydantic, mlx-lm, mlx-vlm, **llama-cpp-python pinned to 0.3.19** (with Metal; 0.3.20 has corrupt wheels Bad CRC-32 on the package server and has been explicitly avoided), fastembed, onnxruntime, sqlcipher3, cryptography, and the rest of the stack.
-- **Multilingual embedding model** pre-downloaded (~470 MB): `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` in ONNX format (loaded via fastembed).
-- **Precomputed KB embeddings** in `knowledge/.embeddings/` for ca/es/en (10.7× first-boot speedup).
+- **Onboarding wizard** built into the frontend (HTML/JS, not SwiftUI): hardware detection, backend selection, model download and configuration, all from the app itself.
+- **Sidecar mode:** server-nexe runs with `NEXE_SIDECAR=1`; paths are managed by Tauri (`NEXE_HOME`, `NEXE_DATA_DIR`).
+- **System tray** and automatic sidecar process management.
+- **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64).
+- **Ollama bundled** or auto-installed.
 
-Practical effects:
-
-- DMG size: **~1.2 GB** (grows from wheels + embedding model bundled to make offline install on other machines easier).
-- Once the DMG is downloaded, installation **requires no network** and does not need Xcode Command Line Tools (no `CMAKE_ARGS` prompt).
-- **No macOS prompt asking for "developer tools"** during install.
-- RAG works on first boot: the embedding model is already present.
-- The only thing that still requires network after installation is downloading your chosen LLM model (Qwen, Gemma, DeepSeek, etc.), unless you use a model already present in a local Ollama.
-- Fallback to PyPI if any bundled wheel is missing (robustness).
-
-Requirement: **Apple Silicon (M1+) with macOS 14 Sonoma or later**. Intel Macs and macOS 13 Ventura are no longer a supported target.
-
-### What the wizard does
-
-1. **Welcome:** Language selector (ca/es/en), logo, version info
-2. **Destination:** Folder picker with free space validation
-3. **Model Selection:** 4 tabs (small/medium/large/custom) with hardware detection. Shows 14 models with RAM requirements, engine compatibility, and year. Recommends models based on detected RAM/GPU.
-4. **Confirmation:** Summary of choices before install
-5. **Progress:** 7-step progress bar with real-time log. Python protocol parser ([PROGRESS], [LOG], [DONE], [ERROR] markers). 8-30 minutes depending on model download.
-6. **Completion:** API key display, options to add to Dock and Login Items, countdown to launch
-
-### Hardware detection
-
-The wizard uses native `sysctl` calls to detect:
-- CPU chip (M1/M2/M3/M4, Intel)
-- Total RAM
-- Metal GPU support
-- Free disk space
-
-Based on detection, recommends appropriate backend and models.
+The wizard reads the model catalog from the maintained `models.json` file (synced into the Tauri binary via `catalog_fallback.json`). See the full catalog below.
 
 ### Backend selection
 
@@ -94,13 +70,9 @@ Based on detection, recommends appropriate backend and models.
 | llama.cpp | macOS + Linux | Universal GGUF format, Metal acceleration on Mac |
 | Ollama | macOS + Linux | If you already have Ollama installed, easiest setup |
 
-### Download
+## Method 2: CLI from source
 
-Download the DMG from the GitHub releases page: https://github.com/jgoy-labs/server-nexe/releases
-
-## Method 2: CLI Headless
-
-For users who prefer terminal installation or are on Linux.
+For users who prefer terminal installation, development, or are on Linux.
 
 ```bash
 # Linux (Debian/Ubuntu) — one-time prerequisites:
@@ -124,23 +96,15 @@ After setup:
 ./nexe go    # Start server → http://127.0.0.1:9119
 ```
 
-## Method 3: nexe-app (Tauri — macOS + Linux)
+## Method 3: SwiftUI DMG Installer (legacy)
 
-Desktop application that embeds server-nexe as a Python sidecar inside a Tauri v2 shell. The installation experience differs from the standalone DMG:
+> **Status:** superseded by the Desktop App (Method 1). Kept documented for existing installations; for new installs, use the Desktop App.
 
-- **Onboarding wizard** built into the frontend (HTML/JS, not SwiftUI)
-- **Hardware detection** and model selection from the app itself
-- **Ollama bundled** or auto-installed
-- **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64/x86_64)
-- **Sidecar mode:** server-nexe runs with `NEXE_SIDECAR=1`, paths managed by Tauri (`NEXE_HOME`, `NEXE_DATA_DIR`)
+Native SwiftUI wizard with 6 screens, with bundled Python 3.12 and 100% offline install (since v0.9.9): it shipped all arm64 pre-compiled wheels (~220 MB, with `llama-cpp-python` pinned to 0.3.19 with Metal), the multilingual embedding model `paraphrase-multilingual-mpnet-base-v2` in ONNX (~470 MB) and precomputed KB embeddings for ca/es/en. DMG size ~1.2 GB; required Apple Silicon (M1+) with macOS 14 Sonoma or later.
 
-The model catalog is the same as standalone (14 models, 4 tiers) — synced via `catalog_fallback.json` embedded in the Tauri binary.
+## Model Catalog (4 tiers by RAM)
 
-> **Status:** Under active development. Private repository (`nexe-app`). Public release planned when Phase 1 is complete.
-
-Download: when available, from https://github.com/jgoy-labs/nexe-app/releases
-
-## Model Catalog (14 models, 4 tiers — verified 2026-05-24)
+The canonical catalog lives in `installer/swift-wizard/Resources/models.json` (source of truth, maintained in the repo and read by the onboarding wizard). The table below mirrors it (currently 14 models in 4 tiers):
 
 ### tier_8 (8 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
@@ -312,7 +276,7 @@ Menu bar app for controlling the server without a terminal. Built on the `rumps`
 
 | Item | What it does | Code |
 |------|--------------|------|
-| **server.nexe v1.0.5** | Non-clickable header. Version read dynamically from `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
+| **server.nexe v1.0.6** | Non-clickable header. Version read dynamically from `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
 | **Server running / stopped** | Non-clickable status indicator. Menu bar icon changes: `ICON_RUNNING` (green) when alive, `ICON_STOPPED` (grey) when not. | `tray.py:197` |
 | **Start / Stop server** | Spawns or stops the `core.app` process (uvicorn + FastAPI + Qdrant). SIGTERM then SIGKILL if needed. PID stored in `storage/run/server.pid`. | `_toggle_server` → `tray.py:296` |
 | **Open Web UI** | Opens `http://127.0.0.1:9119/ui` in the default browser. | `_open_web_ui` → `tray.py:509` |

@@ -5,8 +5,8 @@ id: nexe-installation-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Com instal-lar server-nexe: 3 metodes. (1) DMG per macOS amb wizard SwiftUI, Python 3.12 inclos, models per tiers de RAM. (2) CLI: git clone + ./setup.sh (macOS/Linux). (3) nexe-app (Tauri, macOS + Linux). Requisits: macOS 14+ Sonoma Apple Silicon (M1+), 8GB RAM minim. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Port per defecte: 9119."
-tags: [installation, setup, dmg, swiftui, wizard, cli, headless, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, uninstaller, encryption, how-to]
+abstract: "Com instal-lar server-nexe: (1) Desktop App nexe-app (Tauri v2, recomanat) — DMG macOS (~1.3 GB) i AppImage Linux ARM64 (~1.2 GB) des de Releases, amb onboarding wizard (deteccio hardware, tria backend, descarrega model) i mode sidecar amb safata. (2) CLI des de codi font: git clone + ./setup.sh (macOS/Linux). (3) Legacy: DMG SwiftUI standalone (substituit per la Desktop App). Requisits: macOS 14+ Apple Silicon (M1+) o Linux ARM64, 8GB RAM. Backends: MLX, llama.cpp, Ollama. Cataleg a models.json. Port: 9119."
+tags: [installation, setup, desktop-app, tauri, appimage, dmg, cli, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, encryption, sidecar, wizard, how-to]
 chunk_size: 600
 priority: P1
 
@@ -17,14 +17,14 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Instal·lacio — server-nexe 1.0.5
+# Instal·lacio — server-nexe 1.0.6
 
 ## En 30 segons
 
-- **3 metodes:** DMG (macOS, wizard SwiftUI), CLI (`./setup.sh`) o nexe-app (Tauri, macOS + Linux)
-- **DMG ~1.2 GB offline** (wheels + embedding model bundled)
-- **Requereix macOS 14 Sonoma + Apple Silicon** (M1+)
-- **Tria model segons RAM** (cataleg 14 models, 4 tiers 8/16/24/32 GB)
+- **3 metodes:** Desktop App nexe-app (Tauri, recomanat), CLI des de codi font (`./setup.sh`), o l'installer DMG SwiftUI legacy
+- **Desktop App:** DMG per macOS (~1.3 GB) + AppImage per Linux ARM64 (~1.2 GB), des de [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest)
+- **Requereix macOS 14 Sonoma + Apple Silicon** (M1+) o Linux ARM64
+- **Tria de model segons RAM:** l'onboarding wizard llegeix el cataleg mantingut (`models.json`) i recomana per la teva RAM
 - **Port per defecte:** 9119
 
 ---
@@ -43,48 +43,24 @@ Tres metodes d'instal·lacio disponibles. Tria segons la teva plataforma i prefe
 
 > **Breaking a v0.9.9:** macOS 13 Ventura i macOS Intel queden fora del target suportat. El stack (mlx, mlx-vlm, fastembed ONNX, llama-cpp-python amb Metal, wheels arm64) requereix macOS 14 Sonoma i Apple Silicon.
 
-## Metode 1: Instal·lador DMG per a macOS (recomanat)
+## Metode 1: Desktop App — nexe-app (Tauri v2, recomanat)
 
-Wizard natiu SwiftUI amb 6 pantalles. Inclou Python 3.12 — sense dependencia del Python del sistema.
+Aplicacio d'escriptori que embeu server-nexe com a sidecar Python dins una shell Tauri v2. Es el metode recomanat i el canal de release public.
 
-### ⚡ Instal·lacio 100% offline (des de v0.9.9)
+Descarrega l'ultim paquet des de la pagina de [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest):
 
-A partir d'aquesta versio, el DMG porta **tot** el que l'installer necessita:
+| Plataforma | Paquet | Mida |
+|------------|--------|------|
+| macOS (Apple Silicon) | `nexe-app_1.0.6_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.6_aarch64.AppImage` | ~1.2 GB |
 
-- Runtime Python 3.12 (~45 MB)
-- **Tots els wheels de Python** pre-compilats per a arm64 macOS 14+ (~220 MB): fastapi, pydantic, mlx-lm, mlx-vlm, **llama-cpp-python pinned a 0.3.19** (amb Metal; la 0.3.20 té wheels corruptes Bad CRC-32 al servidor de paquets i s'ha evitat explicitament), fastembed, onnxruntime, sqlcipher3, cryptography, i la resta del stack.
-- **Model d'embeddings multilingue** pre-descarregat (~470 MB): `sentence-transformers/paraphrase-multilingual-mpnet-base-v2` en format ONNX (carregat via fastembed).
-- **KB embeddings precomputats** a `knowledge/.embeddings/` per ca/es/en (10.7× speedup a la primera arrencada).
+- **Onboarding wizard** integrat al frontend (HTML/JS, no SwiftUI): deteccio de hardware, seleccio de backend, descarrega del model i configuracio, tot des de la mateixa app.
+- **Mode sidecar:** server-nexe corre amb `NEXE_SIDECAR=1`; els paths els gestiona Tauri (`NEXE_HOME`, `NEXE_DATA_DIR`).
+- **Safata de sistema** i gestio automatica del proces sidecar.
+- **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64).
+- **Ollama bundled** o auto-instal·lat.
 
-Efectes practics:
-
-- Mida del DMG: **~1.2 GB** (creix per wheels + embedding model bundled per facilitar instal·lació offline a altres equips).
-- Un cop baixat el DMG, l'instal·lacio **no requereix xarxa** i no necessita Xcode Command Line Tools (sense prompt de `CMAKE_ARGS`).
-- **Cap prompt de macOS demanant "eines de desenvolupador"** durant l'install.
-- RAG funcional al primer boot: el model d'embeddings ja esta present.
-- L'unica cosa que segueix requerint xarxa post-install es la descarrega del model LLM que trieu (Qwen, Gemma, DeepSeek, etc.), si no useu un model ja present a Ollama local.
-- Fallback a PyPI si algun wheel del bundle falta (robustesa).
-
-Requisit: **Apple Silicon (M1+) amb macOS 14 Sonoma o superior**. Intel Mac i macOS 13 Ventura ja no son un target suportat.
-
-### Que fa el wizard
-
-1. **Benvinguda:** Selector d'idioma (ca/es/en), logotip, informacio de versio
-2. **Desti:** Selector de carpeta amb validacio d'espai lliure
-3. **Seleccio de model:** 4 pestanyes (petit/mitja/gran/personalitzat) amb deteccio de maquinari. Mostra 14 models amb requisits de RAM, compatibilitat de motor i any. Recomana models basant-se en la RAM/GPU detectada.
-4. **Confirmacio:** Resum de les opcions abans d'instal·lar
-5. **Progres:** Barra de progres de 7 passos amb log en temps real. Parser de protocol Python (marcadors [PROGRESS], [LOG], [DONE], [ERROR]). 8-30 minuts depenent de la descarrega del model.
-6. **Finalitzacio:** Visualitzacio de la clau API, opcions per afegir al Dock i als Elements d'inici, compte enrere per al llancament
-
-### Deteccio de maquinari
-
-El wizard utilitza crides natives a `sysctl` per detectar:
-- Xip CPU (M1/M2/M3/M4, Intel)
-- RAM total
-- Suport de GPU Metal
-- Espai lliure en disc
-
-Basant-se en la deteccio, recomana el backend i els models adequats.
+El cataleg de models el llegeix el wizard del fitxer mantingut `models.json` (sincronitzat al binari Tauri via `catalog_fallback.json`). Vegeu el cataleg complet mes avall.
 
 ### Seleccio de backend
 
@@ -94,13 +70,9 @@ Basant-se en la deteccio, recomana el backend i els models adequats.
 | llama.cpp | macOS + Linux | Format GGUF universal, acceleracio Metal a Mac |
 | Ollama | macOS + Linux | Si ja tens Ollama instal·lat, la configuracio mes facil |
 
-### Descarrega
+## Metode 2: CLI des de codi font
 
-Descarrega el DMG des de la pagina de releases de GitHub: https://github.com/jgoy-labs/server-nexe/releases
-
-## Metode 2: CLI headless
-
-Per a usuaris que prefereixen la instal·lacio per terminal o estan a Linux.
+Per a usuaris que prefereixen la instal·lacio per terminal, desenvolupament, o Linux.
 
 ```bash
 # Linux (Debian/Ubuntu) — prerequisits (un sol cop):
@@ -124,23 +96,15 @@ Despres de la configuracio:
 ./nexe go    # Arrencar servidor -> http://127.0.0.1:9119
 ```
 
-## Metode 3: nexe-app (Tauri — macOS + Linux)
+## Metode 3: Installer DMG SwiftUI (legacy)
 
-Aplicacio d'escriptori que embeu server-nexe com a sidecar Python dins una shell Tauri v2. L'experiencia d'instal·lacio es diferent del DMG standalone:
+> **Estat:** substituit per la Desktop App (Metode 1). Es mante documentat per a instal·lacions existents; per a noves instal·lacions, fes servir la Desktop App.
 
-- **Onboarding wizard** integrat al frontend (HTML/JS, no SwiftUI)
-- **Deteccio de hardware** i seleccio de model des de la mateixa app
-- **Ollama bundled** o auto-instal·lat
-- **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64/x86_64)
-- **Mode sidecar:** server-nexe corre amb `NEXE_SIDECAR=1`, paths gestionats per Tauri (`NEXE_HOME`, `NEXE_DATA_DIR`)
+Wizard natiu SwiftUI amb 6 pantalles, amb Python 3.12 bundled i instal·lacio 100% offline (des de v0.9.9): portava tots els wheels arm64 pre-compilats (~220 MB, amb `llama-cpp-python` pinned a 0.3.19 amb Metal), el model d'embeddings multilingue `paraphrase-multilingual-mpnet-base-v2` en ONNX (~470 MB) i els KB embeddings precomputats per ca/es/en. Mida del DMG ~1.2 GB; requeria Apple Silicon (M1+) amb macOS 14 Sonoma o superior.
 
-El cataleg de models es el mateix que el standalone (14 models, 4 tiers) — sincronitzat via `catalog_fallback.json` embedded al binari Tauri.
+## Cataleg de models (4 tiers per RAM)
 
-> **Estat:** En desenvolupament actiu. Repositori privat (`nexe-app`). Push públic previst quan Fase 1 estigui completa.
-
-Descarrega: quan estigui disponible, des de https://github.com/jgoy-labs/nexe-app/releases
-
-## Cataleg de models (14 models, 4 tiers — verificat 2026-05-24)
+El cataleg canonic viu a `installer/swift-wizard/Resources/models.json` (font de veritat, mantinguda al repo i llegida per l'onboarding wizard). La taula seguent n'es un reflex (actualment 14 models en 4 tiers):
 
 ### tier_8 (8 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
@@ -312,7 +276,7 @@ Aplicacio de la barra de menu per controlar el servidor sense terminal. Implemen
 
 | Opcio | Que fa | Codi |
 |-------|--------|------|
-| **server.nexe v1.0.5** | Capçalera no clicable. La versio es llegeix dinamicament de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
+| **server.nexe v1.0.6** | Capçalera no clicable. La versio es llegeix dinamicament de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
 | **Servidor actiu / aturat** | Indicador d'estat (no clicable). La icona de la barra canvia: `ICON_RUNNING` (verda) quan el servidor esta viu, `ICON_STOPPED` (gris) quan no. | `tray.py:197` |
 | **Aturar / Iniciar servidor** | Engega o atura el proces `core.app` (uvicorn + FastAPI + Qdrant). Fa SIGTERM i, si cal, SIGKILL. Gestio de PID a `storage/run/server.pid`. | `_toggle_server` → `tray.py:296` |
 | **Obrir Web UI** | Obre `http://127.0.0.1:9119/ui` al navegador per defecte. | `_open_web_ui` → `tray.py:509` |

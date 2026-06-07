@@ -5,7 +5,7 @@ id: nexe-security-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Seguridad de server-nexe 1.0.5: autenticacion dual-key, rate limiting (incl. PATCH thinking 10/min y NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectores de inyeccion, 47 patrones jailbreak, cabeceras OWASP, logging RFC5424, encriptacion AES-256-GCM en reposo (SQLCipher, sesiones .enc), MEK fallback order (file->keyring->env->generate), sanitizacion RAG injection (_filter_rag_injection). Todo local, cero llamadas externas."
+abstract: "Seguridad de server-nexe 1.0.6: autenticacion dual-key, rate limiting (incl. PATCH thinking 10/min y NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectores de inyeccion, 47 patrones jailbreak, cabeceras OWASP, logging RFC5424, encriptacion AES-256-GCM en reposo (SQLCipher, sesiones .enc), MEK fallback order (file->keyring->env->generate), sanitizacion RAG injection (_filter_rag_injection). Todo local, cero llamadas externas."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Seguridad — server-nexe 1.0.5
+# Seguridad — server-nexe 1.0.6
 
 ## Tabla de contenidos
 
@@ -49,7 +49,7 @@ expires: null
 - [Checklist de seguridad](#checklist-de-seguridad)
 - [Reporte de vulnerabilidades](#reporte-de-vulnerabilidades)
 
-server-nexe 1.0.5 esta disenado para entornos locales de confianza. Todos los datos permanecen en el dispositivo. Sin telemetria, sin llamadas externas.
+server-nexe 1.0.6 esta disenado para entornos locales de confianza. Todos los datos permanecen en el dispositivo. Sin telemetria, sin llamadas externas.
 
 ## Autenticacion
 
@@ -100,7 +100,7 @@ Implementacion: `slowapi` con decorador `@limiter.limit()` en cada endpoint. `Ra
 Aplicadas via `core/security_headers.py` y middleware:
 
 - `Content-Security-Policy`: script-src 'self' (sin scripts inline — i18n usa atributo `data-nexe-lang` en su lugar)
-- `Strict-Transport-Security`: max-age=31536000
+- `Strict-Transport-Security`: max-age=31536000; includeSubDomains
 - `X-Content-Type-Options`: nosniff
 - `X-Frame-Options`: DENY
 - `X-XSS-Protection`: 0 (deprecado, se usa CSP en su lugar)

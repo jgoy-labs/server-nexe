@@ -5,7 +5,7 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Testing strategy and coverage for server-nexe 1.0.5. 6723 test functions collected (6938 total, 215 deselected), 0 failures in latest run. Tests collocated with modules. Covers test structure, running tests, honest actual coverage ~85% global, AI audit test fixes, crypto tests (68), MEM_DELETE e2e tests (8), automated mass test run results (AI-run), and honest assessment of testing limitations."
+abstract: "Testing strategy and coverage for server-nexe 1.0.6. 6776 test functions collected (6991 total, 215 deselected), 0 failures in latest run. Tests collocated with modules. Covers test structure, running tests, honest actual coverage ~85% global, AI audit test fixes, crypto tests (68), MEM_DELETE e2e tests (8), automated mass test run results (AI-run), and honest assessment of testing limitations."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mass-tests]
 chunk_size: 800
 priority: P2
@@ -17,21 +17,21 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Testing — server-nexe 1.0.5
+# Testing — server-nexe 1.0.6
 
 ## Test Results
 
 | Metric | Value |
 |--------|-------|
-| Total test functions collected | **6723** |
-| Total test functions (incl. deselected) | **6938** (215 deselected by markers) |
-| Latest full run passed | 6723 |
+| Total test functions collected | **6776** |
+| Total test functions (incl. deselected) | **6991** (215 deselected by markers) |
+| Latest full run passed | 6776 |
 | Failed | 0 |
 | Skipped | 6 |
 | XFailed | 1 |
 | **Actual global coverage** | **~85%** (honest baseline, not inflated) |
 
-Note: 6723 functions collected in the standard run (excluding integration/e2e/slow markers). The raw total including deselected tests is 6938.
+Note: 6776 functions collected in the standard run (excluding integration/e2e/slow markers). The raw total including deselected tests is 6991.
 
 > **Honesty note on coverage:** Historical badges have reported 97.4%, 91.1% or 93% in specific mass-test phases. Those numbers correspond to specific subsets (a phase baseline, functional against a live server) and not to the project global. The **actual global code coverage**, measured with `pytest --cov` over the whole codebase, is **~85%**. That is the value we use as reference.
 >

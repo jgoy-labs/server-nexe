@@ -79,7 +79,7 @@ Server Nexe started as a learning-by-doing experiment: *"What would it take to h
 
 **This entire project — code, tests, audits, documentation — has been built by one person orchestrating different AI models**, both local (MLX, Ollama) and cloud (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), as collaborators. The human decides what to build, designs the architecture, reviews lines and runs tests. The AIs write, audit, and stress-test under human direction.
 
-What began as a prototype has turned into a genuinely useful product: 6723 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
+What began as a prototype has turned into a genuinely useful product: 6776 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
 
 This is not trying to compete with ChatGPT or Claude. But it can be complementary for less demanding tasks. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with AI as co-pilot, music, and stubbornness.
 
@@ -157,7 +157,7 @@ Upload `.txt`, `.md` or `.pdf` and they're automatically indexed for RAG. Each d
 <td width="50%">
 
 ### Built to Grow
-6723 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
+6776 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
 
 </td>
 </tr>
@@ -224,7 +224,7 @@ The installer auto-detects your hardware and recommends the best backend. You ca
 
 ## Available Models by RAM Tier
 
-The installer organizes the 15 catalog models by the RAM available on your machine (4 tiers):
+The installer organizes the 14 catalog models by the RAM available on your machine (4 tiers):
 
 | Tier | Models | Origin |
 |------|--------|--------|
@@ -351,7 +351,7 @@ Server Nexe includes a security module enabled by default:
 
 ## Testing
 
-6723 tests collected (of 6938 total, 215 deselected by default markers) with ~85% code coverage. CI runs the full suite on every push.
+6776 tests collected (of 6991 total, 215 deselected by default markers) with ~85% code coverage. CI runs the full suite on every push.
 
 ```bash
 # Unit tests

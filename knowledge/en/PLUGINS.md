@@ -5,7 +5,7 @@ id: nexe-plugins-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete guide to the server-nexe 1.0.5 plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (5: MLX, llama.cpp, Ollama, Security with Unicode normalization, Web UI with input validation), how to create a new plugin step by step, common errors and best practices."
+abstract: "Complete guide to the server-nexe 1.0.6 plugin system. Covers NexeModule Protocol (duck typing, not inheritance), manifest.toml format, plugin file structure, lifecycle (discovery → loading → initialization → integration → shutdown), context object, router registration, existing plugins (5: MLX, llama.cpp, Ollama, Security with Unicode normalization, Web UI with input validation), how to create a new plugin step by step, common errors and best practices."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Plugin System — server-nexe 1.0.5
+# Plugin System — server-nexe 1.0.6
 
 server-nexe uses a plugin architecture based on automatic discovery via manifest.toml files. Plugins are independent modules that add functionality without modifying the core. No manual registration needed — the system scans, discovers, and loads plugins automatically.
 
@@ -226,7 +226,7 @@ server-nexe has **three complementary mechanisms** to decide which plugins get a
 
 ### 1. `server.toml` — `[plugins.modules]` section
 
-Static declarative list in `personality/server.toml` (line 172). This is the primary source: it tells the server which plugins MUST be activated at startup.
+Static declarative list in `personality/server.toml` (line 203). This is the primary source: it tells the server which plugins MUST be activated at startup.
 
 ```toml
 [plugins.modules]
@@ -239,7 +239,7 @@ To add a new plugin, it must be included explicitly here.
 
 ### 2. `NEXE_APPROVED_MODULES` — env var (security allowlist)
 
-Validated by `get_module_allowlist()` in `core/config.py:261`. This is an additional security layer on top of the `server.toml` list:
+Validated by `get_module_allowlist()` in `core/config.py:355`. This is an additional security layer on top of the `server.toml` list:
 
 - **Development mode** (`NEXE_ENV=development` or unset): `NEXE_APPROVED_MODULES` is **optional**. If not defined, `get_module_allowlist()` returns `None` and filters nothing.
 - **Production mode** (`NEXE_ENV=production` or `[core.environment].mode = "production"`): `NEXE_APPROVED_MODULES` is **MANDATORY**. If missing, the server aborts with `ValueError("SECURITY ERROR: NEXE_APPROVED_MODULES is required in production")`.
@@ -405,6 +405,6 @@ Both methods may be called multiple times. Always check `self._initialized` guar
 | Module Lifecycle | `personality/module_manager/module_lifecycle.py` |
 | Config Manager | `personality/module_manager/config_manager.py` |
 | Module Registry | `personality/module_manager/registry.py` |
-| Security Allowlist | `core/config.py:261` (`get_module_allowlist()`) |
+| Security Allowlist | `core/config.py:355` (`get_module_allowlist()`) |
 | Router Registration | `core/server/factory_modules.py` |
 | Reference plugin (cleanest) | `plugins/llama_cpp_module/` |

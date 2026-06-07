@@ -5,7 +5,7 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia de testing i cobertura per a server-nexe 1.0.5. 6723 funcions de test col·lectades (6938 totals, 215 deselected), 0 errors a l'ultima execucio. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura real ~85% global, correccions de tests de l'auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultats dels tests massius automatitzats (executats per IA) i valoracio honesta de les limitacions del testing."
+abstract: "Estrategia de testing i cobertura per a server-nexe 1.0.6. 6776 funcions de test col·lectades (6991 totals, 215 deselected), 0 errors a l'ultima execucio. Tests col·locats amb els moduls. Cobreix estructura de tests, execucio, cobertura real ~85% global, correccions de tests de l'auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultats dels tests massius automatitzats (executats per IA) i valoracio honesta de les limitacions del testing."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mass-tests]
 chunk_size: 800
 priority: P2
@@ -17,21 +17,21 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Testing — server-nexe 1.0.5
+# Testing — server-nexe 1.0.6
 
 ## Resultats dels tests
 
 | Metrica | Valor |
 |--------|-------|
-| Total funcions de test col·lectades | **6723** |
-| Total funcions de test (incl. deseleccionades) | **6938** (215 deselected per marcadors) |
-| Ultima execucio completa passats | 6723 |
+| Total funcions de test col·lectades | **6776** |
+| Total funcions de test (incl. deseleccionades) | **6991** (215 deselected per marcadors) |
+| Ultima execucio completa passats | 6776 |
 | Fallats | 0 |
 | Omesos | 6 |
 | XFailed | 1 |
 | **Cobertura real global** | **~85%** (baseline honest, sense inflar) |
 
-Nota: 6723 funcions col·lectades per l'execucio estandard (sense marcadors integration/e2e/slow). El total brut incloent tests deseleccionats es 6938.
+Nota: 6776 funcions col·lectades per l'execucio estandard (sense marcadors integration/e2e/slow). El total brut incloent tests deseleccionats es 6991.
 
 > **Nota d'honestedat sobre cobertura:** Badges històrics han reportat 97.4%, 91.1% o 93% en fases concretes dels tests massius. Aquests números corresponien a subconjunts específics (baseline d'una fase, funcional contra servidor en viu) i no al global del projecte. La **cobertura real global del codi**, mesurada amb `pytest --cov` sobre tot el codebase, és **~85%**. Aquest és el valor que fem servir com a referència.
 >

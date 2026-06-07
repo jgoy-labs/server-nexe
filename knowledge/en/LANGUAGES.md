@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Languages — server-nexe 1.0.5
+# Languages — server-nexe 1.0.6
 
 ## Which languages you can use with Nexe
 
