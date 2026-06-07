@@ -226,3 +226,60 @@ class TestKeyManagement:
         # Should be functional
         enc = crypto.encrypt(b"test")
         assert crypto.decrypt(enc) == b"test"
+
+
+class TestSidecarKeyringSkip:
+    """CRY-01 regression — in sidecar mode the OS keyring is NEVER accessed.
+
+    The bundled (Developer-ID-signed) Python is not in the Keychain item's
+    trusted-application ACL, so a headless keyring access triggers a blocking
+    macOS authorization dialog that hangs the boot ~6 min. In sidecar mode
+    (NEXE_SIDECAR=1) the keyring must be skipped entirely; the master.key file
+    is the durable anchor. Tests have teeth: any keyring call fails them.
+    """
+
+    def test_keyring_get_skipped_in_sidecar(self, monkeypatch):
+        monkeypatch.setenv("NEXE_SIDECAR", "1")
+        import keyring
+        monkeypatch.setattr(keyring, "get_password",
+                            lambda *a, **k: pytest.fail("keyring.get_password called in sidecar mode (CRY-01)"))
+        assert _try_keyring_get() is None
+
+    def test_keyring_set_skipped_in_sidecar(self, monkeypatch):
+        monkeypatch.setenv("NEXE_SIDECAR", "1")
+        import keyring
+        monkeypatch.setattr(keyring, "set_password",
+                            lambda *a, **k: pytest.fail("keyring.set_password called in sidecar mode (CRY-01)"))
+        assert _try_keyring_set(os.urandom(32)) is False
+
+    def test_get_or_create_never_touches_keyring_in_sidecar(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("NEXE_SIDECAR", "1")
+        monkeypatch.setenv("NEXE_SIDECAR_DIR", str(tmp_path))
+        monkeypatch.delenv("NEXE_MASTER_KEY", raising=False)
+        import keyring
+
+        def _boom(*a, **k):
+            pytest.fail("keyring accessed in sidecar mode (CRY-01)")
+
+        monkeypatch.setattr(keyring, "get_password", _boom)
+        monkeypatch.setattr(keyring, "set_password", _boom)
+        # First call: empty dir → generates to file, never touches keyring.
+        key = get_or_create_master_key()
+        assert len(key) == 32
+        assert (tmp_path / "master.key").exists()
+        # Second call: file is found; the opportunistic keyring mirror is skipped.
+        assert get_or_create_master_key() == key
+
+    def test_keyring_consulted_when_not_sidecar(self, monkeypatch):
+        """Outside sidecar mode the keyring IS consulted (mirror behaviour intact)."""
+        monkeypatch.delenv("NEXE_SIDECAR", raising=False)
+        called = {"get": False}
+        import keyring
+
+        def _track(*a, **k):
+            called["get"] = True
+            return None
+
+        monkeypatch.setattr(keyring, "get_password", _track)
+        assert _try_keyring_get() is None
+        assert called["get"] is True

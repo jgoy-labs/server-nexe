@@ -48,8 +48,23 @@ KEY_FILE_DIR = _resolve_key_file_dir()
 KEY_FILE_PATH = KEY_FILE_DIR / "master.key"
 
 
+def _is_sidecar() -> bool:
+    """True when running as the bundled Tauri sidecar (NEXE_SIDECAR=1).
+
+    In sidecar mode the OS keyring is skipped (CRY-01): the embedded
+    Developer-ID-signed Python is not in the Keychain item's trusted-application
+    ACL, so a headless `keyring` access triggers a blocking macOS authorization
+    dialog that the sidecar cannot answer — the boot hangs ~6 min until timeout.
+    The `master.key` file is the durable anchor; the keyring is only a mirror,
+    so dropping it in sidecar mode loses no durability.
+    """
+    return os.environ.get("NEXE_SIDECAR") == "1"
+
+
 def _try_keyring_get() -> bytes | None:
-    """Try to retrieve master key from OS keyring."""
+    """Try to retrieve master key from OS keyring. Skipped in sidecar mode (CRY-01)."""
+    if _is_sidecar():
+        return None
     try:
         import keyring
         stored = keyring.get_password(KEYRING_SERVICE, KEYRING_USERNAME)
@@ -61,7 +76,9 @@ def _try_keyring_get() -> bytes | None:
 
 
 def _try_keyring_set(key: bytes) -> bool:
-    """Try to store master key in OS keyring."""
+    """Try to store master key in OS keyring. Skipped in sidecar mode (CRY-01)."""
+    if _is_sidecar():
+        return False
     try:
         import keyring
         keyring.set_password(KEYRING_SERVICE, KEYRING_USERNAME, key.hex())
