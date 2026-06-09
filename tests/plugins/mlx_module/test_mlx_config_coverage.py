@@ -19,7 +19,13 @@ class TestAutoMaxKvSize:
         from plugins.mlx_module.core.config import _auto_max_kv_size
         result = _auto_max_kv_size()
         assert isinstance(result, int)
-        assert result >= 16384
+        # El floor depèn de la RAM real (config.py: <12GB→4096, <24GB→8192, else→16384).
+        # Assertem contra el floor derivat perquè el test passi a qualsevol host
+        # (màquina dev gran = 16384; runner CI de ~16GB = 8192) sense amagar res.
+        import psutil
+        total_gb = psutil.virtual_memory().total / (1024 ** 3)
+        floor = 4096 if total_gb < 12 else 8192 if total_gb < 24 else 16384
+        assert result >= floor
 
     def test_auto_max_kv_exception_fallback(self):
         """Line 53-54: exception in psutil returns 65536."""

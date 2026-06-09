@@ -30,6 +30,8 @@ class TestStreamingGenerationCancellation:
     """The text-branch streaming loop must honour cancel_event."""
 
     def test_cancel_event_set_breaks_loop_immediately(self) -> None:
+        # mlx-lm només existeix a Apple Silicon (requirements-macos.txt); patch() força l'import.
+        pytest.importorskip("mlx_lm", reason="mlx-lm Apple-Silicon-only, absent al CI Linux")
         # Build a generator that would yield 100 fake tokens; the loop must
         # exit at the first iteration where cancel_event is already set.
         cancel_event = threading.Event()
@@ -86,6 +88,7 @@ class TestStreamingGenerationCancellation:
         )
 
     def test_cancel_event_none_runs_to_completion(self) -> None:
+        pytest.importorskip("mlx_lm", reason="mlx-lm Apple-Silicon-only, absent al CI Linux")
         # Back-compat: existing callers that don't pass cancel_event must
         # see the full loop (no early break).
         emitted: list[str] = []

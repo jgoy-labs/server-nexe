@@ -222,15 +222,29 @@ def test_save_overwrites_previous_state(tmp_data_dir: Path) -> None:
 def test_fallback_path_when_data_dir_unset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Without NEXE_DATA_DIR, state file lives under ~/Library/Application Support."""
+    """Without NEXE_DATA_DIR, the state file lives under the platform's data dir:
+    macOS → ~/Library/Application Support/com.nexe.app/...; other → platformdirs
+    (~/.local/share/nexe-app on Linux). The test mirrors the code's own branch so
+    it passes on every OS (Mac dev + Linux CI)."""
+    import platform
+    import platformdirs
+
     monkeypatch.delenv("NEXE_DATA_DIR", raising=False)
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
-    expected = (
-        tmp_path
-        / "Library"
-        / "Application Support"
-        / "com.nexe.app"
-        / "sidecar"
-        / "onboarding.json"
-    )
+    if platform.system() == "Darwin":
+        expected = (
+            tmp_path
+            / "Library"
+            / "Application Support"
+            / "com.nexe.app"
+            / "sidecar"
+            / "onboarding.json"
+        )
+    else:
+        expected = (
+            Path(platformdirs.user_data_dir("nexe-app", "nexe"))
+            / "sidecar"
+            / "onboarding.json"
+        )
     assert OnboardingState._state_file() == expected
