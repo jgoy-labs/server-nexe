@@ -5,10 +5,30 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      # typer==0.9.0 és un pin VOLGUT (requirements.txt L30-34: pujar-lo trenca el build)
+      # i imposa rich<14 + click<9. Mantenir typer a 0.9.x i rich a 13.x.
+      # Treure aquests ignore si algun dia es migra typer a la versió moderna.
+      - dependency-name: "typer"
+        versions: [">=0.10"]
+      - dependency-name: "rich"
+        versions: [">=14"]
     groups:
-      python-deps:
+      # Pegats segurs (CVE/patches/minors no-crítics) en UN sol PR ràpid de mergejar.
+      # Els bumps de risc de l'stack ML/servidor queden FORA del grup → PR individual,
+      # per provar-los 1-a-1 (traçabilitat de regressions, sobretot al camí d'inferència).
+      safe-patches:
         patterns:
           - "*"
+        exclude-patterns:
+          - "uvicorn*"
+          - "mlx-*"
+          - "psutil"
+          - "pydantic*"
+          - "structlog"
+          - "httpx"
+          - "qdrant-client*"
+          - "prometheus-client"
 
   - package-ecosystem: "github-actions"
     directory: "/"

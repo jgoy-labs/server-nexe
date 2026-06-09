@@ -17,6 +17,8 @@ qdrant-client==1.16.1
 toml==0.10.2
 structlog==25.5.0
 click==8.1.7
+# rich/typer pinats VOLGUTS: typer 0.9.0 (API antiga usada pel codi; pujar-lo trenca el build,
+# veure L30-34) imposa rich<14. NO pujar rich a 14/15 ni typer a >=0.10 (Dependabot els ignora).
 rich==13.7.0
 typer==0.9.0
 python-dotenv==1.2.2  # GHSA-mf9w-mj56-hr94 symlink attack fixed in 1.2.2
