@@ -13,6 +13,11 @@ updates:
         versions: [">=0.10"]
       - dependency-name: "rich"
         versions: [">=14"]
+      # huggingface_hub>=1.14 exigeix typer>=0.20 → incompatible amb el pin typer 0.9.x
+      # (ResolutionImpossible a pip-audit; va trencar el grup safe-patches 2026-06-11).
+      # El requirements porta sostre <1.14. Treure això quan es migri typer.
+      - dependency-name: "huggingface_hub"
+        versions: [">=1.14"]
     groups:
       # Pegats segurs (CVE/patches/minors no-crítics) en UN sol PR ràpid de mergejar.
       # Els bumps de risc de l'stack ML/servidor queden FORA del grup → PR individual,

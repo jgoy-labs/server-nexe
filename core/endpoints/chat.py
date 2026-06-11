@@ -27,6 +27,7 @@ from .chat_sanitization import (
     _sanitize_sse_token,
     _estimate_tokens,
     rag_security_rule,
+    untrusted_context_turns,
     wrap_untrusted_context,
     MAX_RAG_CONTEXT_LENGTH,
     MAX_CHAT_INPUT_LENGTH,
@@ -207,12 +208,17 @@ def _trim_rag_context(safe_context: str, messages: list) -> str:
 
 
 def _inject_rag_context_into_messages(messages: list, context_text: str, server_lang: str) -> None:
-    """Inject RAG context into the last user message (in-place).
+    """Inject RAG context as its own turn pair before the last user message (in-place).
 
     B030 (RT-01): the retrieved content is wrapped in nonce'd delimiters with a
     data-not-instructions intro, and the system message gets the static RAG
     security rule. _sanitize_rag_context escapes forged delimiters inside the
     content, so only this runtime can emit a valid [CONTEXT <id>] pair.
+
+    B030 layer 2d (turn separation): the wrapped block travels in a separate
+    user turn + assistant data-only acknowledgement, inserted BEFORE the last
+    user message — the user's question arrives clean and keeps its authority,
+    instead of the document speaking with the user's voice.
     """
     if not (context_text and messages):
         return
@@ -223,7 +229,7 @@ def _inject_rag_context_into_messages(messages: list, context_text: str, server_
     wrapped = wrap_untrusted_context(f"{_instruction}\n{safe_context}", server_lang)
     for i in range(len(messages) - 1, -1, -1):
         if messages[i]['role'] == 'user':
-            messages[i]['content'] = f"{wrapped}\n\n{messages[i]['content']}"
+            messages[i:i] = untrusted_context_turns(wrapped, server_lang)
             break
     if messages[0]['role'] == 'system':
         messages[0]['content'] += "\n\n" + rag_security_rule(server_lang)

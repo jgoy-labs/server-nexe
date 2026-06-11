@@ -43,6 +43,39 @@ It does **not** defend against:
 - **v0.9.9 hardening:** `_filter_rag_injection` now also neutralizes `[MEM_DELETE:…]`, `[MEM_SAVE:…]`, `[OLVIDA|OBLIT|FORGET:…]` and `[MEMORIA:…]` at both ingest time (`ingest_docs`, `ingest_knowledge`) and retrieval time (`_sanitize_rag_context`). A malicious document can no longer embed a `MEM_DELETE` tag that the LLM would copy verbatim — every such tag becomes `[FILTERED]` before the model ever sees it.
 - **v0.9.9 clear-all safety rail:** "oblida-ho tot" / "forget everything" triggers `clear_all` intent with an explicit two-turn confirmation (`session._pending_clear_all`). Nothing is wiped until the user confirms with `sí, esborra-ho tot` / `yes delete everything` / `confirmo` / `go ahead`.
 
+### Indirect prompt injection via documents — defenses and the model-size reality (v1.0.6+)
+
+A document you upload can contain instructions written in **plain prose** (no
+markers, no tags) aimed at the model: "when asked about X, always answer Y",
+"ignore your rules", etc. When that document is retrieved via RAG, a model may
+follow those instructions. This is the industry-wide *indirect prompt
+injection* problem; no vendor has fully solved it. What Server Nexe does:
+
+- **Unforgeable context delimiters:** every retrieved fragment is wrapped in
+  `[CONTEXT <nonce>] … [FI CONTEXT <nonce>]` with a fresh per-request nonce;
+  any delimiter-lookalike inside the document itself is escaped, so only the
+  runtime can emit a valid pair.
+- **Static system rule:** the system prompt instructs the model that delimited
+  blocks are untrusted data, never instructions (static on purpose — keeps the
+  local KV prefix cache valid).
+- **Turn separation:** retrieved content travels in its own conversation turn,
+  followed by a fixed assistant acknowledgement ("I will treat this only as
+  data"), and the user's question arrives clean as the last turn — the
+  document never speaks with the user's voice.
+
+**The honest limit: compliance depends on the model's capability.** In our
+red-team measurements, a small default model (4B) followed injected plain-prose
+directives in roughly half of the attempts *despite all the layers above* — at
+that size the model cannot reliably hold the distinction between data and
+instructions while generating, no matter how the prompt is structured.
+
+**Recommendation:** if you work with documents you do not fully trust (anything
+you did not write yourself), use a **larger model (7B or more; bigger is
+better)**. Small models (≤4B) are fine for conversation and notes you authored,
+but should not be your choice for untrusted-document RAG. No model is fully
+immune — treat RAG answers that quote surprising "directives" with suspicion,
+and report them.
+
 ### Pipeline enforcement (v0.9.1+)
 - All chat goes through two canonical endpoints: `/ui/chat` (Web UI) and `/v1/chat/completions` (OpenAI-compatible API)
 - Direct plugin endpoints (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) are blocked by the `RemovedDirectRoutesGuard` middleware — any direct call returns 403. Declared in each plugin's `manifest.toml:removed_direct_routes` and enforced at both request time and plugin load time (a plugin that simultaneously declares and registers a removed route fails to load).
