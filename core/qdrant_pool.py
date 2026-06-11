@@ -22,12 +22,29 @@ _lock = threading.Lock()
 _instances: dict[str, QdrantClient] = {}
 
 
+def _anchor_path(path: Optional[str]) -> Path:
+    """MC-091: resolve the qdrant path ONCE, anchored at the project root.
+
+    _setup_qdrant (lifespan_services) anchors a relative NEXE_QDRANT_PATH to
+    project_root, but this pool used to anchor to cwd — a Tauri-spawned
+    sidecar (cwd = $HOME) would silently open a DIFFERENT vectors dir than
+    the one the lifespan prepared.
+    """
+    p = Path(path or "storage/vectors")
+    if not p.is_absolute():
+        try:
+            from core.paths.detection import get_repo_root
+            p = get_repo_root() / p
+        except Exception:
+            p = p.resolve()
+    return p
+
+
 def _resolve_key(path: Optional[str], url: Optional[str]) -> str:
     """Build a cache key from the connection parameters."""
     if url:
         return f"url:{url}"
-    resolved = str(Path(path or "storage/vectors").resolve())
-    return f"path:{resolved}"
+    return f"path:{_anchor_path(path)}"
 
 
 def get_qdrant_client(
@@ -53,9 +70,9 @@ def _create_client(path: Optional[str], url: Optional[str]) -> QdrantClient:
     """Create a new QdrantClient from parameters."""
     if url:
         return QdrantClient(url=url, prefer_grpc=False)
-    qdrant_path = path or "storage/vectors"
-    Path(qdrant_path).mkdir(parents=True, exist_ok=True)
-    return QdrantClient(path=qdrant_path)
+    qdrant_path = _anchor_path(path)
+    qdrant_path.mkdir(parents=True, exist_ok=True)
+    return QdrantClient(path=str(qdrant_path))
 
 
 def _flush_client(client: QdrantClient) -> None:

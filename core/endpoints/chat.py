@@ -21,10 +21,13 @@ from plugins.security.core.auth_dependencies import require_api_key
 from plugins.security.core.input_sanitizers import validate_string_input, strip_memory_tags
 
 from .chat_schemas import Message, ChatCompletionRequest
+from core.log_redact import redact_user_content
 from .chat_sanitization import (
     _sanitize_rag_context,
     _sanitize_sse_token,
     _estimate_tokens,
+    rag_security_rule,
+    wrap_untrusted_context,
     MAX_RAG_CONTEXT_LENGTH,
     MAX_CHAT_INPUT_LENGTH,
     MAX_CONTEXT_RATIO,
@@ -170,7 +173,8 @@ async def _fetch_rag_context(body: ChatCompletionRequest, app_state: Any, server
     last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
     if not last_user_msg:
         return ""
-    logger.info("RAG Search for: '%s'", last_user_msg[:80] + "..." if len(last_user_msg) > 80 else last_user_msg)
+    # MC-109/111: the user's message must not land in plain in the log file.
+    logger.info("RAG Search for: %s", redact_user_content(last_user_msg))
     return await build_rag_context(last_user_msg, app_state, server_lang)
 
 
@@ -203,23 +207,26 @@ def _trim_rag_context(safe_context: str, messages: list) -> str:
 
 
 def _inject_rag_context_into_messages(messages: list, context_text: str, server_lang: str) -> None:
-    """Inject RAG context into the last user message (in-place)."""
+    """Inject RAG context into the last user message (in-place).
+
+    B030 (RT-01): the retrieved content is wrapped in nonce'd delimiters with a
+    data-not-instructions intro, and the system message gets the static RAG
+    security rule. _sanitize_rag_context escapes forged delimiters inside the
+    content, so only this runtime can emit a valid [CONTEXT <id>] pair.
+    """
     if not (context_text and messages):
         return
     safe_context = _sanitize_rag_context(context_text)
     safe_context = _trim_rag_context(safe_context, messages)
     _labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])
     _instruction = _labels["intro"]
+    wrapped = wrap_untrusted_context(f"{_instruction}\n{safe_context}", server_lang)
     for i in range(len(messages) - 1, -1, -1):
         if messages[i]['role'] == 'user':
-            messages[i]['content'] = (
-                f"[{_labels['docs']}]\n"
-                f"{_instruction}\n"
-                f"{safe_context}\n"
-                f"[/CONTEXT]\n\n"
-                f"{messages[i]['content']}"
-            )
+            messages[i]['content'] = f"{wrapped}\n\n{messages[i]['content']}"
             break
+    if messages[0]['role'] == 'system':
+        messages[0]['content'] += "\n\n" + rag_security_rule(server_lang)
 
 
 async def _build_rag_and_system_prompt(

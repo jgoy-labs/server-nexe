@@ -21,6 +21,7 @@ except ImportError:
     def validate_string_input(s, *a, **k):  # type: ignore[misc, no-redef]
         return s
 from core.dependencies import limiter
+from core.log_redact import redact_user_content
 
 def _get_memory_helper():
     """Lazy resolve via routes module so test patches work."""
@@ -93,5 +94,5 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
         fact = validate_string_input(fact, max_length=500, context="chat")
         memory_helper = _get_memory_helper()
         result = await memory_helper.delete_from_memory(fact)
-        logger.info("MEM_DELETE confirmed by user: '%s' → deleted=%d", fact[:80], result.get("deleted", 0))
+        logger.info("MEM_DELETE confirmed by user: %s → deleted=%d", redact_user_content(fact), result.get("deleted", 0))
         return result

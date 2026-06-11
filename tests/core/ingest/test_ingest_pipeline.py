@@ -499,6 +499,17 @@ class TestRAGChatMLX:
         delete_collection cycle does not touch the dev storage/vectors/.
         Previous env var is restored on teardown.
         """
+        # Resource guard duplicated from require_backends: class-scoped
+        # fixtures are instantiated BEFORE the function-scoped autouse skip
+        # guard, so without this the heavy setup ran (and errored) even when
+        # MLX is not the selected engine.
+        if os.environ.get("NEXE_MODEL_ENGINE") != "mlx":
+            pytest.skip("MLX not selected engine")
+        if not _mlx_available():
+            pytest.skip("MLX model not available")
+        if not _qdrant_available():
+            pytest.skip("Qdrant not running")
+
         import asyncio
         from core.ingest.ingest_knowledge import ingest_knowledge
         from fastapi.testclient import TestClient
@@ -514,7 +525,10 @@ class TestRAGChatMLX:
 
         async def _setup():
             from memory.memory.api import MemoryAPI
-            import plugins.web_ui_module.memory_helper as mh
+            # Fixed stale import: memory_helper moved under core/
+            # (plugins.web_ui_module.memory_helper no longer exists and made
+            # this fixture ERROR at setup before the skip guards could run).
+            import plugins.web_ui_module.core.memory_helper as mh
             mem = MemoryAPI()
             await mem.initialize()
             # Start from a clean personal_memory collection in the isolated

@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import contextlib
 import json
 import logging
 import sqlite3
@@ -43,7 +44,12 @@ class TextStore:
         self._init_db()
 
     def _connect(self):
-        """Open SQLite/SQLCipher connection."""
+        """Open SQLite/SQLCipher connection.
+
+        MC-008: callers must wrap with contextlib.closing() — a bare
+        ``with conn:`` only manages the transaction, it never calls close(),
+        and every operation leaked one SQLite/SQLCipher connection.
+        """
         if self._crypto and SQLCIPHER_AVAILABLE:
             conn = sqlcipher.connect(str(self._db_path))
             dek = self._crypto.derive_key("text_store")
@@ -58,7 +64,7 @@ class TextStore:
     def _init_db(self):
         """Create tables if they don't exist."""
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
+        with contextlib.closing(self._connect()) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS document_texts (
@@ -83,7 +89,7 @@ class TextStore:
             expires_at: Optional[str] = None):
         """Store document text."""
         meta_json = json.dumps(metadata) if metadata else None
-        with self._connect() as conn:
+        with contextlib.closing(self._connect()) as conn:
             conn.execute(
                 """INSERT OR REPLACE INTO document_texts
                    (doc_id, collection, text, metadata_json, created_at, expires_at)
@@ -94,7 +100,7 @@ class TextStore:
 
     def get(self, doc_id: str, collection: str) -> Optional[Dict[str, Any]]:
         """Retrieve document text and metadata."""
-        with self._connect() as conn:
+        with contextlib.closing(self._connect()) as conn:
             row = conn.execute(
                 """SELECT text, metadata_json, created_at, expires_at
                    FROM document_texts WHERE doc_id = ? AND collection = ?""",
@@ -116,7 +122,7 @@ class TextStore:
             return {}
         placeholders = ",".join(["?" for _ in doc_ids])
         sql = f"SELECT doc_id, text, metadata_json, created_at, expires_at FROM document_texts WHERE doc_id IN ({placeholders}) AND collection = ?"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
-        with self._connect() as conn:
+        with contextlib.closing(self._connect()) as conn:
             rows = conn.execute(sql, (*doc_ids, collection)).fetchall()  # nosemgrep: sqlalchemy-execute-raw-query — sql uses '?' placeholders, all params bound
         result = {}
         for doc_id, text, meta_json, created_at, expires_at in rows:
@@ -130,7 +136,7 @@ class TextStore:
 
     def delete(self, doc_id: str, collection: str) -> bool:
         """Delete document text."""
-        with self._connect() as conn:
+        with contextlib.closing(self._connect()) as conn:
             cursor = conn.execute(
                 "DELETE FROM document_texts WHERE doc_id = ? AND collection = ?",
                 (doc_id, collection)
@@ -140,7 +146,7 @@ class TextStore:
 
     def delete_collection(self, collection: str) -> int:
         """Delete all texts in a collection."""
-        with self._connect() as conn:
+        with contextlib.closing(self._connect()) as conn:
             cursor = conn.execute(
                 "DELETE FROM document_texts WHERE collection = ?",
                 (collection,)

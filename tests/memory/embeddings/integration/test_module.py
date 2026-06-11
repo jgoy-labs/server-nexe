@@ -41,7 +41,7 @@ def mock_text_embedding():
   return mock
 
 @pytest.fixture
-async def embeddings_module(mock_text_embedding):
+async def embeddings_module(mock_text_embedding, tmp_path):
   """
   Fixture: EmbeddingsModule with mocked fastembed TextEmbedding.
 
@@ -64,6 +64,13 @@ async def embeddings_module(mock_text_embedding):
       "l2_max_size_gb": 0.001,
       "max_chunk_size": 150
     })
+
+    # Redirect the L2 disk cache to tmp_path: the default lives at
+    # <cwd>/storage/cache/embeddings/embeddings_l2.db, a working-tree file
+    # shared across runs/tests, so stale entries flipped cache_hit (and the
+    # served vector) depending on what ran before — order/disk dependent.
+    if module._cached_embedder is not None and module._cached_embedder.cache is not None:
+      module._cached_embedder.cache.l2_cache_dir = tmp_path / "embeddings_l2"
 
     yield module
 
@@ -118,7 +125,12 @@ async def test_encode_single(embeddings_module):
 
   assert len(response.embedding) == 768, "Embedding hauria de tenir 768 dims"
   assert response.dimensions == 768
-  assert response.model in ["test-model", "paraphrase-multilingual-mpnet-base-v2"]
+  # EmbeddingResponse.model echoes EmbeddingRequest.model, whose default is
+  # the SSOT constant (memory/embeddings/constants.py). The previous literal
+  # list went stale when the constant gained the "sentence-transformers/"
+  # prefix, so the assertion failed regardless of test ordering.
+  from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
+  assert response.model in ["test-model", DEFAULT_EMBEDDING_MODEL]
   assert response.latency_ms >= 0
 
 @pytest.mark.asyncio

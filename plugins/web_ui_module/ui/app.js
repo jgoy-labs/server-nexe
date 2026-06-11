@@ -498,6 +498,14 @@ class NexeUI {
 
         // DOM elements
         this.chatMessages = document.getElementById('chatMessages');
+        // B025: scroll-lock — track whether the user scrolled up to read.
+        // While true, streaming chunks must not drag the view back down.
+        this._userScrolledUp = false;
+        this.chatMessages.addEventListener('scroll', () => {
+            const el = this.chatMessages;
+            const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+            this._userScrolledUp = distanceFromBottom > 80;
+        });
         this.messageInput = document.getElementById('messageInput');
         this.sendBtn = document.getElementById('sendBtn');
         this.stopBtn = document.getElementById('stopBtn');
@@ -2253,7 +2261,7 @@ class NexeUI {
                         return ['http:', 'https:', 'mailto:'].includes(
                             new URL(href, 'http://localhost').protocol
                         );
-                    } catch (_) {
+                    } catch {
                         return false;
                     }
                 };
@@ -2264,7 +2272,7 @@ class NexeUI {
                         text = (token && token.tokens && this.parser)
                             ? this.parser.parseInline(token.tokens)
                             : _escape((token && token.text) || '');
-                    } catch (_) {
+                    } catch {
                         text = _escape((token && token.text) || '');
                     }
                     if (!_isSafeHref(href)) return text;
@@ -2599,7 +2607,13 @@ class NexeUI {
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
-    scrollToBottom() {
+    scrollToBottom(force = false) {
+        // B025: scroll-lock — only auto-scroll if the user is near the bottom.
+        // If they scrolled up to read while the model streams, leave them there;
+        // the lock releases itself when they scroll back down (listener above).
+        // force=true is for user-initiated turns (sending a message, loading a
+        // session), where jumping to the bottom is the expected behavior.
+        if (!force && this._userScrolledUp) return;
         setTimeout(() => {
             this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
         }, 100);

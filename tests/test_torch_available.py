@@ -29,9 +29,21 @@ CHECKSUMS_FILE = PROJECT_ROOT / "installer" / "wheels-checksums.txt"
 pytestmark = pytest.mark.integration
 
 
+
+def _bundle_built() -> bool:
+    """True when the wheels bundle is actually BUILT.
+
+    The wheels are gitignored binaries: on a dev tree the directory exists
+    but is empty, which is not a regression — it just means nobody ran
+    installer/build-wheels-bundle.sh here. The supply-side guards only have
+    teeth against a built bundle; an empty dir must skip, not fail.
+    """
+    return WHEELS_DIR.is_dir() and any(WHEELS_DIR.glob("*.whl"))
+
+
 def test_torch_wheel_present() -> None:
     """Supply-side guard: torch wheel must exist in the bundle."""
-    if not WHEELS_DIR.is_dir():
+    if not _bundle_built():
         pytest.skip(
             "Wheels bundle not built — run installer/build-wheels-bundle.sh"
         )
@@ -46,7 +58,7 @@ def test_torch_wheel_present() -> None:
 
 def test_torchvision_wheel_present() -> None:
     """Supply-side guard: torchvision wheel must exist in the bundle."""
-    if not WHEELS_DIR.is_dir():
+    if not _bundle_built():
         pytest.skip("Wheels bundle not built")
     matches = list(
         WHEELS_DIR.glob("torchvision-*-cp312-cp312-macosx_*_arm64.whl")
@@ -84,7 +96,7 @@ def test_wheels_checksums_match_bundle() -> None:
     """
     if not CHECKSUMS_FILE.is_file():
         pytest.skip("wheels-checksums.txt not present (legacy DMG?)")
-    if not WHEELS_DIR.is_dir():
+    if not _bundle_built():
         pytest.skip("Wheels bundle not built")
 
     for line_num, raw_line in enumerate(

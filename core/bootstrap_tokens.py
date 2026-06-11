@@ -201,20 +201,39 @@ class BootstrapTokenManager:
     logger.info("Master bootstrap token stored in DB (expires in %d min)", ttl_minutes)
 
   def get_bootstrap_token(self) -> Optional[Dict[str, Any]]:
-    """Retrieve the active bootstrap token."""
+    """Retrieve the active bootstrap token.
+
+    RT-09: the plaintext secret is needed only while the token is PENDING
+    (it must be re-displayed across dev restarts). Once used or expired the
+    secret is purged from disk here — the record keeps token=None plus the
+    used/expires metadata so callers can still distinguish 'already used'
+    (403) from 'expired' (410) from 'never initialized' (None → 503).
+    """
     conn = self._get_conn()
     try:
       cursor = conn.cursor()
       cursor.execute("SELECT value, expires FROM bootstrap_config WHERE key = 'master_token'")
       row = cursor.fetchone()
-      if not row:
-        return None
-      
+
       cursor.execute("SELECT value FROM bootstrap_config WHERE key = 'token_used'")
       used_row = cursor.fetchone()
       used = (used_row[0] == "1") if used_row else False
-      
-      return {"token": row[0], "expires": row[1], "used": used}
+
+      if not row:
+        if used:
+          return {"token": None, "expires": 0.0, "used": True}
+        return None
+
+      expires_ts = row[1]
+      now_ts = datetime.now(timezone.utc).timestamp()
+      if used or now_ts > expires_ts:
+        # Purge the plaintext secret; keep metadata semantics.
+        cursor.execute("DELETE FROM bootstrap_config WHERE key = 'master_token'")
+        conn.commit()
+        logger.info("Master bootstrap token purged from DB (%s)", "used" if used else "expired")
+        return {"token": None, "expires": expires_ts, "used": used}
+
+      return {"token": row[0], "expires": expires_ts, "used": used}
     finally:
       conn.close()
 
@@ -243,6 +262,9 @@ class BootstrapTokenManager:
       )
       conn.commit()
       if cursor.rowcount > 0:
+        # RT-09: single-use token consumed — purge the plaintext secret now.
+        cursor.execute("DELETE FROM bootstrap_config WHERE key = 'master_token'")
+        conn.commit()
         return True
     finally:
       conn.close()

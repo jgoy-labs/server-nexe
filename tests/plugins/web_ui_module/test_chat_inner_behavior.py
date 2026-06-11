@@ -138,6 +138,15 @@ class _Harness:
             "success": True, "deleted": 1,
             "deleted_facts": [{"text": "fact del test", "id": "id-1", "score": 0.9}],
         })
+        self.mh.preview_delete_from_memory = AsyncMock(return_value={
+            "success": True,
+            "candidates": [{"id": "id-1", "collection": "personal_memory",
+                            "text": "fact del test", "score": 0.9, "metadata": {}}],
+        })
+        self.mh.delete_memory_entries = AsyncMock(return_value={
+            "success": True, "deleted": 1,
+            "deleted_facts": [{"text": "fact del test", "id": "id-1", "score": 0.9}],
+        })
         self.mh.list_memories = AsyncMock(return_value={
             "success": True, "facts": [], "total": 0, "message": "No memories stored.",
         })
@@ -317,12 +326,43 @@ class TestIntentsMemoria:
         result = await h.call({"message": "Recorda que em dic Joan"})
         assert "Already in memory" in result["response"]
 
-    async def test_delete_amb_contingut_crida_delete(self):
-        """intent='delete' with content → calls delete_from_memory."""
+    async def test_delete_amb_contingut_arma_confirmacio(self):
+        """B028: intent='delete' with content → previews and arms the 2-turn
+        confirmation; NOTHING is deleted on the first turn."""
         h = _Harness(intent="delete", mem_content="el meu nom")
         result = await h.call({"message": "Oblida que em dic Joan"})
-        h.mh.delete_from_memory.assert_called_once()
+        h.mh.preview_delete_from_memory.assert_called_once()
+        h.mh.delete_from_memory.assert_not_called()
+        h.mh.delete_memory_entries.assert_not_called()
+        assert result["memory_action"] == "delete_pending"
+        assert h.session._pending_partial_delete is not None
+
+    async def test_delete_confirmacio_si_executa_esborrat_exacte(self):
+        """B028 second turn: a 'sí' with pending partial delete executes the
+        previewed entries by exact id."""
+        h = _Harness(intent="chat", mem_content=None)
+        h.session._pending_partial_delete = {
+            "content": "el meu nom",
+            "entries": [{"id": "id-1", "collection": "personal_memory",
+                         "text": "fact del test", "score": 0.9, "metadata": {}}],
+        }
+        h.mh.matches_clear_all_confirm = MagicMock(return_value=True)
+        result = await h.call({"message": "sí"})
+        h.mh.delete_memory_entries.assert_called_once()
         assert result["memory_action"] == "delete"
+        assert h.session._pending_partial_delete is None
+
+    async def test_delete_resposta_negativa_cancela_pending(self):
+        """B028: any non-confirmation reply cancels the pending delete."""
+        h = _Harness(intent="list", mem_content=None)
+        h.session._pending_partial_delete = {
+            "content": "x", "entries": [{"id": "id-1", "collection": "personal_memory",
+                                          "text": "t", "score": 0.5, "metadata": {}}],
+        }
+        h.mh.matches_clear_all_confirm = MagicMock(return_value=False)
+        await h.call({"message": "no, deixa-ho"})
+        h.mh.delete_memory_entries.assert_not_called()
+        assert h.session._pending_partial_delete is None
 
     async def test_delete_sense_contingut_retorna_pregunta(self):
         """intent='delete' without content → asks what to forget."""

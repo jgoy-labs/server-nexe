@@ -212,7 +212,10 @@ class TestRecallGracefulDegradation:
         async def _test():
             return await mh.get_memory_helper().recall_from_memory("any query")
 
-        result = asyncio.get_event_loop().run_until_complete(_test())
+        # asyncio.run creates a fresh event loop: get_event_loop() relied on
+        # the ambient loop policy, which earlier async tests in the suite
+        # leave unset (RuntimeError: no current event loop) — order-dependent.
+        result = asyncio.run(_test())
         assert isinstance(result, dict), "Must return dict even when API unavailable"
         assert result["success"] is False
         assert result["results"] == []
@@ -224,7 +227,9 @@ class TestRecallGracefulDegradation:
         async def _test():
             return await mh.get_memory_helper().recall_from_memory("query")
 
-        result = asyncio.get_event_loop().run_until_complete(_test())
+        # See test_recall_returns_dict_not_raises — fresh loop, no ambient
+        # loop dependency.
+        result = asyncio.run(_test())
         assert "Memory API not available" in result.get("message", ""), (
             f"Message should mention Memory API unavailable, got: {result.get('message')}"
         )

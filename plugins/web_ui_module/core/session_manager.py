@@ -238,6 +238,13 @@ class SessionManager:
 
     _SAFE_ID = re.compile(r'^[a-zA-Z0-9_-]+$')
 
+    @classmethod
+    def is_valid_session_id(cls, session_id) -> bool:
+        """RT-10: public check for API boundaries — routes must reject bad ids
+        with a clean 400 instead of letting _validate_session_id's ValueError
+        bubble up as an unhandled 500."""
+        return bool(session_id and isinstance(session_id, str) and cls._SAFE_ID.match(session_id))
+
     @staticmethod
     def _validate_session_id(session_id: str) -> str:
         """Validate session_id to prevent path traversal."""

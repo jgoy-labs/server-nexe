@@ -10,6 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -20,6 +21,28 @@ logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "memory_index"
 VECTOR_SIZE = DEFAULT_VECTOR_SIZE
+
+
+def _to_point_id(raw_id: str) -> str:
+    """MC-079: Qdrant only accepts UUIDs or unsigned ints as point ids.
+
+    Episodic entries use ``str(uuid.uuid4())[:16]`` ("a1b2c3d4-e5f6-78") —
+    not a valid UUID — so every vector sync silently failed and episodic
+    memory was NEVER indexed. Map any raw id to a deterministic UUID; the
+    original id always travels in the ``rdbms_id`` payload field.
+    """
+    raw_id = str(raw_id)
+    try:
+        return str(uuid.UUID(raw_id))
+    except ValueError:
+        pass
+    hex_only = raw_id.replace("-", "")
+    if len(hex_only) <= 32:
+        try:
+            return str(uuid.UUID(hex_only.ljust(32, "0")))
+        except ValueError:
+            pass
+    return str(uuid.uuid5(uuid.NAMESPACE_OID, raw_id))
 
 
 class VectorIndex:
@@ -94,7 +117,7 @@ class VectorIndex:
 
         points_data = [
             {
-                "id": entry["id"],
+                "id": _to_point_id(entry["id"]),
                 "vector": embedding,
                 "payload": {
                     "rdbms_id": entry.get("rdbms_id", entry["id"]),
@@ -158,7 +181,9 @@ class VectorIndex:
 
         return [
             {
-                "id": str(r.id),
+                # MC-079: callers work with SQLite ids — return the original
+                # rdbms_id, not the UUID-mapped Qdrant point id.
+                "id": str((r.payload or {}).get("rdbms_id", r.id)),
                 "score": r.score,
                 "payload": r.payload or {},
             }
@@ -166,14 +191,14 @@ class VectorIndex:
         ]
 
     def delete(self, ids: List[str]) -> int:
-        """Delete entries from the index."""
+        """Delete entries from the index. Accepts the original (SQLite) ids."""
         if not self._available or self._client is None or not ids:
             return 0
 
         # delete_by_ids hides PointIdsList from the caller
         return self._client.delete_by_ids(
             collection_name=COLLECTION_NAME,
-            ids=ids,
+            ids=[_to_point_id(i) for i in ids],
         )
 
     def count(self) -> int:

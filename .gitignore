@@ -45,6 +45,7 @@ releases/
 # =====================
 storage/
 !memory/memory/storage/
+!tests/memory/memory/storage/
 *.db
 *.sqlite
 *.log

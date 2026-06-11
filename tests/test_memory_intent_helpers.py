@@ -14,11 +14,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from plugins.web_ui_module.api.routes_chat import (
     _handle_save_intent,
     _handle_delete_intent,
+    _handle_delete_confirm_intent,
     _handle_list_intent,
     _handle_clear_all_confirm_intent,
     _clean_nonstreaming_text,
     _save_mem_saves_nonstreaming,
-    _delete_mem_deletes_nonstreaming,
+    _arm_mem_deletes_nonstreaming,
 )
 
 
@@ -30,6 +31,7 @@ def _make_session(messages=None):
     s = MagicMock()
     s.id = "sess-test-1"
     s.messages = messages if messages is not None else []
+    s._pending_partial_delete = None
     return s
 
 
@@ -37,9 +39,18 @@ def _make_memory_helper():
     h = MagicMock()
     h.save_to_memory = AsyncMock()
     h.delete_from_memory = AsyncMock()
+    h.preview_delete_from_memory = AsyncMock()
+    h.delete_memory_entries = AsyncMock()
     h.list_memories = AsyncMock()
     h.clear_memory = AsyncMock()
     return h
+
+
+def _candidate(text="fact one", cid="id-1", collection="personal_memory", score=0.9, mtype=None):
+    return {
+        "id": cid, "collection": collection, "text": text, "score": score,
+        "metadata": {"type": mtype} if mtype else {},
+    }
 
 
 # ===========================================================================
@@ -125,16 +136,15 @@ class TestHandleSaveIntent:
 # ===========================================================================
 
 class TestHandleDeleteIntent:
+    """B028: partial deletes must NEVER execute directly — they arm a 2-turn
+    confirmation with the exact entry that would die."""
+
     @pytest.mark.asyncio
-    async def test_delete_success_returns_deleted_count(self):
+    async def test_delete_with_match_arms_confirmation_and_does_not_delete(self):
         mh = _make_memory_helper()
-        mh.delete_from_memory.return_value = {
+        mh.preview_delete_from_memory.return_value = {
             "success": True,
-            "deleted": 2,
-            "deleted_facts": [
-                {"text": "fact one"},
-                {"text": "fact two"},
-            ],
+            "candidates": [_candidate("m'agraden els gats"), _candidate("doc no relacionat", cid="id-2", collection="user_knowledge", score=0.21)],
         }
         session = _make_session(messages=[{"role": "user", "content": "Oblida que m'agraden els gats"}])
         text, action, mem_deleted = await _handle_delete_intent(
@@ -143,14 +153,35 @@ class TestHandleDeleteIntent:
             rag_collections=None,
             memory_helper=mh,
         )
-        assert "Deleted 2" in text
-        assert action == "delete"
-        assert mem_deleted == 2
+        assert action == "delete_pending"
+        assert mem_deleted == 0
+        mh.delete_from_memory.assert_not_called()
+        mh.delete_memory_entries.assert_not_called()
+        # Only the BEST global match is armed (RT-04: no cross-collection collateral)
+        assert session._pending_partial_delete["entries"] == [_candidate("m'agraden els gats")]
+        assert "m'agraden els gats" in text
+        assert "[PENDING_DELETE:" in text
+
+    @pytest.mark.asyncio
+    async def test_delete_profile_candidate_warns(self):
+        mh = _make_memory_helper()
+        mh.preview_delete_from_memory.return_value = {
+            "success": True,
+            "candidates": [_candidate("User is an AI expert", mtype="user_fact")],
+        }
+        session = _make_session(messages=[{"role": "user", "content": "oblida el document"}])
+        text, _action, _ = await _handle_delete_intent(
+            extracted_content="el document",
+            session=session,
+            rag_collections=None,
+            memory_helper=mh,
+        )
+        assert "perfil" in text.lower() or "profile" in text.lower()
 
     @pytest.mark.asyncio
     async def test_delete_nothing_found_returns_not_found_message(self):
         mh = _make_memory_helper()
-        mh.delete_from_memory.return_value = {"success": True, "deleted": 0, "deleted_facts": []}
+        mh.preview_delete_from_memory.return_value = {"success": True, "candidates": []}
         session = _make_session(messages=[{"role": "user", "content": "Oblida"}])
         text, action, mem_deleted = await _handle_delete_intent(
             extracted_content="unknown topic",
@@ -161,11 +192,12 @@ class TestHandleDeleteIntent:
         assert "Nothing found" in text
         assert action == "delete"
         assert mem_deleted == 0
+        assert not session._pending_partial_delete
 
     @pytest.mark.asyncio
     async def test_delete_error_returns_error_message(self):
         mh = _make_memory_helper()
-        mh.delete_from_memory.return_value = {"success": False, "message": "Connection error"}
+        mh.preview_delete_from_memory.return_value = {"success": False, "candidates": [], "message": "Connection error"}
         session = _make_session(messages=[{"role": "user", "content": "Oblida algo"}])
         text, action, mem_deleted = await _handle_delete_intent(
             extracted_content="some topic",
@@ -187,6 +219,7 @@ class TestHandleDeleteIntent:
             memory_helper=mh,
         )
         assert "What do you want me to forget" in text or "forget" in text.lower()
+        mh.preview_delete_from_memory.assert_not_called()
         mh.delete_from_memory.assert_not_called()
         # session history sanitized even when content empty
         assert session.messages[-1]["content"] != "Oblida que..."
@@ -194,9 +227,8 @@ class TestHandleDeleteIntent:
     @pytest.mark.asyncio
     async def test_delete_sanitizes_last_user_message(self):
         mh = _make_memory_helper()
-        mh.delete_from_memory.return_value = {
-            "success": True, "deleted": 1,
-            "deleted_facts": [{"text": "cats fact"}],
+        mh.preview_delete_from_memory.return_value = {
+            "success": True, "candidates": [_candidate("cats fact")],
         }
         session = _make_session(messages=[{"role": "user", "content": "Oblida que m'agraden els gats"}])
         await _handle_delete_intent(
@@ -207,6 +239,38 @@ class TestHandleDeleteIntent:
         )
         assert session.messages[-1]["content"] != "Oblida que m'agraden els gats"
         assert "Memory command" in session.messages[-1]["content"] or "delete" in session.messages[-1]["content"].lower()
+
+
+class TestHandleDeleteConfirmIntent:
+    """Second turn of the B028 flow: a yes executes EXACTLY the previewed entries."""
+
+    @pytest.mark.asyncio
+    async def test_confirm_deletes_exact_pending_entries(self):
+        mh = _make_memory_helper()
+        mh.delete_memory_entries.return_value = {
+            "success": True, "deleted": 1,
+            "deleted_facts": [{"id": "id-1", "text": "m'agraden els gats", "score": 0.9}],
+        }
+        session = _make_session()
+        session._pending_partial_delete = {
+            "content": "m'agraden els gats",
+            "entries": [_candidate("m'agraden els gats")],
+        }
+        text, action, mem_deleted = await _handle_delete_confirm_intent(session, mh)
+        mh.delete_memory_entries.assert_awaited_once_with([_candidate("m'agraden els gats")])
+        assert "Deleted 1" in text
+        assert action == "delete"
+        assert mem_deleted == 1
+        assert session._pending_partial_delete is None
+
+    @pytest.mark.asyncio
+    async def test_confirm_without_pending_is_noop(self):
+        mh = _make_memory_helper()
+        session = _make_session()
+        text, action, mem_deleted = await _handle_delete_confirm_intent(session, mh)
+        mh.delete_memory_entries.assert_not_called()
+        assert mem_deleted == 0
+        assert "Nothing pending" in text
 
 
 # ===========================================================================
@@ -406,38 +470,45 @@ class TestSaveMemSavesNonstreaming:
 
 
 # ===========================================================================
-# _delete_mem_deletes_nonstreaming
+# _arm_mem_deletes_nonstreaming (B028: model tags arm confirmation, never delete)
 # ===========================================================================
 
-class TestDeleteMemDeletesNonstreaming:
+class TestArmMemDeletesNonstreaming:
     @pytest.mark.asyncio
-    async def test_returns_total_deleted(self):
+    async def test_arms_pending_and_returns_question_without_deleting(self):
         mh = _make_memory_helper()
-        mh.delete_from_memory.side_effect = [
-            {"success": True, "deleted": 2},
-            {"success": True, "deleted": 1},
-        ]
-        total = await _delete_mem_deletes_nonstreaming(["fact one", "fact two"], mh)
-        assert total == 3
+        mh.preview_delete_from_memory.return_value = {
+            "success": True, "candidates": [_candidate("fact one")],
+        }
+        session = _make_session()
+        question = await _arm_mem_deletes_nonstreaming(["fact one", "fact two"], session, mh)
+        mh.delete_from_memory.assert_not_called()
+        mh.delete_memory_entries.assert_not_called()
+        assert session._pending_partial_delete["entries"] == [_candidate("fact one")]
+        assert "[PENDING_DELETE:" in question
 
     @pytest.mark.asyncio
-    async def test_returns_zero_when_no_match(self):
+    async def test_no_match_returns_empty_and_no_pending(self):
         mh = _make_memory_helper()
-        mh.delete_from_memory.return_value = {"success": True, "deleted": 0}
-        total = await _delete_mem_deletes_nonstreaming(["unknown topic"], mh)
-        assert total == 0
+        mh.preview_delete_from_memory.return_value = {"success": True, "candidates": []}
+        session = _make_session()
+        question = await _arm_mem_deletes_nonstreaming(["unknown topic"], session, mh)
+        assert question == ""
+        assert not session._pending_partial_delete
 
     @pytest.mark.asyncio
     async def test_skips_short_facts(self):
         mh = _make_memory_helper()
-        total = await _delete_mem_deletes_nonstreaming(["ab", "x"], mh)
-        mh.delete_from_memory.assert_not_called()
-        assert total == 0
+        session = _make_session()
+        question = await _arm_mem_deletes_nonstreaming(["ab", "x"], session, mh)
+        mh.preview_delete_from_memory.assert_not_called()
+        assert question == ""
 
     @pytest.mark.asyncio
     async def test_handles_exception_gracefully(self):
         mh = _make_memory_helper()
-        mh.delete_from_memory.side_effect = RuntimeError("crash")
+        mh.preview_delete_from_memory.side_effect = RuntimeError("crash")
+        session = _make_session()
         # Must not raise
-        total = await _delete_mem_deletes_nonstreaming(["some fact"], mh)
-        assert total == 0
+        question = await _arm_mem_deletes_nonstreaming(["some fact"], session, mh)
+        assert question == ""

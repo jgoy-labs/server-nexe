@@ -185,6 +185,10 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         i18n=Depends(get_i18n),
     ):
         """Upload file and add to session context + automatic memory ingestion"""
+        # RT-10: reject malformed/traversal session ids with a clean 400 —
+        # SessionManager blocks them anyway, but via ValueError → 500.
+        if session_id is not None and not session_mgr.is_valid_session_id(session_id):
+            raise HTTPException(status_code=400, detail="Invalid session_id")
         content = await file.read()
 
         # Security (P1-4): speed-bump denylist for sensitive content patterns.
@@ -284,5 +288,9 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
     @limiter.limit("5/minute")
     async def cleanup_files(request: Request, max_age_hours: int = 24, _auth=Depends(require_ui_auth)):
         """Clean up old files (default > 24h)"""
+        # MC-072 (confirmat reachable al red team RT-06): sense cota mínima,
+        # max_age_hours=0 o negatiu esborraria TOTS els uploads de l'usuari.
+        if max_age_hours < 1:
+            raise HTTPException(status_code=422, detail="max_age_hours must be >= 1")
         deleted = file_handler.cleanup_old_files(max_age_hours)
         return {"deleted": deleted, "message": f"{deleted} files deleted"}

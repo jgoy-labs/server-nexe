@@ -131,34 +131,63 @@ class FileHandler:
 
         elif ext == ".pdf":
             try:
-                from pypdf import PdfReader
-                reader = PdfReader(file_path)
-                total_pages = len(reader.pages)
-                logger.info(f"PDF '{file_path.name}': {total_pages} pages, extracting...")
-                text = ""
-                for i, page in enumerate(reader.pages):
-                    text += (page.extract_text() or "") + "\n"
-                    if (i + 1) % 50 == 0:
-                        logger.info(f"  PDF: {i+1}/{total_pages} pages")
-                logger.info(f"PDF '{file_path.name}': {total_pages} pages → {len(text)} chars extracted")
-                return text
+                return self._extract_pdf_sync(file_path)
             except Exception as e:
                 logger.error(f"Error extracting PDF: {e}")
                 return ""
 
         return ""
 
+    @staticmethod
+    def _looks_glued(text: str) -> bool:
+        """B026: detect pypdf output that lost inter-word spaces.
+
+        PDFs with non-standard font encodings come out as
+        'véroInecesitatuempresahoymismo' — normal prose has ~15% spaces,
+        glued text has almost none. Short texts are not judged (tables,
+        headers and code pages legitimately have few spaces).
+        """
+        stripped = text.strip()
+        if len(stripped) < 200:
+            return False
+        space_ratio = stripped.count(" ") / len(stripped)
+        return space_ratio < 0.05
+
     def _extract_pdf_sync(self, file_path: Path) -> str:
-        """Extract text from PDF (sync, CPU-bound)."""
+        """Extract text from PDF (sync, CPU-bound).
+
+        B026: pypdf's default extraction loses inter-word spaces and breaks
+        ligatures on PDFs with non-standard encodings, poisoning the RAG index
+        with unreadable text. Per page: if the default output looks glued,
+        retry with extraction_mode="layout" (reconstructs spacing from glyph
+        positions). The whole text is NFKC-normalized at the end — resolves
+        ligature codepoints (ﬁ → fi) and recomposes decomposed accents (ı́ → í).
+        """
+        import re as _re
+        import unicodedata as _ud
         from pypdf import PdfReader
         reader = PdfReader(file_path)
         total_pages = len(reader.pages)
         logger.info(f"PDF '{file_path.name}': {total_pages} pages, extracting...")
-        text = ""
+        pages = []
+        relaid_count = 0
         for i, page in enumerate(reader.pages):
-            text += (page.extract_text() or "") + "\n"
+            page_text = page.extract_text() or ""
+            if self._looks_glued(page_text):
+                try:
+                    relaid = page.extract_text(extraction_mode="layout") or ""
+                    if relaid and not self._looks_glued(relaid):
+                        # Layout mode pads columns with spaces — collapse runs.
+                        page_text = _re.sub(r"[ \t]{2,}", " ", relaid)
+                        relaid_count += 1
+                except Exception as e:
+                    logger.debug(f"  PDF layout-mode retry failed on page {i + 1}: {e}")
+            pages.append(page_text)
             if (i + 1) % 50 == 0:
                 logger.info(f"  PDF: {i+1}/{total_pages} pages")
+        if relaid_count:
+            logger.info(f"PDF '{file_path.name}': {relaid_count} glued page(s) re-extracted in layout mode")
+        text = _ud.normalize("NFKC", "\n".join(pages) + "\n")
         logger.info(f"PDF '{file_path.name}': {total_pages} pages -> {len(text)} chars extracted")
         return text
 

@@ -13,6 +13,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -210,7 +211,7 @@ class SqliteStorageMixin:
                 "Database will NOT be encrypted. Install sqlcipher3 for encryption."
             )
 
-        with self._connect_sqlite() as conn:
+        with contextlib.closing(self._connect_sqlite()) as conn:
             cursor = conn.cursor()
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("""
@@ -254,7 +255,7 @@ class SqliteStorageMixin:
         loop = asyncio.get_running_loop()
 
         def _sync_store():
-            with self._connect_sqlite() as conn:
+            with contextlib.closing(self._connect_sqlite()) as conn:
                 cursor = conn.cursor()
                 metadata_json = json.dumps(entry.metadata) if entry.metadata else None
                 unix_timestamp = entry.timestamp.timestamp()
@@ -284,7 +285,7 @@ class SqliteStorageMixin:
         loop = asyncio.get_running_loop()
 
         def _sync_delete():
-            with self._connect_sqlite() as conn:
+            with contextlib.closing(self._connect_sqlite()) as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM memory_entries WHERE id = ?", (entry_id,))
                 conn.commit()
@@ -297,7 +298,7 @@ class SqliteStorageMixin:
         loop = asyncio.get_running_loop()
 
         def _sync_get():
-            with self._connect_sqlite() as conn:
+            with contextlib.closing(self._connect_sqlite()) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     """

@@ -129,6 +129,25 @@ CLEAR_ALL_TRIGGERS = [
     r'^erase\s+all\s+memor(y|ies)\b',
     r'^wipe\s+(all\s+)?(my\s+)?memor(y|ies)\b',
     r'^clear\s+(all\s+)?(my\s+)?memor(y|ies)\b',
+    # B028 (RT-02): natural wipe phrasings that previously fell through to the
+    # PARTIAL delete path and erased an arbitrary fact without confirmation.
+    # "esborra tota la meva memòria, oblida-ho tot" matched none of the anchored
+    # patterns above ("tota" ≠ "tot\b") and became delete(content="tota la meva
+    # memòria..."). Any wipe-shaped phrase must arm the 2-turn confirmation.
+    # Catalan — "esborra/elimina/buida ... tota la (meva) memòria"
+    r'^(esborra|elimina|buida|neteja)\b.{0,40}\btota\s+la\s+(meva\s+)?mem[oò]ria\b',
+    r'\boblida[\s\-]ho\s+tot\b',
+    r'\besborra[\s\-]ho\s+tot\b',
+    r'^oblida\s+tot\s+el\s+que\s+saps\b',
+    # Spanish — "borra/elimina/limpia ... toda la/mi memoria"
+    r'^(borra|elimina|limpia|vac[ií]a)\b.{0,40}\btoda\s+(la\s+|mi\s+)?memoria\b',
+    r'\bolv[ií]dalo\s+todo\b',
+    r'\bb[oó]rralo\s+todo\b',
+    r'^olvida\s+todo\s+lo\s+que\s+sabes\b',
+    # English — "delete/erase/clear/wipe ... all (of) my memory/memories"
+    r'^(delete|erase|clear|wipe|remove)\b.{0,40}\ball\s+(of\s+)?(my\s+)?memor(y|ies)\b',
+    r'\bforget\s+everything\b',
+    r'^forget\s+all\s+you\s+know\b',
 ]
 
 # Confirmation patterns for the 2-turn clear_all flow. Matched only when the
@@ -636,28 +655,80 @@ class MemoryHelper:
                 return text
         return r.text if hasattr(r, 'text') and r.text else ""
 
-    async def _delete_top_match_from_collection(
-        self, memory, content: str, collection: str, deleted_facts: list
-    ) -> int:
-        """Search collection and delete the top-1 matching entry. Returns count deleted (0 or 1)."""
+    async def _search_delete_candidates(
+        self, memory, content: str, collections: List[str]
+    ) -> List[Dict[str, Any]]:
+        """Search collections for delete candidates. Returns top-1 per collection,
+        sorted by score (best match first). NEVER deletes anything."""
+        candidates: List[Dict[str, Any]] = []
+        for collection in collections:
+            try:
+                if not await memory.collection_exists(collection):
+                    continue
+                results = await memory.search(
+                    query=content, collection=collection, top_k=5, threshold=DELETE_THRESHOLD
+                )
+                for r in results[:1]:
+                    candidates.append({
+                        "id": str(r.id),
+                        "collection": collection,
+                        "text": self._extract_fact_text(r),
+                        "score": round(r.score, 2),
+                        "metadata": getattr(r, "metadata", None) or {},
+                    })
+            except Exception as e:
+                logger.debug("Delete search in %s failed: %s", collection, e)
+        candidates.sort(key=lambda c: c["score"], reverse=True)
+        return candidates
+
+    async def preview_delete_from_memory(
+        self,
+        content: str,
+        collections: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """B028: dry-run of delete_from_memory — what WOULD be deleted, best first.
+
+        Used by the 2-turn partial-delete confirmation: the pipeline shows the
+        candidate to the user and only deletes (by exact id) after an explicit
+        confirmation. Never mutates memory.
+        """
         try:
-            if not await memory.collection_exists(collection):
-                return 0
-            results = await memory.search(
-                query=content, collection=collection, top_k=5, threshold=DELETE_THRESHOLD
-            )
-            for r in results[:1]:  # only delete the top match — prevents collateral deletion
-                try:
-                    fact_text = self._extract_fact_text(r)
-                    deleted_facts.append({"id": str(r.id), "text": fact_text, "score": round(r.score, 2)})
-                    await memory.delete(r.id, collection)
-                    logger.info("Deleted memory entry %s from %s (score=%.2f): %s", r.id, collection, r.score, fact_text[:80])
-                    return 1
-                except Exception as e:
-                    logger.warning("Failed to delete %s from %s: %s", r.id, collection, e)
+            memory = await self.get_memory_api()
+            if not memory:
+                return {"success": False, "candidates": [], "message": "Memory API not available"}
+            target_collections = collections if collections is not None else ["personal_memory", "user_knowledge"]
+            candidates = await self._search_delete_candidates(memory, content, target_collections)
+            return {"success": True, "candidates": candidates}
         except Exception as e:
-            logger.debug("Delete search in %s failed: %s", collection, e)
-        return 0
+            logger.error("Memory delete preview error: %s", e)
+            return {"success": False, "candidates": [], "message": str(e)}
+
+    async def delete_memory_entries(self, entries: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """B028: delete previously-previewed entries by EXACT id+collection.
+
+        No re-search between preview and delete — what the user confirmed is
+        exactly what dies, even if memory changed in between.
+        """
+        try:
+            memory = await self.get_memory_api()
+            if not memory:
+                return {"success": False, "deleted": 0, "deleted_facts": [], "message": "Memory API not available"}
+            deleted = 0
+            deleted_facts: list = []
+            for entry in entries:
+                try:
+                    await memory.delete(entry["id"], entry["collection"])
+                    deleted += 1
+                    deleted_facts.append({"id": entry["id"], "text": entry.get("text", ""), "score": entry.get("score", 0)})
+                    logger.info("Deleted memory entry %s from %s (confirmed)", entry["id"], entry["collection"])
+                except Exception as e:
+                    logger.warning("Failed to delete %s from %s: %s", entry.get("id"), entry.get("collection"), e)
+            if deleted > 0:
+                return {"success": True, "deleted": deleted, "deleted_facts": deleted_facts, "message": f"Esborrat {deleted} entrada(es) de la memoria"}
+            return {"success": True, "deleted": 0, "deleted_facts": [], "message": "No s'ha trobat res similar a la memoria"}
+        except Exception as e:
+            logger.error("Memory delete error: %s", e)
+            return {"success": False, "deleted": 0, "deleted_facts": [], "message": f"Error esborrant: {str(e)}"}
 
     async def delete_from_memory(
         self,
@@ -665,7 +736,13 @@ class MemoryHelper:
         collections: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
-        Search for similar content in memory and delete matching entries.
+        Search for similar content in memory and delete the single best match.
+
+        B028 (RT-04): this used to delete the top-1 of EVERY collection — with
+        the default two collections, "oblida X" could kill X in personal_memory
+        AND an unrelated 0.20-similarity document in user_knowledge. Restored
+        to the original safety contract: at most ONE entry dies per call, the
+        best match across all collections.
 
         Args:
             content: Text to search for and delete.
@@ -680,16 +757,11 @@ class MemoryHelper:
             if not memory:
                 return {"success": False, "deleted": 0, "deleted_facts": [], "message": "Memory API not available"}
 
-            deleted = 0
-            deleted_facts: list = []
             target_collections = collections if collections is not None else ["personal_memory", "user_knowledge"]
-            for collection in target_collections:
-                deleted += await self._delete_top_match_from_collection(memory, content, collection, deleted_facts)
-
-            if deleted > 0:
-                return {"success": True, "deleted": deleted, "deleted_facts": deleted_facts, "message": f"Esborrat {deleted} entrada(es) de la memoria"}
-            else:
+            candidates = await self._search_delete_candidates(memory, content, target_collections)
+            if not candidates:
                 return {"success": True, "deleted": 0, "deleted_facts": [], "message": "No s'ha trobat res similar a la memoria"}
+            return await self.delete_memory_entries(candidates[:1])
         except Exception as e:
             logger.error("Memory delete error: %s", e)
             return {"success": False, "deleted": 0, "deleted_facts": [], "message": f"Error esborrant: {str(e)}"}

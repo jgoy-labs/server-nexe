@@ -131,31 +131,43 @@ class TestMemoryModule:
     MemoryModule._instance = None
 
   @pytest.mark.integration
-  async def test_full_lifecycle(self):
+  async def test_full_lifecycle(self, tmp_path):
     """Test full lifecycle: init -> store -> recall -> shutdown"""
+    from unittest.mock import patch
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()
 
-    await module.initialize()
+    # Isolate from the process-global server_state: an earlier TestClient
+    # lifespan in the suite sets crypto_provider on the singleton, making
+    # this test write an ENCRYPTED metadata_memory.db into the shared
+    # <repo>/storage/vectors/ path. Once on disk, any later run without the
+    # same crypto fails with "file is not a database" — even isolated.
+    # tmp_path + crypto=None matches the sibling tests above.
+    with patch("memory.memory.module.get_server_state") as mock_gs:
+      mock_gs.return_value.project_root = tmp_path
+      mock_gs.return_value.config = {}
+      mock_gs.return_value.crypto_provider = None
 
-    entry = MemoryEntry(
-      entry_type=MemoryType.EPISODIC,
-      content="Test integration",
-      source="test_module"
-    )
-    success = await module._pipeline.ingest(entry)
-    assert success is True
+      await module.initialize()
 
-    flash_entry = await module._flash_memory.get(entry.id)
-    assert flash_entry is not None
-    assert flash_entry.content == "Test integration"
+      entry = MemoryEntry(
+        entry_type=MemoryType.EPISODIC,
+        content="Test integration",
+        source="test_module"
+      )
+      success = await module._pipeline.ingest(entry)
+      assert success is True
 
-    context = await module._ram_context.to_context_string(limit=10)
-    assert "Test integration" in context
+      flash_entry = await module._flash_memory.get(entry.id)
+      assert flash_entry is not None
+      assert flash_entry.content == "Test integration"
 
-    result = await module.shutdown()
-    assert result is True
+      context = await module._ram_context.to_context_string(limit=10)
+      assert "Test integration" in context
+
+      result = await module.shutdown()
+      assert result is True
 
     assert module._initialized is False
     assert module._flash_memory is None
@@ -191,30 +203,39 @@ class TestMemoryModule:
       MemoryModule._instance = None
 
   @pytest.mark.integration
-  async def test_integration_smoke(self):
+  async def test_integration_smoke(self, tmp_path):
     """Complete smoke test"""
+    from unittest.mock import patch
     MemoryModule._instance = None
 
     module = MemoryModule.get_instance()
 
-    await module.initialize()
+    # Same isolation as test_full_lifecycle: tmp_path + crypto=None so the
+    # test never touches the shared <repo>/storage/vectors/ databases nor
+    # depends on the crypto_provider left in server_state by earlier tests.
+    with patch("memory.memory.module.get_server_state") as mock_gs:
+      mock_gs.return_value.project_root = tmp_path
+      mock_gs.return_value.config = {}
+      mock_gs.return_value.crypto_provider = None
 
-    for i in range(3):
-      entry = MemoryEntry(
-        entry_type=MemoryType.EPISODIC,
-        content=f"Smoke test entry {i}",
-        source="smoke"
-      )
-      await module._pipeline.ingest(entry)
+      await module.initialize()
 
-    pipeline_stats = module._pipeline.get_stats()
-    assert pipeline_stats["total_ingested"] == 3
+      for i in range(3):
+        entry = MemoryEntry(
+          entry_type=MemoryType.EPISODIC,
+          content=f"Smoke test entry {i}",
+          source="smoke"
+        )
+        await module._pipeline.ingest(entry)
 
-    ram_stats = await module._ram_context.get_stats()
-    # RAM context may have extra entries from initialization or previous tests
-    assert ram_stats["total_available"] >= 3
+      pipeline_stats = module._pipeline.get_stats()
+      assert pipeline_stats["total_ingested"] == 3
 
-    await module.shutdown()
+      ram_stats = await module._ram_context.get_stats()
+      # RAM context may have extra entries from initialization or previous tests
+      assert ram_stats["total_available"] >= 3
+
+      await module.shutdown()
 
     MemoryModule._instance = None
 

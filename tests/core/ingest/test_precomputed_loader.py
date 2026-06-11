@@ -23,6 +23,7 @@ www.jgoy.net · https://server-nexe.org
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -269,15 +270,47 @@ class TestLoading:
 # Coherence (heavyweight — requires fastembed + model download)                #
 # --------------------------------------------------------------------------- #
 
+# Real-model resource gate. Without it the test depended on whatever cache
+# dir fastembed defaulted to (a tmp dir → model absent → hard FAIL, or a
+# network download on every run). Same convention as tests/test_rag_recall_e2e.py.
+_FASTEMBED_CACHE = os.environ.get(
+    "FASTEMBED_CACHE_PATH", os.path.expanduser("~/.cache/fastembed")
+)
+_COHERENCE_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+
+
+def _fastembed_model_cached() -> bool:
+    """Check whether the multilingual fastembed model exists in the cache."""
+    cache_path = Path(_FASTEMBED_CACHE)
+    if not cache_path.exists():
+        return False
+    patterns = [
+        "models--xenova--paraphrase-multilingual*",
+        "paraphrase-multilingual*",
+        "sentence-transformers--paraphrase-multilingual*",
+    ]
+    return any(list(cache_path.glob(pattern)) for pattern in patterns)
+
+
 @pytest.mark.integration
 @pytest.mark.slow
+@pytest.mark.skipif(
+    not _fastembed_model_cached(),
+    reason=(
+        f"fastembed model {_COHERENCE_MODEL} not present in "
+        f"{_FASTEMBED_CACHE} — real-model resource required "
+        "(run the installer or set FASTEMBED_CACHE_PATH)"
+    ),
+)
 def test_runtime_vs_precomputed_cosine_equivalence(tmp_path):
     """Verify that embedding a chunk at runtime yields vectors that
     match what a freshly-precomputed artefact would contain, so the
     fast path is safe to substitute for the embed pipeline.
     """
     from fastembed import TextEmbedding
-    model = TextEmbedding("sentence-transformers/paraphrase-multilingual-mpnet-base-v2")
+    # cache_dir pinned to the same cache the skipif gate checks, so the
+    # test never falls back to an empty tmp cache (fail) or a re-download.
+    model = TextEmbedding(_COHERENCE_MODEL, cache_dir=_FASTEMBED_CACHE)
     texts = ["Sample one content.", "Another chunk of text."]
     raw = np.stack([np.asarray(v, dtype=np.float32) for v in model.embed(texts)])
     norms = np.linalg.norm(raw, axis=1, keepdims=True)
