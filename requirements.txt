@@ -6,54 +6,54 @@
 # --- Core Server ---
 fastapi==0.136.3
 # starlette 1.x: PYSEC-2026-161 (Host header) fixed in >=1.0.1; CVE-2025-54121/CVE-2025-62727 in 0.40+. FastAPI >=0.133 relaxed the starlette<1.0.0 cap (upgraded from fastapi==0.128.8 / starlette==0.52.1, 2026-05-29).
-starlette==1.2.0
+starlette==1.3.0
 uvicorn[standard]==0.34.3
 pydantic==2.10.6
 pydantic-settings==2.14.1
-python-multipart==0.0.27  # CVE-2026-40347; GHSA-pp6c-gr5w-3c5g fixed in 0.0.27
+python-multipart==0.0.32  # CVE-2026-40347; GHSA-pp6c-gr5w-3c5g fixed in 0.0.27
 starlette-csrf==3.0.0
 httpx==0.28.1
 qdrant-client==1.18.0
 toml==0.10.2
 structlog==25.5.0
-click==8.1.7
+click==8.4.1
 # rich/typer pinats VOLGUTS: typer 0.9.0 (API antiga usada pel codi; pujar-lo trenca el build,
 # veure L30-34) imposa rich<14. NO pujar rich a 14/15 ni typer a >=0.10 (Dependabot els ignora).
-rich==13.7.0
-typer==0.9.0
+rich==13.9.4
+typer==0.9.4
 python-dotenv==1.2.2  # GHSA-mf9w-mj56-hr94 symlink attack fixed in 1.2.2
 pyyaml==6.0.3
 # numpy: transitiva MLX/opencv; >=2 requerit per mlx-vlm>=0.4.4 via opencv-python>=4.12 [refresh 2026-05-16]
-numpy==2.4.5
+numpy==2.4.6
 slowapi==0.1.9
 prometheus-client==0.25.0
-tenacity==9.1.2
+tenacity==9.1.4
 psutil==5.9.8
 # huggingface_hub: transitiva mlx-lm/fastembed; transformers 5.x requereix >=1.5.0;
-# F2.A11 va intentar pinar a 1.15.0 però pip-audit detecta conflicte amb typer==0.9.0
+# F2.A11 va intentar pinar a 1.15.0 però pip-audit detecta conflicte amb typer==0.9.4
 # (deps transitives click). [refresh 2026-05-17]
 # ⚠️ SOSTRE <1.14 OBLIGAT mentre visqui el pin typer==0.9.x: hf>=1.14 exigeix
 # typer>=0.20 (verificat a PyPI 2026-06-11) → ResolutionImpossible a pip-audit
 # (va trencar el grup safe-patches en pujar el sòl a >=1.18). Dependabot ignora
 # hf>=1.14; treure sostre+ignore quan es migri typer. [refresh 2026-06-11]
-huggingface_hub>=1.5.0,<1.14
-filelock==3.29.0  # GHSA-qmgc-5h2g-mvrw GHSA-w853-jp5j-5j7f TOCTOU fixed in 3.20.3 (dep transitiva explicitada)
-platformdirs==4.9.6  # cross-platform user data dirs (Linux/macOS); used by core.onboarding_state and installer.install_headless
+huggingface_hub>=1.13.0,<1.14
+filelock==3.29.3  # GHSA-qmgc-5h2g-mvrw GHSA-w853-jp5j-5j7f TOCTOU fixed in 3.20.3 (dep transitiva explicitada)
+platformdirs==4.10.0  # cross-platform user data dirs (Linux/macOS); used by core.onboarding_state and installer.install_headless
 
 # --- Memory & RAG ---
 fastembed==0.8.0
-pypdf==6.10.2  # PDF support for knowledge ingestion; GHSA-3crg-w4f6-42mx GHSA-4pxv-j86v-mhcw GHSA-7gw9-cf7v-778f GHSA-jj6c-8h6c-hppx GHSA-x284-j5p8-9c5p fixed in 6.10.0
+pypdf==6.13.2  # PDF support for knowledge ingestion; GHSA-3crg-w4f6-42mx GHSA-4pxv-j86v-mhcw GHSA-7gw9-cf7v-778f GHSA-jj6c-8h6c-hppx GHSA-x284-j5p8-9c5p fixed in 6.10.0
 # lingua-language-detector: Reply-language detection (75 langs); offline (models bundled in wheel), accurate on short text & close languages (ca/es/pt/fr/it), Apache-2.0. Chosen over langdetect (failed short ca/es) and fast-langdetect (downloads 125MB at runtime). ~95MB on disk.
 lingua-language-detector==2.1.1
 
 # --- Encryption at rest ---
-cryptography==48.0.0
+cryptography==48.0.1
 keyring==25.7.0
 sqlcipher3==0.6.2
 
 # --- Testing ---
 pytest==9.0.3  # CVE-2025-71176
-pytest-asyncio==1.3.0
+pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 
 # --- Inference Engines (Llama.cpp / GGUF) ---
