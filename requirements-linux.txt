@@ -24,4 +24,4 @@
 # Linux keyring backend (Secret Service via D-Bus):
 # sense això, `keyring` falla silenciosament a Linux → HF_TOKEN no es persisteix
 # → rate-limit silenciós a HuggingFace. Mac usa Keychain natiu (no cal).
-secretstorage==3.3.3
+secretstorage==3.5.0
