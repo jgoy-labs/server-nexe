@@ -4,7 +4,7 @@
 # ─────────────────────────────────────────────────────────────
 
 # MLX Inference Engine (Apple Silicon only)
-mlx-lm==0.31.2
+mlx-lm==0.31.3
 mlx-vlm==0.4.4
 
 # Tray app (macOS menu bar)
