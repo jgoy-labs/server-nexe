@@ -113,7 +113,12 @@ class SqliteStorageMixin:
             self.db_path.rename(backup_path)
             backup_path.chmod(0o600)
             tmp_path.rename(self.db_path)
-            logger.info("Migration complete. Backup at %s", backup_path)
+            # B089 / D-002: the encrypted DB is verified in place — drop the
+            # plaintext backup so PII does not survive in clear (Decision B, same
+            # as sqlite_store.py). D-002's original fix only chmod'd it (0o600),
+            # which still leaves the cleartext PII recoverable on a stolen device.
+            backup_path.unlink(missing_ok=True)
+            logger.info("Migration complete; plaintext backup removed.")
         except Exception as e:
             logger.error("SQLCipher migration failed: %s. Keeping plain DB.", e)
             if tmp_path.exists():

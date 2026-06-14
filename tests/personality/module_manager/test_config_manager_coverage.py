@@ -161,6 +161,20 @@ class TestLoadManifest:
         result = cm.load_manifest(tmp_path / "nonexistent.toml")
         assert "module" in result
 
+    def test_load_corrupt_manifest_returns_default(self, tmp_path):
+        """B106: a corrupt TOML manifest must not kill the boot. toml.load raises
+        TomlDecodeError (a ValueError subclass) which the broadened except must
+        catch and fall back to the default dict instead of propagating."""
+        config_file = tmp_path / "server.toml"
+        config_file.write_text("")
+        cm = ConfigManager(config_file)
+
+        manifest_file = tmp_path / "manifest.toml"
+        manifest_file.write_text("[module]\nversion = 'unterminated")  # invalid TOML
+
+        result = cm.load_manifest(manifest_file)  # must not raise
+        assert "module" in result
+
 
 class TestApplyConfigCoreModule:
     def test_core_module_always_enabled(self, tmp_path):

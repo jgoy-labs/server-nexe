@@ -419,6 +419,29 @@ class SQLiteStore:
             )
         return [dict(row) for row in cursor.fetchall()]
 
+    @_with_lock
+    def delete_profile(
+        self, user_id: str, attribute: str, entity: str = "user"
+    ) -> int:
+        """Hard-delete a profile attribute and its history. Returns rows removed.
+
+        ADR-002: single-user local memory uses hard-delete (no tombstones) — when
+        the user says "forget X" and confirms, the fact is removed outright, and
+        a subsequent recall can never surface it.
+        """
+        conn = self._connect()
+        conn.execute(
+            "DELETE FROM profile_history WHERE profile_id IN "
+            "(SELECT id FROM profile WHERE user_id = ? AND entity = ? AND attribute = ?)",
+            (user_id, entity, attribute),
+        )
+        cursor = conn.execute(
+            "DELETE FROM profile WHERE user_id = ? AND entity = ? AND attribute = ?",
+            (user_id, entity, attribute),
+        )
+        conn.commit()
+        return cursor.rowcount
+
     # ── Episodic CRUD ──
 
     @_with_lock

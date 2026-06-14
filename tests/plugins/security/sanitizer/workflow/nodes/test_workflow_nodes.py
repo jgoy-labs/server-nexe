@@ -28,9 +28,9 @@ class TestInterventionNode:
     def setup_method(self):
         self.node = InterventionNode()
 
-    def test_get_metadata_returns_correct_type(self):
+    def test_get_metadata_returns_correct_id(self):
         meta = self.node.get_metadata()
-        assert meta.node_type == "intervention.respond"
+        assert meta.id == "intervention.respond"
 
     def test_get_metadata_version(self):
         meta = self.node.get_metadata()
@@ -38,14 +38,16 @@ class TestInterventionNode:
 
     def test_get_metadata_has_inputs(self):
         meta = self.node.get_metadata()
-        assert "threats" in meta.inputs
-        assert "severity" in meta.inputs
+        input_names = [inp.name for inp in meta.inputs]
+        assert "threats" in input_names
+        assert "severity" in input_names
 
     def test_get_metadata_has_outputs(self):
         meta = self.node.get_metadata()
-        assert "response" in meta.outputs
-        assert "activated" in meta.outputs
-        assert "threat_type" in meta.outputs
+        output_names = [out.name for out in meta.outputs]
+        assert "response" in output_names
+        assert "activated" in output_names
+        assert "threat_type" in output_names
 
     def test_execute_with_threats(self):
         result = asyncio.run(self.node.execute({

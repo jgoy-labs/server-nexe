@@ -223,22 +223,27 @@ def _uninstall_confirm_dialogs(install_dir: Path, t_func) -> tuple:
     return False, keep_data, storage_dir
 
 
-def _uninstall_backup_storage(storage_dir: Path, keep_data: bool, t_func, removed, failed):
-    """Optionally backup storage/ and report outcome into removed/failed."""
-    backup_path = None
-    if keep_data and storage_dir is not None and storage_dir.exists():
-        from datetime import datetime
-        backup_name = f"nexe-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        backup_path = Path.home() / backup_name
-        try:
-            shutil.copytree(storage_dir, backup_path)
-        except Exception:
-            backup_path = None
-    if keep_data:
-        if backup_path:
-            removed.append(t_func("uninstall_backup_ok", path=str(backup_path)))
-        else:
-            failed.append(t_func("uninstall_backup_failed"))
+def _uninstall_backup_storage(storage_dir: Path, keep_data: bool, t_func, removed, failed) -> bool:
+    """Optionally backup storage/ and report outcome into removed/failed.
+
+    Returns False only when the user asked to keep data but the backup could NOT
+    be created — the caller must then abort the uninstall to avoid silent data
+    loss (B150). Returns True when there is nothing to back up (no data to lose).
+    """
+    if not keep_data:
+        return True
+    if storage_dir is None or not storage_dir.exists():
+        return True  # nothing to back up → nothing to lose
+    from datetime import datetime
+    backup_name = f"nexe-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    backup_path = Path.home() / backup_name
+    try:
+        shutil.copytree(storage_dir, backup_path)
+    except Exception:
+        failed.append(t_func("uninstall_backup_failed"))
+        return False
+    removed.append(t_func("uninstall_backup_ok", path=str(backup_path)))
+    return True
 
 
 def _uninstall_remove_system_entries(removed, failed):
@@ -331,8 +336,13 @@ def perform_uninstall(install_dir: Path, t_func, stop_server_func) -> tuple:
     removed: list[str] = []
     failed: list[str] = []
 
-    _uninstall_backup_storage(storage_dir, keep_data, t_func, removed, failed)
+    # B149: stop the server BEFORE the backup so Qdrant/SQLite aren't writing to
+    # storage/ while it is copied (otherwise the backup can be inconsistent/corrupt).
     stop_server_func()
+    # B150: if the user asked to keep data but the backup failed, abort the uninstall
+    # — never remove anything (otherwise data is lost silently despite "keep data").
+    if not _uninstall_backup_storage(storage_dir, keep_data, t_func, removed, failed):
+        return removed, failed
     _uninstall_remove_system_entries(removed, failed)
     _uninstall_remove_install_dir(install_dir, removed, failed)
 

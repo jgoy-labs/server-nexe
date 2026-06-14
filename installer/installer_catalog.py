@@ -20,8 +20,11 @@ def _determine_recommended_category(usable_ram: int) -> tuple:
         return "1", t('size_small')
     elif usable_ram < 20:
         return "2", t('size_medium')
-    else:
+    elif usable_ram < 28:
         return "3", t('size_large')
+    else:
+        # B159: màquines grans (>=28GB usable ≈ 52GB+ RAM) poden amb el tier xlarge.
+        return "4", t('size_xlarge')
 
 
 def _resolve_category(size_choice: str, recommended: str) -> tuple:
@@ -30,6 +33,7 @@ def _resolve_category(size_choice: str, recommended: str) -> tuple:
         "1": ("small", t('category_small')),
         "2": ("medium", t('category_medium')),
         "3": ("large", t('category_large')),
+        "4": ("xlarge", t('category_xlarge')),
     }
     return category_map.get(size_choice, category_map[recommended])
 
@@ -104,6 +108,7 @@ def _select_category(recommended: str, rec_label: str) -> str:
     print(f"  {CYAN}1.{RESET} {t('model_small_desc')}")
     print(f"  {CYAN}2.{RESET} {t('model_medium_desc')}")
     print(f"  {CYAN}3.{RESET} {t('model_large_desc')}")
+    print(f"  {CYAN}4.{RESET} {t('model_xlarge_desc')}")
     print()
     print(f"  {DIM}{t('model_recommended_label').format(label=rec_label)}{RESET}")
     print()

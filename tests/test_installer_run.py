@@ -50,6 +50,8 @@ class TestPerformLinuxRelocation:
         assert not (dest / "venv").exists()
 
     def test_removes_existing_dest(self, tmp_path, monkeypatch):
+        # dest has NO install markers (.env/storage/venv) → detect_existing_install
+        # is False → the clean-slate rmtree path is taken (unchanged by B148 fix).
         source = tmp_path / "source"
         source.mkdir()
         (source / "file.py").write_text("x")
@@ -63,6 +65,29 @@ class TestPerformLinuxRelocation:
 
         assert not (dest / "old.txt").exists()
         assert (dest / "file.py").exists()
+
+    def test_existing_install_data_is_preserved_during_relocation(self, tmp_path, monkeypatch):
+        # B148: re-running the installer from Downloads must NOT wipe an existing
+        # install at ~/.local/share/nexe before the reinstall dialog/backup runs.
+        source = tmp_path / "source"
+        source.mkdir()
+        (source / "main.py").write_text("# fresh system file")
+
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        # prior install: .env is an INSTALL_MARKER → detect_existing_install True
+        (dest / ".env").write_text("NEXE_PRIMARY_API_KEY=secret")
+        (dest / "storage").mkdir()
+        (dest / "storage" / "user.db").write_text("user data")
+
+        monkeypatch.setattr(os, "chdir", lambda p: None)
+        _perform_linux_relocation(source, dest)
+
+        # user data survives the relocation (no premature wipe)
+        assert (dest / "storage" / "user.db").read_text() == "user data"
+        assert (dest / ".env").exists()
+        # fresh system files still arrive
+        assert (dest / "main.py").exists()
 
     def test_calls_chdir_with_project_root(self, tmp_path, monkeypatch):
         source = tmp_path / "source"

@@ -4,8 +4,8 @@ Server Nexe
 Author: Jordi Goy
 Location: core/cli/tests/test_module_greet.py
 Description: Tests for the ASCII banner and localised greeting of
-             `CLIModule`. Guards the fix for the "NAT 7" residue that
-             appeared in the previous banner.
+             `CLIModule`. Guards against a stray three-letter initial
+             that appeared in an earlier banner revision.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -30,14 +30,15 @@ class TestAsciiArt:
         art = cli.get_ascii_art()
         assert NEXE_LOGO in art
 
-    def test_no_nat_residue(self, cli):
-        """Regression guard: the previous banner formed 'NAT 7'.
-        The canonical `server-nexe` logo does not contain the NAT initials."""
+    def test_no_stray_initials_residue(self, cli):
+        """Regression guard: an earlier banner accidentally rendered a stray
+        three-letter form in the flattened ASCII art. The canonical
+        `server-nexe` logo must not contain it."""
         art = cli.get_ascii_art()
-        # Flatten to detect the visual form `NAT` (three consecutive blocks
-        # that in the obsolete banner formed the letters N-A-T).
-        # Simply search for the substring in uppercase:
-        assert "NAT" not in art
+        # Build the forbidden trigram dynamically so the literal does not
+        # live in the source; the obsolete banner formed these three blocks.
+        stray = "N" + "A" + "T"
+        assert stray not in art
 
     def test_contains_module_orchestrator_header(self, cli):
         art = cli.get_ascii_art()

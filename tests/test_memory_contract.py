@@ -337,6 +337,33 @@ class TestSQLiteStore:
         assert len(profiles) == 1
         assert json.loads(profiles[0]["value_json"]) == "Anna"
 
+    def test_profile_delete_removes_fact(self):
+        """ADR-002 stage 2: a structured fact is deterministically deletable by key."""
+        self.store.upsert_profile(user_id="user1", attribute="name", value="Anna")
+        assert len(self.store.get_profile("user1", "name")) == 1
+
+        removed = self.store.delete_profile(user_id="user1", attribute="name")
+        assert removed == 1
+        assert self.store.get_profile("user1", "name") == []
+
+    def test_profile_delete_nonexistent_returns_zero(self):
+        removed = self.store.delete_profile(user_id="user1", attribute="ghost")
+        assert removed == 0
+
+    def test_reinit_on_existing_db_is_idempotent_and_preserves_data(self):
+        """ADR-002 stage 2: re-opening the same DB must not wipe or error (gate)."""
+        from memory.memory.storage.sqlite_store import SQLiteStore
+        self.store.upsert_profile(user_id="user1", attribute="name", value="Anna")
+        self.store.close()
+        reopened = SQLiteStore(self.db_path)  # second init on the same file
+        try:
+            profiles = reopened.get_profile("user1", "name")
+            assert len(profiles) == 1
+            assert json.loads(profiles[0]["value_json"]) == "Anna"
+        finally:
+            reopened.close()
+            self.store = SQLiteStore(self.db_path)  # restore for teardown_method
+
     def test_episodic_crud(self):
         entry_id = self.store.insert_episodic(
             user_id="user1",

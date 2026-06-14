@@ -145,6 +145,20 @@ def _ollama_pull_embeddings(ollama_bin):
     embed_return = embed_process.wait()
     if embed_return == 0:
         print_success(t('embeddings_downloaded'))
+        # B146: the embeddings model is downloaded on every install — verify its
+        # manifest digest against the catalog pin, same as the chat model.
+        try:
+            matched = verify_download_integrity(
+                "ollama", "nomic-embed-text", Path("."),
+                ollama_bin=ollama_bin,
+            )
+        except DownloadIntegrityError as exc:
+            print_warn("✗ Integrity check failed for nomic-embed-text")
+            print(str(exc))
+            raise
+        if not matched:
+            print(f"{YELLOW}⚠️  nomic-embed-text: SHA256 not pinned in catalog "
+                  f"— install proceeded without integrity check{RESET}")
     else:
         print_warn(t('embeddings_failed'))
         print(f"  {DIM}{t('embeddings_manual')}{RESET}")

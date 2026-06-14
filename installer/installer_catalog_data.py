@@ -372,6 +372,10 @@ MODEL_WEIGHT_SHA256: dict[tuple[str, str], Optional[str]] = {
     ("ollama", "deepseek-r1:32b"): None,
     ("ollama", "qwen3.5:35b-a3b"): "606ad9f1ecbcd0d400a89572f49d9a8e80b11a346be74883245e24ecbbc3ac81",
     ("ollama", "csala/ALIA-40B:Q8_0"): None,
+    # ── Bundled embeddings (pulled on every install for the RAG) ──────────
+    # B146: not a user-selectable MODEL_CATALOG entry, but downloaded every
+    # time — must carry an integrity entry (None = not yet pinned → warn).
+    ("ollama", "nomic-embed-text"): None,
     # ── GGUF direct downloads (single-file hash) ──────────────────────────
     (
         "gguf",
@@ -420,12 +424,14 @@ def get_expected_sha256(engine: str, model_id: str) -> Optional[str]:
 
 
 def iter_catalog_model_ids() -> list[tuple[str, str]]:
-    """List every ``(engine, model_id)`` pair referenced by MODEL_CATALOG.
+    """List every downloadable ``(engine, model_id)`` pair the installer fetches.
 
-    Used by the smoke test to enforce that every downloadable artefact in
-    the catalog has an entry in ``MODEL_WEIGHT_SHA256`` (value may be
-    ``None``). New models without an entry would otherwise silently bypass
-    the integrity check.
+    This is every artefact referenced by MODEL_CATALOG PLUS the bundled
+    artefacts that are always downloaded but are not user-selectable (the
+    nomic-embed-text embeddings model). Used by the smoke test to enforce that
+    every downloadable artefact has an entry in ``MODEL_WEIGHT_SHA256`` (value
+    may be ``None``). New models without an entry would otherwise silently
+    bypass the integrity check.
     """
     pairs: list[tuple[str, str]] = []
     for category in MODEL_CATALOG.values():
@@ -434,4 +440,7 @@ def iter_catalog_model_ids() -> list[tuple[str, str]]:
                 value = model.get(engine_key)
                 if value:
                     pairs.append((engine_key, cast(str, value)))
+    # B146: the embeddings model is pulled on every install but is not in
+    # MODEL_CATALOG — surface it so the integrity map must carry its entry.
+    pairs.append(("ollama", "nomic-embed-text"))
     return pairs

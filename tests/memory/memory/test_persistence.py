@@ -650,8 +650,10 @@ class TestPersistenceManagerSQLCipher:
         assert retrieved is not None
         assert retrieved.content == "Pre-migration data"
 
-        # Backup should exist
-        assert db_path.with_suffix('.db.bak').exists()
+        # B089 / D-002: the plaintext backup must be REMOVED after a successful
+        # migration — it held cleartext PII (previously it was only chmod'd 0o600,
+        # which still leaves it recoverable on a stolen device).
+        assert not db_path.with_suffix('.db.bak').exists()
 
         # DB should no longer be plain
         assert not PersistenceManager._is_plaintext_sqlite(db_path)

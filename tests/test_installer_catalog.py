@@ -91,8 +91,9 @@ class TestDetermineRecommendedCategory:
         rec, _ = _determine_recommended_category(10)
         assert rec == "2"
 
-    def test_large_when_ram_20_plus(self):
-        rec, _ = _determine_recommended_category(30)
+    def test_large_when_ram_20_to_27(self):
+        # B159: amb el tier xlarge (>=28), large queda 20..27.
+        rec, _ = _determine_recommended_category(27)
         assert rec == "3"
 
     def test_boundary_5_is_medium(self):
@@ -102,6 +103,29 @@ class TestDetermineRecommendedCategory:
     def test_boundary_20_is_large(self):
         rec, _ = _determine_recommended_category(20)
         assert rec == "3"
+
+
+class TestXlargeCategoryReachable:
+    """B159: el tier xlarge ha de ser recomanable i seleccionable des del wizard."""
+
+    def test_high_ram_machine_recommends_xlarge(self):
+        rec, _ = _determine_recommended_category(35)
+        assert rec == "4"
+
+    def test_xlarge_starts_at_28(self):
+        assert _determine_recommended_category(28)[0] == "4"
+        assert _determine_recommended_category(27)[0] == "3"
+
+    def test_choice_4_resolves_to_xlarge(self, monkeypatch):
+        import installer.installer_catalog as ic
+        monkeypatch.setattr(ic, "t", lambda k: k)
+        cat, _ = _resolve_category("4", "3")
+        assert cat == "xlarge"
+
+    def test_xlarge_models_accessible_through_catalog_lookup(self):
+        from installer.installer_catalog_data import MODEL_CATALOG
+        assert "xlarge" in MODEL_CATALOG
+        assert len(MODEL_CATALOG["xlarge"]) >= 5
 
 
 class TestResolveCategory:

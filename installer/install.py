@@ -94,11 +94,17 @@ def _perform_linux_relocation(source_root: Path, project_root: Path) -> None:
     """Linux: copy source_root to project_root (outside Downloads/tmp) and chdir."""
     print(f"\n{YELLOW}[Linux]{RESET} Directori de descàrregues detectat.")
     print(f"  Instal·lant a: {CYAN}{project_root}{RESET}\n")
-    if project_root.exists():
+    # B148: never wipe an existing install here — this runs BEFORE the confirm and
+    # reinstall dialog (_handle_reinstall_or_clean), the only place allowed to touch
+    # user data (with consent + backup). When a prior install is present we overlay
+    # fresh system files instead of destroying .env/storage/knowledge.
+    existing_install = project_root.exists() and detect_existing_install(project_root)
+    if project_root.exists() and not existing_install:
         shutil.rmtree(project_root)
     shutil.copytree(
         source_root, project_root,
         ignore=shutil.ignore_patterns("venv", "__pycache__", "*.pyc", ".git"),
+        dirs_exist_ok=existing_install,
     )
     os.chdir(project_root)
     print(f"{GREEN}[OK]{RESET} Fitxers copiats a {project_root}\n")

@@ -88,7 +88,7 @@ class TestRAGCLI:
       "description": "Test RAG",
       "initialized": True,
       "sources": ["personality"],
-      "capabilities": ["vector_search"],
+      "capabilities": ["keyword_search"],
       "stats": {
         "documents_added": 10,
         "searches_performed": 5,

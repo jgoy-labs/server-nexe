@@ -35,7 +35,7 @@ class TestInterventionNode:
         from plugins.security.sanitizer.workflow.nodes.intervention_node import InterventionNode
         node = InterventionNode()
         meta = node.get_metadata()
-        assert meta.node_type == "intervention.respond"
+        assert meta.id == "intervention.respond"
 
 
 class TestSanitizerNode:

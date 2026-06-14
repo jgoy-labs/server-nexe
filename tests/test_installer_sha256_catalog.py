@@ -64,6 +64,36 @@ def test_no_orphan_entries_in_integrity_map() -> None:
     )
 
 
+def test_nomic_embed_has_integrity_entry() -> None:
+    # B146: the always-downloaded embeddings model must be in the integrity map
+    # AND surfaced by the iterator (so coverage/orphan checks enforce it).
+    assert ("ollama", "nomic-embed-text") in MODEL_WEIGHT_SHA256
+    assert ("ollama", "nomic-embed-text") in set(iter_catalog_model_ids())
+
+
+def test_ollama_pull_embeddings_verifies_integrity(monkeypatch) -> None:
+    # B146: after a successful pull of nomic-embed-text the installer must run the
+    # SHA256 integrity check on it (it was previously pulled completely unverified).
+    from installer import installer_setup_models as sm
+
+    class _Proc:
+        def wait(self):
+            return 0
+
+    monkeypatch.setattr(sm.subprocess, "Popen", lambda *a, **k: _Proc())
+    monkeypatch.setattr(sm, "t", lambda key, **kw: key)
+    calls: list[tuple[str, str]] = []
+
+    def _spy(engine, model_id, target, **kwargs):
+        calls.append((engine, model_id))
+        return True
+
+    monkeypatch.setattr(sm, "verify_download_integrity", _spy)
+    sm._ollama_pull_embeddings("ollama")
+
+    assert ("ollama", "nomic-embed-text") in calls  # fail-before: never called
+
+
 # ════════════════════════════════════════════════════════════════════════
 # Format of pinned hashes
 # ════════════════════════════════════════════════════════════════════════

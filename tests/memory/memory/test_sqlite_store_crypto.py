@@ -51,6 +51,20 @@ class TestSQLiteStoreCrypto:
         s2.close()
         assert any('"Barcelona"' in r["value_json"] for r in rows)
 
+    def test_delete_profile_round_trip_encrypted(self, tmp_path):
+        """ADR-002 stage 2: delete a structured fact through the encrypted store."""
+        db = tmp_path / "memory_v1.db"
+        crypto = _crypto()
+        s1 = SQLiteStore(db, crypto_provider=crypto)
+        s1.upsert_profile("u1", "city", "Barcelona")
+        removed = s1.delete_profile("u1", "city")
+        s1.close()
+        assert removed == 1
+        s2 = SQLiteStore(db, crypto_provider=crypto)
+        rows = s2.get_profile("u1", "city")
+        s2.close()
+        assert rows == []
+
     def test_wrong_key_quarantines_and_starts_fresh(self, tmp_path):
         """A different MASTER_KEY cannot open the DB → quarantine + fresh DB."""
         db = tmp_path / "memory_v1.db"

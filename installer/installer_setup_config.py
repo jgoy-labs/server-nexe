@@ -258,7 +258,13 @@ def _atomic_write_env(env_file, new_lines):
     import os as _os
     env_tmp = env_file.parent / f".env.tmp.{_os.getpid()}"
     try:
-        with open(env_tmp, 'w') as f:
+        # B147: create the tmp file with 0o600 FROM THE START — it carries the
+        # NEXE_PRIMARY_API_KEY / NEXE_CSRF_SECRET secrets on the update path too.
+        # A plain open() uses the default umask (typically world-readable) until
+        # the post-rename chmod, a TOCTOU window. Same defence as SITE1
+        # (generate_env_file) and core/crypto/keys.py::_try_file_set.
+        tmp_fd = _os.open(env_tmp, _os.O_CREAT | _os.O_WRONLY | _os.O_EXCL, 0o600)
+        with _os.fdopen(tmp_fd, 'w') as f:
             f.writelines(new_lines)
             # fsync before rename so a crash here cannot leave a zero-byte
             # .env. See _generate_env_file() for the same defence.

@@ -61,7 +61,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     try:
       from core.sidecar_config import get_sidecar_config
       if get_sidecar_config().is_sidecar:
-        script_src_extra = " 'unsafe-inline' 'unsafe-eval'"
+        script_src_extra = " 'unsafe-inline'"
     except Exception as exc:  # pragma: no cover — fallback behaviour pre-sidecar
       logger.debug("SidecarConfig unavailable, using strict CSP: %s", exc)
 

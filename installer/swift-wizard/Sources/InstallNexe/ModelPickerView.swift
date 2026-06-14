@@ -63,7 +63,8 @@ struct ModelPickerView: View {
                             Spacer(minLength: 0)
                             LazyVStack(spacing: 10) {
                                 ForEach(engine.catalog.models(for: selectedTab)) { model in
-                                    let tooLarge = model.ramGB >= Double(engine.hardware.ramGB) * 0.75
+                                    // B171: '>' estricte perquè un model al seu tier exacte (ramGB == 75% de la RAM) sigui seleccionable.
+                                    let tooLarge = model.ramGB > Double(engine.hardware.ramGB) * 0.75
                                     ModelCard(
                                         model: model,
                                         isSelected: engine.selectedModel?.key == model.key,

@@ -12,81 +12,94 @@ www.jgoy.net · https://server-nexe.org
 import logging
 from typing import Any, Dict, List
 
-from nexe_flow.core.node import Node, NodeMetadata
+# nexe_flow is the (not-yet-shipped) workflow engine. Import it optionally so
+# importing this dormant workflow subpackage does not crash a real install that
+# lacks nexe_flow. Tests inject a mock nexe_flow in conftest.py, so the import
+# succeeds there unchanged.
+try:
+  from nexe_flow.core.node import (
+    Node,
+    NodeMetadata,
+    NodeInput,
+    NodeOutput,
+  )
+  NEXE_FLOW_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised only on real (unmocked) installs
+  NEXE_FLOW_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 RESISTANCE_RESPONSE = "Crec que hi ha un problema amb el teu missatge. Pots reformular?"
 
-class InterventionNode(Node):
-  """
-  Intervention Node for Nexe.
-
-  When the Sanitizer detects threats, this node:
-  1. Generates an appropriate resistance response
-  2. Stops the pipeline (it is terminal)
-  3. Does not call the LLM (saves resources and avoids risks)
-
-  Inputs:
-    threats: List[str] - List of threats detected by the Sanitizer
-    severity: str - Severity level ("low", "medium", "high", "critical")
-
-  Outputs:
-    response: str - Resistance response
-    activated: bool - True (always, if executed)
-    threat_type: str - Primary threat type
-  """
-
-  def get_metadata(self) -> NodeMetadata:
-    return NodeMetadata(
-      node_type="intervention.respond",
-      version="1.0.0",
-      description="Generate resistance response when threats are detected",
-      inputs={
-        "threats": {
-          "type": "array",
-          "description": "List of detected threats",
-          "required": False,
-          "default": [],
-        },
-        "severity": {
-          "type": "string",
-          "description": "Severity level",
-          "required": False,
-          "default": "medium",
-        },
-      },
-      outputs={
-        "response": {"type": "string", "description": "Resistance response"},
-        "activated": {"type": "boolean", "description": "Whether activated"},
-        "threat_type": {"type": "string", "description": "Primary threat type"},
-      },
-    )
-
-  async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+if not NEXE_FLOW_AVAILABLE:
+  # nexe_flow is not installed → the InterventionNode workflow node cannot be
+  # defined (it subclasses nexe_flow's Node). Expose a None sentinel so the
+  # subpackage stays importable and importers can degrade gracefully.
+  InterventionNode = None  # type: ignore[assignment,misc]
+else:
+  class InterventionNode(Node):  # type: ignore[no-redef]
     """
-    Generate resistance response based on detected threats.
+    Intervention Node for Nexe.
 
-    Args:
-      inputs: Dict with threats and severity
+    When the Sanitizer detects threats, this node:
+    1. Generates an appropriate resistance response
+    2. Stops the pipeline (it is terminal)
+    3. Does not call the LLM (saves resources and avoids risks)
 
-    Returns:
-      Dict with response, activated, threat_type
+    Inputs:
+      threats: List[str] - List of threats detected by the Sanitizer
+      severity: str - Severity level ("low", "medium", "high", "critical")
+
+    Outputs:
+      response: str - Resistance response
+      activated: bool - True (always, if executed)
+      threat_type: str - Primary threat type
     """
-    threats: List[str] = inputs.get("threats", [])
-    severity: str = inputs.get("severity", "medium")
 
-    logger.warning(
-      "RESISTANCE ACTIVATED - Threats: %s, Severity: %s",
-      threats, severity
-    )
+    def get_metadata(self) -> NodeMetadata:
+      return NodeMetadata(
+        id="intervention.respond",
+        name="Intervention Respond",
+        version="1.0.0",
+        description="Generate resistance response when threats are detected",
+        category="nexe_native",
+        inputs=[
+          NodeInput(name="threats", type="array", required=False, default=[], description="List of detected threats"),
+          NodeInput(name="severity", type="string", required=False, default="medium", description="Severity level"),
+        ],
+        outputs=[
+          NodeOutput(name="response", type="string", description="Resistance response"),
+          NodeOutput(name="activated", type="boolean", description="Whether activated"),
+          NodeOutput(name="threat_type", type="string", description="Primary threat type"),
+        ],
+        icon="🛡️",
+        color="#e74c3c",
+      )
 
-    threat_type = threats[0] if threats else "unknown"
+    async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+      """
+      Generate resistance response based on detected threats.
 
-    response = RESISTANCE_RESPONSE
+      Args:
+        inputs: Dict with threats and severity
 
-    return {
-      "response": response,
-      "activated": True,
-      "threat_type": threat_type,
-    }
+      Returns:
+        Dict with response, activated, threat_type
+      """
+      threats: List[str] = inputs.get("threats", [])
+      severity: str = inputs.get("severity", "medium")
+
+      logger.warning(
+        "RESISTANCE ACTIVATED - Threats: %s, Severity: %s",
+        threats, severity
+      )
+
+      threat_type = threats[0] if threats else "unknown"
+
+      response = RESISTANCE_RESPONSE
+
+      return {
+        "response": response,
+        "activated": True,
+        "threat_type": threat_type,
+      }

@@ -272,6 +272,74 @@ class TestHandleDeleteConfirmIntent:
         assert mem_deleted == 0
         assert "Nothing pending" in text
 
+    # B093 — a bare generic "yes" must not erase profile entries.
+    @pytest.mark.asyncio
+    async def test_profile_entry_generic_yes_is_blocked(self):
+        mh = _make_memory_helper()
+        session = _make_session()
+        session._pending_partial_delete = {
+            "content": "I am an expert",
+            "entries": [_candidate("I am an expert", mtype="user_fact")],
+        }
+        text, action, mem_deleted = await _handle_delete_confirm_intent(session, mh, "yes")
+        mh.delete_memory_entries.assert_not_called()
+        assert action == "delete_blocked"
+        assert mem_deleted == 0
+        assert session._pending_partial_delete is None
+
+    @pytest.mark.asyncio
+    async def test_profile_entry_explicit_reference_is_allowed(self):
+        mh = _make_memory_helper()
+        mh.delete_memory_entries.return_value = {
+            "success": True, "deleted": 1,
+            "deleted_facts": [{"id": "id-1", "text": "I am an expert", "score": 0.9}],
+        }
+        session = _make_session()
+        session._pending_partial_delete = {
+            "content": "I am an expert",
+            "entries": [_candidate("I am an expert", mtype="user_fact")],
+        }
+        text, action, mem_deleted = await _handle_delete_confirm_intent(
+            session, mh, "yes, delete that I am an expert"
+        )
+        mh.delete_memory_entries.assert_awaited_once()
+        assert action == "delete"
+        assert mem_deleted == 1
+
+    @pytest.mark.asyncio
+    async def test_non_profile_entry_generic_yes_still_deletes(self):
+        """No regression: a non-profile entry confirms with a bare yes."""
+        mh = _make_memory_helper()
+        mh.delete_memory_entries.return_value = {
+            "success": True, "deleted": 1,
+            "deleted_facts": [{"id": "id-1", "text": "m'agraden els gats", "score": 0.9}],
+        }
+        session = _make_session()
+        session._pending_partial_delete = {
+            "content": "m'agraden els gats",
+            "entries": [_candidate("m'agraden els gats")],  # no profile type
+        }
+        text, action, mem_deleted = await _handle_delete_confirm_intent(session, mh, "yes")
+        mh.delete_memory_entries.assert_awaited_once()
+        assert action == "delete"
+        assert mem_deleted == 1
+
+    @pytest.mark.asyncio
+    async def test_profile_stopwords_only_do_not_count_as_reference(self):
+        """Anti-theatre: generic stop-words ('delete', 'user', 'memory') must
+        not slip past the guard as if they referenced the entry."""
+        mh = _make_memory_helper()
+        session = _make_session()
+        session._pending_partial_delete = {
+            "content": "I am an expert",
+            "entries": [_candidate("I am an expert", mtype="user_fact")],
+        }
+        text, action, mem_deleted = await _handle_delete_confirm_intent(
+            session, mh, "yes please delete user memory"
+        )
+        mh.delete_memory_entries.assert_not_called()
+        assert action == "delete_blocked"
+
 
 # ===========================================================================
 # _handle_list_intent

@@ -102,3 +102,35 @@ class TestSecurityHeadersMiddleware:
         resp = client.get("/test")
         csp = resp.headers.get("Content-Security-Policy", "")
         assert "upgrade-insecure-requests" not in csp
+
+
+class TestSecurityHeadersSidecar:
+    """B083: sidecar mode relaxes script-src to allow the Web UI's inline
+    scripts, but must NOT enable 'unsafe-eval' (no eval()/new Function() exists
+    in plugins/web_ui_module — verified by grep)."""
+
+    @pytest.fixture
+    def sidecar_env(self, monkeypatch):
+        from core import sidecar_config
+
+        # Set the required sidecar vars so get_sidecar_config() builds a real
+        # is_sidecar=True config (otherwise fail-fast → middleware except branch
+        # → strict CSP → false green that hides the bug).
+        monkeypatch.setenv("NEXE_SIDECAR", "1")
+        monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-key")
+        monkeypatch.setenv("NEXE_PORT", "9119")
+        monkeypatch.delenv("NEXE_SERVER_PORT", raising=False)
+        sidecar_config.reset_sidecar_config()
+        assert sidecar_config.get_sidecar_config().is_sidecar is True
+        yield
+        sidecar_config.reset_sidecar_config()
+
+    def test_sidecar_csp_no_unsafe_eval(self, sidecar_env):
+        app = make_app()
+        client = TestClient(app)
+        resp = client.get("/test")
+        csp = resp.headers.get("Content-Security-Policy", "")
+        # Inline scripts are still allowed (the Web UI needs them)…
+        assert "'unsafe-inline'" in csp
+        # …but eval must never be enabled.
+        assert "'unsafe-eval'" not in csp

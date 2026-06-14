@@ -24,7 +24,7 @@ MANIFEST: Dict[str, Any] = {
   "dependencies": ["embeddings"],
 
   "capabilities": [
-    "vector_search",
+    "keyword_search",
     "multi_rag_management",
     "personality_rag",
     "temp_upload_rag",

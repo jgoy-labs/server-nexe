@@ -79,3 +79,32 @@ def test_migration_closes_both_connections_when_iterdump_execute_raises(tmp_path
     # Plain DB preserved (migration failed, no .bak rename happened).
     assert db_path.exists()
     assert SqliteStorageMixin._is_plaintext_sqlite(db_path) is True
+
+
+def test_migration_removes_plaintext_backup_on_success(tmp_path):
+    # B089 / D-002: after a SUCCESSFUL migration the plaintext .db.bak must be
+    # REMOVED (Decision B), not merely chmod'd — otherwise the cleartext PII
+    # survives on disk and is recoverable on a stolen device.
+    db_path = tmp_path / "memory.db"
+    _make_plaintext_db(db_path)
+    store = _Store(db_path)
+
+    enc_conn = MagicMock()  # accepts every PRAGMA/dump line → success path
+
+    def _connect(path):
+        # the real sqlcipher creates the encrypted tmp file; emulate it so the
+        # subsequent tmp_path.rename(db_path) succeeds without sqlcipher3.
+        Path(path).write_bytes(b"not-a-plaintext-sqlite-header")
+        return enc_conn
+
+    fake_sqlcipher = MagicMock()
+    fake_sqlcipher.connect.side_effect = _connect
+
+    with patch.object(ps, "SQLCIPHER_AVAILABLE", True), \
+         patch.object(ps, "sqlcipher", fake_sqlcipher):
+        store._migrate_to_encrypted()
+
+    bak_path = db_path.with_suffix(".db.bak")
+    assert not bak_path.exists()  # fail-before: D-002 left the .bak (only chmod'd)
+    assert db_path.exists()
+    assert SqliteStorageMixin._is_plaintext_sqlite(db_path) is False

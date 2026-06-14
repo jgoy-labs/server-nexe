@@ -80,6 +80,8 @@ struct InstallerWizardView: View {
         }
         .alert(t("btn_cancel"), isPresented: $showCancelAlert) {
             Button(t("btn_cancel"), role: .destructive) {
+                // B172: atura el subprocés d'instal·lació abans de tancar, perquè no quedi orfe.
+                engine.cancelInstall()
                 NSApplication.shared.terminate(nil)
             }
             Button(t("btn_back"), role: .cancel) {}

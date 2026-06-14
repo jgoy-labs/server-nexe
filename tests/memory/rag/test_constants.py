@@ -84,10 +84,12 @@ class TestManifestDefaultConfig:
 class TestManifestCapabilities:
   """Tests for MANIFEST capabilities."""
 
-  def test_capabilities_include_vector_search(self):
-    """Verify capabilities include vector_search."""
+  def test_capabilities_include_keyword_search(self):
+    """Verify capabilities advertise keyword_search (B114: PersonalityRAG does
+    token matching, not vector search — the manifest must not over-claim)."""
     caps = MANIFEST.get("capabilities", [])
-    assert "vector_search" in caps
+    assert "keyword_search" in caps
+    assert "vector_search" not in caps
 
   def test_capabilities_include_multi_source(self):
     """Verify capabilities include multi_rag_management or similar."""

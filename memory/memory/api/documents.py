@@ -413,27 +413,64 @@ async def delete_document(
   doc_id: str,
   collection: str,
   text_store=None,
+  *,
+  max_retries: int = 1,
 ) -> bool:
-  """Delete a document."""
-  loop = asyncio.get_running_loop()
+  """Delete a document, verifying the point is actually gone.
 
-  def _delete():
-    """Delete a single document from Qdrant by its hex ID."""
-    uuid_id = hex_to_uuid(doc_id)
+  Qdrant can accept a delete and silently leave the point (eventual
+  consistency, a partial shard failure, a swallowed error). Returning success
+  in that case makes the chat report "forgotten" while the fact still gets
+  recalled. We re-read the point after deleting and retry; only an empty
+  re-read counts as success (ADR-002 Stage 1).
+  """
+  loop = asyncio.get_running_loop()
+  uuid_id = hex_to_uuid(doc_id)
+
+  def _delete_and_verify():
+    """Delete then confirm the point no longer exists. Returns True only if gone."""
     try:
       _delete_points(qdrant, collection, [uuid_id])
-      logger.debug("Deleted document %s from collection %s", doc_id, collection)
-      return True
-
     except Exception as e:
-      logger.warning("Failed to delete document %s: %s", doc_id, e)
+      logger.warning("Failed to delete document %s from %s: %s", doc_id, collection, e)
       return False
+    try:
+      remaining = qdrant.retrieve(
+        collection_name=collection, ids=[uuid_id], with_payload=False
+      )
+    except Exception as e:
+      # If we cannot verify, treat as not-deleted — never report a false success.
+      logger.warning("Could not verify deletion of %s in %s: %s", doc_id, collection, e)
+      return False
+    if remaining:
+      logger.warning(
+        "Delete of %s in %s did not remove the point (still present after delete)",
+        doc_id, collection,
+      )
+      return False
+    logger.debug("Deleted and verified document %s from collection %s", doc_id, collection)
+    return True
 
-  result = await loop.run_in_executor(executor, _delete)
+  result = False
+  for attempt in range(max_retries + 1):
+    result = await loop.run_in_executor(executor, _delete_and_verify)
+    if result:
+      break
+    if attempt < max_retries:
+      logger.info("Retrying delete of %s in %s (attempt %d)", doc_id, collection, attempt + 2)
 
   if result:
     if text_store:
-      text_store.delete(doc_id, collection)
+      try:
+        text_store.delete(doc_id, collection)
+      except Exception as e:
+        # The Qdrant point is gone (user-visible fact removed) but the SQLite
+        # text row survived → orphan. Log loudly; do NOT crash and do NOT flip
+        # the result to failure (the orphan is a cleanup concern, not a recall one).
+        logger.error(
+          "TextStore delete failed for %s in %s — orphan text row left behind: %s",
+          doc_id, collection, e,
+        )
     ops, _ = _get_metrics()
     if ops:
       ops.labels(operation="delete").inc()

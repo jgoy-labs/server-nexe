@@ -275,6 +275,19 @@ class TestAtomicWriteEnv:
         _atomic_write_env(env_file, ["NEXE_ENV=test\n"])
         assert seen_fds, "_atomic_write_env must fsync the tmp fd before rename"
 
+    def test_tmp_file_created_with_0600_mode(self, tmp_path):
+        # B147: the .env carries NEXE_PRIMARY_API_KEY + NEXE_CSRF_SECRET; it must
+        # never be world-readable, not even in the tmp window. The mode is set at
+        # create time (0o600), so the final renamed .env inherits it.
+        old_umask = os.umask(0o022)  # permissive umask: a plain open() would yield 0o644
+        try:
+            env_file = tmp_path / ".env"
+            _atomic_write_env(env_file, ["NEXE_PRIMARY_API_KEY=secret\n"])
+            mode = stat.S_IMODE(env_file.stat().st_mode)
+        finally:
+            os.umask(old_umask)
+        assert mode == 0o600  # fail-before: open() → 0o644 under umask 0o022
+
 
 # ── _update_env_model_config (integration) ────────────────────────────────
 

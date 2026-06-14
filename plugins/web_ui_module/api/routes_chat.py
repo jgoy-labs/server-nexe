@@ -499,6 +499,27 @@ def _clean_full_response(full_response: str, user_input: str = "") -> tuple[str,
     return clean_response, mem_saves, mem_deletes
 
 
+# Placeholder persisted for a think-only assistant turn (B125).
+_THINK_ONLY_PLACEHOLDER = "…"
+
+
+def _think_only_placeholder(clean_response: str, full_response: str) -> str:
+    """B125: keep an assistant turn even when the model produced only thinking.
+
+    When the model emits a turn that cleans down to nothing (e.g. think-only
+    output), no assistant message gets persisted. ``get_context_messages()``
+    then sees two consecutive ``user`` turns and drops the newer one as a
+    duplicate role — silently losing the user's next message. Returning a
+    placeholder keeps the user/assistant alternation intact.
+
+    A genuinely empty turn (``full_response`` empty, e.g. an upstream
+    exception) is left untouched so nothing spurious is saved.
+    """
+    if not clean_response and full_response:
+        return _THINK_ONLY_PLACEHOLDER
+    return clean_response
+
+
 def _extract_reprompt_chunk_content(chunk) -> tuple[str, bool]:
     """Extract text content from a reprompt chunk. Returns (content, skip).
 
@@ -764,17 +785,67 @@ async def _handle_delete_intent(
     return response_text, "delete", mem_deleted
 
 
+# B093: a bare generic "yes" must not be enough to erase *profile* memories.
+# An ambiguous confirmation (often meant for something else in the chat) was
+# silently deleting user profile data. For profile-like entries we now require
+# the confirmation to reference the entry's content with a significant token.
+_DELETE_REF_STOPWORDS = {
+    # generic ≥4-char tokens that carry no reference (ca / es / en)
+    "user", "this", "that", "with", "from", "have", "your", "want", "just",
+    "yes", "sure", "okay", "delete", "remove", "forget", "memory",
+    "usuari", "usuario", "memoria", "perfil", "profile", "esborra", "elimina",
+    "borra", "borrar", "oblida", "olvida", "quiero", "vull", "please", "sisplau",
+}
+_DELETE_BLOCKED_MSGS = {
+    "ca": ('Per esborrar dades de perfil necessito que ho diguis explícitament '
+           '(per exemple: «esborra que ...»), no només «sí». No s\'ha esborrat res.'),
+    "es": ('Para borrar datos de perfil necesito que lo digas explícitamente '
+           '(por ejemplo: «borra que ...»), no solo «sí». No se ha borrado nada.'),
+    "en": ('To delete profile data I need an explicit reference '
+           '(e.g. "delete that ..."), not just "yes". Nothing was deleted.'),
+}
+
+
+def _references_entry(message: str, entries: list) -> bool:
+    """True if `message` names an entry's content with a significant token.
+
+    A significant token is ≥4 chars and not a generic confirmation/stop word,
+    so "yes" / "ok" / "delete it" alone do not count as a reference.
+    """
+    tokens = {t for t in _re.findall(r"\w+", (message or "").lower())
+              if len(t) >= 4 and t not in _DELETE_REF_STOPWORDS}
+    if not tokens:
+        return False
+    for e in entries:
+        text = str(e.get("text", "")).lower()
+        if any(t in text for t in tokens):
+            return True
+    return False
+
+
 async def _handle_delete_confirm_intent(
     session,
     memory_helper,
+    message: str = "",
 ) -> tuple[str, str, int]:
-    """Execute a confirmed partial delete by exact id (B028 2-turn flow)."""
+    """Execute a confirmed partial delete by exact id (B028 2-turn flow).
+
+    B093: profile entries require an explicit reference, not a bare "yes".
+    """
     pending = getattr(session, "_pending_partial_delete", None) or {}
     session._pending_partial_delete = None
     entries = pending.get("entries", [])
     content = pending.get("content", "")
     if not entries:
         return "\x00[MODEL:nexe-system]\x00Nothing pending to delete.", "delete", 0
+    has_profile = any(
+        str((e.get("metadata") or {}).get("type", "")).lower() in _PROFILE_LIKE_TYPES
+        for e in entries
+    )
+    if has_profile and not _references_entry(message, entries):
+        _lang = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
+        _blocked = _DELETE_BLOCKED_MSGS.get(_lang, _DELETE_BLOCKED_MSGS["en"])
+        return f"\x00[MODEL:nexe-system]\x00{_blocked}", "delete_blocked", 0
     result = await memory_helper.delete_memory_entries(entries)
     if result["success"] and result.get("deleted", 0) > 0:
         response_text, mem_deleted = _build_delete_success_response(result, content, session)
@@ -884,7 +955,7 @@ async def _handle_memory_intent(
         )
     elif intent == "delete_confirm":
         response_text, memory_action, mem_deleted = await _handle_delete_confirm_intent(
-            session, memory_helper
+            session, memory_helper, message
         )
     elif intent == "recall":
         memory_action = "recall"
@@ -2016,6 +2087,12 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         clean_response = "Memòria desada: " + ", ".join(_fallback_facts)
                                         yield clean_response
                                         logger.info("Re-prompt fallback: confirmation message")
+
+                            # B125: persist a placeholder for a think-only turn so
+                            # the next user message is not dropped as a duplicate role.
+                            if not clean_response and full_response:
+                                logger.info("Think-only turn: persisting placeholder assistant message (B125)")
+                            clean_response = _think_only_placeholder(clean_response, full_response)
 
                             if clean_response:
                                 # Atomize + save LLM-extracted facts to memory

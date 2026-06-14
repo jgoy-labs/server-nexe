@@ -173,7 +173,10 @@ async def _rag_module_fallback(app_state: Any, query: str) -> str:
     results = await rag_module.search(search_request, source="personality")
 
     if not results:
-        logger.info("RAG Search returned no results")
+        # B114: the legacy PersonalityRAG fallback is a structurally-empty dead
+        # loop (superseded by MemoryAPI/Qdrant). Make the empty result audible
+        # so the dead path is observable instead of silently swallowed.
+        logger.warning("RAG Search returned no results")
         return ""
 
     if isinstance(results, list):

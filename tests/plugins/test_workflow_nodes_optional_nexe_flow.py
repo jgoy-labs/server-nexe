@@ -101,3 +101,15 @@ def test_sanitizer_node_imports_without_nexe_flow():
         assert mod.SanitizerNode is None
         # The config dataclass does not depend on nexe_flow.
         assert mod.SanitizerNodeConfig().fail_on_critical is False
+
+
+def test_intervention_node_imports_without_nexe_flow():
+    """B130: intervention_node imports and InterventionNode degrades to a None
+    sentinel when nexe_flow is absent (instead of raising ModuleNotFoundError).
+    RESISTANCE_RESPONSE is nexe_flow-independent and must stay importable."""
+    mod_name = "plugins.security.sanitizer.workflow.nodes.intervention_node"
+    with _BlockNexeFlow(mod_name):
+        mod = importlib.import_module(mod_name)
+        assert mod.NEXE_FLOW_AVAILABLE is False
+        assert mod.InterventionNode is None
+        assert isinstance(mod.RESISTANCE_RESPONSE, str)

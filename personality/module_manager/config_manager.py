@@ -168,8 +168,12 @@ class ConfigManager:
     except FileNotFoundError as e:
       logger.debug("Manifest file not found: %s - %s", manifest_path, e)
       pass
-    except (IOError, KeyError) as e:
-      logger.debug("Error reading manifest: %s - %s", manifest_path, e)
+    except (IOError, KeyError, toml.TomlDecodeError) as e:
+      # B106: a corrupt/unparseable manifest must not crash the boot — fall
+      # back to the default dict below. TomlDecodeError is a ValueError subclass;
+      # we catch it explicitly rather than bare ValueError so genuine
+      # programming errors inside the try still surface.
+      logger.warning("Error reading manifest: %s - %s", manifest_path, e)
       pass
 
     module_key = get_message(self.i18n, 'manifest.keys.module')
