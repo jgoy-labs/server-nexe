@@ -128,28 +128,3 @@ def detect_hardware():
         "disk_free_gb": disk_free_gb
     }
     return HW_INFO
-
-
-def get_recommended_size(ram_gb):
-    """
-    Get recommended model size based on RAM.
-
-    IMPORTANT: Models should use max 50-60% of total RAM to leave
-    space for OS, browser, and other apps.
-
-    RAM Total → RAM for Model → Recommended
-    8 GB      → 4-5 GB        → small (2.4 GB) ✅ or medium (4 GB) ⚠️
-    16 GB     → 8-10 GB       → medium (4 GB) ✅ or large (4.5 GB) ✅
-    32 GB     → 16-20 GB      → large (4.5 GB) ✅
-    64 GB+    → 32+ GB        → xl (26 GB) ✅
-    """
-    usable_ram = ram_gb * 0.55  # 55% of RAM for model
-
-    if usable_ram >= 28:
-        return "xl"
-    elif usable_ram >= 8:
-        return "large"
-    elif usable_ram >= 5:
-        return "medium"
-    else:
-        return "small"

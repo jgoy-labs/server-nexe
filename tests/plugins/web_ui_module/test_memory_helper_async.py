@@ -10,6 +10,8 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
+import logging
+import re
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -202,6 +204,30 @@ class TestPruneOldEntries:
         deleted = asyncio.run(helper._prune_old_entries(mem))
         assert deleted > 0
         assert mem.delete.call_count > 0
+
+    def test_pruned_entry_text_not_logged(self, caplog):
+        # MC-112: the pruned entry's text is user memory content (PII). It must
+        # not reach the logs; only the id (+ retention score) may, so we can
+        # still tell *which* entry was pruned without leaking *what* it said.
+        SECRET = "PII_Joan_lives_in_Barcelona_secret"
+        count = MAX_MEMORY_ENTRIES + PRUNE_BATCH_SIZE + 1
+        entries = []
+        for i in range(count):
+            e = MagicMock()
+            e.id = f"id-{i}"
+            e.text = f"{SECRET} {i}"
+            e.metadata = {"type": "conversation", "access_count": 0, "saved_at": ""}
+            entries.append(e)
+
+        mem = make_memory_mock(collection_exists=True, search_results=entries)
+        helper = MemoryHelper()
+
+        with caplog.at_level(logging.DEBUG):
+            deleted = asyncio.run(helper._prune_old_entries(mem))
+
+        assert deleted > 0
+        assert SECRET not in caplog.text                      # content must not leak
+        assert re.search(r"Pruned entry id-\d+", caplog.text)  # id still logged (diagnostic)
 
     def test_collection_not_exists_returns_0(self):
         mem = make_memory_mock(collection_exists=False)
@@ -513,6 +539,84 @@ class TestRecallFromMemory:
         assert result["success"] is True
         assert len(result["results"]) <= 5
         assert result["total"] == len(result["results"])
+
+    def test_mc002_embeds_query_once_and_reuses_across_collections(self):
+        """MC-002: the query is embedded ONCE (not once per collection) and the
+        precomputed embedding is forwarded to every per-collection search."""
+        fake_vec = [0.11, 0.22, 0.33]
+        mem = make_memory_mock(
+            collection_exists=True,
+            search_results=[make_result("hit", score=0.7, rid="x")],
+        )
+        mem.embed_query = AsyncMock(return_value=fake_vec)
+        helper = MemoryHelper()
+
+        with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
+            result = asyncio.run(helper.recall_from_memory("qui soc"))
+
+        assert result["success"] is True
+        # Embedded exactly once for the whole recall (the 3 default collections).
+        mem.embed_query.assert_awaited_once_with("qui soc")
+        # Every per-collection search reused the SAME precomputed embedding.
+        assert mem.search.await_count == 3
+        for call in mem.search.await_args_list:
+            assert call.kwargs.get("query_embedding") == fake_vec
+
+    def test_mc002_falls_back_when_embed_query_unavailable(self):
+        """MC-002: if embed precompute fails, recall still works and the searches
+        run WITHOUT query_embedding (graceful per-search embedding)."""
+        mem = make_memory_mock(
+            collection_exists=True,
+            search_results=[make_result("hit", score=0.7, rid="x")],
+        )
+        mem.embed_query = AsyncMock(side_effect=RuntimeError("no embedder"))
+        helper = MemoryHelper()
+
+        with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
+            result = asyncio.run(helper.recall_from_memory("qui soc"))
+
+        assert result["success"] is True
+        assert mem.search.await_count == 3
+        for call in mem.search.await_args_list:
+            assert "query_embedding" not in call.kwargs
+
+    def test_mc002_collection_searches_run_concurrently(self):
+        """MC-002: the per-collection searches run via asyncio.gather, so all 3
+        are in-flight simultaneously. A serial loop would never have >1 active
+        at once. Mutation-proof: revert gather->serial and max_active drops to 1."""
+        async def _run():
+            arrived = asyncio.Event()
+            state = {"active": 0, "max_active": 0}
+
+            async def search_side(query=None, collection=None, top_k=5, **kwargs):
+                state["active"] += 1
+                state["max_active"] = max(state["max_active"], state["active"])
+                if state["active"] >= 3:
+                    arrived.set()
+                try:
+                    # Concurrent: all 3 arrive and the event releases everyone.
+                    # Serial: only 1 is ever active, the event never sets -> timeout.
+                    await asyncio.wait_for(arrived.wait(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    pass
+                finally:
+                    state["active"] -= 1
+                return [make_result("hit", score=0.7)]
+
+            mem = MagicMock()
+            mem.collection_exists = AsyncMock(return_value=True)
+            mem.embed_query = AsyncMock(return_value=[0.1, 0.2])
+            mem.search = search_side
+            helper = MemoryHelper()
+
+            with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
+                result = await helper.recall_from_memory("q")
+
+            assert result["success"] is True
+            # All three collection searches were active at the same instant.
+            assert state["max_active"] == 3
+
+        asyncio.run(_run())
 
     def test_memory_not_available(self):
         helper = MemoryHelper()

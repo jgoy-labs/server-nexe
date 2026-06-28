@@ -46,7 +46,7 @@ Local models are less capable than cloud models (GPT-4, Claude, etc.). This is t
 The MLX backend supports vision models (image + text) via `mlx-vlm 0.4.4`. Detected architectures: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (all), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama and more. Since **v0.9.8** the 3-signal "any-of" detector (architectures + vision_config in `config.json` + weight_map in `model.safetensors.index.json`) covers new architectures that lack the classical keys.
 
 Current limitations:
-- **Qwen3.5 family (Omni VLM, sizes 2B/4B/9B/27B):** Works via MLX and Ollama with vision. The DMG bundle and the dev venv ship `PyTorch` + `torchvision` (sprint v1.0.4-beta TODO 1.3, cp312 macOS-arm64 wheels, ~92 MB net). The VLM detector catches the `Qwen3_5ForConditionalGeneration` architecture + `vision_config` and loads via `mlx-vlm.load()`. Empirically verified 2026-05-13 with `qwen3.5:4b` correctly describing images. **Still unsupported in the pipeline:** `Qwen3-Omni` and `Kimi-VL` (audio/video branch in `mlx-vlm` not yet exposed).
+- **Qwen3.5 family (Omni VLM, sizes 2B/4B/9B/27B):** Works via MLX and Ollama with vision. The DMG bundle and the dev venv ship `PyTorch` + `torchvision` (cp312 macOS-arm64 wheels, ~92 MB net). The VLM detector catches the `Qwen3_5MoeForConditionalGeneration` architecture + `vision_config` and loads via `mlx-vlm.load()`. Empirically verified 2026-05-13 with `qwen3.5:4b` correctly describing images. **Still unsupported in the pipeline:** `Qwen3-Omni` and `Kimi-VL` (audio/video branch in `mlx-vlm` not yet exposed).
 - **Recommended default:** `gemma-4-e4b-4bit` (4.9 GB) or `gemma-4-31b-8bit` (20 GB). Image only, no torch dependencies.
 - **Audio/speech:** Not supported. Models like Qwen3-Omni, Kimi-VL or DeepSeek-VL-V2 have an audio branch in `mlx-vlm` but the server-nexe pipeline does not expose it yet.
 - **Native video:** Not supported (see omni models).
@@ -86,16 +86,16 @@ Partially compatible with OpenAI API format:
 
 ## Security
 
-- **Prompt injection:** Local models may follow injected instructions. Sanitizer catches common patterns (47 jailbreak patterns, 6 injection detectors with Unicode normalization) but not all.
+- **Prompt injection:** Local models may follow injected instructions. Sanitizer catches common patterns (49 jailbreak patterns, 6 injection detectors with Unicode normalization) but not all.
 - **No TLS by default:** HTTP on localhost. Use reverse proxy for HTTPS.
 - **Single-user:** No multi-user isolation. One API key = full access.
-- **AI audits, not external audits:** Security has been reviewed by autonomous AI sessions, not by third-party security firms. This is thorough but not exhaustive.
+- **AI audits, not external audits:** Security has been reviewed by autonomous AI sessions, not by third-party security firms. This is thorough but not complete.
 - **Ollama keep_alive bug:** keep_alive:0 doesn't always release VRAM (known Ollama issue).
 
 ## Encryption Caveats
 
 - **Default `auto`:** Encryption at rest activates automatically if `sqlcipher3` is available. Can be forced with `NEXE_ENCRYPTION_ENABLED=true` or disabled with `false`.
-- **New feature:** Added in v0.9.0, available since v0.9.7. Tested (68 tests, 0 failures) but not yet battle-tested in production with real users.
+- **New feature:** Added in v0.9.0, available since v0.9.7. Tested (72 tests, 0 failures) but not yet battle-tested in production with real users.
 - **Key management:** Master key stored in OS Keyring, env var, or file. If the key is lost, encrypted data cannot be recovered.
 - **SQLCipher dependency:** Requires the `sqlcipher3` Python package — install `sqlcipher3-binary` (prebuilt wheel, recommended) or `sqlcipher3` (needs `libsqlcipher`, e.g. via Homebrew on macOS). Falls back to plaintext SQLite with a warning if not installed.
 - **Migration:** Migrating large datasets (many memories, many sessions) can take time. Backup before migrating.

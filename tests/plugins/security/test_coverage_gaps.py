@@ -297,16 +297,38 @@ class TestAuthConfigGaps:
 
 class TestAuthDependenciesGaps:
 
-    def test_metrics_disabled_fallback(self):
-        """Line 32: METRICS_ENABLED=False fallback functions are callable."""
-        # The import fallback functions should be no-ops
+    def test_metrics_functions_are_explicit_noops(self):
+        """B042: the 5 metric hooks are honest module-level no-ops.
+
+        They MUST stay as module attributes (~30 patch() across the auth
+        tests resolve them by name), but the phantom `plugins.observability.
+        prometheus_metrics` import + the dead `METRICS_ENABLED` flag must be
+        gone — that scaffolding pretended metrics could be enabled while the
+        target module never existed (permanent no-op masquerading as toggle).
+        """
         from plugins.security.core import auth_dependencies
-        # These should be callable without error even if metrics not available
+
+        # The hooks must exist as module attributes and be callable no-ops.
+        for name in (
+            "record_auth_attempt",
+            "record_auth_failure",
+            "update_key_expiry_days",
+            "update_key_status",
+            "set_grace_period_active",
+        ):
+            assert hasattr(auth_dependencies, name), f"missing hook: {name}"
         auth_dependencies.record_auth_attempt('test', 'primary', '/test')
         auth_dependencies.record_auth_failure('test')
         auth_dependencies.update_key_expiry_days('primary', 30)
         auth_dependencies.update_key_status('primary', 'active')
         auth_dependencies.set_grace_period_active(True)
+
+        # The phantom import + its lying toggle must NOT exist anymore.
+        assert not hasattr(auth_dependencies, "METRICS_ENABLED"), (
+            "METRICS_ENABLED is a phantom toggle: the import it gated "
+            "(plugins.observability.prometheus_metrics) never existed, so it "
+            "was permanently False. Remove it instead of faking a switch."
+        )
 
     @pytest.mark.asyncio
     async def test_require_api_key_dev_mode_bypass_logs(self, monkeypatch):
@@ -425,16 +447,10 @@ class TestSecurityLoggerGaps:
 
 class TestAuthModelsGaps:
 
-    def test_has_any_valid_key_legacy_only(self):
-        """Line 94: legacy key makes has_any_valid_key True."""
-        from plugins.security.core.auth_models import ApiKeyConfig
-        config = ApiKeyConfig(primary=None, secondary=None, legacy="legacy-key")
-        assert config.has_any_valid_key is True
-
     def test_has_any_valid_key_no_keys(self):
-        """Line 95: no keys returns False."""
+        """No keys configured → has_any_valid_key is False."""
         from plugins.security.core.auth_models import ApiKeyConfig
-        config = ApiKeyConfig(primary=None, secondary=None, legacy=None)
+        config = ApiKeyConfig(primary=None, secondary=None)
         assert config.has_any_valid_key is False
 
 

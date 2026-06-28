@@ -228,6 +228,46 @@ class TestChat:
                     pass
 
     @pytest.mark.asyncio
+    async def test_chat_retry_failure_records_breaker(self):
+        """B119: a think:true request gets a 400, the no-think retry then fails
+        with an infra error → the circuit breaker MUST record the failure. The
+        retry runs inside the HTTPStatusError except, whose sibling except does
+        NOT catch it. Mutation 'drop the retry guard' → record_failure 0 calls → red."""
+        import httpx
+        module = OllamaModule()
+
+        req = httpx.Request("POST", "http://x/api/chat")
+        err400 = httpx.HTTPStatusError("400", request=req, response=httpx.Response(400, request=req))
+
+        resp1 = MagicMock()
+        resp1.raise_for_status = MagicMock(side_effect=err400)
+        ctx1 = AsyncMock()
+        ctx1.__aenter__ = AsyncMock(return_value=resp1)
+        ctx1.__aexit__ = AsyncMock(return_value=None)
+
+        ctx2 = AsyncMock()  # the retry's stream blows up with an infra error
+        ctx2.__aenter__ = AsyncMock(side_effect=ConnectionError("retry boom"))
+        ctx2.__aexit__ = AsyncMock(return_value=None)
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.stream = MagicMock(side_effect=[ctx1, ctx2])
+
+        with patch("plugins.ollama_module.module.httpx.AsyncClient", return_value=mock_client), \
+             patch("plugins.ollama_module.module.ollama_breaker") as mock_breaker:
+            mock_breaker.check_circuit = AsyncMock(return_value=True)
+            mock_breaker.record_success = AsyncMock()
+            mock_breaker.record_failure = AsyncMock()
+            with pytest.raises(ConnectionError):
+                async for _ in module.chat(
+                    "qwen3:8b", [{"role": "user", "content": "hi"}],
+                    stream=True, thinking_enabled=True,
+                ):
+                    pass
+            mock_breaker.record_failure.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_chat_invalid_json_in_stream(self):
         """Lines 286-288: invalid JSON in streaming response"""
         module = OllamaModule()

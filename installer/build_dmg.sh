@@ -207,16 +207,16 @@ tar czf "$PAYLOAD_TMP/payload.tar.gz" \
     --exclude='.DS_Store' \
     --exclude='.coverage' \
     --exclude='.build' \
-    core/ plugins/ memory/ personality/ installer/ tests/ knowledge/ \
+    core/ plugins/ memory/ personality/ installer/ knowledge/ \
     setup.sh requirements.txt requirements-macos.txt pyproject.toml .env.example \
     install_nexe.py LICENSE COMMANDS.md 2>/dev/null || warn "Some files excluded from payload"
 
 mv "$PAYLOAD_TMP/payload.tar.gz" "$RESOURCES/payload.tar.gz"
 rm -rf "$PAYLOAD_TMP"
 
-# ── Step 4a-bis: Sync .plist versions des de pyproject.toml ─────
-# Garanteix que Nexe.app i NexeTray.app porten la versió del projecte
-# abans de bundlejar-les. Font única: pyproject.toml ([project].version).
+# ── Step 4a-bis: Sync .plist versions from pyproject.toml ─────
+# Ensures Nexe.app and NexeTray.app carry the project version
+# before bundling them. Single source: pyproject.toml ([project].version).
 info "Syncing Info.plist versions from pyproject.toml..."
 if python3 -m installer.sync_plist_versions; then
     info "  Plist versions synced OK"
@@ -224,17 +224,17 @@ else
     warn "  Plist sync failed — continuing with possibly stale versions"
 fi
 
-# ── Step 4a-ter: Compilar launcher Swift natiu per Nexe.app ─────
-# El launcher natiu (vs bash script) gestiona applicationShouldHandleReopen,
-# apareix a Força la Sortida, i estabilitza el triangle "app activa" al Dock.
-# Reemplaca Nexe.app/Contents/MacOS/NexeTray amb el binari compilat.
+# ── Step 4a-ter: Compile native Swift launcher for Nexe.app ─────
+# The native launcher (vs bash script) handles applicationShouldHandleReopen,
+# appears in Force Quit, and stabilizes the "app active" triangle in the Dock.
+# Replaces Nexe.app/Contents/MacOS/NexeTray with the compiled binary.
 LAUNCHER_SRC="$SCRIPT_DIR/nexe_launcher.swift"
 LAUNCHER_DEST="$PROJECT_ROOT/Nexe.app/Contents/MacOS/NexeTray"
 if [ -f "$LAUNCHER_SRC" ] && [ -d "$PROJECT_ROOT/Nexe.app/Contents/MacOS" ]; then
     info "Compiling native Nexe launcher (Swift)..."
     if swiftc -O -o "$LAUNCHER_DEST" "$LAUNCHER_SRC" 2>&1; then
         chmod +x "$LAUNCHER_DEST"
-        # Esborrar bash obsolet `nexe-tray` (sense capital) si hi era
+        # Remove the obsolete bash `nexe-tray` (lowercase) if present
         rm -f "$PROJECT_ROOT/Nexe.app/Contents/MacOS/nexe-tray"
         info "  Launcher compilat OK ($(du -h "$LAUNCHER_DEST" | cut -f1))"
     else
@@ -243,9 +243,9 @@ if [ -f "$LAUNCHER_SRC" ] && [ -d "$PROJECT_ROOT/Nexe.app/Contents/MacOS" ]; the
 fi
 
 # ── Step 4b: Bundle Nexe.app i NexeTray.app inside installer resources ─
-# Ambdues són excluded del payload.tar.gz (són .app bundles, no codi font).
-# Han de viatjar dins InstallNexe.app/Contents/Resources/ perquè el Swift
-# wizard les desplegui a installPath just abans d'executar install_headless.
+# Both are excluded from payload.tar.gz (they are .app bundles, not source code).
+# They must travel inside InstallNexe.app/Contents/Resources/ so the Swift
+# wizard deploys them to installPath just before running install_headless.
 if [ -d "$PROJECT_ROOT/Nexe.app" ]; then
     info "Bundling Nexe.app into installer resources..."
     rm -rf "$RESOURCES/Nexe.app"
@@ -338,12 +338,12 @@ IDENTITY="${NEXE_SIGNING_IDENTITY:-UNSET_SIGNING_IDENTITY}"
 ENTITLEMENTS="$SWIFT_WIZARD_DIR/InstallNexe.entitlements"
 
 if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
-    # Step 6a: signar els binaris natius dins els wheels del bundle.
-    # Wheels de PyPI porten .so/.dylib signats ad-hoc (o pel seu autor)
-    # sense timestamp segur; Apple Notarization rebutja qualsevol Mach-O
-    # nested sense Developer ID. Aquest script itera cada wheel, signa
-    # els .so/.dylib amb la nostra identitat + timestamp + hardened
-    # runtime, regenera el RECORD i re-empaqueta el wheel.
+    # Step 6a: sign the native binaries inside the bundle wheels.
+    # PyPI wheels carry .so/.dylib signed ad-hoc (or by their author)
+    # without a secure timestamp; Apple Notarization rejects any nested
+    # Mach-O without a Developer ID. This script iterates each wheel, signs
+    # the .so/.dylib with our identity + timestamp + hardened
+    # runtime, regenerates the RECORD and re-packages the wheel.
     if [ -d "$WHEELS_DIR" ] && ls "$WHEELS_DIR"/*.whl >/dev/null 2>&1; then
         info "Signing native binaries inside wheel bundle..."
         if ! bash "$SCRIPT_DIR/sign-wheels-bundle.sh"; then
@@ -353,8 +353,8 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
         info "  Wheels bundle signed"
     fi
 
-    # Signar tots els binaris Mach-O del Python bundled individualment
-    # (--deep no recorre Resources/python/ correctament i deixen signatura adhoc)
+    # Sign every Mach-O binary of the bundled Python individually
+    # (--deep does not traverse Resources/python/ correctly and they keep an ad-hoc signature)
     if [ -d "$RESOURCES/python" ]; then
         info "Signing embedded Python binaries..."
         find "$RESOURCES/python" \( -name '*.dylib' -o -name '*.so' -o -perm +111 \) -type f | while read -r f; do
@@ -365,31 +365,31 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
         done
     fi
 
-    # Signar launcher natiu de Nexe.app (Swift binary). `--deep` NO el cobreix
-    # dins Resources/ — cal explícit amb hardened runtime + timestamp perquè
-    # Apple accepti notarització.
+    # Sign the native Nexe.app launcher (Swift binary). `--deep` does NOT cover it
+    # inside Resources/ — it must be explicit with hardened runtime + timestamp so
+    # Apple accepts notarization.
     NEXE_LAUNCHER="$RESOURCES/Nexe.app/Contents/MacOS/NexeTray"
     if [ -f "$NEXE_LAUNCHER" ] && file "$NEXE_LAUNCHER" | grep -q "Mach-O"; then
         info "Signing Nexe.app native launcher..."
         codesign --force --sign "$IDENTITY" --options runtime --timestamp "$NEXE_LAUNCHER"
         info "  Signed: Nexe.app/Contents/MacOS/NexeTray"
     fi
-    # Signar el bundle Nexe.app complet (seal de Info.plist, Resources, etc.)
-    # NO usem --deep aquí: el launcher intern (NexeTray) ja ha estat signat
-    # explícitament a dalt. --deep re-signaria i podria heretar entitlements
-    # del wrapper extern, cosa que NO volem (el launcher no els necessita).
+    # Sign the full Nexe.app bundle (seal of Info.plist, Resources, etc.)
+    # We do NOT use --deep here: the internal launcher (NexeTray) has already been
+    # signed explicitly above. --deep would re-sign and could inherit entitlements
+    # from the external wrapper, which we do NOT want (the launcher doesn't need them).
     if [ -d "$RESOURCES/Nexe.app" ]; then
         codesign --force --sign "$IDENTITY" --options runtime --timestamp "$RESOURCES/Nexe.app"
         info "  Signed: Nexe.app bundle (bottom-up, sense --deep)"
     fi
-    # NexeTray.app (bash wrapper del tray — Step 4b)
+    # NexeTray.app (bash wrapper of the tray — Step 4b)
     if [ -d "$RESOURCES/NexeTray.app" ]; then
         codesign --force --sign "$IDENTITY" --options runtime --timestamp "$RESOURCES/NexeTray.app"
         info "  Signed: NexeTray.app bundle"
     fi
 
-    # Frameworks del bundle extern (InstallNexe.app): signar explícitament
-    # abans del bundle pare perquè el seal final ja trobi les firmes correctes.
+    # Frameworks of the external bundle (InstallNexe.app): sign explicitly
+    # before the parent bundle so the final seal finds the correct signatures.
     if [ -d "$APP_BUNDLE/Contents/Frameworks" ]; then
         info "Signing InstallNexe.app Frameworks..."
         find "$APP_BUNDLE/Contents/Frameworks" -type f \( -name '*.dylib' -o -perm +111 \) | while read -r f; do
@@ -400,8 +400,8 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
     fi
 
     info "Signing app bundle (wrapper, sense --deep)..."
-    # NO --deep: evita re-signar recursivament el bundle intern Nexe.app i
-    # que el seu launcher hereti els entitlements d'InstallNexe.
+    # NO --deep: avoids recursively re-signing the internal Nexe.app bundle and
+    # its launcher inheriting the InstallNexe entitlements.
     codesign --force --verify --verbose \
         --sign "$IDENTITY" \
         --options runtime \
@@ -412,10 +412,10 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
     info "Verifying app signature..."
     codesign -dv "$APP_BUNDLE" 2>&1 || true
 
-    # ── Verificació: launcher intern NO ha d'heretar entitlements del wrapper ──
-    # Nota: sintaxi `--entitlements -` (sense `:`) és la recomanada per Apple a macOS 26+.
-    # La vella `:-` emet un warning deprecation que es colava al check i generava
-    # fals positius. Filtrem també warning:/Error: per robustesa a futurs avisos.
+    # ── Verification: the internal launcher must NOT inherit the wrapper's entitlements ──
+    # Note: the `--entitlements -` syntax (without `:`) is the one Apple recommends on macOS 26+.
+    # The old `:-` emits a deprecation warning that leaked into the check and produced
+    # false positives. We also filter warning:/Error: for robustness against future notices.
     NEXE_LAUNCHER_ENT="$(codesign -d --entitlements - "$RESOURCES/Nexe.app/Contents/MacOS/NexeTray" 2>&1 \
         | { grep -vE '^(Executable=|warning:|Error:)' || true; } \
         | tr -d '[:space:]')"
@@ -426,7 +426,7 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
         info "  OK: NexeTray no hereta entitlements del wrapper"
     fi
 
-    # Verificació final (strict, --deep aquí només inspecciona — NO re-signa)
+    # Final verification (strict, --deep here only inspects — does NOT re-sign)
     info "Verifying final bundle (strict + deep inspect)..."
     codesign --verify --strict --deep --verbose=2 "$APP_BUNDLE" 2>&1 || warn "codesign --verify ha reportat problemes"
 else
@@ -442,14 +442,14 @@ info "Building DMG..."
 # Detach any previous volume with same name
 hdiutil detach "/Volumes/$DMG_VOLUME_NAME" -force 2>/dev/null || true
 
-# Crear staging dir amb l'app bundle
+# Create staging dir with the app bundle
 DMG_STAGING="$(mktemp -d)/dmg_staging"
 mkdir -p "$DMG_STAGING"
 cp -R "$APP_BUNDLE" "$DMG_STAGING/"
 
 info "Building DMG..."
-# create-dmg gestiona background, icones i DS_Store correctament a Sequoia
-# ⚠️ POSICIÓ VALIDADA — NO CANVIAR {260, 145} sense revisar el background (520x400)
+# create-dmg handles background, icons and DS_Store correctly on Sequoia
+# ⚠️ VALIDATED POSITION — DO NOT CHANGE {260, 145} without reviewing the background (520x400)
 CREATE_DMG="$(which create-dmg 2>/dev/null || echo /opt/homebrew/bin/create-dmg)"
 if [ ! -x "$CREATE_DMG" ]; then
     error "create-dmg no trobat. Instal·la: brew install create-dmg"
@@ -483,7 +483,7 @@ fi
 rm -rf "$DMG_STAGING"
 
 # ── Step 9: Sign DMG + Notarize ──────────────────────────────────
-if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
+if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
     info "Signing DMG..."
     codesign --force --verify --verbose \
         --sign "$IDENTITY" \
@@ -501,9 +501,19 @@ if security find-identity -v -p codesigning | grep -q "Developer ID Application"
             xcrun stapler staple "$DMG_PATH"
 
             info "Verifying notarization..."
-            spctl -a -t open --context context:primary-signature "$DMG_PATH" 2>&1 || warn "spctl check failed (may need retry)"
+            if ! spctl -a -t open --context context:primary-signature "$DMG_PATH" 2>&1; then
+                if [ "${NEXE_RELEASE:-0}" = "1" ]; then
+                    error "spctl post-staple verification failed — aborting release build (B193)"
+                else
+                    warn "spctl check failed (may need retry)"
+                fi
+            fi
         else
-            warn "Notarization credentials not found — skipping"
+            if [ "${NEXE_RELEASE:-0}" = "1" ]; then
+                error "Notarization keychain-profile 'nexe' not found — aborting release build (B193)"
+            else
+                warn "Notarization credentials not found — skipping"
+            fi
         fi
     else
         info "Notarization skipped (--no-notarize). Run without flag for final release."

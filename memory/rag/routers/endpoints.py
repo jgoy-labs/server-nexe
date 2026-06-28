@@ -40,12 +40,16 @@ def _get_metrics():
   return _RAG_SEARCHES, _RAG_SEARCH_DURATION
 
 def _get_file_rag():
-  """Get singleton FileRAGSource. Returns None if not available."""
+  """Get singleton FileRAGSource. Returns None only if the module is absent (ImportError).
+  Any other exception is logged and re-raised so callers see real errors (B186)."""
   try:
     from ..module import get_file_rag
     return get_file_rag()
-  except (ImportError, Exception):
+  except ImportError:
     return None
+  except Exception:
+    logger.error("_get_file_rag: unexpected error initialising FileRAGSource", exc_info=True)
+    raise
 
 async def add_document_endpoint(request: Dict[str, Any]):
   """Add document to the RAG."""

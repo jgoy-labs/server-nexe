@@ -42,10 +42,16 @@ echo "$MSG_COPYING"
 
 if [ -d "$INSTALL_DIR" ]; then
     # Already exists — update files but keep storage/, .env, venv/
-    rsync -a --exclude='storage/' --exclude='.env' --exclude='venv/' --exclude='.venv/' "$SOURCE_DIR/" "$INSTALL_DIR/"
+    rsync -a --exclude='storage/' --exclude='.env' --exclude='venv/' --exclude='.venv/' "$SOURCE_DIR/" "$INSTALL_DIR/" || {
+        osascript -e "display dialog \"$MSG_ERROR\" buttons {\"OK\"} with title \"Install Nexe\" with icon stop" 2>/dev/null
+        exit 1
+    }
 else
     mkdir -p "$INSTALL_DIR"
-    rsync -a "$SOURCE_DIR/" "$INSTALL_DIR/"
+    rsync -a "$SOURCE_DIR/" "$INSTALL_DIR/" || {
+        osascript -e "display dialog \"$MSG_ERROR\" buttons {\"OK\"} with title \"Install Nexe\" with icon stop" 2>/dev/null
+        exit 1
+    }
 fi
 
 # Clear quarantine on the copied files
@@ -73,7 +79,10 @@ if [ -z "$PYTHON_BIN" ]; then
 fi
 
 # ── Launch GUI installer from the clean location ─────────────────────────
-cd "$INSTALL_DIR"
+cd "$INSTALL_DIR" || {
+    osascript -e "display dialog \"$MSG_ERROR\" buttons {\"OK\"} with title \"Install Nexe\" with icon stop" 2>/dev/null
+    exit 1
+}
 "$PYTHON_BIN" -m installer.gui &
 
 # Close this Terminal window

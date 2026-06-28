@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import copy
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -176,13 +177,23 @@ PROFILES = {
 
 
 def get_config(profile_name: str = "m1_8gb") -> MemoryConfig:
-    """Get a memory configuration by profile name."""
+    """Get a memory configuration by profile name.
+
+    MEM-009: returns an INDEPENDENT copy of the profile. The entries in
+    ``PROFILES`` are module-level ``MemoryConfig`` instances and the dataclass
+    is mutable (not frozen), so handing out the shared reference let any caller
+    that mutated an attribute silently corrupt the singleton for every other
+    consumer. ``get_config`` is only called at service init (MemoryService,
+    DreamingCycle, core bootstrap), so the deepcopy cost is negligible.
+    Frozen dataclasses are not an option here because ``IngestConfig`` is
+    mutated in place elsewhere (e.g. ``lifespan`` sets ``pre_warm``).
+    """
     if profile_name not in PROFILES:
         raise ValueError(
             f"Unknown profile '{profile_name}'. "
             f"Available: {list(PROFILES.keys())}"
         )
-    return PROFILES[profile_name]
+    return copy.deepcopy(PROFILES[profile_name])
 
 
 def resolve_ingest_config(memory_api) -> IngestConfig:

@@ -7,9 +7,9 @@ All options can be configured via environment variables:
 - NEXE_LLAMA_CPP_N_CTX: Context window (default: 8192)
 - NEXE_LLAMA_CPP_N_BATCH: Batch size for generation (default: 512) - HIGHER = FASTER
 - NEXE_LLAMA_CPP_GPU_LAYERS: Layers on GPU, -1=all (default: -1)
-- NEXE_LLAMA_CPP_THREADS: CPU threads (default: 8)
+- NEXE_LLAMA_CPP_THREADS: CPU threads (default: auto = os.cpu_count(), fallback 8)
 - NEXE_LLAMA_CPP_MAX_SESSIONS: Maximum active sessions (default: 1)
-- NEXE_LLAMA_CPP_CHAT_FORMAT: Chat format (default: gemma)
+- NEXE_LLAMA_CPP_CHAT_FORMAT: Chat format (default: chatml)
 - NEXE_LLAMA_CPP_USE_MLOCK: Keep model in RAM (default: true)
 - NEXE_LLAMA_CPP_USE_MMAP: Memory-map the model (default: true)
 - NEXE_LLAMA_CPP_FLASH_ATTN: Flash attention (default: true)
@@ -91,22 +91,11 @@ class LlamaCppConfig:
         from core.runtime_state import get_with_env_fallback
         model_path = get_with_env_fallback("NEXE_LLAMA_CPP_MODEL", "")
         if not model_path:
-            try:
-                from core.paths.helpers import get_models_dir
-                models_dir = get_models_dir()
-                if models_dir.exists():
-                    candidates = sorted(
-                        p for p in models_dir.iterdir()
-                        if p.is_file() and p.suffix.lower() == ".gguf"
-                    )
-                    if candidates:
-                        # Use absolute path so __post_init__ doesn't re-resolve
-                        # relative to a different project root than the one we
-                        # scanned.
-                        model_path = str(candidates[0].resolve())
-                        logger.info(f"LlamaCppConfig: auto-discovered GGUF model at {model_path}")
-            except Exception as e:
-                logger.debug(f"LlamaCppConfig: auto-discover scan failed: {e}")
+            from core.paths.helpers import discover_first_model
+            model_path = discover_first_model(
+                lambda p: p.is_file() and p.suffix.lower() == ".gguf",
+                "GGUF model (llama.cpp)",
+            )
 
         config = cls(
             model_path=model_path,

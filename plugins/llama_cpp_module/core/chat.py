@@ -7,9 +7,12 @@ llama.cpp has automatic prefix caching when the prefix is identical.
 
 """
 import asyncio
+import atexit
 import base64
+import functools
 import time
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 from .config import LlamaCppConfig
@@ -17,6 +20,19 @@ from .model_pool import ModelPool
 from core.utils import compute_system_hash
 
 logger = logging.getLogger(__name__)
+
+# B190/MC-011: llama-cpp-python is NOT thread-safe — concurrent
+# create_chat_completion() on the same Llama instance corrupts the native KV
+# cache. asyncio.to_thread() dispatches to the default multi-worker pool, so two
+# concurrent /chat requests on the shared "default" session generated on the
+# same context at once. Pin all generation to a single dedicated worker thread
+# (the same fix MLX uses via _MLX_EXECUTOR): with max_workers=1 generations
+# serialise on one thread instead of racing.
+_LLAMA_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="llama-worker")
+
+# Tear the worker down even if a generation is mid-flight (Stop button race,
+# sidecar SIGTERM) so the interpreter doesn't hang at exit draining it.
+atexit.register(_LLAMA_EXECUTOR.shutdown, wait=False, cancel_futures=True)
 
 
 class LlamaCppChatNode:
@@ -45,6 +61,20 @@ class LlamaCppChatNode:
                 self.config.max_sessions
             )
 
+    def apply_config(self, new_config: "LlamaCppConfig") -> None:
+        """Hot-swap the active model config and rebuild the shared ModelPool.
+
+        Mirrors __init__'s pool setup: tears down the old pool's sessions,
+        swaps _config and replaces _pool with one bound to the new config.
+        Public entry point so web_ui calls LlamaCppModule.switch_model()
+        instead of poking these class-level privates directly (B073).
+        """
+        if LlamaCppChatNode._pool is not None:
+            LlamaCppChatNode._pool.destroy_all()
+        self.config = new_config
+        LlamaCppChatNode._config = new_config
+        LlamaCppChatNode._pool = ModelPool(new_config)
+
     def _get_model(self, session_id: str, system_hash: str) -> tuple[Any, bool]:
         """
         Get model from the pool for this session.
@@ -72,7 +102,13 @@ class LlamaCppChatNode:
         stream_callback = inputs.get("stream_callback")
         max_tokens_override = inputs.get("max_tokens")
         temperature_override = inputs.get("temperature")
+        top_p_override = inputs.get("top_p")  # opt-in nucleus sampling; None → 0.9 default
         images = inputs.get("images")  # Optional[List[bytes]] — VLM support
+        # cancel_event: threading.Event-like; the route handler sets it when the
+        # HTTP client disconnects so the streaming loop can break early instead
+        # of running to max_tokens (orphan worker blocking the instance). None
+        # disables cancellation (back-compat).
+        cancel_event = inputs.get("cancel_event")
 
         # Graceful fallback: if there is an image but no mmproj, warn and ignore the image
         if images and not self.config.mmproj_path:
@@ -104,32 +140,51 @@ class LlamaCppChatNode:
             # Get model from pool (handles cache/reset automatically)
             model, cache_hit = self._get_model(session_id, system_hash)
 
-            # Execute with create_chat_completion — VLM/text branch
+            # Execute with create_chat_completion — VLM/text branch.
+            # Pin to the dedicated single-worker executor so generations on the
+            # shared instance serialise (B190) instead of racing on the default
+            # multi-worker pool.
             if images and self.config.mmproj_path:
                 # VLM path: images + clip model configured
                 if stream_callback:
-                    result = await asyncio.to_thread(
-                        self._generate_vlm_streaming,
-                        model, system, messages, images, threadsafe_callback,
-                        max_tokens_override, temperature_override,
+                    result = await loop.run_in_executor(
+                        _LLAMA_EXECUTOR,
+                        functools.partial(
+                            self._generate_vlm_streaming,
+                            model, system, messages, images, threadsafe_callback,
+                            max_tokens_override, temperature_override, cancel_event,
+                            top_p=top_p_override,
+                        ),
                     )
                 else:
-                    result = await asyncio.to_thread(
-                        self._generate_vlm,
-                        model, system, messages, images,
-                        max_tokens_override, temperature_override,
+                    result = await loop.run_in_executor(
+                        _LLAMA_EXECUTOR,
+                        functools.partial(
+                            self._generate_vlm,
+                            model, system, messages, images,
+                            max_tokens_override, temperature_override,
+                            top_p=top_p_override,
+                        ),
                     )
             elif stream_callback:
-                result = await asyncio.to_thread(
-                    self._generate_streaming,
-                    model, system, messages, threadsafe_callback,
-                    max_tokens_override, temperature_override,
+                result = await loop.run_in_executor(
+                    _LLAMA_EXECUTOR,
+                    functools.partial(
+                        self._generate_streaming,
+                        model, system, messages, threadsafe_callback,
+                        max_tokens_override, temperature_override, cancel_event,
+                        top_p=top_p_override,
+                    ),
                 )
             else:
-                result = await asyncio.to_thread(
-                    self._generate,
-                    model, system, messages,
-                    max_tokens_override, temperature_override,
+                result = await loop.run_in_executor(
+                    _LLAMA_EXECUTOR,
+                    functools.partial(
+                        self._generate,
+                        model, system, messages,
+                        max_tokens_override, temperature_override,
+                        top_p=top_p_override,
+                    ),
                 )
 
             elapsed_ms = int((time.time() - start_time) * 1000)
@@ -182,6 +237,7 @@ class LlamaCppChatNode:
         messages: List[Dict],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Generate a response without streaming."""
         all_messages = [{"role": "system", "content": system}] + messages
@@ -191,7 +247,7 @@ class LlamaCppChatNode:
             messages=all_messages,
             max_tokens=max_tokens if max_tokens is not None else 2048,
             temperature=temperature if temperature is not None else 0.7,
-            top_p=0.9,
+            top_p=top_p if top_p is not None else 0.9,
             stop=self._STOP_SEQUENCES,
         )
         end_time = time.time()
@@ -219,6 +275,8 @@ class LlamaCppChatNode:
         stream_callback: Any,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        cancel_event: Any = None,
+        top_p: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Generate a response with streaming."""
         all_messages = [{"role": "system", "content": system}] + messages
@@ -235,10 +293,16 @@ class LlamaCppChatNode:
             messages=all_messages,
             max_tokens=max_tokens if max_tokens is not None else 2048,
             temperature=temperature if temperature is not None else 0.7,
-            top_p=0.9,
+            top_p=top_p if top_p is not None else 0.9,
             stream=True,
             stop=self._STOP_SEQUENCES,
         ):
+            # MC-011: the route handler sets cancel_event when the HTTP client
+            # disconnects; exit early instead of generating to max_tokens.
+            if cancel_event is not None and cancel_event.is_set():
+                logger.info("LlamaCppChatNode: cancel_event set — breaking stream loop")
+                break
+
             delta = chunk.get("choices", [{}])[0].get("delta", {})
             content = delta.get("content", "")
 
@@ -335,6 +399,7 @@ class LlamaCppChatNode:
         images: List[bytes],
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Generate a VLM response without streaming (images + clip model)."""
         all_messages = self._build_vlm_messages(system, messages, images)
@@ -344,7 +409,7 @@ class LlamaCppChatNode:
             messages=all_messages,
             max_tokens=max_tokens if max_tokens is not None else 2048,
             temperature=temperature if temperature is not None else 0.7,
-            top_p=0.9,
+            top_p=top_p if top_p is not None else 0.9,
             stop=self._STOP_SEQUENCES,
         )
         end_time = time.time()
@@ -371,6 +436,8 @@ class LlamaCppChatNode:
         stream_callback: Any,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        cancel_event: Any = None,
+        top_p: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Generate a VLM response with streaming (images + clip model)."""
         all_messages = self._build_vlm_messages(system, messages, images)
@@ -386,10 +453,15 @@ class LlamaCppChatNode:
             messages=all_messages,
             max_tokens=max_tokens if max_tokens is not None else 2048,
             temperature=temperature if temperature is not None else 0.7,
-            top_p=0.9,
+            top_p=top_p if top_p is not None else 0.9,
             stream=True,
             stop=self._STOP_SEQUENCES,
         ):
+            # MC-011: break early when the route handler cancels (HTTP disconnect).
+            if cancel_event is not None and cancel_event.is_set():
+                logger.info("LlamaCppChatNode: cancel_event set — breaking VLM stream loop")
+                break
+
             delta = chunk.get("choices", [{}])[0].get("delta", {})
             content = delta.get("content", "")
 

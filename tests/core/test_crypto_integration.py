@@ -68,5 +68,12 @@ class TestDefaultConfigSecurity:
         from core.config import DEFAULT_CONFIG
         assert 'security' in DEFAULT_CONFIG
         assert 'encryption' in DEFAULT_CONFIG['security']
-        assert DEFAULT_CONFIG['security']['encryption']['enabled'] is False
+        # warn_unencrypted IS read (lifespan_crypto) — must stay.
         assert DEFAULT_CONFIG['security']['encryption']['warn_unencrypted'] is True
+
+    def test_encryption_enabled_is_not_dead_config(self):
+        # MC-092: `security.encryption.enabled` was config that nothing read —
+        # the encryption decision is driven solely by NEXE_ENCRYPTION_ENABLED.
+        # Keeping it would mislead users into thinking the TOML toggles crypto.
+        from core.config import DEFAULT_CONFIG
+        assert 'enabled' not in DEFAULT_CONFIG['security']['encryption']

@@ -16,6 +16,8 @@ import secrets
 from datetime import datetime, timezone
 from typing import Optional
 
+from core.env_utils import parse_truthy
+
 logger = logging.getLogger(__name__)
 
 # Bug 11: handle for the bootstrap token renewal background task.
@@ -91,7 +93,7 @@ def setup_bootstrap_tokens(server_state, _translate) -> None:
     )
   is_production = sidecar_is_production or raw_is_production
   # Bootstrap logic is only relevant in development mode
-  bootstrap_display = os.getenv('NEXE_BOOTSTRAP_DISPLAY', 'true').lower() == 'true'
+  bootstrap_display = parse_truthy(os.getenv('NEXE_BOOTSTRAP_DISPLAY', 'true'))
 
   if (not is_production) and bootstrap_display:
     title = _translate(server_state.i18n, "core.server.bootstrap_token_title",

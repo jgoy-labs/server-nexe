@@ -5,7 +5,7 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia y cobertura de pruebas de server-nexe 1.0.6. 6776 funciones de test recopiladas (6991 totales, 215 deselected), 0 fallos en la ultima ejecucion. Tests colocados junto a los modulos. Cubre estructura de tests, ejecucion, cobertura real ~85% global, correcciones de tests de auditoria IA, tests de crypto (68), tests e2e MEM_DELETE (8), resultados de los tests masivos automatizados (ejecutados por IA) y valoracion honesta de las limitaciones de las pruebas."
+abstract: "Estrategia y cobertura de pruebas de server-nexe 1.0.6. 7165 funciones de test recopiladas (7400 totales, 235 deselected), 0 fallos en la ultima ejecucion. Tests centralizados en un unico directorio tests/ en la raiz que refleja la estructura de modulos. Cubre estructura de tests, ejecucion, cobertura real ~85% global, correcciones de tests de auditoria IA, tests de crypto (72), tests e2e MEM_DELETE (8), resultados de los tests masivos automatizados (ejecutados por IA) y valoracion honesta de las limitaciones de las pruebas."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mass-tests]
 chunk_size: 800
 priority: P2
@@ -23,15 +23,15 @@ expires: null
 
 | Metrica | Valor |
 |---------|-------|
-| Total de funciones de test recopiladas | **6776** |
-| Total de funciones de test (incl. deseleccionadas) | **6991** (215 deselected por marcadores) |
-| Ultima ejecucion completa pasados | 6776 |
+| Total de funciones de test recopiladas | **7165** |
+| Total de funciones de test (incl. deseleccionadas) | **7400** (235 deselected por marcadores) |
+| Ultima ejecucion completa pasados | 7165 |
 | Fallidos | 0 |
 | Saltados | 6 |
 | XFailed | 1 |
 | **Cobertura real global** | **~85%** (baseline honesta, sin inflar) |
 
-Nota: 6776 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 6991.
+Nota: 7165 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 7400.
 
 > **Nota de honestidad sobre cobertura:** Badges historicos han reportado 97.4%, 91.1% o 93% en fases concretas de los tests masivos. Esos numeros correspondian a subconjuntos especificos (baseline de una fase, funcional contra servidor en vivo) y no al global del proyecto. La **cobertura real global del codigo**, medida con `pytest --cov` sobre todo el codebase, es **~85%**. Este es el valor que usamos como referencia.
 >
@@ -39,20 +39,20 @@ Nota: 6776 funciones recopiladas en la ejecucion estandar (sin marcadores integr
 
 ## Estructura de los tests
 
-Los tests estan colocados junto a sus modulos (no en un directorio `tests/` raiz separado):
+Todos los tests viven en un unico directorio centralizado `tests/` en la raiz que refleja la estructura de los modulos (no estan co-localizados dentro de `core/`, `plugins/`, `memory/` o `personality/`):
 
 ```
-core/endpoints/tests/       # Tests de endpoints
-core/server/tests/          # Tests de factory
-core/tests/                 # Tests de core (crypto, lifespan)
-plugins/security/tests/     # Tests del plugin de seguridad
-plugins/web_ui_module/tests/ # Tests de la Web UI
-plugins/ollama_module/tests/ # Tests de Ollama
-memory/memory/tests/        # Tests del modulo de memoria
-memory/rag/tests/           # Tests de RAG
-memory/embeddings/tests/    # Tests de embeddings
-personality/module_manager/tests/ # Tests del module manager
-tests/                      # Tests de integracion raiz
+tests/core/endpoints/       # Tests de endpoints
+tests/core/server/          # Tests de factory
+tests/core/                 # Tests de core (crypto, lifespan)
+tests/plugins/security/     # Tests del plugin de seguridad
+tests/plugins/web_ui_module/ # Tests de la Web UI
+tests/plugins/ollama_module/ # Tests de Ollama
+tests/memory/memory/        # Tests del modulo de memoria
+tests/memory/rag/           # Tests de RAG
+tests/memory/embeddings/    # Tests de embeddings
+tests/personality/module_manager/ # Tests del module manager
+tests/integration/          # Tests de integracion
 ```
 
 ## Ejecutar los tests
@@ -68,11 +68,11 @@ pytest --cov
 pytest -c pytest-full.ini
 
 # Modulo especifico
-pytest plugins/security/tests/
+pytest tests/plugins/security/
 
 # Comando equivalente a CI
-pytest core memory personality plugins \
-  -m "not integration and not e2e and not slow" \
+pytest tests \
+  -m "not integration and not e2e and not slow and not gpu and not test_live" \
   --cov=core --cov=memory --cov=personality --cov=plugins \
   --cov-report=term --cov-report=xml:coverage.xml --tb=short -q
 ```
@@ -81,19 +81,19 @@ El `conftest.py` raiz proporciona fixtures compartidas. Cada modulo puede tener 
 
 ## Tests de crypto (nuevos en v0.9.0)
 
-68 tests anadidos para el sistema de encriptacion en reposo:
+72 tests anadidos para el sistema de encriptacion en reposo:
 
 | Fichero de test | Tests | Cubre |
 |----------------|-------|-------|
-| `core/tests/test_crypto.py` | 30 | CryptoProvider AES-256-GCM, gestion de claves, HKDF |
-| `core/tests/test_crypto_cli.py` | 8 | Comandos CLI (encrypt-all, export-key, status) |
-| `memory/memory/tests/test_persistence.py` (+9) | 9 | Migracion SQLCipher, persistencia encriptada |
-| `plugins/web_ui_module/tests/test_session_manager.py` (+7) | 7 | Sesiones encriptadas (.json -> .enc) |
+| `tests/core/test_crypto.py` | 34 | CryptoProvider AES-256-GCM, gestion de claves, HKDF |
+| `tests/core/test_crypto_cli.py` | 8 | Comandos CLI (encrypt-all, export-key, status) |
+| `tests/memory/memory/test_persistence.py` (+9) | 9 | Migracion SQLCipher, persistencia encriptada |
+| `tests/plugins/web_ui_module/test_session_manager.py` (+7) | 7 | Sesiones encriptadas (.json -> .enc) |
 | Tests de integracion lifespan | 14 | Integracion end-to-end de CryptoProvider |
 
 ## Tests e2e MEM_DELETE (v0.9.9)
 
-En v0.9.9, la correccion de MEM_DELETE (DELETE_THRESHOLD 0.70 → 0.20) vino acompanado de una bateria de **8 tests end-to-end** en `tests/integration/test_mem_delete_e2e.py`:
+En v0.9.9, la correccion de MEM_DELETE (DELETE_THRESHOLD 0.82 → 0.70 → 0.55 → 0.20, valor final 0.20) vino acompanado de una bateria de **8 tests end-to-end** en `tests/integration/test_mem_delete_e2e.py`:
 
 - Qdrant embedded real (no mockeado)
 - fastembed ONNX real (no mockeado)
@@ -140,7 +140,7 @@ Durante la division del monolito (chat.py, routes.py, tray.py, lifespan.py), las
 
 ### Filosofia de testing
 
-- Tests dentro de los modulos (colocados, no centralizados)
+- Tests centralizados en un directorio `tests/` en la raiz que refleja la estructura de modulos (no co-localizados)
 - Mocks para servicios externos (Ollama) y servicios embebidos (Qdrant embebido)
 - Codigo real para logica interna
 - Preparado para CI: todos los tests se ejecutan en GitHub Actions
@@ -149,7 +149,7 @@ Durante la division del monolito (chat.py, routes.py, tray.py, lifespan.py), las
 ## CI/CD
 
 Workflow de GitHub Actions (`.github/workflows/ci.yml`):
-- Python 3.12
+- Python 3.11
 - Instalar dependencias (solo requirements.txt, sin las especificas de macOS)
 - Ejecutar suite completa de tests
 - Generacion de badge de cobertura
@@ -161,6 +161,6 @@ El CI en Linux funciona porque `rumps` (tray de macOS) esta en `requirements-mac
 - **Probado por el desarrollador + sesiones autonomas de auditoria IA.** Ningun usuario externo aun. Sin auditoria de seguridad externa.
 - **Un solo usuario real** — server-nexe solo ha sido usado por el desarrollador hasta ahora. No hay feedback de usuarios externos ni pruebas en entornos de produccion multi-usuario.
 - **Las auditorias IA son exhaustivas pero no completas** — encuentran muchos problemas pero sin duda se escapan otros. La **cobertura real global es ~85%** (no 97%/91%/93% como aparece en badges antiguos: esos numeros correspondian a subconjuntos de fase).
-- **Los tests de encriptacion son nuevos** — 68 tests para el sistema de crypto, pero el sistema aun no ha pasado por uso real en produccion.
+- **Los tests de encriptacion son nuevos** — 72 tests para el sistema de crypto, pero el sistema aun no ha pasado por uso real en produccion.
 - **Los tests de integracion requieren servicios locales** — Ollama debe estar ejecutandose (Qdrant es embebido, no requiere proceso separado). Se prueban en desarrollo pero no en CI.
 - **Tests generados por IA 🎭 — leed la cobertura con esta advertencia.** Los tests tambien estan escritos por IA bajo direccion humana (multi-model). Se han hecho auditorias de muestra pero **no podemos garantizar al 100% que no haya "test theatre"** (tests que pasan sin probar nada significativo — comprobaciones triviales, mocks que siempre devuelven el valor esperado, aserciones tautologicas). Un 85% de cobertura con potencial test theatre vale menos que un 70% con tests robustos. Revisiones futuras (humanas o IA independiente) pueden identificarlos y reescribirlos. Mientras tanto: tratad los tests como **senal util pero no prueba definitiva** — un bug en produccion puede manifestarse aunque los tests pasen.

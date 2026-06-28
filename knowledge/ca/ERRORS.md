@@ -56,7 +56,7 @@ expires: null
 |-------|-------|----------|
 | 401 Missing X-API-Key | Falta capcalera d'autenticacio | Afegeix `-H "X-API-Key: YOUR_KEY"` a la peticio |
 | 429 Rate Limited | Massa peticions | Espera i reintenta. Comprova els limits de rate al `.env` |
-| 408 Timeout | Inferencia del model massa lenta | Augmenta el timeout de NEXE_DEFAULT_MAX_TOKENS. Models grans necessiten 600s. |
+| 500 Timeout | Inferencia del model massa lenta (timeout de stream d'Ollama, per defecte 300s; httpx.ReadTimeout no es captura i surt com a 500) | Augmenta `NEXE_OLLAMA_STREAM_TIMEOUT` (en segons). Els models grans poden necessitar 600s o mes. |
 | Missatge d'error buit | httpx.ReadTimeout te str() buit | Corregit amb repr(e). Comprova els logs del servidor. |
 
 ## Errors de model

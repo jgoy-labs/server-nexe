@@ -5,6 +5,10 @@ Author: Jordi Goy
 Location: personality/module_manager/system_lifecycle.py
 Description: Nexe system lifecycle manager. Controls start_system (discovery +
 
+SCAFFOLDING for the plugin-isolation runtime (ADR-001): zero production callers
+today is EXPECTED (wired up when the isolation runtime lands). Do not flag as
+dead code — see docs/NEXE_ARCHITECTURAL_DECISIONS.md.
+
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """

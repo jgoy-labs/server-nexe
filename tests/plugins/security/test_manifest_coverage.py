@@ -198,7 +198,9 @@ class TestSecurityReportError:
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "success"
-        assert "report" in data
+        # B075-C4: capabilities, not a fake "report".
+        assert "report" not in data
+        assert "capabilities" in data
 
 
 class TestServeSecurityUI:
@@ -394,4 +396,4 @@ class TestReportExceptionPath:
         r = client.get("/security/report", headers={"X-API-Key": "test-rpt-err-key"})
         assert r.status_code == 200
         data = r.json()
-        assert data["report"]["checks_available"] == ["auth_check", "web_security_check", "rate_limit_check"]
+        assert data["capabilities"]["checks_available"] == ["auth_check", "web_security_check", "rate_limit_check"]

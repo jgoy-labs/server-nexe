@@ -1,5 +1,5 @@
-// InstallNexeApp.swift — Punt d'entrada de l'aplicació SwiftUI
-// Wizard natiu per instal·lar server-nexe a macOS
+// InstallNexeApp.swift — SwiftUI application entry point
+// Native wizard to install server-nexe on macOS
 
 import SwiftUI
 
@@ -22,16 +22,16 @@ struct InstallNexeApp: App {
     }
 }
 
-/// Evitar que el procés quedi viu en background quan es tanca la finestra.
-/// Sense això, si l'usuari ejecta el DMG, el procés fa SIGBUS (KERN_MEMORY_ERROR)
-/// perquè el kernel no pot servir pàgines del volum desmuntat.
+/// Prevent the process from staying alive in the background when the window closes.
+/// Without this, if the user ejects the DMG, the process gets SIGBUS (KERN_MEMORY_ERROR)
+/// because the kernel cannot serve pages from the unmounted volume.
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Auto-expulsar el DMG quan el wizard es tanca
+        // Auto-eject the DMG when the wizard closes
         let bundlePath = Bundle.main.bundlePath
         if bundlePath.hasPrefix("/Volumes/") {
             let components = bundlePath.split(separator: "/")
@@ -46,7 +46,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// NSViewRepresentable que intercepta el botó vermell de la finestra
+/// NSViewRepresentable that intercepts the window's red close button
 struct WindowCloseInterceptor: NSViewRepresentable {
     let engine: InstallerEngine
 
@@ -74,10 +74,10 @@ struct WindowCloseInterceptor: NSViewRepresentable {
         }
 
         func windowShouldClose(_ sender: NSWindow) -> Bool {
-            // Si ja ha acabat, tancar directament
+            // If it already finished, close directly
             if engine.installFinished { return true }
 
-            // Preguntar sempre
+            // Always ask
             let alert = NSAlert()
             alert.messageText = T.get("cancel_title", lang: engine.lang)
             alert.informativeText = T.get("cancel_message", lang: engine.lang)

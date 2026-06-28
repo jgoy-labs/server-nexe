@@ -164,30 +164,39 @@ class SmartChunker:
     paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
     chunks = []
     current_section = None
-    char_pos = 0
+    search_pos = 0
 
     for para in paragraphs:
+      # MC-045: locate each stripped paragraph in the ORIGINAL content so the
+      # char offsets are real. split('\n\n')+strip discards leading/trailing
+      # whitespace and collapses multi-newline separators, so accumulating
+      # len(para)+2 drifts; SmartChunker is position-based, so the offsets must
+      # satisfy content[char_start:char_end] == para.
+      idx = content.find(para, search_pos)
+      if idx == -1:
+        idx = search_pos
+      char_start = idx
+      char_end = idx + len(para)
+      search_pos = char_end
+
       if self._is_title(para):
         current_section = para
-        char_pos += len(para) + 2
         continue
 
       if len(para) > self.max_chunk_size:
-        sub_chunks = self._split_long_paragraph(para, char_pos, document_id, current_section)
+        sub_chunks = self._split_long_paragraph(para, char_start, document_id, current_section)
         chunks.extend(sub_chunks)
-        char_pos += len(para) + 2
       else:
         chunk = ChunkMetadata(
           chunk_id=str(uuid.uuid4()),
           document_id=document_id,
           chunk_index=len(chunks),
-          char_start=char_pos,
-          char_end=char_pos + len(para),
+          char_start=char_start,
+          char_end=char_end,
           section_title=current_section,
           chunk_type="paragraph"
         )
         chunks.append(chunk)
-        char_pos += len(para) + 2
 
     return chunks
 

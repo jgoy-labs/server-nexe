@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from ..chat_memory import _pending_save_tasks
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
-from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, fallback_to_ollama
+from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, fallback_to_ollama, resolve_loaded_model_name
 from ._streaming import TokenBridge, format_sse_chunk, format_sse_done, SSE_DONE, background_memory_save
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ async def _mlx_stream_generator(
     session_id: str = "chat_session",
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
+    top_p: Optional[float] = None,
 ):
     """SSE generator for MLX streaming.
 
@@ -53,11 +54,12 @@ async def _mlx_stream_generator(
                 stream_callback=bridge.on_token,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                top_p=top_p,
             )
             bridge.set_done(result=result)
         except Exception as e:
             bridge.set_done(error=str(e))
-            logger.error("MLX streaming error: %s", e)
+            logger.error("MLX streaming error: %s", e, exc_info=True)
 
     mlx_task = asyncio.create_task(run_mlx())
 
@@ -78,7 +80,7 @@ async def _mlx_stream_generator(
             yield SSE_DONE
             return
 
-        yield format_sse_done(model_name, "mlx")
+        yield format_sse_done(model_name, "mlx", truncated=bridge._truncated)
         yield SSE_DONE
 
         full_response_text = bridge.get_response_text()
@@ -122,7 +124,9 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
 
         system_msg, user_messages = separate_messages(messages)
         session_id = derive_session_id(req)
-        model_name = request.model or "mlx-local"
+        # B075-C3: report the model that actually ran, not the client's
+        # request.model (MLX runs the single loaded model, ignoring the param).
+        model_name = resolve_loaded_model_name(mlx_module, "mlx-local")
 
         if request.stream:
             logger.info("Forwarding to MLX module (streaming)...")
@@ -131,7 +135,7 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
                     mlx_module, user_messages, system_msg, model_name,
                     app_state=req.app.state, user_msg=last_user_msg,
                     session_id=session_id, max_tokens=request.max_tokens,
-                    temperature=request.temperature,
+                    temperature=request.temperature, top_p=request.top_p,
                 ),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
@@ -141,6 +145,7 @@ async def _forward_to_mlx(messages: List[Dict], request: ChatCompletionRequest, 
         result = await mlx_module.chat(
             messages=user_messages, system=system_msg, session_id=session_id,
             max_tokens=request.max_tokens, temperature=request.temperature,
+            top_p=request.top_p,
         )
         return build_openai_response(result, model_name, "mlx")
 

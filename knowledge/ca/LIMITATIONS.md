@@ -46,7 +46,7 @@ Els models locals son menys capacos que els models al nuvol (GPT-4, Claude, etc.
 El backend MLX suporta models de visio (imatge + text) a traves de `mlx-vlm 0.4.4`. Llista d'arquitectures detectades: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (tots), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama i mes. Des de **v0.9.8** el detector "any-of" de 3 senyals (architectures + vision_config al `config.json` + weight_map al `model.safetensors.index.json`) cobreix arquitectures noves sense keys clàssiques.
 
 Limitacions actuals:
-- **Familia Qwen3.5 (Omni VLM, talles 2B/4B/9B/27B):** Funciona via MLX i Ollama amb visio. El bundle DMG i el venv de dev inclouen `PyTorch` + `torchvision` (sprint v1.0.4-beta TODO 1.3, wheels cp312 macOS-arm64, ~92 MB net). El detector VLM detecta arquitectura `Qwen3_5ForConditionalGeneration` + `vision_config` i carrega via `mlx-vlm.load()`. Verificat empiricament 2026-05-13 amb `qwen3.5:4b` descrivint imatges correctament. **Encara no suportats al pipeline:** `Qwen3-Omni` i `Kimi-VL` (audio/video branch a `mlx-vlm` no exposat).
+- **Familia Qwen3.5 (Omni VLM, talles 2B/4B/9B/27B):** Funciona via MLX i Ollama amb visio. El bundle DMG i el venv de dev inclouen `PyTorch` + `torchvision` (wheels cp312 macOS-arm64, ~92 MB net). El detector VLM detecta arquitectura `Qwen3_5MoeForConditionalGeneration` + `vision_config` i carrega via `mlx-vlm.load()`. Verificat empiricament 2026-05-13 amb `qwen3.5:4b` descrivint imatges correctament. **Encara no suportats al pipeline:** `Qwen3-Omni` i `Kimi-VL` (audio/video branch a `mlx-vlm` no exposat).
 - **Model per defecte recomanat:** `gemma-4-e4b-4bit` (4.9 GB) o `gemma-4-31b-8bit` (20 GB). Imatge only, sense dependencies torch.
 - **Audio/veu:** No suportat. Models com Qwen3-Omni, Kimi-VL o DeepSeek-VL-V2 tenen branch d'audio a `mlx-vlm` pero el pipeline de server-nexe encara no el exposa.
 - **Video nativament:** No suportat (veure omni-models).
@@ -86,7 +86,7 @@ Parcialment compatible amb el format de l'API d'OpenAI:
 
 ## Seguretat
 
-- **Injeccio de prompt:** Els models locals poden seguir instruccions injectades. El sanitizer detecta patrons comuns (47 patrons de jailbreak, 6 detectors d'injeccio amb normalitzacio Unicode) pero no tots.
+- **Injeccio de prompt:** Els models locals poden seguir instruccions injectades. El sanitizer detecta patrons comuns (49 patrons de jailbreak, 6 detectors d'injeccio amb normalitzacio Unicode) pero no tots.
 - **Sense TLS per defecte:** HTTP a localhost. Utilitza un reverse proxy per a HTTPS.
 - **Un sol usuari:** Sense aillament multi-usuari. Una clau API = acces complet.
 - **Auditories IA, no auditories externes:** La seguretat ha estat revisada per sessions autonomes d'IA, no per empreses de seguretat externes. Aixo es exhaustiu pero no complet.
@@ -95,9 +95,9 @@ Parcialment compatible amb el format de l'API d'OpenAI:
 ## Advertencies d'encriptacio
 
 - **Default `auto`:** L'encriptacio at-rest s'activa automaticament si `sqlcipher3` es disponible (mode `auto`). Es pot forcar amb `NEXE_ENCRYPTION_ENABLED=true` o desactivar amb `false`.
-- **Funcionalitat nova:** Afegida a la v0.9.0, disponible des de 0.9.7. Testejada (68 tests, 0 errors) pero encara no provada en batalla en produccio amb usuaris reals.
+- **Funcionalitat nova:** Afegida a la v0.9.0, disponible des de 0.9.7. Testejada (72 tests, 0 errors) pero encara no provada en batalla en produccio amb usuaris reals.
 - **Gestio de claus:** La clau mestra s'emmagatzema a l'OS Keyring, variable d'entorn o fitxer. Si la clau es perd, les dades encriptades no es poden recuperar.
-- **Dependencia de SQLCipher:** Requereix el paquet `sqlcipher3`. Fa fallback a SQLite en text pla amb un avis si no esta instal·lat.
+- **Dependencia de SQLCipher:** Requereix el paquet de Python `sqlcipher3` — instal·la `sqlcipher3-binary` (wheel pre-compilat, recomanat) o `sqlcipher3` (necessita `libsqlcipher`, p. ex. via Homebrew a macOS). Fa fallback a SQLite en text pla amb un avis si no esta instal·lat.
 - **Migracio:** Migrar conjunts de dades grans (moltes memories, moltes sessions) pot trigar. Fes copia de seguretat abans de migrar.
 
 ## Mancances funcionals

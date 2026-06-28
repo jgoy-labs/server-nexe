@@ -300,6 +300,124 @@ class TestChatCompletionsEndpoint:
         data = resp.json()
         assert data["choices"][0]["message"]["content"] == "Hola des de Llama.cpp"
 
+    def test_mlx_reports_loaded_model_not_request_model(self):
+        """B075-C3: MLX must echo the model that ACTUALLY ran, never request.model."""
+        mlx_module = AsyncMock()
+        mlx_module.chat = AsyncMock(return_value={
+            "response": "Hola", "tokens": 1, "prompt_tokens": 1, "context_used": 1,
+        })
+        mlx_module._node = MagicMock()
+        mlx_module._node.config.model_path = "/Users/x/storage/models/Qwen3-32B-MLX-4bit"
+
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no")):
+            client = self._client(modules={"mlx_module": mlx_module})
+            resp = client.post("/chat/completions",
+                               json=self._payload(engine="mlx", model="gpt-4", use_rag=False),
+                               headers=self._headers())
+
+        assert resp.status_code == 200
+        data = resp.json()
+        # The dishonest behaviour would echo the requested "gpt-4"; the honest
+        # one reports the basename of the single loaded local model.
+        assert data["model"] != "gpt-4"
+        assert data["model"] == "Qwen3-32B-MLX-4bit"
+
+    def test_llama_cpp_reports_loaded_model_not_request_model(self):
+        """B075-C3: llama.cpp must echo the loaded GGUF, never request.model."""
+        llama_module = AsyncMock()
+        llama_module.chat = AsyncMock(return_value={
+            "response": "Hola", "tokens": 1, "prompt_tokens": 1, "context_used": 1,
+        })
+        llama_module._node = MagicMock()
+        llama_module._node.config.model_path = "/Users/x/models/gemma-2-27b-it-Q4_K_M.gguf"
+
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no")):
+            client = self._client(modules={"llama_cpp_module": llama_module})
+            resp = client.post("/chat/completions",
+                               json=self._payload(engine="llama.cpp", model="gpt-4", use_rag=False),
+                               headers=self._headers())
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["model"] != "gpt-4"
+        assert data["model"] == "gemma-2-27b-it-Q4_K_M.gguf"
+
+    def test_mlx_unconfigured_falls_back_to_literal_label(self):
+        """B075-C3: a serviceable node with no model_path keeps the stable literal
+        label (not request.model). B260 note: an mlx with _node=None is no longer
+        dispatched — it cascades away — so the literal-label path is now reached
+        with a LIVE node whose config.model_path is empty (the dead-node cascade
+        is covered by tests/fixos/test_B260.py)."""
+        mlx_module = AsyncMock()
+        mlx_module.chat = AsyncMock(return_value={
+            "response": "Hola", "tokens": 1, "prompt_tokens": 1, "context_used": 1,
+        })
+        mlx_module._node = MagicMock()
+        mlx_module._node.config.model_path = ""  # node up, no model loaded → literal label
+
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no")):
+            client = self._client(modules={"mlx_module": mlx_module})
+            resp = client.post("/chat/completions",
+                               json=self._payload(engine="mlx", model="gpt-4", use_rag=False),
+                               headers=self._headers())
+
+        assert resp.status_code == 200
+        assert resp.json()["model"] == "mlx-local"
+
+    def test_mlx_streaming_reports_loaded_model_not_request_model(self):
+        """B075-C3: the streaming path must also carry the real model, not request.model."""
+        mlx_module = AsyncMock()
+        mlx_module.chat = AsyncMock(return_value={
+            "response": "Hola", "tokens": 1, "prompt_tokens": 1, "context_used": 1,
+        })
+        mlx_module._node = MagicMock()
+        mlx_module._node.config.model_path = "/m/Qwen3-32B-MLX-4bit"
+
+        captured = {}
+
+        async def fake_gen(module, user_messages, system_msg, model_name, **kwargs):
+            captured["model_name"] = model_name
+            yield "data: {}\n\n"
+
+        with patch("core.endpoints.chat_engines.mlx._mlx_stream_generator", side_effect=fake_gen), \
+             patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no")):
+            client = self._client(modules={"mlx_module": mlx_module})
+            resp = client.post("/chat/completions",
+                               json=self._payload(engine="mlx", model="gpt-4", stream=True, use_rag=False),
+                               headers=self._headers())
+            # drain the stream so the generator actually runs
+            list(resp.iter_lines())
+
+        assert captured["model_name"] == "Qwen3-32B-MLX-4bit"
+        assert captured["model_name"] != "gpt-4"
+
+    def test_llama_cpp_streaming_reports_loaded_model_not_request_model(self):
+        """B075-C3: llama.cpp streaming path must carry the real model too
+        (symmetric with the MLX streaming wiring test)."""
+        llama_module = AsyncMock()
+        llama_module.chat = AsyncMock(return_value={
+            "response": "Hola", "tokens": 1, "prompt_tokens": 1, "context_used": 1,
+        })
+        llama_module._node = MagicMock()
+        llama_module._node.config.model_path = "/m/gemma-2-27b-it-Q4_K_M.gguf"
+
+        captured = {}
+
+        async def fake_gen(module, user_messages, system_msg, model_name, **kwargs):
+            captured["model_name"] = model_name
+            yield "data: {}\n\n"
+
+        with patch("core.endpoints.chat_engines.llama_cpp._llama_cpp_stream_generator", side_effect=fake_gen), \
+             patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no")):
+            client = self._client(modules={"llama_cpp_module": llama_module})
+            resp = client.post("/chat/completions",
+                               json=self._payload(engine="llama.cpp", model="gpt-4", stream=True, use_rag=False),
+                               headers=self._headers())
+            list(resp.iter_lines())
+
+        assert captured["model_name"] == "gemma-2-27b-it-Q4_K_M.gguf"
+        assert captured["model_name"] != "gpt-4"
+
     def test_default_engine_fallback(self):
         """Engine 'other' → default Ollama."""
         import httpx

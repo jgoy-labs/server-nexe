@@ -221,6 +221,8 @@ class TestSystemHealthEndpoint:
         assert data["status"] == "healthy"
         assert "version" in data
         assert data["platform"] == "Nexe Framework"
+        # B075-C1: uptime is real whole seconds, not the old fixed "available".
+        assert data["uptime"].isdigit(), f"uptime must be whole seconds, got {data['uptime']!r}"
 
     def test_system_health_with_server_state(self):
         app = make_app()

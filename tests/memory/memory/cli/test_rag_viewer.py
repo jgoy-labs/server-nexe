@@ -256,40 +256,6 @@ class TestShowStatsGetStats:
                     assert "Qdrant" in calls
                     assert "FlashMemory" in calls
 
-    def test_show_stats_async_get_stats_persistence_and_flash(self):
-        """Lines 48-88: test the internal async function paths."""
-        from memory.memory.cli import rag_viewer
-
-        async def run():
-            mock_module = MagicMock()
-            mock_module._persistence = MagicMock()
-            mock_module._persistence.get_stats = AsyncMock(return_value={
-                "total_entries": 5, "episodic_count": 3, "semantic_count": 2
-            })
-            mock_module._persistence._qdrant_available = False
-            mock_module._flash_memory = MagicMock()
-            mock_module._flash_memory.get_stats = AsyncMock(return_value={
-                "total_entries": 3, "expired_pending": 1
-            })
-            mock_module.initialize = AsyncMock()
-
-            mock_rag_logger = MagicMock()
-            mock_rag_logger.stats_summary = MagicMock()
-
-            with patch("memory.memory.MemoryModule") as mock_cls:
-                mock_cls.get_instance.return_value = mock_module
-                with patch("memory.memory.rag_logger.get_rag_logger", return_value=mock_rag_logger, create=True):
-                    # Import the actual async function
-                    # We need to call show_stats indirectly
-                    pass
-
-        # Just verify show_stats can run with various return values
-        stats = {"sqlite": {"total_entries": 5}}
-        with patch("asyncio.run", return_value=stats):
-            with patch.object(rag_viewer, "find_log_path", return_value=Path("/tmp/rag.log")):  # nosemgrep
-                with patch("builtins.print"):
-                    rag_viewer.show_stats()
-
     def test_show_stats_qdrant_api_call(self):
         """Lines 65-80: qdrant stats via httpx."""
         from memory.memory.cli import rag_viewer

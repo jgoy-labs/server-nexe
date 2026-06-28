@@ -152,6 +152,21 @@ class LlamaCppModule:
         except Exception:
             return False
 
+    def switch_model(self, new_config: "LlamaCppConfig") -> bool:
+        """Hot-swap the active model to `new_config` if it differs.
+
+        Public entry point so web_ui never reaches into the node's class-level
+        singletons (_pool/_config). Returns True if a swap happened, False if
+        there is no node yet or the model path is unchanged (B073).
+        """
+        if self._node is None:
+            return False
+        if self._node.config.model_path == new_config.model_path:
+            return False
+        self._node.apply_config(new_config)
+        logger.info("LlamaCppModule: model switched to %s", new_config.model_path)
+        return True
+
     async def chat(
         self, messages: List[Dict[str, str]], system: str = "",
         session_id: str = "default", stream_callback=None, **kwargs,

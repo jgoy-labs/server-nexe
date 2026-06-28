@@ -17,7 +17,8 @@ import structlog
 from personality.i18n import get_i18n
 from memory.shared.health_helpers import (
   check_module_initialized as _shared_check_module_initialized,
-  aggregate_health_checks
+  aggregate_health_checks,
+  check_paths_writable
 )
 
 logger = structlog.get_logger()
@@ -63,81 +64,22 @@ def check_storage_paths() -> Dict[str, Any]:
     vector_dir = get_repo_root() / "storage" / "vectors"
     catalog_dir = get_repo_root() / "storage" / "vectors" / "catalog"
 
-    vector_dir.mkdir(parents=True, exist_ok=True)
-    catalog_dir.mkdir(parents=True, exist_ok=True)
-
-    test_file = vector_dir / ".write_test"
-    try:
-      test_file.write_text("test")
-      test_file.unlink()
-      writable = True
-    except Exception:
-      writable = False
-
-    if writable:
-      return {
-        "name": "storage_paths",
-        "status": "pass",
-        "message": i18n.t("rag.health.storage_paths_writable", "Storage paths writable: {path}", path=str(vector_dir))
-      }
-    else:
-      return {
-        "name": "storage_paths",
-        "status": "fail",
-        "message": i18n.t("rag.health.storage_paths_not_writable", "Storage paths not writable: {path}", path=str(vector_dir))
-      }
+    return check_paths_writable(
+      check_name="storage_paths",
+      paths=[vector_dir],
+      i18n_prefix="rag.health",
+      writable_key="storage_paths_writable",
+      writable_text="Storage paths writable: {path}",
+      not_writable_key="storage_paths_not_writable",
+      not_writable_text="Storage paths not writable: {path}",
+      mkdir_paths=[vector_dir, catalog_dir]
+    )
 
   except Exception as e:
     return {
       "name": "storage_paths",
       "status": "fail",
       "message": i18n.t("rag.health.storage_paths_error", "Error checking storage paths: {error}", error=str(e))
-    }
-
-def check_transaction_ledger() -> Dict[str, Any]:
-  """Check 4: Verify TransactionLedger is accessible."""
-  i18n = get_i18n()
-  try:
-    pass
-    return {
-      "name": "transaction_ledger",
-      "status": "pass",
-      "message": i18n.t("rag.health.ledger_importable", "TransactionLedger importable")
-    }
-  except ImportError as e:
-    return {
-      "name": "transaction_ledger",
-      "status": "fail",
-      "message": i18n.t("rag.health.ledger_not_importable", "TransactionLedger not importable: {error}", error=str(e))
-    }
-  except Exception as e:
-    return {
-      "name": "transaction_ledger",
-      "status": "fail",
-      "message": i18n.t("rag.health.ledger_check_error", "Error checking TransactionLedger: {error}", error=str(e))
-    }
-
-def check_write_coordinator() -> Dict[str, Any]:
-  """Check 5: Verify WriteCoordinator is functional."""
-  i18n = get_i18n()
-  try:
-    pass
-    return {
-      "name": "write_coordinator",
-      "status": "pass",
-      "message": i18n.t("rag.health.write_coordinator_importable", "WriteCoordinator importable")
-    }
-  except ImportError as e:
-    return {
-      "name": "write_coordinator",
-      "status": "fail",
-      "message": i18n.t("rag.health.write_coordinator_not_importable", "WriteCoordinator not importable: {error}", error=str(e))
-    }
-  except Exception as e:
-    return {
-      "name": "write_coordinator",
-      "status": "fail",
-      "message": i18n.t("rag.health.write_coordinator_check_error", "Error checking WriteCoordinator: {error}", error=str(e))
     }
 
 def check_rag_sources(module) -> Dict[str, Any]:
@@ -263,8 +205,6 @@ def check_health(module) -> Dict[str, Any]:
     checks.append(check_rag_sources(module))
     checks.append(check_qdrant_available())
     checks.append(check_storage_paths())
-    checks.append(check_transaction_ledger())
-    checks.append(check_write_coordinator())
     checks.append(check_disk_space(min_gb=10.0))
 
     metadata = {
@@ -299,7 +239,5 @@ __all__ = [
   "check_rag_sources",
   "check_qdrant_available",
   "check_storage_paths",
-  "check_transaction_ledger",
-  "check_write_coordinator",
   "check_disk_space"
 ]

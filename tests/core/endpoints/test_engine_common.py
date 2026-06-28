@@ -106,6 +106,56 @@ class TestBuildOpenaiResponse:
         assert resp["usage"]["total_tokens"] == 15
 
 
+class TestResolveLoadedModelName:
+    """B075-C3: report the model that actually ran, never request.model."""
+
+    def _module_with_path(self, model_path):
+        module = MagicMock()
+        module._node = MagicMock()
+        module._node.config.model_path = model_path
+        return module
+
+    def test_returns_basename_of_loaded_model(self):
+        from core.endpoints.chat_engines._common import resolve_loaded_model_name
+
+        module = self._module_with_path("/Users/x/storage/models/Qwen3-32B-MLX-4bit")
+        assert resolve_loaded_model_name(module, "mlx-local") == "Qwen3-32B-MLX-4bit"
+
+    def test_returns_basename_of_gguf_file(self):
+        from core.endpoints.chat_engines._common import resolve_loaded_model_name
+
+        module = self._module_with_path("/Users/x/models/gemma-2-27b-it-Q4_K_M.gguf")
+        assert resolve_loaded_model_name(module, "llama-cpp-local") == "gemma-2-27b-it-Q4_K_M.gguf"
+
+    def test_never_leaks_absolute_path(self):
+        from core.endpoints.chat_engines._common import resolve_loaded_model_name
+
+        module = self._module_with_path("/Users/secret/home/models/Qwen3-32B-MLX-4bit")
+        result = resolve_loaded_model_name(module, "mlx-local")
+        assert "/Users/secret" not in result
+        assert result == "Qwen3-32B-MLX-4bit"
+
+    def test_node_none_returns_fallback(self):
+        from core.endpoints.chat_engines._common import resolve_loaded_model_name
+
+        module = MagicMock()
+        module._node = None
+        assert resolve_loaded_model_name(module, "mlx-local") == "mlx-local"
+
+    def test_empty_model_path_returns_fallback(self):
+        from core.endpoints.chat_engines._common import resolve_loaded_model_name
+
+        module = self._module_with_path("")
+        assert resolve_loaded_model_name(module, "llama-cpp-local") == "llama-cpp-local"
+
+    def test_non_string_model_path_returns_fallback(self):
+        from core.endpoints.chat_engines._common import resolve_loaded_model_name
+
+        # A bare mock (not a real loaded config) must not crash Path(); fall back.
+        module = MagicMock()
+        assert resolve_loaded_model_name(module, "mlx-local") == "mlx-local"
+
+
 class TestFallbackToOllama:
 
     @pytest.mark.asyncio

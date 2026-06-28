@@ -137,7 +137,19 @@ prefix = "/my-plugin"
 router_prefix = "/my-plugin"
 public_routes = ["/health", "/info"]
 protected_routes = ["/process"]
+removed_direct_routes = []   # Optional. Routes that MUST NOT exist on the HTTP surface.
 ```
+
+### `removed_direct_routes` field (optional)
+
+Declares routes that **must not be registered** on the plugin's router. Semantics: "if someone registers this route, it's an error; if someone calls it, they get 403".
+
+- Type: list of strings, each entry must start with `/` (e.g. `["/chat"]`)
+- Enforced at **request time**: the `RemovedDirectRoutesGuard` middleware returns 403 with code `direct_plugin_endpoint_disabled` before any handler
+- Enforced at **load time**: if the plugin's router registers a route declared in `removed_direct_routes`, the plugin does not load (`PluginLoadError`)
+- **Difference from `protected_routes`**: `protected_routes` has ambiguous semantics across plugins (in some it means "ghost route", in others "sensitive route that requires auth"). `removed_direct_routes` has a single, executable meaning: the route must never exist on the HTTP surface.
+
+Example (plugin `mlx_module`): `removed_direct_routes = ["/chat"]` → any `POST /mlx/chat` returns 403. The canonical pipeline endpoints (`/ui/chat`, `/v1/chat/completions`) keep working normally.
 
 ### Key rules
 - All sections under `[module.*]` — never top-level sections
@@ -226,7 +238,7 @@ server-nexe has **three complementary mechanisms** to decide which plugins get a
 
 ### 1. `server.toml` — `[plugins.modules]` section
 
-Static declarative list in `personality/server.toml` (line 203). This is the primary source: it tells the server which plugins MUST be activated at startup.
+Static declarative list in `personality/server.toml` (line 197). This is the primary source: it tells the server which plugins MUST be activated at startup.
 
 ```toml
 [plugins.modules]
@@ -239,7 +251,7 @@ To add a new plugin, it must be included explicitly here.
 
 ### 2. `NEXE_APPROVED_MODULES` — env var (security allowlist)
 
-Validated by `get_module_allowlist()` in `core/config.py:355`. This is an additional security layer on top of the `server.toml` list:
+Validated by `get_module_allowlist()` in `core/config.py:362`. This is an additional security layer on top of the `server.toml` list:
 
 - **Development mode** (`NEXE_ENV=development` or unset): `NEXE_APPROVED_MODULES` is **optional**. If not defined, `get_module_allowlist()` returns `None` and filters nothing.
 - **Production mode** (`NEXE_ENV=production` or `[core.environment].mode = "production"`): `NEXE_APPROVED_MODULES` is **MANDATORY**. If missing, the server aborts with `ValueError("SECURITY ERROR: NEXE_APPROVED_MODULES is required in production")`.
@@ -272,17 +284,17 @@ known_paths = [
 
 ## ModuleManager Architecture
 
-The ModuleManager lives in `personality/module_manager/` — 13 files, ~3279 lines. It is the central facade of the plugin system.
+The ModuleManager lives in `personality/module_manager/` — 15 files, ~3485 lines. It is the central facade of the plugin system.
 
 ### Main components
 
 | File | Responsibility |
 |------|----------------|
-| `module_manager.py` | Central facade, lifecycle, load/unload/health (642 lines) |
+| `module_manager.py` | Central facade, lifecycle, load/unload/health (416 lines) |
 | `config_manager.py` | Loads `server.toml`, parsed config, secrets |
 | `config_validator.py` | Configuration validation and schemas |
 | `module_lifecycle.py` | Initialization, shutdown, error handling |
-| `path_discovery.py` | Scans paths (`plugins/`, `memory/modules/`, `core/tools/`...) |
+| `path_discovery.py` | Scans paths (`plugins/`, `memory/core/`, `core/tools/`...) |
 | `discovery.py` | Imports manifests, detects capabilities |
 | `registry.py` | Registry of loaded modules, cache |
 | `system_lifecycle.py` | Global system startup/shutdown |
@@ -302,7 +314,7 @@ The ModuleManager lives in `personality/module_manager/` — 13 files, ~3279 lin
 | **mlx_module** | local_llm_option | /mlx | Apple Silicon native, prefix caching (trie), Metal GPU, is_model_loaded() |
 | **llama_cpp_module** | local_llm_option | /llama-cpp | GGUF universal, ModelPool LRU, CPU/GPU, is_model_loaded() |
 | **ollama_module** | local_llm_option | /ollama | HTTP bridge to Ollama, auto-start, VRAM cleanup on shutdown, streaming, is_model_loaded() via /api/ps |
-| **security** | core | /security | Dual-key auth, 6 injection detectors with Unicode normalization (NFKC), 47 jailbreak patterns, rate limiting (all endpoints), RFC5424 audit logging, permanent=true |
+| **security** | core | /security | Dual-key auth, 6 injection detectors with Unicode normalization (NFKC), 49 jailbreak patterns, rate limiting (all endpoints), RFC5424 audit logging, permanent=true |
 | **web_ui_module** | web_interface | /ui | Web chat UI, session manager, document upload (session-isolated), memory helper (MEM_SAVE), input validation (validate_string_input on all routes), RAG context sanitization, i18n (ca/es/en), 6 route files |
 
 ### Common patterns in LLM backend plugins
@@ -405,6 +417,6 @@ Both methods may be called multiple times. Always check `self._initialized` guar
 | Module Lifecycle | `personality/module_manager/module_lifecycle.py` |
 | Config Manager | `personality/module_manager/config_manager.py` |
 | Module Registry | `personality/module_manager/registry.py` |
-| Security Allowlist | `core/config.py:355` (`get_module_allowlist()`) |
+| Security Allowlist | `core/config.py:362` (`get_module_allowlist()`) |
 | Router Registration | `core/server/factory_modules.py` |
 | Reference plugin (cleanest) | `plugins/llama_cpp_module/` |

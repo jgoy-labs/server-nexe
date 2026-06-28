@@ -69,16 +69,6 @@ class TestCreateHeader:
         )
         assert "expires: null" in result
 
-    def test_create_header_truncates_abstract(self):
-        long_abstract = "a" * 600
-        result = self.parser.create_header(
-            id="long-abs",
-            abstract=long_abstract,
-            tags=["test"],
-        )
-        # abstract should be truncated to 500
-        assert len(long_abstract[:500]) == 500
-
     def test_create_header_no_related(self):
         result = self.parser.create_header(
             id="no-rel",
@@ -86,6 +76,39 @@ class TestCreateHeader:
             tags=["test"],
         )
         assert "related:" not in result
+
+    def test_create_header_truncates_abstract(self):
+        """create_header must truncate abstract to 500 chars (header_parser.py:355).
+
+        The ORIGINAL test (T78) only asserted `len(long_abstract[:500]) == 500`
+        — a slice of the test's OWN local variable, never touching `result`.
+        This version asserts on the actual return value of create_header().
+
+        Mutation target: header_parser.py:355
+          abstract: "{abstract[:500]}"
+        If the [:500] slice is removed, `result` contains the full 600-char
+        abstract and this test must go RED.
+        """
+        long_abstract = "a" * 600
+        result = self.parser.create_header(
+            id="long-abs",
+            abstract=long_abstract,
+            tags=["test"],
+        )
+        # Extract what's between the quotes of the abstract line in the result
+        import re
+        match = re.search(r'^abstract: "(.+)"$', result, re.MULTILINE)
+        assert match is not None, "abstract field not found in result"
+        abstract_in_result = match.group(1)
+        assert len(abstract_in_result) <= 500, (
+            f"abstract must be truncated to 500 chars, got {len(abstract_in_result)}"
+        )
+        assert len(abstract_in_result) == 500, (
+            "abstract of 600 chars should yield exactly 500 chars in result"
+        )
+        assert abstract_in_result == "a" * 500, (
+            "truncated abstract must be the first 500 chars of the input"
+        )
 
 
 class TestHelperFunctions:

@@ -38,7 +38,7 @@ Most endpoints require `X-API-Key` header. Value from `.env` file (`NEXE_PRIMARY
 - `NEXE_SECONDARY_API_KEY` — grace period for rotation
 - Expiry tracking via `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
 
-**Bootstrap token:** For initial setup, a one-time token is generated at startup (256-bit, 30min TTL). Shown in console output.
+**Bootstrap token:** For initial setup, a one-time token is generated at startup (128-bit, 30min TTL). Shown in console output.
 
 ## Rate Limiting
 
@@ -68,6 +68,7 @@ Rate limiting is applied to **all endpoints** — both API and Web UI.
 | POST /ui/files/cleanup | 5/minute |
 | GET /ui/session/{id} | 30/minute |
 | DELETE /ui/session/{id} | 10/minute |
+| PATCH /ui/session/{id} | 10/minute |
 | PATCH /ui/session/{id}/thinking | 10/minute |
 
 ## Core Endpoints
@@ -81,7 +82,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 ```json
 {
   "messages": [{"role": "user", "content": "Hello"}],
-  "model": "auto",
+  "model": null,
   "engine": "auto",
   "use_rag": true,
   "stream": false,
@@ -90,17 +91,19 @@ OpenAI-compatible chat completion with RAG and streaming support.
 }
 ```
 
+- `model`: null by default (not "auto"). For **Ollama** a passed value selects the model with a partial-name fallback (e.g. `llama3` → `llama3.1:8b`); 404 only if no chat model matches. For **MLX / llama.cpp** the value is **ignored** — they run the single configured model — and the response reports the actual loaded model's name, never the requested one
 - `use_rag`: true by default — searches 3 Qdrant collections
 - `engine`: "auto" (default), "ollama", "mlx", "llama_cpp"
 - `stream`: true returns SSE stream with markers
 - `temperature`: 0.0-2.0 (default 0.7)
+- `top_p`: 0 < top_p ≤ 1 (null by default) — nucleus sampling; null lets each engine use its own default (≈ 0.9)
 - `max_tokens`: null = use model default, max 32000
 
 **Streaming markers** (injected in SSE stream, parsed by UI):
 - `[MODEL:name]` — active model
 - `[MODEL_LOADING]` / `[MODEL_READY]` — model load state with timing
 - `[RAG_AVG:0.75]` — average RAG relevance score
-- `[RAG_ITEM:0.82|nexe_documentation|ARCHITECTURE.md]` — per-source detail
+- `[RAG_ITEM:nexe_documentation|0.82]` — per-source detail (collection first, then score; only 2 fields)
 - `[MEM:2]` — number of facts auto-saved via MEM_SAVE
 - `[COMPACT:N]` — context compaction indicator
 - `[THINKING]` / `[/THINKING]` — thinking tokens (Ollama models like qwen3.5)
@@ -116,8 +119,8 @@ OpenAI-compatible chat completion with RAG and streaming support.
 | `/health` | GET | No | Basic health check |
 | `/health/ready` | GET | No | Readiness check (verifies required modules) |
 | `/health/circuits` | GET | Yes (X-API-Key) | Circuit breaker states (Ollama, Qdrant) |
-| `/status` | GET | Yes (X-API-Key) | Real-time status: active engine, model, loaded modules |
-| `/api/info` | GET | No | API info and list of available endpoints |
+| `/status` | GET | Yes (X-API-Key) | Real-time status: `configured_engine` (intent), `resolved_engine` (the engine chat will effectively run, node-aware), `model` (the configured default — MLX/llama.cpp report their actually-loaded model only in the chat response), loaded modules |
+| `/api/info` | GET | No | API info and a representative subset of public endpoints (not exhaustive) |
 | `/docs` | GET | No | Swagger/OpenAPI interactive documentation |
 
 ### Modules
@@ -146,7 +149,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 **Store request:**
 ```json
 {
-  "text": "Information to store",
+  "content": "Information to store",
   "collection": "user_knowledge",
   "metadata": {"source": "api", "tags": ["example"]}
 }
@@ -157,8 +160,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 {
   "query": "search query",
   "collection": "user_knowledge",
-  "limit": 5,
-  "threshold": 0.35
+  "limit": 5
 }
 ```
 
@@ -212,7 +214,7 @@ These endpoints serve the web interface and are used by the JavaScript frontend.
 | `/ui/session/{id}` | GET | Yes | 30/min | Get session data (validates session_id) |
 | `/ui/session/{id}/history` | GET | Yes | 30/min | Get session chat history |
 | `/ui/session/{id}` | DELETE | Yes | 10/min | Delete session |
-| `/ui/session/{id}` | PATCH | Yes | default | Rename session (new 2026-04-01) |
+| `/ui/session/{id}` | PATCH | Yes | 10/min | Rename session (new 2026-04-01) |
 | `/ui/session/{id}/thinking` | PATCH | Yes | 10/min | Toggle thinking mode (reasoning tokens) per session (new v0.9.9) |
 | `/ui/session/{id}/clear-document` | POST | Yes | default | Clear attached document from session (new 2026-04-02) |
 | `/ui/sessions` | GET | Yes | default | List all sessions |
@@ -256,7 +258,7 @@ Compatible with tools that use OpenAI API format: Cursor, Continue, Zed, custom 
 | Host/Port | server.toml `[core.server]` | Server bind address |
 | API keys | .env | NEXE_PRIMARY_API_KEY, NEXE_SECONDARY_API_KEY |
 | Rate limits | .env | NEXE_RATE_LIMIT_* variables |
-| Timeout | .env | NEXE_DEFAULT_MAX_TOKENS (default 4096) |
+| Timeout | .env | NEXE_OLLAMA_STREAM_TIMEOUT (default 300, seconds) |
 | CORS origins | server.toml `[core.server]` | Allowed origins |
 | Encryption | .env | NEXE_ENCRYPTION_ENABLED (default auto) |
 
@@ -276,7 +278,7 @@ curl -X POST http://127.0.0.1:9119/v1/chat/completions \
 curl -X POST http://127.0.0.1:9119/v1/memory/store \
   -H "X-API-Key: YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"text": "My name is Jordi", "collection": "user_knowledge"}'
+  -d '{"content": "My name is Jordi", "collection": "user_knowledge"}'
 
 # Search memory
 curl -X POST http://127.0.0.1:9119/v1/memory/search \

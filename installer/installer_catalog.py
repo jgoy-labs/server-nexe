@@ -23,7 +23,7 @@ def _determine_recommended_category(usable_ram: int) -> tuple:
     elif usable_ram < 28:
         return "3", t('size_large')
     else:
-        # B159: màquines grans (>=28GB usable ≈ 52GB+ RAM) poden amb el tier xlarge.
+        # B159: large machines (>=28GB usable ≈ 52GB+ RAM) can handle the xlarge tier.
         return "4", t('size_xlarge')
 
 

@@ -556,7 +556,8 @@ class MemoryHelper:
                     if hasattr(entry, 'id') and entry.id:
                         await memory.delete(entry.id, collection="personal_memory")
                         deleted += 1
-                        logger.debug(f"Pruned entry (retention={score:.2f}): {entry.text[:50] if entry.text else 'N/A'}...")
+                        # MC-112: log the entry id, never its text (user PII).
+                        logger.debug("Pruned entry %s (retention=%.2f)", entry.id, score)
                 except Exception as e:
                     logger.warning(f"Failed to delete entry: {e}")
 
@@ -661,13 +662,20 @@ class MemoryHelper:
         """Search collections for delete candidates. Returns top-1 per collection,
         sorted by score (best match first). NEVER deletes anything."""
         candidates: List[Dict[str, Any]] = []
+        # MC-015: track per-collection outcome so an all-collections failure
+        # (e.g. Qdrant down) is NOT mistaken for a legitimate 'nothing found'.
+        n_responded = 0  # collections the service answered (exists check / search OK)
+        n_errors = 0
+        last_error: Optional[Exception] = None
         for collection in collections:
             try:
                 if not await memory.collection_exists(collection):
+                    n_responded += 1
                     continue
                 results = await memory.search(
                     query=content, collection=collection, top_k=5, threshold=DELETE_THRESHOLD
                 )
+                n_responded += 1
                 for r in results[:1]:
                     candidates.append({
                         "id": str(r.id),
@@ -677,7 +685,15 @@ class MemoryHelper:
                         "metadata": getattr(r, "metadata", None) or {},
                     })
             except Exception as e:
-                logger.debug("Delete search in %s failed: %s", collection, e)
+                n_errors += 1
+                last_error = e
+                # MC-015: a failed search is not the legitimate 0-results case.
+                logger.warning("Delete search in %s failed: %s", collection, e)
+        # MC-015: if EVERY collection errored (none responded), propagate so the
+        # caller reports an error instead of a false 'nothing found'. Partial
+        # resilience is preserved: a single responding collection suppresses this.
+        if not candidates and n_errors > 0 and n_responded == 0:
+            raise last_error  # caught by delete_from_memory/preview → success:False
         candidates.sort(key=lambda c: c["score"], reverse=True)
         return candidates
 
@@ -989,14 +1005,20 @@ class MemoryHelper:
         return score
 
     async def _search_collection_results(
-        self, memory, query: str, collection: str, limit: int, session_id
+        self, memory, query: str, collection: str, limit: int, session_id,
+        query_embedding: "List[float] | None" = None,
     ) -> list:
         """Search one collection and return scored result dicts with temporal decay applied."""
         out: list[Dict[str, Any]] = []
         try:
             if not await memory.collection_exists(collection):
                 return out
-            results = await memory.search(query=query, collection=collection, top_k=limit * 2)
+            _search_kwargs: Dict[str, Any] = dict(query=query, collection=collection, top_k=limit * 2)
+            # MC-002: reuse the precomputed query embedding when available so the
+            # vector store does not re-embed the identical query per collection.
+            if query_embedding is not None:
+                _search_kwargs["query_embedding"] = query_embedding
+            results = await memory.search(**_search_kwargs)
             for r in results:
                 meta = r.metadata or {}
                 meta["source_collection"] = collection
@@ -1050,10 +1072,27 @@ class MemoryHelper:
                 return {"success": False, "results": [], "message": "Memory API not available"}
 
             _all_collections = ["nexe_documentation", "personal_memory", "user_knowledge"]
-            collections_to_search = [c for c in _all_collections if c in collections] if collections else _all_collections
+            collections_to_search = [c for c in _all_collections if c in collections] if collections is not None else _all_collections
+
+            # MC-002: embed the query ONCE and reuse it across collections instead
+            # of recomputing the identical embedding per collection. Falls back to
+            # per-search embedding (query_embedding=None) if precompute is unavailable.
+            query_embedding = None
+            try:
+                query_embedding = await memory.embed_query(query)
+            except Exception as emb_err:
+                logger.debug("RAG recall: query embedding precompute unavailable: %s", emb_err)
+
+            # MC-002: run the per-collection searches concurrently (was serial).
+            # gather preserves argument order, so all_results keeps the original
+            # collection ordering before dedup re-sorts by score.
+            _per_collection = await _asyncio.gather(*(
+                self._search_collection_results(memory, query, collection, limit, session_id, query_embedding)
+                for collection in collections_to_search
+            ))
             all_results = []
-            for collection in collections_to_search:
-                all_results.extend(await self._search_collection_results(memory, query, collection, limit, session_id))
+            for _results in _per_collection:
+                all_results.extend(_results)
 
             final_results = self._deduplicate_results(all_results, limit)
             return {

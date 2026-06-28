@@ -212,8 +212,14 @@ class TestWebUIModuleEndpoints:
         assert response.status_code == 200
 
     def test_verify_auth_invalid_key(self, client):
+        # T3 REINFORCED: with an invalid key, /ui/auth must ALWAYS return 401.
+        # The 200 in the original assert was an AUTH BYPASS accepted as valid.
+        # This test must go RED if routes_auth.py lets through
+        # an invalid key with 200 (bypass) or any code != 401.
         response = client.get("/ui/auth", headers={"X-API-Key": "wrong-key"})
-        assert response.status_code in (200, 401)
+        assert response.status_code == 401, (
+            f"Clau invàlida ha retornat {response.status_code} en lloc de 401 — possible auth bypass"
+        )
 
     def test_serve_ui_not_found(self, client, auth_headers):
         response = client.get("/ui/")

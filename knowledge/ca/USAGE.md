@@ -196,7 +196,7 @@ print(response.json()["choices"][0]["message"]["content"])
 curl -X POST http://127.0.0.1:9119/v1/memory/store \
   -H "X-API-Key: YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Project deadline is March 30", "collection": "user_knowledge"}'
+  -d '{"content": "Project deadline is March 30", "collection": "user_knowledge"}'
 ```
 
 ## Casos d'us
@@ -208,5 +208,5 @@ Consulta **[[USE_CASES|casos d'us practics]]** per a la llista completa amb cont
 - **Primera execucio:** La memoria esta buida. Parla amb el servidor, puja docs o utilitza `nexe knowledge ingest` per poblar el RAG.
 - **Primera resposta lenta:** La carrega del model triga (10-60s). L'indicador de carrega mostra el progres.
 - **Backend desconnectat:** El servidor fa auto-fallback al primer backend disponible. Comprova amb `./nexe status`.
-- **Models grans:** Els models de 32B+ necessiten 32+ GB de RAM i poden trigar minuts a carregar. El timeout es de 600s.
+- **Models grans:** Els models de 32B+ necessiten 32+ GB de RAM i poden trigar minuts a carregar. El timeout de stream d'Ollama es de 300s per defecte (`NEXE_OLLAMA_STREAM_TIMEOUT`); augmenta'l per a models molt grans.
 - **Encriptacio:** Activa l'encriptacio aviat — migrar conjunts de dades grans mes tard triga temps. Exporta i guarda la clau mestra de forma segura.

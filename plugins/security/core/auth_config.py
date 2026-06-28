@@ -97,7 +97,7 @@ def is_dev_mode() -> bool:
   Returns:
     True if NEXE_DEV_MODE="true" AND NEXE_ENV != "production", False otherwise
   """
-  is_production = os.getenv("NEXE_ENV", "development").lower() == "production"
+  is_production = os.getenv("NEXE_ENV", "production").lower() == "production"
   dev_mode_requested = os.getenv("NEXE_DEV_MODE", "false").lower() == "true"
 
   if is_production and dev_mode_requested:

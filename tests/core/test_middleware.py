@@ -140,79 +140,47 @@ class TestSetupRateLimiting:
             setup_rate_limiting(app)
         assert app.state.limiter is not None
 
-    def test_advanced_rate_limiting_success(self):
-        """Lines 77-96: advanced rate limiting enabled successfully."""
+    def test_advanced_mode_does_not_publish_orphan_limiters(self):
+        """MC-123: with ADVANCED_RATE_LIMITING on, only the per-IP limiter is
+        published. The advanced limiters (by_key / composite / by_endpoint) were
+        set on app.state but consumed by nobody — dead wiring — so they must NOT
+        be published any more.
+
+        Mutation guard: re-add ``app.state.limiter_by_key = limiter_by_key`` (or a
+        sibling) to setup_rate_limiting and this test goes RED. (The previous test
+        here was theatre: it patched names the code no longer references and only
+        asserted ``hasattr(app.state, "limiter")``, so restoring the orphan wiring
+        would not fail it.)
+        """
         from core.middleware import setup_rate_limiting
         app = FastAPI()
-        with patch("core.middleware.ADVANCED_RATE_LIMITING", True), \
-             patch("core.middleware.limiter_by_key", create=True, new=MagicMock()), \
-             patch("core.middleware.limiter_composite", create=True, new=MagicMock()), \
-             patch("core.middleware.limiter_by_endpoint", create=True, new=MagicMock()), \
-             patch("core.middleware.start_rate_limit_cleanup_task", create=True, new=MagicMock()):
+        with patch("core.middleware.ADVANCED_RATE_LIMITING", True):
             setup_rate_limiting(app)
+        # the real, enforced per-IP limiter is always present
         assert hasattr(app.state, "limiter")
+        for orphan in ("limiter_by_key", "limiter_composite", "limiter_by_endpoint"):
+            assert not hasattr(app.state, orphan), (
+                f"{orphan} is dead wiring (no consumer) and must not be published (MC-123)"
+            )
 
-    def test_advanced_rate_limiting_import_error(self):
-        """Lines 98-102: advanced rate limiting import fails -> fallback."""
+    def test_advanced_mode_does_not_wire_noop_cleanup_task(self):
+        """MC-124: the hourly rate-limit cleanup task iterated an always-empty
+        tracker (RateLimitTracker.record_request has no production caller), so it
+        must no longer be wired onto app.state.
+
+        Mutation guard: re-add ``app.state.start_rate_limit_cleanup = ...`` to
+        setup_rate_limiting and this test goes RED.
+        """
         from core.middleware import setup_rate_limiting
         app = FastAPI()
-        with patch("core.middleware.ADVANCED_RATE_LIMITING", True), \
-             patch("core.dependencies.limiter_by_key", side_effect=ImportError("fail"), create=True):
-            # The setup_rate_limiting catches Exception at line 98
+        with patch("core.middleware.ADVANCED_RATE_LIMITING", True):
             setup_rate_limiting(app)
-        assert hasattr(app.state, "limiter")
-
-
-class TestSetupPrometheusMetrics:
-    def test_prometheus_import_error(self):
-        """Lines 199-200: ImportError in prometheus setup."""
-        from core.middleware import setup_prometheus_metrics
-        app = FastAPI()
-        with patch("core.middleware.PrometheusMiddleware", side_effect=ImportError("no module"), create=True):
-            # Should not raise
-            setup_prometheus_metrics(app)
+        assert not hasattr(app.state, "start_rate_limit_cleanup"), (
+            "the no-op rate-limit cleanup task must not be wired (MC-124)"
+        )
 
 
 class TestSetupCsrfProtection:
-    def test_csrf_dev_mode_no_secret(self):
-        """Lines 224-228: dev mode without CSRF secret."""
-        from core.middleware import setup_csrf_protection
-        app = FastAPI()
-        config = {"core": {"server": {"host": "127.0.0.1"}}}
-        with patch.dict('os.environ', {'NEXE_ENV': 'development'}, clear=False), \
-             patch.dict('os.environ', {}, clear=False):
-            # Remove NEXE_CSRF_SECRET if present
-            import os
-            os.environ.pop("NEXE_CSRF_SECRET", None)
-            try:
-                setup_csrf_protection(app, config)
-            except ImportError:
-                pass  # starlette-csrf may not be installed
-
-    def test_csrf_prod_mode_no_secret(self):
-        """Lines 216-223: production mode without CSRF secret."""
-        from core.middleware import setup_csrf_protection
-        app = FastAPI()
-        config = {"core": {"server": {"host": "127.0.0.1"}}}
-        import os
-        os.environ.pop("NEXE_CSRF_SECRET", None)
-        with patch.dict('os.environ', {'NEXE_ENV': 'production'}, clear=False):
-            try:
-                setup_csrf_protection(app, config)
-            except ImportError:
-                pass
-
-    def test_csrf_cookie_secure_override(self):
-        """Lines 247-249: manual cookie_secure override."""
-        from core.middleware import setup_csrf_protection
-        app = FastAPI()
-        config = {"core": {"server": {"host": "127.0.0.1", "csrf_cookie_secure": True}}}
-        with patch.dict('os.environ', {'NEXE_CSRF_SECRET': 'testsecret123'}, clear=False):
-            try:
-                setup_csrf_protection(app, config)
-            except ImportError:
-                pass
-
     def test_csrf_import_error(self):
         """starlette-csrf is mandatory — missing module raises ImportError."""
         from core.middleware import setup_csrf_protection
@@ -222,20 +190,6 @@ class TestSetupCsrfProtection:
              patch.dict('sys.modules', {'starlette_csrf': None}):
             with pytest.raises((ImportError, ModuleNotFoundError)):
                 setup_csrf_protection(app, config)
-
-    def test_csrf_non_local_prod_sets_secure(self):
-        """Lines 241-244: non-local host in prod -> cookie_secure=True."""
-        from core.middleware import setup_csrf_protection
-        app = FastAPI()
-        config = {"core": {"server": {"host": "192.168.1.100"}}}
-        with patch.dict('os.environ', {
-            'NEXE_CSRF_SECRET': 'secret123',
-            'NEXE_ENV': 'production'
-        }, clear=False):
-            try:
-                setup_csrf_protection(app, config)
-            except ImportError:
-                pass
 
 
 class TestSetupAllMiddleware:

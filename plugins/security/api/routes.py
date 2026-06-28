@@ -133,8 +133,9 @@ def create_router(module_instance) -> APIRouter:
             categorised = _categorise_findings(results)
             return {"status": "completed", **categorised}
         except Exception as e:
+            # MC-074: `str(e)` only in the log; generic message to the client.
             logger.error("Security scan failed: %s", e)
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Security scan failed")
 
     @router.get("/report", operation_id="security_report")
     @limiter.limit("10/minute")
@@ -143,7 +144,11 @@ def create_router(module_instance) -> APIRouter:
         _: str = Depends(require_api_key)
     ):
         """
-        Returns the latest security report.
+        Returns the security module's reporting capabilities.
+
+        B075-C4: no scan result is persisted, so there is no "latest report" to
+        return. This endpoint exposes the module's capabilities (the checks it
+        can run) and points the caller at POST /security/scan for live findings.
 
         PROTECTED: Requires API key (X-API-Key header)
         Rate limited: 10 requests/minute
@@ -151,16 +156,17 @@ def create_router(module_instance) -> APIRouter:
         try:
             return {
                 "status": "success",
-                "report": {
+                "capabilities": {
                     "module": "security",
                     "version": module_instance.metadata.version,
                     "checks_available": ["auth_check", "web_security_check", "rate_limit_check"],
-                    "message": "Use POST /security/scan to run a full security scan"
+                    "message": "No scan result is persisted; run POST /security/scan for live findings."
                 }
             }
         except Exception as e:
+            # MC-074: `str(e)` only in the log; generic message to the client.
             logger.error("Failed to get security report: %s", e)
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Failed to retrieve security report")
 
     @router.get("/ui/assets/{path:path}", operation_id="security_serve_assets")
     async def serve_security_assets(path: str):

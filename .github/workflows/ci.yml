@@ -10,6 +10,10 @@ on:
     paths-ignore:
       - ".github/badges/**"
 
+# Default least-privilege: jobs that need more elevate locally.
+permissions:
+  contents: read
+
 jobs:
   security-audit:
     name: Security Audit
@@ -27,7 +31,32 @@ jobs:
         run: pip install pip-audit
 
       - name: Run pip-audit (CVE scan)
-        run: pip-audit --requirement requirements.txt
+        run: |
+          pip-audit --requirement requirements.txt
+          pip-audit --requirement requirements-macos.txt
+          pip-audit --requirement requirements-linux.txt
+
+      # Bundle-only deps (torch, torchvision, llama-cpp-python, transformers) are
+      # installed dynamically and never appear in requirements*.txt, so pip-audit
+      # above cannot see them. This gate queries OSV for those pinned versions.
+      - name: Run OSV CVE gate for bundled deps (B070)
+        run: |
+          set +e
+          python installer/check_cves_osv.py
+          code=$?
+          set -e
+          if [ "$code" = "1" ]; then
+            echo "::error::Unexpected CVE in a bundled dependency — review installer/pip-audit-ignore.txt or bump the pin"
+            exit 1
+          fi
+          if [ "$code" = "2" ]; then
+            echo "::warning::OSV API unreachable — bundle CVE gate skipped this run"
+          fi
+
+      - name: Run gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   tests:
     name: Unit Tests
@@ -57,7 +86,7 @@ jobs:
           NEXE_CSRF_SECRET: ${{ secrets.NEXE_CI_CSRF_SECRET || 'nexe-ci-csrf-secret' }}
         run: >
           pytest tests
-          -m "not integration and not e2e and not slow"
+          -m "not integration and not e2e and not slow and not gpu and not test_live"
           --cov=core --cov=memory --cov=personality --cov=plugins
           --cov-report=term
           --cov-report=xml:coverage.xml
@@ -128,7 +157,7 @@ jobs:
         # continue-on-error: small knowledge edits between DMG builds
         # must not block CI. Authoritative check runs locally
         # (`scripts/precompute_kb.py --verify`) and at DMG build time
-        # (build pipeline), where stale embeddings must be regenerated
+        # (ship-nexe.sh), where stale embeddings must be regenerated
         # before notarisation.
         continue-on-error: true
         run: |
@@ -137,6 +166,26 @@ jobs:
           else
             echo "No precomputed manifest yet; runtime fallback active."
           fi
+
+  layering:
+    name: Layering Gate (#471)
+    runs-on: ubuntu-latest
+    needs: security-audit
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Check inter-package layering (freeze coupling debt)
+        # Stdlib-only AST gate: fails if a NEW import-time cross-package import
+        # (core/memory/personality/plugins) appears outside the frozen baseline.
+        # Deferred (function-local) imports are the allowed escape hatch.
+        run: python scripts/check_layering.py
 
   badge:
     name: Update Coverage Badge

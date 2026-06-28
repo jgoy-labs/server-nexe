@@ -1,4 +1,4 @@
-// CompletionView.swift — Pantalla final: API key + obrir Nexe + Dock + Login Items
+// CompletionView.swift — Final screen: API key + open Nexe + Dock + Login Items
 
 import SwiftUI
 import AppKit
@@ -27,7 +27,7 @@ struct CompletionView: View {
             Text(t("done_title"))
                 .font(.system(size: 24, weight: .bold))
 
-            // Temps total
+            // Total time
             if !engine.totalTime.isEmpty {
                 Text(engine.totalTime)
                     .font(.caption)
@@ -92,7 +92,7 @@ struct CompletionView: View {
 
             Spacer()
 
-            // Botons
+            // Buttons
             HStack(spacing: 16) {
                 Button(t("btn_close")) {
                     isCountingDown = false
@@ -120,12 +120,12 @@ struct CompletionView: View {
         .onAppear { applyDockIcon() }
     }
 
-    // MARK: - Accions
+    // MARK: - Actions
 
     private func applyDockIcon() {
-        // Bug #19d fix (v1.0): Nexe.app viu NOMÉS a <install_dir>/Nexe.app.
-        // Abans es copiava una segona instància a /Applications/Nexe.app
-        // que acabava sent un orfe sense codi Python al costat.
+        // Bug #19d fix (v1.0): Nexe.app lives ONLY at <install_dir>/Nexe.app.
+        // It used to copy a second instance to /Applications/Nexe.app
+        // that ended up an orphan without the Python code alongside it.
         guard engine.addToDock else { return }
         let nexeAppPath = engine.installPath + "/Nexe.app"
         DispatchQueue.global(qos: .utility).async {
@@ -142,9 +142,9 @@ struct CompletionView: View {
         }
     }
 
-    /// Click "Obrir Nexe": llança el servidor IMMEDIATAMENT i inicia el
-    /// countdown en paral·lel (visual only — quan arriba a 0 no fa res extra,
-    /// simplement oculta el número, el servidor ja porta X segons arrencant).
+    /// Click "Open Nexe": launches the server IMMEDIATELY and starts the
+    /// countdown in parallel (visual only — when it reaches 0 it does nothing extra,
+    /// it just hides the number; the server has already been starting for X seconds).
     private func launchAndCountdown() {
         openNexe()
         isCountingDown = true
@@ -156,7 +156,7 @@ struct CompletionView: View {
         guard isCountingDown else { return }
         if countdown <= 0 {
             isCountingDown = false
-            return  // visual only — el servidor ja corre de fa 10s
+            return  // visual only — the server has been running for 10s already
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [self] in
             guard isCountingDown else { return }
@@ -168,12 +168,12 @@ struct CompletionView: View {
     private func openNexe() {
         nexeOpened = true
 
-        // Llançament via <install_dir>/Nexe.app (el mateix bundle que hi ha al Dock).
-        // Així macOS registra que l'app està corrent i apareix el triangle sota la
-        // icona del Dock. El bash launcher de Nexe.app gestiona port-check + tray spawn.
+        // Launch via <install_dir>/Nexe.app (the same bundle that's in the Dock).
+        // This way macOS registers that the app is running and the triangle appears under
+        // the Dock icon. Nexe.app's bash launcher handles port-check + tray spawn.
         let dockAppPath = engine.installPath + "/Nexe.app"
 
-        // Eliminar quarantena per evitar bloqueig Gatekeeper
+        // Remove quarantine to avoid a Gatekeeper block
         let xattr = Process()
         xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
         xattr.arguments = ["-rd", "com.apple.quarantine", dockAppPath]
@@ -181,9 +181,9 @@ struct CompletionView: View {
         xattr.waitUntilExit()
 
         if FileManager.default.fileExists(atPath: dockAppPath) {
-            // Via `open -a`: macOS tracta el bundle com a app pròpia, aplica
-            // LSUIElement=false (dock presence), enganxa el triangle sota la icona
-            // del Dock, i evita dobles instàncies si ja corre.
+            // Via `open -a`: macOS treats the bundle as its own app, applies
+            // LSUIElement=false (dock presence), attaches the triangle under the Dock
+            // icon, and avoids double instances if it's already running.
             let open = Process()
             open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
             open.arguments = ["-a", dockAppPath]
@@ -196,7 +196,7 @@ struct CompletionView: View {
             return
         }
 
-        // Fallback: entorn dev o /Applications/Nexe.app missing → llançar tray directe
+        // Fallback: dev environment or /Applications/Nexe.app missing → launch tray directly
         let trayBundlePath = engine.installPath + "/installer/NexeTray.app/Contents/MacOS/NexeTray"
         let tray = Process()
         var env = ProcessInfo.processInfo.environment
@@ -217,11 +217,11 @@ struct CompletionView: View {
     }
 
     private func doAddToDock(nexeAppPath: String) {
-        // Verificar que Nexe.app existeix abans d'afegir al Dock
+        // Verify Nexe.app exists before adding it to the Dock
         guard FileManager.default.fileExists(atPath: nexeAppPath) else { return }
 
-        // Idempotent: si ja hi ha una entrada que apunta a nexeAppPath, no afegir.
-        // Evita duplicats en reinstal·lacions successives.
+        // Idempotent: if there's already an entry pointing to nexeAppPath, don't add.
+        // Avoids duplicates across successive reinstalls.
         if dockHasEntry(for: nexeAppPath) { return }
 
         let entry = "<dict><key>tile-data</key><dict><key>file-data</key><dict>" +
@@ -235,7 +235,7 @@ struct CompletionView: View {
         try? addDock.run()
         addDock.waitUntilExit()
 
-        // Reiniciar Dock per aplicar els canvis al plist
+        // Restart the Dock to apply the plist changes
         let killDock = Process()
         killDock.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
         killDock.arguments = ["Dock"]
@@ -243,8 +243,8 @@ struct CompletionView: View {
         killDock.waitUntilExit()
     }
 
-    /// Retorna true si el Dock ja té una entrada persistent-apps apuntant a appPath.
-    /// Check via `defaults read`: busquem el path (amb i sense prefix file://).
+    /// Returns true if the Dock already has a persistent-apps entry pointing to appPath.
+    /// Check via `defaults read`: we look for the path (with and without the file:// prefix).
     private func dockHasEntry(for appPath: String) -> Bool {
         let read = Process()
         read.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
@@ -256,7 +256,7 @@ struct CompletionView: View {
         read.waitUntilExit()
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         guard let output = String(data: data, encoding: .utf8) else { return false }
-        // `defaults read` serialitza com `file:///Applications/Nexe.app/` o path cru
+        // `defaults read` serializes as `file:///Applications/Nexe.app/` or a raw path
         return output.contains("file://\(appPath)") || output.contains("\"\(appPath)\"")
     }
 

@@ -15,6 +15,7 @@ from fastapi import APIRouter, Request, Depends
 
 from core.version import __version__
 from core.i18n_utils import translate
+from core.uptime import uptime_str
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +132,9 @@ async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthRespon
     message=translate(i18n, 'server_core.api.health.message',
         "Basic server operational"),
     version=__version__,
-    uptime=translate(i18n, 'server_core.api.health.uptime', "operational")
+    # B075-C1: report real seconds since startup, not the fixed "operational"
+    # label that masqueraded as a metric.
+    uptime=uptime_str()
   )
 
 @router.get("/health/ready", summary="Readiness check — verifies required modules", response_model=dict, operation_id="readiness_check")
@@ -143,12 +146,12 @@ async def readiness_check(request: Request) -> dict:
   Verifies that the required modules are loaded and healthy.
   """
   # in minimal_mode (pre-onboarding)
-  # els mòduls rag/security/web_ui_module NO s'arrenquen per disseny. El
-  # sidecar SÍ està ready per al que ofereix (endpoints /installer/* per al
-  # wizard). Retornar "healthy" perquè el readinessOverlay del frontend
-  # (public/ui/static/app.js:723) desaparegui i el wizard pugui renderitzar-se.
-  # Sense aquest fix, l'app es queda penjada a "Starting..." perquè el
-  # frontend polleja /health/ready cada 3s i bloca la UI fins a "healthy".
+  # the rag/security/web_ui_module modules are NOT started by design. The
+  # sidecar IS ready for what it offers (/installer/* endpoints for the
+  # wizard). We return "healthy" so the frontend readinessOverlay
+  # (public/ui/static/app.js:723) disappears and the wizard can render.
+  # Without this fix, the app stays stuck at "Starting..." because the
+  # frontend polls /health/ready every 3s and blocks the UI until "healthy".
   if bool(getattr(request.app.state, "minimal_mode", False)):
     return {
       "status": "healthy",
@@ -209,11 +212,16 @@ async def readiness_check(request: Request) -> dict:
     "timestamp": datetime.now(timezone.utc).isoformat(),
   }
 
-@router.get("/api/info", response_model=ApiInfoResponse, summary="API information and list of available endpoints", operation_id="api_info")
+@router.get("/api/info", response_model=ApiInfoResponse, summary="API information and a representative subset of public endpoints", operation_id="api_info")
 @limiter.limit("30/minute")
 async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoResponse:
   """Basic system information"""
 
+  # B075-C2: this is a deliberately curated, quick-start subset of *public*
+  # endpoints — NOT an exhaustive inventory. The full route list is the gated
+  # OpenAPI schema; enumerating app.routes here would expose the whole attack
+  # surface to unauthenticated callers. The summary/model no longer promise
+  # completeness.
   # usem translate() canònica en comptes de l'inline ternari.
   endpoints = [
     EndpointInfo(
@@ -245,22 +253,11 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
   )
 
 
-def _check_llama_cpp_available(modules: dict) -> bool:
-  """Check if llama_cpp_module is loaded AND has a working _node.
-
-  Symmetric with the MLX check inside /status (P0-2.c): only reports True
-  when the module has an active backend, not just when the dict key exists.
-  This catches edge cases where the loader didn't pop a failed module
-  (e.g., exception path from P0-2.b design choice).
-
-  Extracted as a pure helper so it can be unit-tested without a real
-  starlette.Request (slowapi's @limiter.limit rejects MagicMock).
-  """
-  if "llama_cpp_module" not in modules:
-    return False
-  instance = modules["llama_cpp_module"]
-  return hasattr(instance, '_node') and instance._node is not None
-
+# B260: the legacy node-aware helpers (_check_llama_cpp_available and
+# _resolve_effective_engine) are GONE. Engine availability and resolution now
+# live in a SINGLE source of truth — routing._engine_available /
+# routing._resolve_engine — which /status delegates to (see server_status). This
+# removes the parallel reimplementation that B075-C6 had to keep in lockstep.
 
 @router.get("/status", summary="Real-time status: active engine, model, and loaded modules (API key required)", response_model=dict, operation_id="server_status")
 @limiter.limit("60/minute")
@@ -285,23 +282,13 @@ async def server_status(
   modules = getattr(request.app.state, "modules", {})
   actual_engine = env_engine
 
-  # Check which engine module is actually initialized and working
-  mlx_available = False
-  llama_cpp_available = False
-  ollama_available = False
-
-  if "mlx_module" in modules:
-    mlx_instance = modules["mlx_module"]
-    # Check if MLX actually has a working node
-    if hasattr(mlx_instance, '_node') and mlx_instance._node is not None:
-      mlx_available = True
-
-  # P0-2.c: use extracted helper for unit-testability (slowapi blocks direct
-  # call with MagicMock request, so the logic lives in a pure function).
-  llama_cpp_available = _check_llama_cpp_available(modules)
-
-  if "ollama_module" in modules:
-    ollama_available = True
+  # B260: availability is node-aware and sourced from the SINGLE canonical
+  # definition the chat router uses (routing._engine_available), so /status can
+  # never drift from what a real chat call resolves.
+  from core.endpoints.chat_engines.routing import _engine_available, _resolve_engine
+  mlx_available = _engine_available("mlx", request.app.state)
+  llama_cpp_available = _engine_available("llama_cpp", request.app.state)
+  ollama_available = _engine_available("ollama", request.app.state)
 
   # Determine actual engine based on what's available
   if env_engine == "mlx" and not mlx_available:
@@ -310,12 +297,19 @@ async def server_status(
   elif env_engine == "llama_cpp" and not llama_cpp_available:
     actual_engine = "ollama"
 
-  # Expose minimal_mode flag perquè el frontend sàpiga si el sidecar
-  # està en mode reduït pre-onboarding. No canviem el format existent
-  # (web UI depèn dels camps actuals); afegim camp opcional.
+  # B260/B075-C6: resolved_engine DELEGATES to the canonical chat resolver, so it
+  # reports exactly what a chat call with no explicit engine would run — zero
+  # drift, single source of truth. The legacy `engine`/`configured_engine`
+  # fields stay untouched for backward-compat (web UI + documented API).
+  resolved_engine, _ = _resolve_engine(None, request.app.state)
+
+  # Expose minimal_mode flag so the frontend knows whether the sidecar
+  # is in reduced pre-onboarding mode. We don't change the existing format
+  # (the web UI depends on the current fields); we add an optional field.
   return {
     "engine": actual_engine,
     "configured_engine": env_engine,
+    "resolved_engine": resolved_engine,
     "model": env_model,
     "modules_loaded": list(modules.keys()),
     "engines_available": {

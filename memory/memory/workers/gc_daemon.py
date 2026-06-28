@@ -127,8 +127,22 @@ class GCDaemon:
         return list(set(to_delete) | set(budget_ids))
 
     def _gc_delete_entries(self, conn, user_id: str, to_delete: list) -> None:
-        """Archive entries in RDBMS, remove from vector index, create tombstones."""
+        """Archive entries in RDBMS, remove from vector index, create tombstones.
+
+        Tombstones MUST carry the entry's real ``content_hash`` (SHA256 of the
+        normalised content), not its ``id`` (a uuid4[:16]). The reinsertion guard
+        in ``DreamingCycle._process_episodic`` looks up ``is_tombstoned`` by the
+        recomputed content hash, so an id-keyed tombstone could never match and
+        the gc_decay anti-zombie protection was dead weight (B032).
+        """
         placeholders = ",".join("?" for _ in to_delete)
+        # Resolve the real content_hash of each entry before archiving (archiving
+        # only flips ``state``, so the hash column is unaffected by order).
+        hash_rows = conn.execute(
+            f"SELECT id, content_hash FROM episodic WHERE id IN ({placeholders})",  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
+            to_delete,
+        ).fetchall()  # nosemgrep: sqlalchemy-execute-raw-query — parameterized with '?' placeholders
+        id_to_hash = {row["id"]: row["content_hash"] for row in hash_rows}
         sql = f"UPDATE episodic SET state = 'archived' WHERE id IN ({placeholders})"  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
         conn.execute(sql, to_delete)  # nosemgrep: sqlalchemy-execute-raw-query — parameterized with '?' placeholders
         conn.commit()
@@ -140,8 +154,14 @@ class GCDaemon:
         if self._store is None:
             return
         for eid in to_delete:
+            content_hash = id_to_hash.get(eid)
+            if content_hash is None:
+                # No row found for this id (e.g. concurrently deleted) — without
+                # the real hash a tombstone would be inert, so skip it loudly.
+                logger.warning("GC: no content_hash for entry %s; tombstone skipped", eid)
+                continue
             try:
-                self._store.add_tombstone(user_id=user_id, content_hash=eid, reason="gc_decay")
+                self._store.add_tombstone(user_id=user_id, content_hash=content_hash, reason="gc_decay")
             except Exception:  # nosec B110: best-effort tombstone insertion during GC; failure logged elsewhere via outer error path (BACKLOG-v1.0.5 M5-02 review for log.debug upgrade)
                 pass
 

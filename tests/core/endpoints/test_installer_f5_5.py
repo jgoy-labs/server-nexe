@@ -22,12 +22,15 @@ import pytest
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_find_ollama_user_applications_candidate_present():
-    """_find_ollama_bin candidate list must include ~/Applications/Ollama.app."""
-    import inspect
-    import core.endpoints.installer as _mod
+    """The canonical Ollama-binary candidate list must include ~/Applications/Ollama.app.
 
-    src = inspect.getsource(_mod._find_ollama_bin)
-    assert "~/Applications/Ollama.app/Contents/Resources/ollama" in src, (
+    MC-028: the list moved to the single source of truth
+    ollama_runtime.OLLAMA_BIN_CANDIDATES (shared with _find_ollama_bin), so we
+    assert the contract on the constant rather than inspecting source text.
+    """
+    from plugins.ollama_module.core.ollama_runtime import OLLAMA_BIN_CANDIDATES
+
+    assert "~/Applications/Ollama.app/Contents/Resources/ollama" in OLLAMA_BIN_CANDIDATES, (
         "Candidate list must include ~/Applications/Ollama.app/Contents/Resources/ollama"
     )
 
@@ -107,21 +110,30 @@ def test_stuck_handler_threshold_is_99():
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_valid_engines_consistent():
-    """Installer uses VALID_ENGINES (download allowlist); onboarding_state uses
-    ONBOARDING_ENGINES (= VALID_ENGINES + 'local' for the local-folder wizard
-    flow). Both must derive from core.installer_constants — single source."""
-    from core.installer_constants import VALID_ENGINES, ONBOARDING_ENGINES
+    """All engine sets derive from the single source core.installer_constants:
+    - installer uses VALID_ENGINES (the download allowlist);
+    - onboarding_state persists PERSISTABLE_ENGINES (= ONBOARDING_ENGINES minus the
+      auxiliary 'embedder', which is not a primary chat engine; 'local' is the
+      local-folder wizard flow). See MC-022/MC-043.
+    No module may hardcode a divergent copy."""
+    from core.installer_constants import (
+        VALID_ENGINES,
+        ONBOARDING_ENGINES,
+        PERSISTABLE_ENGINES,
+    )
     from core.endpoints.installer import _VALID_ENGINES as installer_engines
-    from core.onboarding_state import _ONBOARDING_ENGINES as state_engines
+    from core.onboarding_state import _PERSISTABLE_ENGINES as state_engines
 
     assert installer_engines == VALID_ENGINES, (
         f"installer._VALID_ENGINES {installer_engines} != constants {VALID_ENGINES}"
     )
-    assert state_engines == ONBOARDING_ENGINES, (
-        f"onboarding_state._ONBOARDING_ENGINES {state_engines} != constants {ONBOARDING_ENGINES}"
+    assert state_engines == PERSISTABLE_ENGINES, (
+        f"onboarding_state._PERSISTABLE_ENGINES {state_engines} != constants {PERSISTABLE_ENGINES}"
     )
-    # onboarding accepts exactly the download engines plus the local-folder marker
+    # SSOT relationships: onboarding offers the download engines + the local-folder
+    # marker; persistence drops the auxiliary 'embedder'.
     assert ONBOARDING_ENGINES == VALID_ENGINES | {"local"}
+    assert PERSISTABLE_ENGINES == ONBOARDING_ENGINES - {"embedder"}
 
 
 def test_valid_engines_contains_expected_values():
@@ -315,13 +327,24 @@ def test_cancel_ev_threading_event():
 # ──────────────────────────────────────────────────────────────────────────────
 
 def test_tqdm_queue_lock_exists():
-    """_TQDM_QUEUE_LOCK must exist and be a threading.Lock."""
+    """_TQDM_QUEUE_LOCK must be a real threading.Lock, not just any object.
+
+    Regression guard: if installer_progress.py:113 stops creating a proper
+    threading.Lock (e.g. replaced by a plain object, Event, or Semaphore),
+    concurrent set_tqdm_queue() calls can race and corrupt the queue reference.
+
+    Mutation target: installer_progress.py:113
+      _TQDM_QUEUE_LOCK = __import__("threading").Lock()
+    If replaced with a non-Lock (e.g. object()), this test must go RED.
+    """
     import threading
     from core.endpoints.installer_progress import _TQDM_QUEUE_LOCK
-    assert isinstance(_TQDM_QUEUE_LOCK, type(_TQDM_QUEUE_LOCK)), (
-        "_TQDM_QUEUE_LOCK must be a threading lock"
+
+    _LockType = type(threading.Lock())  # concrete _thread.lock class
+    assert isinstance(_TQDM_QUEUE_LOCK, _LockType), (
+        f"_TQDM_QUEUE_LOCK must be threading.Lock() but got {type(_TQDM_QUEUE_LOCK)!r}"
     )
-    # Verify it's acquirable (basic lock sanity check)
+    # Also verify it behaves as a lock (acquirable and releasable)
     acquired = _TQDM_QUEUE_LOCK.acquire(blocking=False)
     assert acquired, "_TQDM_QUEUE_LOCK must be acquirable (not already held)"
     _TQDM_QUEUE_LOCK.release()

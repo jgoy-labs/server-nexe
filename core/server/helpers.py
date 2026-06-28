@@ -47,7 +47,7 @@ def setup_signal_handlers():
   signal.signal(signal.SIGINT, signal_handler)
   signal.signal(signal.SIGTERM, signal_handler)
 
-# translate() viu ara a core.i18n_utils (font canònica).
-# Re-exportem aquí perquè els call-sites (`from .helpers import translate`)
-# segueixin funcionant amb la mateixa signatura.
+# translate() now lives in core.i18n_utils (canonical source).
+# We re-export here so the call-sites (`from .helpers import translate`)
+# keep working with the same signature.
 from core.i18n_utils import translate  # noqa: E402,F401

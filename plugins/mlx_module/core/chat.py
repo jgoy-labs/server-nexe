@@ -390,6 +390,20 @@ class MLXChatNode:
             MLXChatNode._model = None  # Force reload
             MLXChatNode._is_vlm = False  # Reset: will be re-detected during _get_model()
 
+    def apply_config(self, new_config: "MLXConfig") -> None:
+        """Hot-swap the active model config and invalidate the class singletons.
+
+        Mirrors the reset that __init__ performs when the model path changes:
+        swaps the shared _config, drops the cached _model so the next
+        _get_model() reloads, and resets _is_vlm for re-detection. Public entry
+        point so web_ui calls MLXModule.switch_model() instead of reaching into
+        these class-level privates directly (B073).
+        """
+        self.config = new_config
+        MLXChatNode._config = new_config
+        MLXChatNode._model = None
+        MLXChatNode._is_vlm = False
+
     def _get_model(self) -> tuple:
         """
         Get model and tokenizer/processor (lazy load singleton).
@@ -475,6 +489,7 @@ class MLXChatNode:
         stream_callback = inputs.get("stream_callback")
         max_tokens_override = inputs.get("max_tokens")
         temperature_override = inputs.get("temperature")
+        top_p_override = inputs.get("top_p")  # opt-in nucleus sampling; None → self.config.top_p
         thinking_enabled = inputs.get("thinking_enabled", True)  # True = model decides; False = force off
         images = inputs.get("images")  # Optional[List[bytes]] — VLM support
         # cancel_event: threading.Event-like; route handler sets it when the
@@ -517,6 +532,7 @@ class MLXChatNode:
                         thinking_enabled,
                         cancel_event,
                         session_id,
+                        top_p=top_p_override,
                     ),
                 )
             else:
@@ -536,6 +552,7 @@ class MLXChatNode:
                         temperature_override,
                         thinking_enabled,
                         cancel_event,
+                        top_p=top_p_override,
                     ),
                 )
 
@@ -721,6 +738,8 @@ class MLXChatNode:
         stream_callback: Callable[[str], None],
         cancel_event: Any = None,
         prompt_cache_state: Any = None,
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
     ):
         from mlx_vlm import stream_generate as vlm_stream
 
@@ -741,6 +760,14 @@ class MLXChatNode:
         cache_kwargs = {}
         if prompt_cache_state is not None:
             cache_kwargs["prompt_cache_state"] = prompt_cache_state
+        # Sampling params: mlx_vlm >= 0.4 accepts temperature/top_p via **kwargs.
+        # Passed only when set so unset values (and older mlx_vlm) keep prior
+        # behavior. This also fixes temperature being dropped on the VLM path.
+        sampling_kwargs = {}
+        if temperature is not None:
+            sampling_kwargs["temperature"] = temperature
+        if top_p is not None:
+            sampling_kwargs["top_p"] = top_p
         for chunk in vlm_stream(
             model=model,
             processor=processor,
@@ -748,6 +775,7 @@ class MLXChatNode:
             prompt=formatted_prompt,
             max_tokens=max_tokens or self.config.max_tokens,
             **cache_kwargs,
+            **sampling_kwargs,
         ):
             # Honour client-side cancel: when the HTTP client disconnects,
             # the route handler sets cancel_event so we exit early instead of
@@ -774,9 +802,17 @@ class MLXChatNode:
         formatted_prompt: str,
         tmp_path: Optional[str],
         max_tokens: Optional[int],
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
     ):
         from mlx_vlm import generate as vlm_generate
 
+        # Sampling params passed only when set (see _run_vlm_streaming).
+        sampling_kwargs = {}
+        if temperature is not None:
+            sampling_kwargs["temperature"] = temperature
+        if top_p is not None:
+            sampling_kwargs["top_p"] = top_p
         one = vlm_generate(
             model=model,
             processor=processor,
@@ -784,6 +820,7 @@ class MLXChatNode:
             prompt=formatted_prompt,
             max_tokens=max_tokens or self.config.max_tokens,
             verbose=False,
+            **sampling_kwargs,
         )
         text = one.text if hasattr(one, "text") else str(one)
         if _prompt_has_open_think_prefix(formatted_prompt):
@@ -834,6 +871,7 @@ class MLXChatNode:
         thinking_enabled: bool = True,
         cancel_event: Any = None,
         session_id: str = "default",
+        top_p: Optional[float] = None,
     ) -> Dict[str, Any]:
         """VLM generation with mlx_vlm (text + image). Uses mlx_vlm.generate().
 
@@ -895,10 +933,12 @@ class MLXChatNode:
                     model, processor, formatted_prompt, tmp_path,
                     max_tokens, stream_callback, cancel_event,
                     prompt_cache_state=cache_state,
+                    temperature=temperature, top_p=top_p,
                 )
             else:
                 result_text, result_obj = self._run_vlm_oneshot(
                     model, processor, formatted_prompt, tmp_path, max_tokens,
+                    temperature=temperature, top_p=top_p,
                 )
         finally:
             if tmp_path:
@@ -925,6 +965,7 @@ class MLXChatNode:
         temperature: Optional[float] = None,
         thinking_enabled: bool = True,
         cancel_event: Any = None,
+        top_p: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Blocking generation with MLX and PREFIX MATCHING (executed in thread).
@@ -935,7 +976,7 @@ class MLXChatNode:
             return self._generate_blocking_inner(
                 system, messages, messages_for_cache,
                 stream_callback, session_id, max_tokens, temperature,
-                thinking_enabled, cancel_event,
+                thinking_enabled, cancel_event, top_p,
             )
 
     def _generate_blocking_inner(
@@ -949,13 +990,14 @@ class MLXChatNode:
         temperature: Optional[float] = None,
         thinking_enabled: bool = True,
         cancel_event: Any = None,
+        top_p: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Inner generation logic, called under lock."""
         from mlx_lm.sample_utils import make_sampler
         from .prompt_cache_manager import get_prompt_cache_manager
 
         model, tokenizer = self._get_model()
-        cache_manager = get_prompt_cache_manager(max_size=8)
+        cache_manager = get_prompt_cache_manager(max_size=self.config.max_session_caches)
 
         # Model key for cache (path + identity_hash + session_id)
         identity_hash = compute_system_hash(system)
@@ -995,8 +1037,13 @@ class MLXChatNode:
             full_tokens, cached_token_count, prefix_reused
         )
 
-        # 4. Create sampler
-        sampler = make_sampler(temp=temperature if temperature is not None else self.config.temperature, top_p=self.config.top_p)
+        # 4. Create sampler — top_p is opt-in (mirror of temperature): the request
+        # value wins when set, else fall back to the engine config default (≈0.9).
+        # `is not None` (never truthiness); schema enforces gt=0.0 so 0.0 never arrives.
+        sampler = make_sampler(
+            temp=temperature if temperature is not None else self.config.temperature,
+            top_p=top_p if top_p is not None else self.config.top_p,
+        )
 
         # 5. Run generation with streaming
         text, last_response, _ = run_streaming_generation(

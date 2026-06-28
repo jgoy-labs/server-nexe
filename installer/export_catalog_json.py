@@ -53,11 +53,56 @@ def _flatten_json(path):
     return out
 
 
+def _duplicate_key_errors(label: str, catalog: dict) -> list[str]:
+    """Detect keys present in more than one tier (B158).
+
+    The catalog dicts are flattened with out[key]=model, so a duplicated key
+    silently collapses (last wins) and any metadata divergence (e.g. ram_gb
+    10 vs 22 for the same artifact) is hidden. Flag it before the flatten.
+    """
+    seen: dict = {}
+    for tier, models in catalog.items():
+        for m in models:
+            seen.setdefault(m["key"], []).append((tier, m))
+    errors: list[str] = []
+    for key, occ in seen.items():
+        if len(occ) < 2:
+            continue
+        tiers = ", ".join(t for t, _ in occ)
+        divergent = []
+        for field in ("ram_gb", "disk_gb"):
+            vals = {m.get(field) for _, m in occ}
+            if len(vals) > 1:
+                divergent.append(
+                    f"{field}={sorted(v for v in vals if v is not None)}"
+                )
+        detail = (
+            f" amb metadades divergents ({'; '.join(divergent)})"
+            if divergent
+            else ""
+        )
+        errors.append(
+            f"[DUP] {label}: clau '{key}' apareix a {len(occ)} tiers "
+            f"({tiers}){detail} — el catàleg col·lapsa per clau i amaga la divergència"
+        )
+    return errors
+
+
 def validate(json_path: str) -> list[str]:
     """Validate sync. Return list of errors (empty if all OK)."""
     py = _flatten_py()
     js = _flatten_json(json_path)
     errors: list[str] = []
+
+    # B158: claus duplicades dins un mateix catàleg col·lapsen al flatten i
+    # amaguen divergències de metadades (gemma4_31b: ram_gb 10 vs 22). Caça-ho.
+    errors.extend(_duplicate_key_errors("installer_catalog_data.py", MODEL_CATALOG))
+    errors.extend(
+        _duplicate_key_errors(
+            "models.json",
+            json.loads(Path(json_path).read_text(encoding="utf-8")),
+        )
+    )
 
     for key, jm in js.items():
         if key not in py:

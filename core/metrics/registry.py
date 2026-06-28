@@ -142,6 +142,33 @@ def reset_metrics() -> None:
   Warning: Only use in tests!
   """
   logger.warning("Metrics reset requested - only for testing")
+  _ALL_METRICS = [
+    HTTP_REQUESTS_TOTAL,
+    HTTP_REQUEST_DURATION,
+    HTTP_ERRORS_TOTAL,
+    ACTIVE_CONNECTIONS,
+    MODULE_HEALTH_STATUS,
+    RATE_LIMIT_HITS,
+    MEMORY_OPERATIONS,
+    MEMORY_STORE_SIZE,
+    RAG_SEARCHES,
+    RAG_SEARCH_DURATION,
+    CHAT_ENGINE_REQUESTS,
+    CHAT_ENGINE_DURATION,
+    EMBEDDING_OPERATIONS,
+    EMBEDDING_CACHE_HITS,
+    EMBEDDING_CACHE_MISSES,
+  ]
+  for metric in _ALL_METRICS:
+    if metric._labelnames:
+      # Labeled metric: clear() removes all child label combinations
+      metric.clear()
+    elif isinstance(metric, Gauge):
+      # Non-labeled Gauge: set back to 0
+      metric.set(0)
+    else:
+      # Non-labeled Counter/Histogram: reset internal value directly
+      metric._value.set(0)
 
 def normalize_path(path: str) -> str:
   """

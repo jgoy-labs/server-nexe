@@ -194,9 +194,14 @@ class MemoryRecallNode(Node):
     rag_log = get_rag_logger()
     rag_log.recall_start(query, limit, entry_type_str, person_id)
 
+    # MC-113: the query is sensitive free text and this node's logs persist to
+    # disk (sidecar stdout) → redact, never log verbatim. Function-level import
+    # keeps core.log_redact off the import-time layering graph (leaf-only dep).
+    from core.log_redact import redact_user_content
+
     logger.info("═" * 50)
     logger.info("MEMORY RECALL START")
-    logger.info(f"  limit={limit}, type={entry_type_str}, query={query[:30] if query else 'None'}...")
+    logger.info(f"  limit={limit}, type={entry_type_str}, query={redact_user_content(query) if query else 'None'}")
 
     try:
       # Try MemoryService first (v1)
@@ -251,10 +256,13 @@ class MemoryRecallNode(Node):
     """Generate embedding via Ollama API."""
     try:
       import httpx
+      # MC-089: honour OLLAMA_HOST/SidecarConfig too (function-level import keeps
+      # core.ollama_utils off the import-time layering graph for memory/).
+      from core.ollama_utils import resolve_ollama_url
 
       async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.post(
-          f"{os.environ.get('NEXE_OLLAMA_HOST', 'http://localhost:11434').rstrip('/')}/api/embeddings",
+          f"{resolve_ollama_url()}/api/embeddings",
           json={"model": os.environ.get("NEXE_OLLAMA_EMBED_MODEL", "nomic-embed-text"), "prompt": text[:8000]}
         )
 

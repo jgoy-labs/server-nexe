@@ -170,12 +170,13 @@ def setup_removed_direct_routes_guard(app: FastAPI) -> None:
 
 def setup_rate_limiting(app: FastAPI, i18n = None) -> None:
   """
-  Setup rate limiting for the application
+  Setup rate limiting for the application.
 
-  Advanced rate limiting with:
-  - Multiple limiters (IP, API key, composite, endpoint)
-  - X-RateLimit-* headers
-  - Background cleanup task (started via startup event)
+  Only per-IP rate limiting is actually enforced, via SlowAPIMiddleware
+  (``app.state.limiter``). The advanced limiters (API key / composite /
+  endpoint) and the hourly cleanup task were dead wiring and were removed
+  (MC-123/MC-124); the unreferenced definitions in
+  plugins/security/core/rate_limiting.py await a future dead-code sweep.
 
   Args:
     app: FastAPI application instance
@@ -187,30 +188,15 @@ def setup_rate_limiting(app: FastAPI, i18n = None) -> None:
 
   app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+  # MC-123/MC-124: the advanced limiters (by_key/composite/by_endpoint) were
+  # published to app.state but never consumed, and the hourly rate-limit cleanup
+  # task iterated an always-empty tracker (record_request has no caller). Only the
+  # per-IP limiter (app.state.limiter via SlowAPIMiddleware, set above) is actually
+  # enforced, so we no longer publish the orphan limiters nor start the no-op
+  # cleanup task. (The now-unreferenced definitions in plugins/security/core/
+  # rate_limiting.py can be garbage-collected in a future dead-code sweep.)
   if ADVANCED_RATE_LIMITING:
-    try:
-      from core.dependencies import (
-        limiter_by_key,
-        limiter_composite,
-        limiter_by_endpoint,
-        start_rate_limit_cleanup_task,
-      )
-
-      app.state.limiter_by_key = limiter_by_key
-      app.state.limiter_composite = limiter_composite
-      app.state.limiter_by_endpoint = limiter_by_endpoint
-
-      app.state.start_rate_limit_cleanup = start_rate_limit_cleanup_task
-
-      logger.info("Advanced rate limiting enabled")
-      logger.info("  - IP rate limiting: OK")
-      logger.info("  - API key / composite limiters available on app.state")
-
-    except Exception as e:
-      msg1 = _translate(i18n, "core.middleware.rate_limit_advanced_failed", "Advanced rate limiting setup failed: {error}", error=str(e))
-      msg2 = _translate(i18n, "core.middleware.rate_limit_fallback", "  Falling back to basic rate limiting")
-      logger.warning(msg1)
-      logger.info(msg2)
+    logger.info("Rate limiting: per-IP enforced (SlowAPIMiddleware)")
   else:
     msg = _translate(i18n, "core.middleware.rate_limit_basic", "Using basic rate limiting (per-IP only)")
     logger.info(msg)
@@ -410,7 +396,7 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
   # prefer SidecarConfig.is_production over direct NEXE_ENV,
   # combinem amb OR sobre el raw env per a robustesa davant singletons stale.
   # Session 3 part 3 already overrode csrf_secret + is_prod with SidecarConfig.
-  raw_is_prod = os.getenv("NEXE_ENV", "development") == "production"
+  raw_is_prod = os.getenv("NEXE_ENV", "production") == "production"
   sidecar_is_prod = False
   try:
     from core.sidecar_config import get_sidecar_config

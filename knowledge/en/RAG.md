@@ -152,7 +152,7 @@ routes_chat.py — _extract_safe_mem_saves()
     ├─── clean text → visible stream (user never sees the marker)
     │
     ▼
-chat_memory.py — auto_save_to_memory()
+chat_memory.py — _save_conversation_to_memory()
     │  · Creates personal_memory collection if missing
     │  · Checks duplicates (similarity > 0.80 → discards)
     │
@@ -165,7 +165,7 @@ Qdrant — personal_memory collection
 
 **Delete intent (MEM_DELETE):** When the user says "forget that X", searches for entries with similarity >= **DELETE_THRESHOLD (0.20 since v0.9.9)**. Deletes the closest match. Anti-re-save guard: `_recently_deleted_facts` prevents the model from re-saving a just-deleted fact within the same session.
 
-> **In v0.9.9 the memory threshold was lowered:** the previous value (0.70) was too high and no match passed the check. It was adjusted to **0.20** after 8 real e2e tests (`tests/integration/test_mem_delete_e2e.py`) against embedded Qdrant + fastembed. Deletion now works consistently.
+> **In v0.9.9 the memory threshold was lowered:** the previous value (0.55) was too high and no match passed the check (full historical chain: 0.82 → 0.70 → 0.55 → 0.20). It was adjusted to **0.20** after 8 real e2e tests (`tests/integration/test_mem_delete_e2e.py`) against embedded Qdrant + fastembed. Deletion now works consistently.
 
 ### 2-turn `clear_all` confirmation
 
@@ -230,7 +230,7 @@ When RAG finds relevant results, they are injected into the LLM prompt in 3 labe
 |----------|-----------|-----------|-----------|-------------------|
 | System docs | SYSTEM DOCUMENTATION | DOCUMENTACIO DEL SISTEMA | DOCUMENTACION DEL SISTEMA | nexe_documentation |
 | Technical docs | TECHNICAL DOCUMENTATION | DOCUMENTACIO TECNICA | DOCUMENTACION TECNICA | user_knowledge |
-| User memory | USER MEMORY | MEMORIA USUARI | MEMORIA USUARIO | personal_memory |
+| User memory | USER MEMORY | MEMORIA DE L'USUARI | MEMORIA DEL USUARIO | personal_memory |
 
 **Context limits:**
 - `MAX_CONTEXT_CHARS` = 24000 (configurable via `NEXE_MAX_CONTEXT_CHARS` env var)
@@ -296,4 +296,4 @@ storage/vectors/
 - `POST /v1/chat/completions` — Chat with RAG (use_rag: true by default)
 - `POST /v1/memory/store` — Save text to a collection (uses MemoryService when initialised, otherwise falls back to a direct Qdrant write for resilience)
 - `POST /v1/memory/search` — Direct semantic search in a collection
-- `DELETE /v1/rag/documents/{id}` — Delete a specific entry
+- `DELETE /v1/rag/documents/{id}` — **[planned, NOT implemented]** returns 501 Not Implemented (router tagged `future`; all three `/v1/rag/*` endpoints — search, add, documents/{id} — are not yet operational)

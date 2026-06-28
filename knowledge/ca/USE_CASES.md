@@ -57,7 +57,7 @@ L'API compatible amb OpenAI (`/v1/chat/completions`) funciona amb qualsevol eina
 
 **Per a qui:** usuaris que volen comparar empiricament velocitat i qualitat de diferents backends i models locals.
 
-Canvia entre **MLX** (natiu Apple Silicon), **llama.cpp** (GGUF universal) i **Ollama** (gestio facil) amb un canvi de config. Cataleg de 14 models en 4 tiers de RAM — des de Qwen3.5 4B fins ALIA-40B.
+Canvia entre **MLX** (natiu Apple Silicon), **llama.cpp** (GGUF universal) i **Ollama** (gestio facil) amb un canvi de config. Cataleg de 15 models en 4 tiers de RAM — des de Qwen3.5 4B fins ALIA-40B.
 
 **Exemple:** prova Qwen3.5 9B (Ollama, tier_16) vs Gemma 4 E4B (MLX, tier_16) per saber quin encaixa millor amb el teu hardware i cas d'us.
 
@@ -65,7 +65,7 @@ Canvia entre **MLX** (natiu Apple Silicon), **llama.cpp** (GGUF universal) i **O
 
 **Per a qui:** organitzacions amb requeriments de compliance (RGPD, HIPAA, secret professional) que no poden enviar dades a un proveidor extern.
 
-Activa l'encriptacio at-rest (`NEXE_ENCRYPTION_ENABLED=auto`, fail-closed des de v0.9.2) i totes les dades queden xifrades amb AES-256-GCM: base de dades SQLite (via SQLCipher), sessions de xat (`.enc`) i text de documents RAG.
+Per a compliance, activa l'encriptacio at-rest en mode **fail-closed estricte**: `pip install sqlcipher3-binary && export NEXE_ENCRYPTION_ENABLED=true`. Amb `=true` el servidor es nega a arrencar si no hi ha `sqlcipher3`, aixi que mai pot caure silenciosament a plaintext. (El valor per defecte `=auto` es fail-OPEN: si falta `sqlcipher3` arrenca en plaintext amb un banner d'avis ben visible — be per a dev, NO per a compliance.) Amb l'encriptacio activa, totes les dades queden xifrades amb AES-256-GCM: base de dades SQLite (via SQLCipher), sessions de xat (`.enc`) i text de documents RAG.
 
 **Nota compliance:** server-nexe NO ha passat certificacions externes. L'encriptacio es forta pero el sistema es un projecte open-source d'un desenvolupador, no un producte enterprise amb auditories professionals.
 

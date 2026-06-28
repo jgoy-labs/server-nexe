@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from core.env_utils import parse_truthy
+
 from fastapi import FastAPI
 
 from core.server.factory import create_app as _create_app
@@ -77,7 +79,7 @@ def get_app() -> FastAPI:
   """
   global _app_instance
   if _app_instance is None:
-    force_reload = os.getenv('NEXE_FORCE_RELOAD', 'false').lower() == 'true'
+    force_reload = parse_truthy(os.getenv('NEXE_FORCE_RELOAD', 'false'))
     _app_instance = create_app(force_reload=force_reload)
   return _app_instance
 

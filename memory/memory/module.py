@@ -14,7 +14,11 @@ import threading
 import logging
 
 from personality.i18n import get_i18n
-from core.lifespan import get_server_state
+# MC-102: import the shared startup-state from the dependency-free leaf
+# (core/server_state.py), NOT from core/lifespan.py. memory→core is the INTENDED
+# direction; pointing at the leaf removes the latent core↔memory cycle entirely
+# (core.server_state imports nothing from memory) — no deferred-edge escape hatch.
+from core.server_state import get_server_state
 
 from .engines.flash_memory import FlashMemory
 from .engines.ram_context import RAMContext
@@ -70,7 +74,8 @@ class MemoryModule:
 
     # Dependencies obtained via server_state (single source of truth)
     self.i18n = get_i18n()
-    self.config = get_server_state().config
+    # MC-126: removed dead `self.config = get_server_state().config` snapshot —
+    # no reader; initialize() resolves config from manifest + arg independently.
 
     self._flash_memory = None
     self._ram_context = None

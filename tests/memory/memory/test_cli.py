@@ -1,49 +1,105 @@
 """
-Tests for memory/memory/cli.py - Memory CLI module.
-The cli.py file coexists with a cli/ package directory.
-Python resolves the package directory first, so we use importlib
-to load cli.py directly, injecting its dependencies first.
+Tests for memory/memory/memory_cli.py - Memory CLI module.
+
+The CLI module was renamed from ``cli.py`` to ``memory_cli.py`` (B065):
+a sibling ``cli/`` package shadowed ``cli.py`` so ``python -m memory.memory.cli``
+resolved to the package (no ``__main__``) and always exited 1. After the rename
+the module is importable normally — no spec_from_file_location hack needed.
 """
 
 import pytest
 import asyncio
 import argparse
-import importlib.util
+import os
+import subprocess
 import sys
-import types
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
+import memory.memory.memory_cli as _cli_mod
 
-def _load_cli_module():
-    """Load memory/memory/cli.py directly since the cli/ package shadows it."""
-    import memory.memory as _mm
-    cli_path = Path(_mm.__file__).parent / "cli.py"
 
-    # Create a fake parent package context so relative imports work
-    # The cli.py does: from .module import MemoryModule
-    # from .models.memory_entry import MemoryEntry
-    # from .models.memory_types import MemoryType
-    # These resolve relative to memory.memory
+# Repository root (…/server-nexe) — three levels up from this test file:
+#   tests/memory/memory/test_cli.py -> tests/memory/memory -> tests/memory -> tests -> repo root
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
-    # Ensure memory.memory is importable
-    import memory.memory
 
-    spec = importlib.util.spec_from_file_location(
-        "memory.memory._cli_file",
-        cli_path,
-        submodule_search_locations=[]
+def _run_cli(*args: str) -> subprocess.CompletedProcess:
+    """Run the Memory CLI as a real module: ``python -m memory.memory.memory_cli``.
+
+    This is the *production* invocation path (core/cli/router.py launches the
+    entry_point via ``python -m <entry_point>``). It is the only honest way to
+    prove the shadowing bug is gone: a spec_from_file_location loader bypasses
+    the package-shadow resolution and would stay green even with the bug.
+    """
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        f"{_REPO_ROOT}{os.pathsep}{existing}" if existing else str(_REPO_ROOT)
     )
-    mod = importlib.util.module_from_spec(spec)
-    # Set the package so relative imports resolve to memory.memory
-    mod.__package__ = "memory.memory"
-    sys.modules["memory.memory._cli_file"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    return subprocess.run(
+        [sys.executable, "-m", "memory.memory.memory_cli", *args],
+        cwd=str(_REPO_ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
 
 
-# Load the module once
-_cli_mod = _load_cli_module()
+# The 8 subcommands the Memory CLI must expose.
+_SUBCOMMANDS = ["store", "recall", "stats", "cleanup", "inspect", "search", "mirror", "gc"]
+
+
+class TestModuleInvocation:
+    """B065: the CLI must run as a real ``python -m`` module, not be shadowed."""
+
+    def test_module_help_runs(self):
+        """`python -m memory.memory.memory_cli --help` must exit 0.
+
+        With the bug (cli.py shadowed by the cli/ package), running the package
+        as a module fails with 'is a package and cannot be directly executed'
+        and a non-zero exit. After the rename the module runs cleanly.
+        """
+        proc = _run_cli("--help")
+        assert proc.returncode == 0, (
+            f"`python -m memory.memory.memory_cli --help` exited "
+            f"{proc.returncode}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+        assert "Memory Module CLI" in proc.stdout
+
+    def test_all_eight_subcommands_present(self):
+        """All 8 subcommands must appear in --help output (not just store/recall/stats/cleanup)."""
+        proc = _run_cli("--help")
+        assert proc.returncode == 0, proc.stderr
+        for cmd in _SUBCOMMANDS:
+            assert cmd in proc.stdout, f"subcommand '{cmd}' missing from --help:\n{proc.stdout}"
+
+    def test_package_main_entry_runs(self):
+        """`python -m memory.memory` (via __main__.py) must also exit 0.
+
+        __main__.py used to do `from .cli import main`, which after the shadow
+        resolved to the cli/ package (no `main`) → ImportError. It must import
+        from memory_cli now.
+        """
+        env = os.environ.copy()
+        existing = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = (
+            f"{_REPO_ROOT}{os.pathsep}{existing}" if existing else str(_REPO_ROOT)
+        )
+        proc = subprocess.run(
+            [sys.executable, "-m", "memory.memory", "--help"],
+            cwd=str(_REPO_ROOT),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert proc.returncode == 0, (
+            f"`python -m memory.memory --help` exited {proc.returncode}\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+        assert "Memory Module CLI" in proc.stdout
 MemoryCLI = _cli_mod.MemoryCLI
 create_parser = _cli_mod.create_parser
 async_main_func = _cli_mod.async_main

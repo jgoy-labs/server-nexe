@@ -545,3 +545,36 @@ export default UserService;
     result = self.chunker.chunk(code, metadata={"file_path": "service.js"})
 
     assert result.total_chunks >= 2
+
+class TestCharOffsetsWithDuplicateChunks:
+  """B116: chunks amb text idèntic han de rebre posicions distintes i correctes."""
+
+  def setup_method(self):
+    self.chunker = CodeChunker()
+
+  _CODE = (
+    "def helper():\n"
+    "  return 1\n"
+    "\n"
+    "def other():\n"
+    "  return 2\n"
+    "\n"
+    "def helper():\n"
+    "  return 1\n"
+  )
+
+  def test_duplicate_helpers_get_distinct_positions(self):
+    """Dos helpers homònims idèntics no poden compartir start_char/end_char."""
+    result = self.chunker.chunk(self._CODE, metadata={"file_path": "m.py"})
+    assert result.total_chunks == 3
+    starts = [c.start_char for c in result.chunks]
+    # El bug B116 produeix [0, 26, 0]; els starts han de ser estrictament creixents.
+    assert starts == sorted(starts)
+    assert len(set(starts)) == 3, f"posicions duplicades (bug B116): {starts}"
+
+  def test_char_offsets_point_to_actual_text(self):
+    """El slice code[start:end] del 3r chunk (segon helper) ha de coincidir amb el seu text."""
+    result = self.chunker.chunk(self._CODE, metadata={"file_path": "m.py"})
+    third = result.chunks[2]
+    assert self._CODE[third.start_char:third.end_char] == third.text
+    assert third.start_char > result.chunks[1].start_char

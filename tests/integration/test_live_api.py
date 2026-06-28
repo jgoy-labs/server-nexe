@@ -162,15 +162,6 @@ class TestV1Endpoints:
 # Bootstrap
 # ═══════════════════════════════════════════════════════════════════════════
 
-class TestBootstrapEndpoints:
-    """GET /api/bootstrap/info"""
-
-    def test_bootstrap_info(self):
-        """GET /api/bootstrap/info → 200 or 4xx (depends on configuration)"""
-        r = requests.get(f"{BASE_URL}/api/bootstrap/info", timeout=5)
-        # The endpoint may return 200 or 4xx if bootstrap has already been completed
-        assert r.status_code in (200, 400, 403, 404, 410)
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Admin endpoints

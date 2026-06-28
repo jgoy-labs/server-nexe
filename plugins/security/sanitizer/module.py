@@ -111,7 +111,12 @@ class SanitizerModule:
 
     needs_intervention = severity in ["medium", "high", "critical"]
 
-    is_safe = severity != "critical"
+    # B129: is_safe must agree with the .is_safe() method (False on ANY threat).
+    # The previous `severity != "critical"` reported is_safe=True for medium/high
+    # threats, contradicting the field docstring and the method. The HTTP block
+    # gate uses `severity`, not this field, so this only fixes the field's own
+    # semantics (and its log line).
+    is_safe = len(threats) == 0
 
     scan_time = (time.perf_counter() - start) * 1000
 

@@ -3,62 +3,54 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/tests/test_status_endpoint_llama_cpp.py
-Description: Regression tests for P0-2.c fix — /status endpoint symmetric check
-             for llama_cpp. Tests the extracted helper _check_llama_cpp_available()
-             which is pure and unit-testable without a real starlette.Request
-             (slowapi's @limiter.limit rejects MagicMock).
+Description: Node-aware llama_cpp availability regression tests. Originally
+             P0-2.c covered the extracted helper _check_llama_cpp_available();
+             B260 consolidated that node check into the SINGLE source of truth
+             routing._engine_available() (used by both chat routing and /status),
+             so these tests now exercise the canonical function. The ghost-plugin
+             semantics (key present but _node is None → unavailable) are preserved.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import pytest
 from unittest.mock import MagicMock
 
-try:
-  from core.endpoints.root import _check_llama_cpp_available
-except ImportError:
-  pytest.skip("_check_llama_cpp_available helper not available", allow_module_level=True)
+from core.endpoints.chat_engines.routing import _engine_available
 
 
-class TestCheckLlamaCppAvailable:
-  """P0-2.c: /status symmetric check via _check_llama_cpp_available() helper."""
+def _state(modules):
+  app_state = MagicMock()
+  app_state.modules = modules
+  return app_state
+
+
+class TestLlamaCppNodeAwareAvailability:
+  """B260 (ex P0-2.c): /status + chat share routing._engine_available."""
 
   def test_false_when_node_is_none(self):
     """Module present in dict but _node is None → NOT available.
 
-    This catches the ghost-plugin bug: before P0-2.c, /status only checked
-    `"llama_cpp_module" in modules` and reported True regardless of whether
-    the module had a working backend.
+    The ghost-plugin bug: before the node check, availability was reported by
+    ``"llama_cpp_module" in modules`` regardless of a working backend.
     """
     ghost_plugin = MagicMock()
     ghost_plugin._node = None
-
-    modules = {"llama_cpp_module": ghost_plugin}
-    assert _check_llama_cpp_available(modules) is False, (
-      "llama_cpp must be reported unavailable when _node is None — "
-      "this is the ghost-plugin bug that P0-2.c fixes"
+    assert _engine_available("llama_cpp", _state({"llama_cpp_module": ghost_plugin})) is False, (
+      "llama_cpp must be unavailable when _node is None — the ghost-plugin bug"
     )
 
   def test_true_when_node_present(self):
     """Module present with a working _node → available."""
     working_plugin = MagicMock()
     working_plugin._node = MagicMock()  # non-None, truthy
-
-    modules = {"llama_cpp_module": working_plugin}
-    assert _check_llama_cpp_available(modules) is True
+    assert _engine_available("llama_cpp", _state({"llama_cpp_module": working_plugin})) is True
 
   def test_false_when_module_absent(self):
-    """Module not in dict at all (e.g., popped by P0-2.b loader fix) → False."""
-    # Only ollama loaded, no llama_cpp
-    modules = {"ollama_module": MagicMock()}
-    assert _check_llama_cpp_available(modules) is False
+    """Module not in dict at all (e.g., popped by the loader) → False."""
+    assert _engine_available("llama_cpp", _state({"ollama_module": MagicMock()})) is False
 
   def test_false_when_instance_has_no_node_attr(self):
-    """Defensive: if the plugin doesn't even have _node attribute, return False.
-
-    Prevents AttributeError if a future plugin class is misshapen.
-    """
+    """Defensive: a plugin without a _node attribute returns False (no AttributeError)."""
     weird_plugin = object()  # no attributes at all
-    modules = {"llama_cpp_module": weird_plugin}
-    assert _check_llama_cpp_available(modules) is False
+    assert _engine_available("llama_cpp", _state({"llama_cpp_module": weird_plugin})) is False

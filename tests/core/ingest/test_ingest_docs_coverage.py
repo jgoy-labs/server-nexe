@@ -11,10 +11,6 @@ class TestIngestDocsModule:
         assert CHUNK_SIZE == 500
         assert CHUNK_OVERLAP == 50
 
-    def test_ingest_function_exists(self):
-        from core.ingest.ingest_docs import ingest_documentation
-        assert callable(ingest_documentation)
-
     def test_chunk_text_called_with_module_constants(self, tmp_path):
         """AP-04: ingest must pass CHUNK_SIZE/CHUNK_OVERLAP to chunk_text.
 

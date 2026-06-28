@@ -1,4 +1,4 @@
-// ModelPickerView.swift — Pantalla 3: Selecció de model amb tabs i targetes
+// ModelPickerView.swift — Screen 3: Model selection with tabs and cards
 
 import SwiftUI
 
@@ -41,7 +41,7 @@ struct ModelPickerView: View {
             .padding(.horizontal, 24)
 
             if selectedTab == "custom" {
-                // Pestanya personalitzat
+                // Custom tab
                 CustomModelView(
                     ollamaName: $customOllamaName,
                     hfRepo: $customHFRepo,
@@ -56,14 +56,14 @@ struct ModelPickerView: View {
                     }
                 )
             } else {
-                // Llista de models del catàleg
+                // List of models from the catalog
                 GeometryReader { geo in
                     ScrollView {
                         VStack {
                             Spacer(minLength: 0)
                             LazyVStack(spacing: 10) {
                                 ForEach(engine.catalog.models(for: selectedTab)) { model in
-                                    // B171: '>' estricte perquè un model al seu tier exacte (ramGB == 75% de la RAM) sigui seleccionable.
+                                    // B171: strict '>' so a model at its exact tier (ramGB == 75% of RAM) stays selectable.
                                     let tooLarge = model.ramGB > Double(engine.hardware.ramGB) * 0.75
                                     ModelCard(
                                         model: model,
@@ -88,7 +88,7 @@ struct ModelPickerView: View {
                 }
             }
 
-            // Engine selector (només si hi ha model seleccionat)
+            // Engine selector (only if a model is selected)
             if let model = engine.selectedModel {
                 HStack {
                     Text(t("model_engine"))
@@ -109,7 +109,7 @@ struct ModelPickerView: View {
                 .padding(.horizontal, 24)
             }
 
-            // Botons
+            // Buttons
             HStack {
                 Button(t("btn_back")) { onBack() }
                     .controlSize(.large)
@@ -308,7 +308,7 @@ struct CustomModelView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
-                // Selector Ollama / HuggingFace
+                // Ollama / HuggingFace selector
                 Picker("", selection: $selectedSource) {
                     Text("Ollama").tag("ollama")
                     Text("Hugging Face").tag("hf")

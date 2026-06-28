@@ -79,7 +79,7 @@ Server Nexe empezó como un experimento de learning-by-doing: *"¿Qué haría fa
 
 **Todo este proyecto — código, tests, auditorías, documentación — ha sido construido por una persona orquestando diferentes modelos de IA**, tanto locales (MLX, Ollama) como en la nube (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), como colaboradores. El humano decide qué construir, diseña la arquitectura, revisa línea a línea y ejecuta tests. Las IAs escriben, auditan y hacen stress-test bajo dirección humana.
 
-Lo que empezó como un prototipo se ha convertido en un producto genuinamente útil: 5291 tests, auditorías de seguridad, encriptación at-rest, un instalador macOS con detección de hardware, y un sistema de plugins. No está acabado — hay una hoja de ruta llena de ideas — pero ya hace lo que se proponía: **ejecutar un servidor de IA en tu máquina, con memoria que persiste, y cero datos saliendo de tu dispositivo.**
+Lo que empezó como un prototipo se ha convertido en un producto genuinamente útil: 7165 tests, auditorías de seguridad, encriptación at-rest, un instalador macOS con detección de hardware, y un sistema de plugins. No está acabado — hay una hoja de ruta llena de ideas — pero ya hace lo que se proponía: **ejecutar un servidor de IA en tu máquina, con memoria que persiste, y cero datos saliendo de tu dispositivo.**
 
 No intenta competir con ChatGPT ni Claude. Pero sí puede ser complementario para tareas menos pesadas. Es una herramienta open-source para gente que quiere ser propietaria de su infraestructura de IA. Construido por una persona en Barcelona, con IA como copiloto, música, y tozudez.
 
@@ -159,7 +159,7 @@ Sube .txt, .md o .pdf y se indexan automáticamente para RAG. Cada documento sol
 <td width="50%">
 
 ### Construido para Crecer
-5291 tests (~85% cobertura), auditoría de seguridad, i18n en 3 idiomas, API completa. Lo que empezó como un experimento se construye con prácticas de producción.
+7165 tests (~85% cobertura), auditoría de seguridad, i18n en 3 idiomas, API completa. Lo que empezó como un experimento se construye con prácticas de producción.
 
 </td>
 </tr>
@@ -289,7 +289,7 @@ Server Nexe utiliza un protocolo de duck typing (NexeModule Protocol) — sin he
 | **mlx_module** | Backend LLM | Nativo Apple Silicon, prefix caching (trie), GPU Metal |
 | **llama_cpp_module** | Backend LLM | GGUF universal, ModelPool LRU, CPU/GPU |
 | **ollama_module** | Backend LLM | Puente HTTP a Ollama, auto-arranque, limpieza VRAM |
-| **security** | Core | Auth dual-key, 6 detectores de inyección + NFKC, 47 patrones jailbreak, rate limiting, audit logging RFC5424 |
+| **security** | Core | Auth dual-key, 6 detectores de inyección + NFKC, 49 patrones jailbreak, rate limiting, audit logging RFC5424 |
 | **web_ui_module** | Interfaz | Chat web, sesiones, subida de documentos, MEM_SAVE, sanitización RAG, i18n |
 
 ## Documentación AI-Ready
@@ -315,7 +315,7 @@ Server Nexe incluye un módulo de seguridad activado por defecto:
 - **Protección CSRF** con validación de token
 - **Rate limiting** por endpoint (20/min chat, 5/min upload)
 - **Sanitización de input** — 6 detectores de inyección + normalización Unicode (NFKC)
-- **Detección de jailbreak** — 47 patrones speed-bump (v0.9.1)
+- **Detección de jailbreak** — 11 patrones speed-bump (v0.9.1)
 - **Denylist de subidas** — bloquea subida accidental de claves API, claves PEM (v0.9.1)
 - **Protección de inyección de memoria** — stripping de tags en todos los caminos de entrada (v0.9.1)
 - **Enforcement de pipeline** — todo el chat pasa por los endpoints canónicos (v0.9.1)
@@ -348,7 +348,7 @@ Server Nexe incluye un módulo de seguridad activado por defecto:
 
 ## Testing
 
-5291 tests (~85% cobertura honesta). El CI ejecuta la suite completa en cada push.
+7165 tests (~85% cobertura honesta). El CI ejecuta la suite completa en cada push.
 
 ```bash
 # Tests unitarios

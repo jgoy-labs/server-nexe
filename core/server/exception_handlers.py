@@ -41,6 +41,57 @@ def _retry_after_seconds(detail: str | None) -> int:
   multiplier_seconds = _UNIT_SECONDS[match.group(2).lower()]
   return int(match.group(1)) * multiplier_seconds
 
+_JSON_PRIMITIVE = (str, int, float, bool, type(None))
+
+
+def _sanitize_ctx(ctx: object) -> dict | None:
+  """Keep only JSON-primitive ``ctx`` entries (B256).
+
+  For a *custom* ``@field_validator`` that ``raise``s, Pydantic v2 packs the raw
+  exception into ``ctx={'error': ValueError(...)}`` — a non-JSON-serialisable
+  object. Left untouched it detonates twice: ``JSONResponse.render()`` raises
+  ``TypeError: ... not JSON serializable`` (the 422 collapses into a latent 500),
+  and the ``ValueError``'s repr — which may echo the user's value — reaches the
+  log. Standard constraint failures use flat primitive ctx (e.g.
+  ``{'max_length': 200}``), which survives untouched so diagnostics stay intact.
+  """
+  if not isinstance(ctx, dict):
+    return None
+  safe = {k: v for k, v in ctx.items() if k != "error" and isinstance(v, _JSON_PRIMITIVE)}
+  return safe or None
+
+
+def _sanitize_validation_errors(errors: list) -> list:
+  """Strip non-diagnostic, value-bearing fields from Pydantic validation errors
+  before they are logged or returned in the 422 body (B254 + B256).
+
+  B254: ``input`` echoes the offending value — for an oversized HF-token paste
+  that value IS the secret. B256: ``ctx`` may carry a non-serialisable exception
+  from a custom validator (see ``_sanitize_ctx``). The client already holds the
+  value and never reads the 422 body (only the status); the log does not need it
+  either. ``type``/``loc``/``msg``/``url`` and primitive ``ctx`` entries carry no
+  landmine, so diagnostics stay intact. Applies to every validated endpoint via
+  the global handler below.
+
+  B259 (design decision): ``msg`` is intentionally NOT genericised. Pydantic
+  packs a custom validator's ``ValueError`` text into ``msg`` ("Value error,
+  <text>"), so blanket-stripping it would discard useful domain diagnostics the
+  client needs ("model not in allowlist", "must match ..."). The contract is the
+  inverse and lives at the source: an HTTP request-body ``@field_validator`` MUST
+  NOT interpolate the user's value into its ``ValueError`` message (keep it
+  static). Today the only such validator is ``PullModelRequest._validate_name``
+  (static; guarded by tests/core/server/test_validation_error_redaction.py).
+  """
+  out = []
+  for err in errors:
+    clean = {k: v for k, v in err.items() if k not in ("input", "ctx")}
+    safe_ctx = _sanitize_ctx(err.get("ctx"))
+    if safe_ctx is not None:
+      clean["ctx"] = safe_ctx
+    out.append(clean)
+  return out
+
+
 def register_exception_handlers(app: FastAPI, i18n) -> None:
   """Register global exception handlers for the application."""
 
@@ -101,17 +152,20 @@ def register_exception_handlers(app: FastAPI, i18n) -> None:
   @app.exception_handler(RequestValidationError)
   async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Validation error handler"""
+    # B254: never log nor echo the offending value (Pydantic's ``input``) — for an
+    # oversized HF-token paste that field is the secret itself.
+    safe_errors = _sanitize_validation_errors(exc.errors())
     logger.error(
       "Validation error on %s: %s",
       request.url.path,
-      exc.errors()
+      safe_errors
     )
 
     return JSONResponse(
       status_code=422,
       content={
         "error": translate(i18n, 'server_core.errors.validation_error', "Validation error"),
-        "detail": exc.errors()
+        "detail": safe_errors
       }
     )
 

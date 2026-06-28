@@ -196,7 +196,7 @@ print(response.json()["choices"][0]["message"]["content"])
 curl -X POST http://127.0.0.1:9119/v1/memory/store \
   -H "X-API-Key: YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Project deadline is March 30", "collection": "user_knowledge"}'
+  -d '{"content": "Project deadline is March 30", "collection": "user_knowledge"}'
 ```
 
 ## Use cases
@@ -208,5 +208,5 @@ See **[[USE_CASES|practical use cases]]** for the full list with detailed contex
 - **First run:** Memory is empty. Talk to the server, upload docs, or use `nexe knowledge ingest` to populate RAG.
 - **Slow first response:** Model loading takes time (10-60s). The loading indicator shows progress.
 - **Backend disconnected:** Server auto-falls back to the first available backend. Check with `./nexe status`.
-- **Large models:** 32B+ models need 32+ GB RAM and may take minutes to load. Timeout is 600s.
+- **Large models:** 32B+ models need 32+ GB RAM and may take minutes to load. The Ollama stream timeout is 300s by default (`NEXE_OLLAMA_STREAM_TIMEOUT`); raise it for very large models.
 - **Encryption:** Enable encryption early — migrating large datasets later takes time. Export and store the master key securely.

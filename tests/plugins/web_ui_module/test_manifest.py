@@ -151,9 +151,28 @@ class TestServeStatic:
         r = client.get("/ui/static/nonexistent.css")
         assert r.status_code == 404
 
-    def test_path_traversal_403(self, client):
-        r = client.get("/ui/static/../../../etc/passwd")
-        assert r.status_code in (400, 403, 404)
+    def test_path_traversal_403(self, tmp_path):
+        """serve_static must yield 403 on traversal — behavioural (B071).
+
+        L'original feia client.get('/ui/static/../../../etc/passwd') via TestClient:
+        httpx col·lapsa '..' a la URL abans del routing → mai exercia el guard (i
+        acceptava 404). Aquí cridem serve_static directament amb el filename cru.
+
+        Prova de mutació: trencar is_relative_to a routes_static.py → ja no 403.
+        """
+        import types
+        from fastapi import APIRouter, HTTPException
+        from plugins.web_ui_module.api.routes_static import register_static_routes
+
+        router = APIRouter()
+        register_static_routes(router, module_ref=types.SimpleNamespace(ui_dir=tmp_path))
+        serve_static = next(
+            r.endpoint for r in router.routes
+            if getattr(r, "path", "").endswith("/static/{filename:path}")
+        )
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(serve_static(filename="../../../etc/passwd", i18n=None))
+        assert exc.value.status_code == 403
 
     def test_existing_css_file(self, client, tmp_path):
         module = get_module_instance()

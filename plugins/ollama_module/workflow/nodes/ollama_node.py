@@ -144,7 +144,7 @@ def sanitize_ollama_response(response: str) -> str:
 
   response = re.sub(r'/Users/[^/\s]+(/[^\s]*)?', '[REDACTED_PATH]', response)  # nosemgrep
   response = re.sub(r'/home/[^/\s]+(/[^\s]*)?', '[REDACTED_PATH]', response)  # nosemgrep
-  response = re.sub(r'C:\\Users\\[^\\\s]+(\\.]*)?', '[REDACTED_PATH]', response)
+  response = re.sub(r'C:\\Users\\[^\\\s]+(?:\\[^\\\s]+)*', '[REDACTED_PATH]', response)
 
   response = re.sub(r'(API_KEY|SECRET|PASSWORD|TOKEN)=[^\s]+', r'\1=[REDACTED]', response, flags=re.IGNORECASE)
 
@@ -414,10 +414,9 @@ else:
 
       start_time = time.perf_counter()
 
-      try:
-        from plugins.workflow_engine.core.execution.sequential_executor import _verbose_logger
-      except ImportError:
-        _verbose_logger = None
+      # plugins.workflow_engine was never shipped (the path doesn't exist), so
+      # this import always fell back to None. Removed the phantom try/except (B078).
+      _verbose_logger = None
 
       if use_streaming:
         generated_text, token_count = await self._execute_streaming(

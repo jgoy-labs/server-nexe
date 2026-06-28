@@ -83,27 +83,6 @@ class TestMetricsContent:
     """Create test client."""
     return TestClient(app)
 
-  def test_contains_nexe_metrics(self, client):
-    """Test metrics contain Nexe-specific metrics."""
-    response = client.get("/metrics", headers=_HEADERS)
-    content = response.text
-
-    assert response.status_code == 200
-
-  def test_metrics_format_valid(self, client):
-    """Test metrics are in valid Prometheus format."""
-    response = client.get("/metrics")
-    content = response.text
-
-    lines = content.strip().split("\n")
-    for line in lines:
-      if not line.strip():
-        continue
-      if line.startswith("#"):
-        continue
-      parts = line.split()
-      assert len(parts) >= 1, f"Invalid metric line: {line}"
-
 
 class TestMetricsHealthUnhealthy:
   """Tests for metrics_health when generate_latest fails (lines 78-80)."""

@@ -10,7 +10,8 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from typing import Dict, Any, List
+from pathlib import Path
+from typing import Dict, Any, List, Optional
 import structlog
 
 from personality.i18n import get_i18n
@@ -109,7 +110,91 @@ def aggregate_health_checks(
   return result
 
 
+def check_paths_writable(
+  check_name: str,
+  paths: List[Path],
+  i18n_prefix: str,
+  *,
+  writable_key: str,
+  writable_text: str,
+  not_writable_key: str,
+  not_writable_text: str,
+  mkdir_paths: Optional[List[Path]] = None,
+  with_details: bool = False
+) -> Dict[str, Any]:
+  """
+  Shared mkdir + write-test + unlink routine for path-writability health checks.
+
+  Creates the required directories, then probes each path in ``paths`` by writing
+  and removing a ``.write_test`` file (stopping at the first failure). Builds the
+  pass/fail result. Callers keep their own try/except so the module-specific
+  "error" branch (and its i18n key) is preserved unchanged.
+
+  Args:
+    check_name: Value for the result "name" field.
+    paths: Directories to probe for writability.
+    i18n_prefix: i18n key namespace (e.g. "rag.health").
+    writable_key / writable_text: i18n key suffix + fallback for the pass case.
+    not_writable_key / not_writable_text: i18n key suffix + fallback for the fail case.
+    mkdir_paths: Directories to create (defaults to ``paths``).
+    with_details: When True, include a "details" block (memory module shape) and
+      render the pass message with ``count``; otherwise render it with ``path``.
+
+  Returns:
+    Dict: {"name", "status", "message"[, "details"]}
+  """
+  i18n = get_i18n()
+  dirs_to_make = mkdir_paths if mkdir_paths is not None else paths
+
+  for directory in dirs_to_make:
+    directory.mkdir(parents=True, exist_ok=True)
+
+  paths_checked: List[str] = []
+  all_writable = True
+
+  for path in paths:
+    test_file = path / ".write_test"
+    try:
+      test_file.write_text("test")
+      test_file.unlink()
+      paths_checked.append(str(path.resolve()))
+    except Exception:
+      all_writable = False
+      break
+
+  if all_writable:
+    if with_details:
+      message = i18n.t(f"{i18n_prefix}.{writable_key}", writable_text, count=len(paths_checked))
+    else:
+      message = i18n.t(f"{i18n_prefix}.{writable_key}", writable_text, path=str(paths[0]))
+    result = {
+      "name": check_name,
+      "status": "pass",
+      "message": message
+    }
+  else:
+    if with_details:
+      message = i18n.t(f"{i18n_prefix}.{not_writable_key}", not_writable_text)
+    else:
+      message = i18n.t(f"{i18n_prefix}.{not_writable_key}", not_writable_text, path=str(paths[0]))
+    result = {
+      "name": check_name,
+      "status": "fail",
+      "message": message
+    }
+
+  if with_details:
+    result["details"] = {
+      "paths": paths_checked,
+      "total": len(paths),
+      "writable": len(paths_checked)
+    }
+
+  return result
+
+
 __all__ = [
   "check_module_initialized",
-  "aggregate_health_checks"
+  "aggregate_health_checks",
+  "check_paths_writable"
 ]

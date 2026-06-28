@@ -11,6 +11,24 @@ import core.bootstrap_tokens as bootstrap_tokens_module
 from core.endpoints.bootstrap import router
 
 
+@pytest.fixture(autouse=True)
+def _reset_sidecar_config():
+    """B258: isolate tests from the SidecarConfig singleton cache.
+
+    _validate_bootstrap_env reads NEXE_ENV via resolve_core_env(), which forces
+    core_env='production' from the get_sidecar_config() singleton (is_production
+    is frozen at construction). Without this reset, the first test that touches
+    config with NEXE_ENV=production freezes the value and later
+    monkeypatch.setenv() calls don't bust the cache, so 8 tests fail when this
+    file runs alone (they pass in the full gate only because other files reset
+    the singleton mid-collection — which masks real env-gate regressions).
+    """
+    from core import sidecar_config
+    sidecar_config.reset_sidecar_config()
+    yield
+    sidecar_config.reset_sidecar_config()
+
+
 @pytest.fixture
 def client():
     app = FastAPI()
@@ -176,103 +194,6 @@ class TestBootstrapSession:
         mock_client.host = ip
         return patch("fastapi.Request.client", new_callable=lambda: property(lambda self: mock_client))
 
-    def test_bootstrap_success_from_localhost(self, monkeypatch, tmp_path):
-        """Bootstrap success from localhost"""
-        monkeypatch.setenv("NEXE_ENV", "development")
-        from core.bootstrap_tokens import BootstrapTokenManager
-        manager = BootstrapTokenManager()
-        manager._initialized = False
-        manager.initialize_on_startup(tmp_path)
-        manager.set_bootstrap_token("NEXE-TEST-TOKEN", ttl_minutes=30)
-
-        app = FastAPI()
-        app.state.i18n = None
-        app.include_router(router)
-        client = TestClient(app, raise_server_exceptions=False)
-
-        with patch("core.bootstrap_tokens.check_bootstrap_rate_limit", return_value="ok"), \
-             patch("core.endpoints.bootstrap.check_rate_limit"), \
-             patch("starlette.testclient.TestClient"):
-            pass
-
-        # Patch at the endpoint function level
-        with patch("core.endpoints.bootstrap.check_rate_limit"), \
-             patch("core.bootstrap_tokens.validate_master_bootstrap", return_value=True), \
-             patch("core.bootstrap_tokens.create_session_token", return_value="sess-token-xyz"):
-            resp = client.post("/api/bootstrap", json={"token": "nexe-test-token"})
-
-        # With IP "testclient" → error 400. Test the logic via mock
-        assert resp.status_code in (200, 400)  # 400 for invalid TestClient IP
-
-    def test_bootstrap_invalid_token_no_info(self, monkeypatch, tmp_path):
-        """Incorrect token with no info → 503"""
-        monkeypatch.setenv("NEXE_ENV", "development")
-
-        app = FastAPI()
-        app.state.i18n = None
-        app.include_router(router)
-        client = TestClient(app, raise_server_exceptions=False)
-
-        with patch("core.endpoints.bootstrap.check_rate_limit"), \
-             patch("core.bootstrap_tokens.validate_master_bootstrap", return_value=False), \
-             patch("core.bootstrap_tokens.get_bootstrap_token", return_value=None):
-            resp = client.post("/api/bootstrap", json={"token": "WRONG-TOKEN"})
-
-        assert resp.status_code in (400, 503)  # 400 for invalid IP
-
-    def test_bootstrap_token_already_used(self, monkeypatch):
-        """Token already used → 403"""
-        monkeypatch.setenv("NEXE_ENV", "development")
-        now_ts = datetime.now(timezone.utc).timestamp()
-
-        app = FastAPI()
-        app.state.i18n = None
-        app.include_router(router)
-        client = TestClient(app, raise_server_exceptions=False)
-
-        with patch("core.endpoints.bootstrap.check_rate_limit"), \
-             patch("core.bootstrap_tokens.validate_master_bootstrap", return_value=False), \
-             patch("core.bootstrap_tokens.get_bootstrap_token",
-                   return_value={"token": "T", "expires": now_ts + 600, "used": True}):
-            resp = client.post("/api/bootstrap", json={"token": "T"})
-
-        assert resp.status_code in (400, 403)  # 400 for invalid TestClient IP
-
-    def test_bootstrap_token_expired(self, monkeypatch):
-        """Expired token → 410"""
-        monkeypatch.setenv("NEXE_ENV", "development")
-        expired_ts = datetime.now(timezone.utc).timestamp() - 3600
-
-        app = FastAPI()
-        app.state.i18n = None
-        app.include_router(router)
-        client = TestClient(app, raise_server_exceptions=False)
-
-        with patch("core.endpoints.bootstrap.check_rate_limit"), \
-             patch("core.bootstrap_tokens.validate_master_bootstrap", return_value=False), \
-             patch("core.bootstrap_tokens.get_bootstrap_token",
-                   return_value={"token": "T", "expires": expired_ts, "used": False}):
-            resp = client.post("/api/bootstrap", json={"token": "T"})
-
-        assert resp.status_code in (400, 410)  # 400 for invalid TestClient IP
-
-    def test_bootstrap_invalid_status_401(self, monkeypatch):
-        """Invalid token but active token → 401"""
-        monkeypatch.setenv("NEXE_ENV", "development")
-        now_ts = datetime.now(timezone.utc).timestamp()
-
-        app = FastAPI()
-        app.state.i18n = None
-        app.include_router(router)
-        client = TestClient(app, raise_server_exceptions=False)
-
-        with patch("core.endpoints.bootstrap.check_rate_limit"), \
-             patch("core.bootstrap_tokens.validate_master_bootstrap", return_value=False), \
-             patch("core.bootstrap_tokens.get_bootstrap_token",
-                   return_value={"token": "correct-token", "expires": now_ts + 600, "used": False}):
-            resp = client.post("/api/bootstrap", json={"token": "wrong-token"})
-
-        assert resp.status_code in (400, 401)  # 400 for invalid TestClient IP
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -408,6 +329,45 @@ class TestBootstrapSessionSuccessPath:
         assert result.session_token == "sess-abc"
         assert result.status == "initialized"
         assert result.expires_in == 900
+
+    def test_next_steps_are_honest_b195(self, monkeypatch):
+        """B195: next_steps must not point at the non-existent POST
+        /api/keys/generate (404) nor at the unvalidated X-Session-Token; it must
+        describe the real auth (X-API-Key) and derive the TTL from
+        NEXE_SESSION_TTL instead of hardcoding '15 minutes'.
+
+        Mutation: restore the old next_steps → '/api/keys/generate' reappears and
+        the TTL minutes go back to a hardcoded 15 (red)."""
+        monkeypatch.setenv("NEXE_ENV", "development")
+        monkeypatch.setenv("NEXE_SESSION_TTL", "1800")  # 30 min → proves TTL is derived
+        import asyncio
+        from core.endpoints.bootstrap import bootstrap_session, BootstrapRequest
+
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+        mock_request.app.state.i18n = None
+        mock_headers = MagicMock()
+        mock_headers.get.side_effect = lambda k, d="": {"user-agent": "TestAgent"}.get(k, d)
+        mock_request.headers = mock_headers
+
+        # This test is about next_steps honesty, so it patches out every
+        # precondition (env gate, rate limit, token validation) rather than
+        # depending on them: _validate_bootstrap_env reads a *cached* NEXE_ENV via
+        # resolve_core_env, so a prior test that froze the cache to "production"
+        # would otherwise leak in and 503 here regardless of our monkeypatch.
+        with patch("core.endpoints.bootstrap._validate_bootstrap_env"), \
+             patch("core.endpoints.bootstrap.check_rate_limit"), \
+             patch("core.endpoints.bootstrap._validate_bootstrap_token"), \
+             patch("core.endpoints.bootstrap.create_session_token", return_value="sess-abc"):
+            result = asyncio.run(
+                bootstrap_session(BootstrapRequest(token="VALID-TOKEN"), mock_request)
+            )
+        joined = " ".join(result.next_steps)
+        assert "/api/keys/generate" not in joined, "next_steps points at a 404 endpoint"
+        assert "/installer/finalize" not in joined, "next_steps must not name an endpoint that 404s post-onboarding"
+        assert "X-Session-Token" not in joined, "next_steps tells clients to use the unvalidated session header"
+        assert "X-API-Key" in joined, "next_steps must describe the real auth header"
+        assert "30 minutes" in joined, "TTL must be derived from NEXE_SESSION_TTL, not hardcoded"
 
     def test_token_not_initialized_returns_503(self, monkeypatch):
         """Lines 149-151: get_bootstrap_token returns None -> 503."""

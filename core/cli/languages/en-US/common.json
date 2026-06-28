@@ -36,7 +36,6 @@
    },
    "basic_functionality": {
     "name": "Basic Functionality",
-    "module_ok": "CLIModule works correctly",
     "methods_ok": "All methods respond"
    }
   },
@@ -53,7 +52,6 @@
    "invalid_timeout": "Invalid timeout",
    "config_ok": "Configuration OK",
    "config_error": "Configuration error",
-   "module_ok": "CLIModule works correctly",
    "methods_ok": "All methods respond",
    "assertion_failed": "Test failed",
    "func_error": "Functionality error",
@@ -94,7 +92,8 @@
    "services_stopped": "\n✅ Services stopped.",
    "stopped_ok": "  ✓ {name} stopped (PID {pid})",
    "no_longer_exists": "  - {name} no longer exists (PID {pid})",
-   "permission_denied": "  ✗ {name} — permission denied (PID {pid})"
+   "permission_denied": "  ✗ {name} — permission denied (PID {pid})",
+   "none_stopped": "\n⚠️  No services were stopped."
   },
   "server_status": {
    "offline": "✗ Server offline: {msg}",

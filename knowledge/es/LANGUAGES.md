@@ -5,7 +5,7 @@ id: nexe-languages
 collection: nexe_documentation
 
 # === CONTENIDO RAG (OBLIGATORIO) ===
-abstract: "Como server-nexe gestiona los idiomas: detecta el idioma de cada mensaje del usuario (unos 75 idiomas, deteccion offline con lingua) y responde en ese mismo idioma, no en el idioma de instalacion (NEXE_LANG). Explica el pipeline de deteccion y la directiva de respuesta, el papel de NEXE_LANG como reserva, y el comportamiento en mensajes cortos o cambios de idioma. Documenta la correccion del bug por el que hasta la 1.0.5 respondia siempre en el idioma fijo de instalacion (por defecto catalan)."
+abstract: "Como server-nexe gestiona los idiomas: detecta el idioma de cada mensaje del usuario (unos 75 idiomas, deteccion offline con lingua) y responde en ese mismo idioma, no en el idioma de instalacion (NEXE_LANG). Explica el pipeline de deteccion y la directiva de respuesta, el papel de NEXE_LANG como reserva, y el comportamiento en mensajes cortos o cambios de idioma. Documenta la correccion del bug por el que hasta la 1.0.4 respondia siempre en el idioma fijo de instalacion (por defecto catalan); la deteccion automatica se anadio en la 1.0.5."
 tags: [idiomas, lengua, language, i18n, multilingue, deteccion, lingua, nexe-lang, multi-idioma]
 chunk_size: 600
 priority: P2
@@ -43,4 +43,4 @@ Si el mensaje es demasiado corto o ambiguo (por ejemplo "ok", "gracias") o es so
 ## Notas
 
 - **Cambio de idioma a media conversación:** puedes cambiar de idioma cuando quieras y Nexe se adapta. Dentro de una conversación ya iniciada en un idioma, el cambio puede costar un poco más (el historial de la conversación influye); si quieres un cambio limpio, abre una conversación nueva.
-- **Corrección (1.0.5):** hasta la versión 1.0.5, Nexe respondía siempre en el idioma fijo de instalación (por defecto catalán) aunque el usuario escribiera en otro idioma. Este comportamiento se **corrigió en la 1.0.5** con la detección automática del idioma del mensaje.
+- **Corrección (1.0.5):** hasta la versión 1.0.4, Nexe respondía siempre en el idioma fijo de instalación (por defecto catalán) aunque el usuario escribiera en otro idioma. Este comportamiento se **corrigió en la 1.0.5** con la detección automática del idioma del mensaje.

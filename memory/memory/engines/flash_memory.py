@@ -41,6 +41,10 @@ class FlashMemory:
     self._store: Dict[str, MemoryEntry] = {}
     self._expiry_heap: List[tuple] = []
     self._lock = asyncio.Lock()
+    # Retained as a config knob (and for API/constructor compat). Expiry is now
+    # driven solely by each entry's ttl_seconds: a real TTL bounds the entry,
+    # None means permanent. Entries with no explicit TTL already arrive with the
+    # model default (1800), so this is no longer a None-fallback.
     self._default_ttl = default_ttl_seconds
 
     logger.info("FlashMemory initialized (TTL=%ss)", default_ttl_seconds)
@@ -56,14 +60,23 @@ class FlashMemory:
       str: Entry ID
     """
     async with self._lock:
-      ttl = entry.ttl_seconds or self._default_ttl
-      expiry = datetime.now(timezone.utc) + timedelta(seconds=ttl)
-
       self._store[entry.id] = entry
 
-      heapq.heappush(self._expiry_heap, (expiry.timestamp(), entry.id))
-
-      logger.debug("Stored entry %s (TTL=%ss, expires=%s)", entry.id, ttl, expiry)
+      # ttl_seconds is None means permanent (never expires) — no expiry tuple to
+      # track. For a real TTL, schedule eviction at now+ttl; the heap drives
+      # _cleanup_expired, which re-validates via _is_expired before deleting
+      # (MEM-001 lazy-delete), so a permanent entry could never be evicted.
+      if entry.ttl_seconds is not None:
+        expiry = datetime.now(timezone.utc) + timedelta(
+          seconds=entry.ttl_seconds
+        )
+        heapq.heappush(self._expiry_heap, (expiry.timestamp(), entry.id))
+        logger.debug(
+          "Stored entry %s (TTL=%ss, expires=%s)",
+          entry.id, entry.ttl_seconds, expiry,
+        )
+      else:
+        logger.debug("Stored entry %s (permanent, no TTL)", entry.id)
 
     return entry.id
 
@@ -174,8 +187,13 @@ class FlashMemory:
     Returns:
       bool: True if expired
     """
-    ttl = entry.ttl_seconds or self._default_ttl
-    expiry = entry.timestamp + timedelta(seconds=ttl)
+    # ttl_seconds is None means permanent (never expires) — consistent with the
+    # SQLite layer (persistence get_recent) and the Document API. Only a real
+    # positive TTL is time-bounded; a precarried None entry from SQLite must NOT
+    # be evicted by a default applied over its (old) creation timestamp.
+    if entry.ttl_seconds is None:
+      return False
+    expiry = entry.timestamp + timedelta(seconds=entry.ttl_seconds)
     expiry = _normalize_expiry(expiry)
     return datetime.now(timezone.utc) > expiry
 

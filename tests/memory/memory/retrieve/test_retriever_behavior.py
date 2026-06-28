@@ -244,10 +244,13 @@ class TestRetrieveEndToEnd:
         store.upsert_profile(
             USER, "allergy", "peanuts", trust_level="trusted", is_critical=True
         )
+        # The huge episodic must exist in SQLite so it is hydrated and then
+        # genuinely dropped by the token budget (not by the hydration filter).
+        huge_id = store.insert_episodic(USER, _words(450))  # 450 tokens > 409 budget
         huge = {
-            "id": "huge",
+            "id": huge_id,
             "score": 0.9,
-            "payload": {"content": _words(450)},  # 450 tokens > 409 budget
+            "payload": {"rdbms_id": huge_id},  # real VectorIndex stores no content
         }
         retriever = Retriever(
             config=MemoryConfig(),
@@ -259,8 +262,42 @@ class TestRetrieveEndToEnd:
         cards = retriever.retrieve(USER, SESSION, "anything to eat tonight?")
 
         ids = [c.entry_id for c in cards]
-        assert "huge" not in ids  # over budget -> dropped
+        assert huge_id not in ids  # over budget -> dropped
         assert any(
             c.source_store == "profile" and c.metadata.get("is_critical")
             for c in cards
         )
+
+
+class TestRetrieveVectorHydration:
+    """B112: vector hits hydrate real content from SQLite (the Qdrant payload
+    stores metadata only), and ids absent from SQLite are dropped (no leak)."""
+
+    def test_hydrates_content_from_sqlite(self, store):
+        eid = store.insert_episodic(USER, "I love climbing in the Pyrenees")
+        cand = {"id": eid, "score": 0.9, "payload": {"rdbms_id": eid}}  # no content
+        retriever = Retriever(
+            config=MemoryConfig(),
+            sqlite_store=store,
+            vector_index=FakeVectorIndex([cand]),
+            embedder=FakeEmbedder(),
+        )
+
+        cards = retriever._retrieve_vector(USER, "mountains", None, "exploratory")
+
+        assert len(cards) == 1
+        assert cards[0].content == "I love climbing in the Pyrenees"
+        assert not cards[0].content.startswith("[episodic:")
+
+    def test_drops_ids_absent_from_sqlite(self, store):
+        cand = {"id": "ghost", "score": 0.9, "payload": {"rdbms_id": "ghost"}}
+        retriever = Retriever(
+            config=MemoryConfig(),
+            sqlite_store=store,
+            vector_index=FakeVectorIndex([cand]),
+            embedder=FakeEmbedder(),
+        )
+
+        cards = retriever._retrieve_vector(USER, "x", None, "exploratory")
+
+        assert cards == []

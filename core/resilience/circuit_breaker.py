@@ -231,6 +231,11 @@ class CircuitBreaker:
       yield
       await self._record_success()
     except (ConnectionError, TimeoutError, OSError) as e:
+      # MC-020: unlike protect() (which counts every Exception), guard_streaming
+      # only trips on transport errors — an app-level error mid-stream should not
+      # open the transport circuit. NOTE: this context manager is currently unused
+      # in production (all streaming paths use protect()/check_circuit); kept for
+      # completeness. Revisit the scope if a real streaming caller adopts it.
       await self._record_failure(e)
       raise
 

@@ -13,7 +13,7 @@
 #
 # ─────────────────────────────────────────────────────────────────────
 
-# ── transformers 5.8.1 — 8 CVE (transitive via mlx-lm 0.31.2 + mlx-vlm 0.4.4)
+# ── transformers 5.8.1 — 8 CVE (transitive via mlx-lm 0.31.3 + mlx-vlm 0.4.4)
 # Fix versions upstream: NONE (cap)
 # Vector inhabilitat: mlx-lm i mlx-vlm NO importen cap dels mòduls vulnerables;
 # els noms similars (Idefics2Perceiver*, GLM4*) són implementacions natives mlx.

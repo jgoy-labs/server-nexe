@@ -1,25 +1,25 @@
-// nexe_launcher.swift — Launcher natiu de Nexe.app (substitueix bash script)
+// nexe_launcher.swift — Native launcher for Nexe.app (replaces the bash script)
 //
-// Per què un binari Swift en lloc de bash:
-// - Apareix correctament a "Força la sortida" (NSApplication registrada)
-// - Click al Dock NO relaunxa l'app (applicationShouldHandleReopen gestionat)
-// - Triangle "app activa" estable (no flashing)
-// - Cmd+Q del Dock funciona i tanca tray net
+// Why a Swift binary instead of bash:
+// - Shows up correctly in "Force Quit" (NSApplication registered)
+// - Clicking the Dock does NOT relaunch the app (applicationShouldHandleReopen handled)
+// - Stable "app active" triangle (no flashing)
+// - Cmd+Q from the Dock works and shuts the tray down cleanly
 //
-// Comportament:
-// 1. Si ja hi ha servidor a :9119 → obrir UI i sortir (cas: tray orfe viu)
-// 2. Si no → llançar Python tray --autostart + quedar-se viu esperant
-// 3. Click posterior al Dock → applicationShouldHandleReopen → obrir UI (tab)
-// 4. Cmd+Q → terminar tray i netejar
+// Behavior:
+// 1. If a server is already on :9119 → open UI and exit (case: orphaned tray alive)
+// 2. Otherwise → launch the Python tray --autostart + stay alive waiting
+// 3. Later click on the Dock → applicationShouldHandleReopen → open UI (tab)
+// 4. Cmd+Q → terminate the tray and clean up
 //
 // Build:
 //   swiftc -O -o NexeTray nexe_launcher.swift
-//   (fet automàticament per installer/build_dmg.sh)
+//   (done automatically by installer/build_dmg.sh)
 
 import Cocoa
 import Darwin
 
-// MARK: - Helpers de paths
+// MARK: - Path helpers
 
 func resolveProjectRoot() -> String? {
     let fm = FileManager.default
@@ -29,14 +29,14 @@ func resolveProjectRoot() -> String? {
     let bundleDir = (contentsDir as NSString).deletingLastPathComponent // Nexe.app
     let parentDir = (bundleDir as NSString).deletingLastPathComponent   // parent
 
-    // 1) Cas dev: Nexe.app dins el projecte (parent conté venv/)
+    // 1) Dev case: Nexe.app inside the project (parent contains venv/)
     if fm.isExecutableFile(atPath: parentDir + "/venv/bin/python") {
         return parentDir
     }
 
-    // 2) Cas producció: marker FORA del bundle, a ~/Library/Application Support/Nexe/
-    //    Fora del bundle perquè si fos dins Resources/ trencaria el seal
-    //    de codesign i Gatekeeper refusaria el llançament.
+    // 2) Production case: marker OUTSIDE the bundle, at ~/Library/Application Support/Nexe/
+    //    Outside the bundle because if it were inside Resources/ it would break the
+    //    codesign seal and Gatekeeper would refuse to launch.
     let home = NSHomeDirectory()
     let extMarker = home + "/Library/Application Support/Nexe/project_root.txt"
     if let content = try? String(contentsOfFile: extMarker, encoding: .utf8) {
@@ -46,14 +46,14 @@ func resolveProjectRoot() -> String? {
         }
     }
 
-    // 3) Fallback legacy: marker dins Resources/ (installs anteriors al fix).
-    //    Aquest path trenca la signatura — si el trobem, el moure'm a la
-    //    ubicació nova per recuperar la signatura.
+    // 3) Legacy fallback: marker inside Resources/ (installs prior to the fix).
+    //    This path breaks the signature — if we find it, we move it to the
+    //    new location to recover the signature.
     let legacyMarker = bundleDir + "/Contents/Resources/project_root.txt"
     if let content = try? String(contentsOfFile: legacyMarker, encoding: .utf8) {
         let path = content.trimmingCharacters(in: .whitespacesAndNewlines)
         if fm.isExecutableFile(atPath: path + "/venv/bin/python") {
-            // Migrar silenciosament a la ubicació bona
+            // Silently migrate to the correct location
             let newDir = home + "/Library/Application Support/Nexe"
             try? fm.createDirectory(atPath: newDir, withIntermediateDirectories: true)
             try? content.write(toFile: newDir + "/project_root.txt", atomically: true, encoding: .utf8)
@@ -82,26 +82,26 @@ func openWebUI() {
     try? task.run()
 }
 
-// MARK: - Lock file anti-race (doble-click al Dock)
+// MARK: - Lock file anti-race (double-click on the Dock)
 
-/// Path del lock file del launcher. Fora del bundle per no trencar codesign.
+/// Path of the launcher lock file. Outside the bundle so it doesn't break codesign.
 func launcherLockPath() -> String {
     let home = NSHomeDirectory()
     return home + "/Library/Application Support/Nexe/launcher.pid"
 }
 
-/// Retorna true si el PID donat està viu (kill(pid, 0) == 0).
+/// Returns true if the given PID is alive (kill(pid, 0) == 0).
 func isPidAlive(_ pid: pid_t) -> Bool {
     if pid <= 0 { return false }
-    // kill amb signal 0 no envia res — només comprova existència + permisos.
+    // kill with signal 0 sends nothing — it only checks existence + permissions.
     let res = kill(pid, 0)
     if res == 0 { return true }
-    // ESRCH = no existeix; EPERM = existeix però no tenim permisos (viu)
+    // ESRCH = does not exist; EPERM = exists but we lack permissions (alive)
     return errno == EPERM
 }
 
-/// Retorna true si ja hi ha un launcher viu (cas: doble-click ràpid al Dock).
-/// Si no, escriu el nostre PID al lock i retorna false (via lliure).
+/// Returns true if a launcher is already alive (case: fast double-click on the Dock).
+/// Otherwise, writes our PID to the lock and returns false (path clear).
 func acquireLauncherLock() -> Bool {
     let lockPath = launcherLockPath()
     let fm = FileManager.default
@@ -111,17 +111,17 @@ func acquireLauncherLock() -> Bool {
     if let content = try? String(contentsOfFile: lockPath, encoding: .utf8) {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         if let pid = Int32(trimmed), isPidAlive(pid), pid != getpid() {
-            // Ja hi ha un launcher viu — avortar silenciosament.
+            // A launcher is already alive — abort silently.
             return false
         }
     }
-    // Escriure el nostre PID (sobrescriu lock orfe)
+    // Write our PID (overwrites an orphaned lock)
     let myPid = String(getpid())
     try? myPid.write(toFile: lockPath, atomically: true, encoding: .utf8)
     return true
 }
 
-/// Esborra el lock file si encara és el nostre.
+/// Removes the lock file if it is still ours.
 func releaseLauncherLock() {
     let lockPath = launcherLockPath()
     if let content = try? String(contentsOfFile: lockPath, encoding: .utf8) {
@@ -147,39 +147,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var trayProcess: Process?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Lock file contra race de doble-click: si ja hi ha un launcher viu,
-        // sortir silenciosament (el primer ja està fent la feina).
+        // Lock file against double-click race: if a launcher is already alive,
+        // exit silently (the first one is already doing the work).
         if !acquireLauncherLock() {
             NSApp.terminate(nil)
             return
         }
 
-        // Si ja hi ha servidor escoltant (tray orfe d'una sessió anterior),
-        // obrir UI i sortir — no duplicar tray.
+        // If a server is already listening (orphaned tray from a previous session),
+        // open UI and exit — don't duplicate the tray.
         if isServerListening(port: 9119) {
             openWebUI()
             NSApp.terminate(nil)
             return
         }
 
-        // Resoldre project root
+        // Resolve project root
         guard let projectRoot = resolveProjectRoot() else {
             showMissingVenvDialog()
             NSApp.terminate(nil)
             return
         }
 
-        // Matar processos nexe-tray/installer.tray orfes (no escolten port)
+        // B211: Kill ONLY the nexe-tray/installer.tray processes of the current
+        // projectRoot; a generic pkill -f kills trays of other installations in parallel.
+        // Strategy: pgrep -f <pattern> to get PIDs, filter by CWD matching
+        // projectRoot (via lsof -p or /proc/PID/cwd), and kill them one by one.
+        // Safe simplification: restrict the pattern to the specific venv executable.
+        let trayExecutable = projectRoot + "/venv/bin/python"
         let killTask = Process()
         killTask.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        killTask.arguments = ["-f", "nexe-tray|installer.tray"]
+        // Kill processes that use exactly the python of this projectRoot
+        killTask.arguments = ["-f", trayExecutable + ".*installer.tray|" + trayExecutable + ".*nexe-tray"]
         killTask.standardOutput = nil
         killTask.standardError = nil
         try? killTask.run()
         killTask.waitUntilExit()
         Thread.sleep(forTimeInterval: 0.3)
 
-        // Llançar tray Python --autostart
+        // Launch the Python tray --autostart
         let python = projectRoot + "/venv/bin/python"
         let tray = Process()
         tray.executableURL = URL(fileURLWithPath: python)
@@ -191,7 +197,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             try tray.run()
             self.trayProcess = tray
 
-            // Observer: si el tray mor, terminar la launcher també
+            // Observer: if the tray dies, terminate the launcher as well
             tray.terminationHandler = { _ in
                 DispatchQueue.main.async {
                     NSApp.terminate(nil)
@@ -203,20 +209,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // Click al Dock quan l'app ja corre → NO-OP (no obrir tabs).
-    // Motiu: si el servidor ja corre, l'usuari pot tenir la UI oberta en un tab;
-    // obrir un tab nou a cada click genera spam. L'usuari accedeix a la UI via
-    // el menubar icon (menu "Obrir UI"). Retornar true per evitar que macOS
-    // relancxi res — nosaltres ja ho hem gestionat (ignorant).
+    // Click on the Dock when the app is already running → NO-OP (don't open tabs).
+    // Reason: if the server is already running, the user may have the UI open in a tab;
+    // opening a new tab on each click generates spam. The user accesses the UI via
+    // the menubar icon (the "Open UI" menu). Return true to prevent macOS from
+    // relaunching anything — we have already handled it (by ignoring it).
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         return true
     }
 
-    // Cmd+Q / Force Quit / "Quit" del menú → tancar el tray Python també
+    // Cmd+Q / Force Quit / "Quit" from the menu → close the Python tray as well
     func applicationWillTerminate(_ notification: Notification) {
         if let tray = trayProcess, tray.isRunning {
-            // SIGTERM primer; donar 8s perquè uvicorn faci graceful shutdown
-            // (graceful timeout intern ~30s, 8s és un compromís raonable).
+            // SIGTERM first; give it 8s so uvicorn can do a graceful shutdown
+            // (internal graceful timeout ~30s, 8s is a reasonable compromise).
             tray.terminate()
             let deadline = Date().addingTimeInterval(8.0)
             while tray.isRunning && Date() < deadline {
@@ -226,11 +232,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 kill(tray.processIdentifier, SIGKILL)
             }
         }
-        // Alliberar lock file del launcher
+        // Release the launcher lock file
         releaseLauncherLock()
     }
 
-    // No tancar l'app quan l'última finestra es tanca (no tenim finestres propies)
+    // Don't quit the app when the last window closes (we have no windows of our own)
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
     }
@@ -241,5 +247,5 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.regular)  // Dock presence (NO LSUIElement — és el launcher visible)
+app.setActivationPolicy(.regular)  // Dock presence (NO LSUIElement — this is the visible launcher)
 app.run()

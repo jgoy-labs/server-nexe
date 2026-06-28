@@ -57,7 +57,7 @@ The OpenAI-compatible API (`/v1/chat/completions`) works with any tool that acce
 
 **For whom:** users who want to empirically compare speed and quality of different backends and local models.
 
-Switch between **MLX** (Apple Silicon native), **llama.cpp** (universal GGUF) and **Ollama** (easy management) with a config change. 14-model catalog across 4 RAM tiers — from Qwen3.5 4B to ALIA-40B.
+Switch between **MLX** (Apple Silicon native), **llama.cpp** (universal GGUF) and **Ollama** (easy management) with a config change. 15-model catalog across 4 RAM tiers — from Qwen3.5 4B to ALIA-40B.
 
 **Example:** try Qwen3.5 9B (Ollama, tier_16) vs Gemma 4 E4B (MLX, tier_16) to figure out which one fits your hardware and use case best.
 
@@ -65,7 +65,7 @@ Switch between **MLX** (Apple Silicon native), **llama.cpp** (universal GGUF) an
 
 **For whom:** organisations with compliance requirements (GDPR, HIPAA, professional secrecy) that cannot send data to an external provider.
 
-Enable encryption at-rest (`NEXE_ENCRYPTION_ENABLED=auto`, fail-closed since v0.9.2) and all data is encrypted with AES-256-GCM: SQLite database (via SQLCipher), chat sessions (`.enc`), and RAG document text.
+For compliance, enable encryption at-rest in **strict fail-closed** mode: `pip install sqlcipher3-binary && export NEXE_ENCRYPTION_ENABLED=true`. With `=true` the server refuses to start unless `sqlcipher3` is present, so it can never silently fall back to plaintext. (The default `=auto` is fail-OPEN: if `sqlcipher3` is missing it runs in plaintext with a loud startup banner — fine for dev, NOT for compliance.) With encryption on, all data is encrypted with AES-256-GCM: SQLite database (via SQLCipher), chat sessions (`.enc`), and RAG document text.
 
 **Compliance note:** server-nexe has NOT passed external certifications. The encryption is strong but the system is an open-source project by a single developer, not an enterprise product with professional audits.
 
@@ -79,7 +79,7 @@ Be honest about limitations. There are use cases where other options are better:
 |----------------|--------|
 | Frontier models (GPT-5, Claude Opus 4.5, Gemini 3) | Official cloud services — local models are still less capable |
 | Multi-user with device sync | server-nexe is **mono-user by design**. Consider an external client-server deployment |
-| Production Windows or Linux arm64 support | server-nexe requires **macOS 14+ Apple Silicon** since v0.9.9 |
+| Production Windows support | Windows is under active development — not recommended for production right now. Linux ARM64 and x86_64 **are supported** (Ollama/llama.cpp backend, CPU) |
 | Model fine-tuning or training | Not a server-nexe feature. Use MLX, transformers or Axolotl directly |
 | Uptime guarantees and SLA | It's an open-source project maintained by one person — no SLA |
 | Professional security audit | Current audits are AI-assisted (Claude, Gemini), not by specialised human security firms |

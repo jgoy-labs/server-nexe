@@ -63,7 +63,6 @@ class ApiKeyConfig:
   """
   primary: Optional[ApiKeyData] = None
   secondary: Optional[ApiKeyData] = None
-  legacy: Optional[str] = None
 
   def get_valid_keys(self) -> list[ApiKeyData]:
     """
@@ -88,8 +87,6 @@ class ApiKeyConfig:
     if self.primary and self.primary.is_valid:
       return True
     if self.secondary and self.secondary.is_valid:
-      return True
-    if self.legacy:
       return True
     return False
 

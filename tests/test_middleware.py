@@ -59,27 +59,11 @@ class TestSetupRateLimiting:
         assert hasattr(app.state, 'limiter')
 
     def test_advanced_rate_limiting_setup(self):
+        # MC-103/MC-123/124: advanced limiters are gone; with the flag on,
+        # setup just enforces the per-IP limiter (no orphan names to patch).
         from core.middleware import setup_rate_limiting
         app = FastAPI()
-
-        mock_limiter = MagicMock()
-        mock_cleanup = MagicMock()
-
-        with patch("core.middleware.ADVANCED_RATE_LIMITING", True), \
-             patch("core.dependencies.limiter_by_key", mock_limiter), \
-             patch("core.dependencies.limiter_composite", mock_limiter), \
-             patch("core.dependencies.limiter_by_endpoint", mock_limiter), \
-             patch("core.dependencies.start_rate_limit_cleanup_task", mock_cleanup):
-            setup_rate_limiting(app)
-
-        assert hasattr(app.state, 'limiter')
-
-    def test_advanced_rate_limiting_exception_falls_back(self):
-        from core.middleware import setup_rate_limiting
-        app = FastAPI()
-
-        with patch("core.middleware.ADVANCED_RATE_LIMITING", True), \
-             patch("core.dependencies.limiter_by_key", side_effect=Exception("import error")):
+        with patch("core.middleware.ADVANCED_RATE_LIMITING", True):
             setup_rate_limiting(app)
         assert hasattr(app.state, 'limiter')
 
@@ -259,20 +243,44 @@ class TestSetupTrustedHosts:
         assert len(app.user_middleware) > mw_before
 
     def test_empty_host_ignored(self):
+        # T2 REFORÇAT: verifica que "" NO entra a l'allowlist de TrustedHostMiddleware.
+        # Anti-DNS-rebinding: si la guarda de middleware.py:494 es trencava i "" s'afegia,
+        # qualsevol Host header buit passaria la validació. El test ha de posar-se VERMELL
+        # si la guarda desapareix.
         from core.middleware import setup_trusted_hosts
+        from starlette.middleware.trustedhost import TrustedHostMiddleware
         app = FastAPI()
-        mw_before = len(app.user_middleware)
         config = {"core": {"server": {"host": ""}}}
         setup_trusted_hosts(app, config)
-        assert len(app.user_middleware) > mw_before
+        trusted_mw = next(
+            (mw for mw in app.user_middleware if mw.cls is TrustedHostMiddleware),
+            None,
+        )
+        assert trusted_mw is not None, "TrustedHostMiddleware no s'ha afegit"
+        allowed = trusted_mw.kwargs.get("allowed_hosts", [])
+        assert "" not in allowed, (
+            'Host buit ("") ha entrat a l\'allowlist de TrustedHost — risc de DNS rebinding'
+        )
 
     def test_0000_host_not_added(self):
+        # T2 REFORÇAT: verifica que "0.0.0.0" NO entra a l'allowlist de TrustedHostMiddleware.
+        # Anti-DNS-rebinding: "0.0.0.0" és un wildcard d'interfície (bind-all); afegir-lo a
+        # l'allowlist permetria qualsevol Host header i anularia la protecció. El test ha de
+        # posar-se VERMELL si la guarda de middleware.py:494 desapareix.
         from core.middleware import setup_trusted_hosts
+        from starlette.middleware.trustedhost import TrustedHostMiddleware
         app = FastAPI()
-        mw_before = len(app.user_middleware)
         config = {"core": {"server": {"host": "0.0.0.0"}}}
         setup_trusted_hosts(app, config)
-        assert len(app.user_middleware) > mw_before
+        trusted_mw = next(
+            (mw for mw in app.user_middleware if mw.cls is TrustedHostMiddleware),
+            None,
+        )
+        assert trusted_mw is not None, "TrustedHostMiddleware no s'ha afegit"
+        allowed = trusted_mw.kwargs.get("allowed_hosts", [])
+        assert "0.0.0.0" not in allowed, (
+            '"0.0.0.0" ha entrat a l\'allowlist de TrustedHost — anularia la protecció anti-DNS-rebinding'
+        )
 
 
 class TestSetupAllMiddleware:

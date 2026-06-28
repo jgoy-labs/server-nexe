@@ -1,12 +1,12 @@
-"""Parent process watchdog — monitoritza el PID del procés pare (tray/Tauri).
+"""Parent process watchdog — monitors the parent process PID (tray/Tauri).
 
-Si el pare mor (Force Quit, Ctrl+C al terminal de `pnpm tauri dev`, crash),
-el sidecar es suïcida amb SIGTERM per evitar orfes consumint RAM, ports i
-locks (per exemple, lock fcntl de Qdrant a /Users/<user>/.nexe/data/vectors).
+If the parent dies (Force Quit, Ctrl+C in the `pnpm tauri dev` terminal, crash),
+the sidecar terminates itself with SIGTERM to avoid orphans consuming RAM, ports and
+locks (for example, Qdrant's fcntl lock at /Users/<user>/.nexe/data/vectors).
 
-Aquest mòdul s'extreu de `core/server/runner.py` (F2.A11) per evitar cicles
-d'imports quan `core/lifespan.py` necessita invocar-lo en mode sidecar.
-`runner.py` continua reexportant la funció per backward compatibility.
+This module is extracted from `core/server/runner.py` (F2.A11) to avoid import
+cycles when `core/lifespan.py` needs to invoke it in sidecar mode.
+`runner.py` keeps re-exporting the function for backward compatibility.
 """
 from __future__ import annotations
 

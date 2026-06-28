@@ -13,7 +13,3 @@ class TestLlamaCppChatNodeInit:
             node = LlamaCppChatNode(config=mock_config)
             assert node.config is mock_config
 
-    def test_get_pool_stats(self):
-        from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
-        stats = LlamaCppChatNode.get_pool_stats()
-        assert stats is not None

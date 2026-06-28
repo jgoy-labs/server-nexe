@@ -66,16 +66,6 @@ class TestDetectionViaMarkers:
         assert isinstance(result, Path)
         assert result.exists()
 
-    def test_detect_via_markers_returns_none_when_no_root(self, tmp_path):
-        """_detect_via_markers returns None when no root is found."""
-        from core.paths.detection import _detect_via_markers
-        # Patch __file__ to point to a tmp dir where no nexe structure exists
-        import core.paths.detection as det_module
-        with patch.object(det_module, "__file__", str(tmp_path / "detection.py")):
-            # This should either find a root (via the real markers) or return None
-            result = _detect_via_markers()
-            # Either result is acceptable depending on file structure
-            assert result is None or isinstance(result, Path)
 
 
 class TestDetectionViaStartPath:

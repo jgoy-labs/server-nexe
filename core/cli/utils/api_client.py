@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import os
-import json
 import logging
 import re
 import httpx
@@ -60,58 +59,6 @@ class NexeAPIClient:
         except Exception:
             return False
 
-    async def chat_stream(
-        self, 
-        messages: list, 
-        engine: str, 
-        rag: bool = False
-    ) -> AsyncGenerator[str, None]:
-        """
-        Send a streaming request to /v1/chat/completions.
-
-        Note: Standard OpenAI format uses /v1/chat/completions.
-        Assumes Nexe exposes a compatible endpoint or unified chat router.
-        """
-        
-        # OpenAI-compatible chat completions endpoint
-        url = f"{self.base_url}/v1/chat/completions"
-        
-        payload = {
-            "messages": messages,
-            "engine": engine,
-            "use_rag": rag,
-            "stream": True,
-            "temperature": 0.7 
-        }
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            try:
-                async with client.stream("POST", url, json=payload, headers=self.headers) as response:
-                    if response.status_code != 200:
-                        error_msg = await response.aread()
-                        yield f"Server error ({response.status_code}): {error_msg.decode()}"
-                        return
-
-                    async for line in response.aiter_lines():
-                        if not line or line.strip() == "":
-                            continue
-                        
-                        # Format SSE: "data: {json}"
-                        if line.startswith("data: "):
-                            data_str = line[6:]
-                            if data_str == "[DONE]":
-                                break
-                            
-                            try:
-                                data = json.loads(data_str)
-                                # Extract content delta (OpenAI-compatible)
-                                delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                if delta:
-                                    yield delta
-                            except json.JSONDecodeError:
-                                pass
-            except httpx.ConnectError:
-                yield "❌ Error: Could not connect to Nexe server. Make sure './nexe go' is running."
 
     async def upload_file(self, file_path: str, session_id: str) -> Optional[Dict[str, Any]]:
         """Upload a file to the session via /ui/upload (multipart form)."""
@@ -204,9 +151,6 @@ class NexeAPIClient:
             except httpx.ConnectError:
                 yield "❌ Error: Could not connect to Nexe server. Make sure './nexe go' is running."
 
-    async def chat_offline(self, messages: list, engine: str) -> str:
-        """Offline fallback when the server is unavailable (not recommended for interactive CLI)."""
-        return "❌ Offline mode not supported yet. Please run './nexe go' first."
 
     async def memory_store(self, content: str, metadata: Optional[Dict] = None) -> bool:
         """Store content in RAG memory."""

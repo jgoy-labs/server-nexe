@@ -14,6 +14,8 @@ import threading
 from pathlib import Path
 from typing import List, Tuple
 
+from .constants import BASE_CONFIG_RELATIVE
+
 logger = logging.getLogger(__name__)
 
 NEXE_CORE_DIRS = ["plugins", "core", "memory", "storage"]
@@ -55,7 +57,7 @@ def _is_valid_core_root(path: Path) -> Tuple[bool, List[str]]:
 
   reasons.append(f"[OK] Path exists: {path}")
 
-  config_file = path / "personality" / "server.toml"
+  config_file = path / BASE_CONFIG_RELATIVE
   if not config_file.exists():
     reasons.append(f"[ERROR] Required config not found: {config_file}")
     return False, reasons

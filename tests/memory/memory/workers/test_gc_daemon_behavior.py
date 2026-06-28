@@ -85,6 +85,15 @@ def _count(store: SQLiteStore, table: str) -> int:
     return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # nosec B608: table name is a test-local literal
 
 
+def _content_hash(store: SQLiteStore, entry_id: str) -> str:
+    """The real content_hash stored for an episodic entry (SHA256, 64 hex)."""
+    conn = store._connect()
+    row = conn.execute(
+        "SELECT content_hash FROM episodic WHERE id = ?", (entry_id,)
+    ).fetchone()
+    return row["content_hash"]
+
+
 class TestRunGcScoreThreshold:
     """(1) run_gc archives entries with score < 0.15 and keeps the rest."""
 
@@ -113,10 +122,14 @@ class TestRunGcScoreThreshold:
 
     def test_archived_entries_get_tombstones(self, store):
         dropped = _insert_episodic(store, "doomed memory", 0.3, days_ago=400)
+        real_hash = _content_hash(store, dropped)
         daemon = GCDaemon(config=MemoryConfig(), sqlite_store=store)
         daemon.run_gc(USER)
-        # GCDaemon tombstones with content_hash=<entry id> and reason gc_decay
-        assert store.is_tombstoned(USER, dropped) is True
+        # B032: the tombstone must carry the real content_hash (so the dreaming
+        # reinsertion guard, which looks up by content hash, can match it)...
+        assert store.is_tombstoned(USER, real_hash) is True
+        # ...and NOT be keyed by the entry id (the old inert behaviour).
+        assert store.is_tombstoned(USER, dropped) is False
 
     def test_gc_log_row_written(self, store):
         _insert_episodic(store, "old entry to purge", 0.3, days_ago=400)
@@ -209,6 +222,7 @@ class TestDeleteEntries:
     def test_archives_tombstones_and_deletes_vectors(self, store):
         e1 = _insert_episodic(store, "delete me one", 0.5)
         e2 = _insert_episodic(store, "delete me two", 0.5)
+        h1, h2 = _content_hash(store, e1), _content_hash(store, e2)
         vector = FakeVectorIndex()
         daemon = GCDaemon(config=MemoryConfig(), sqlite_store=store, vector_index=vector)
 
@@ -219,8 +233,11 @@ class TestDeleteEntries:
         assert states[e1] == "archived"
         assert states[e2] == "archived"
         assert vector.deleted_batches == [[e1, e2]]
-        assert store.is_tombstoned(USER, e1) is True
-        assert store.is_tombstoned(USER, e2) is True
+        # B032: tombstones keyed by the real content_hash, not the entry id.
+        assert store.is_tombstoned(USER, h1) is True
+        assert store.is_tombstoned(USER, h2) is True
+        assert store.is_tombstoned(USER, e1) is False
+        assert store.is_tombstoned(USER, e2) is False
 
     def test_vector_delete_failure_does_not_abort_tombstones(self, store):
         e1 = _insert_episodic(store, "vector failure entry", 0.5)
@@ -229,6 +246,7 @@ class TestDeleteEntries:
             def delete(self, ids):
                 raise RuntimeError("qdrant down")
 
+        real_hash = _content_hash(store, e1)
         daemon = GCDaemon(
             config=MemoryConfig(), sqlite_store=store, vector_index=ExplodingVector()
         )
@@ -236,7 +254,7 @@ class TestDeleteEntries:
         daemon._gc_delete_entries(conn, USER, [e1])
 
         assert _episodic_states(store)[e1] == "archived"
-        assert store.is_tombstoned(USER, e1) is True
+        assert store.is_tombstoned(USER, real_hash) is True
 
 
 class TestDryRun:
@@ -304,3 +322,38 @@ class TestScoreModel:
         assert hot > cold
         # 0.4 * exp(-2) ~= 0.054 < 0.15: cold entry is GC fodder
         assert cold < 0.15
+
+
+class TestB032TombstoneReinsertionGuard:
+    """B032 — GC tombstones must match the dreaming reinsertion guard.
+
+    DreamingCycle._process_episodic recomputes the content hash as
+    sha256(content.lower().strip()) and calls is_tombstoned(user, hash).
+    If the GC keyed the tombstone by entry id (a uuid4[:16]) it could never
+    match the 64-hex content hash, leaving the anti-zombie guard dead weight.
+    """
+
+    def test_gc_tombstone_matches_dreaming_reinsertion_guard(self, store):
+        import hashlib
+
+        content = "Recurring trivia that decayed away"
+        _insert_episodic(store, content, 0.3, days_ago=400)
+        daemon = GCDaemon(config=MemoryConfig(), sqlite_store=store)
+        daemon.run_gc(USER)
+
+        # The exact hash DreamingCycle._process_episodic computes for this content.
+        guard_hash = hashlib.sha256(content.lower().strip().encode()).hexdigest()
+        assert store.is_tombstoned(USER, guard_hash) is True
+
+    def test_missing_content_hash_skips_tombstone_loudly(self, store, caplog):
+        import logging
+
+        # An id with no matching episodic row (e.g. concurrently hard-deleted):
+        # without the real hash a tombstone would be inert, so it must be skipped.
+        with caplog.at_level(logging.WARNING, logger="memory.memory.workers.gc_daemon"):
+            daemon = GCDaemon(config=MemoryConfig(), sqlite_store=store)
+            conn = store._connect()
+            daemon._gc_delete_entries(conn, USER, ["ghost-id-xyz"])
+
+        assert _count(store, "tombstones") == 0
+        assert any("no content_hash" in rec.message for rec in caplog.records)

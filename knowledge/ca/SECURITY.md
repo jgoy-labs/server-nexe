@@ -5,7 +5,7 @@ id: nexe-security-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Seguretat de server-nexe 1.0.6: autenticacio dual-key, rate limiting (incl. PATCH thinking 10/min i NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectors d'injeccio, 47 patrons jailbreak, capsaleres OWASP, logging RFC5424, encriptacio AES-256-GCM at-rest (SQLCipher, sessions .enc), MEK fallback order (file->keyring->env->generate), sanititzacio RAG injection (_filter_rag_injection). Tot local, zero crides externes."
+abstract: "Seguretat de server-nexe 1.0.6: autenticacio dual-key, rate limiting (incl. PATCH thinking 10/min i NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectors d'injeccio, 49 patrons jailbreak, capsaleres OWASP, logging RFC5424, encriptacio AES-256-GCM at-rest (SQLCipher, sessions .enc), MEK fallback order (file->keyring->env->generate), sanititzacio RAG injection (_filter_rag_injection). Tot local, zero crides externes."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
 chunk_size: 600
 priority: P1
@@ -23,7 +23,7 @@ expires: null
 
 - [Autenticacio](#autenticacio)
 - [Rate Limiting](#rate-limiting)
-  - [Endpoints de l'API (configurables via `.env`)](#endpoints-de-lapi-configurables-via-env)
+  - [Endpoints de l'API (límits fixats al codi)](#endpoints-de-lapi-limits-fixats-al-codi)
   - [Endpoints de la Web UI (fixats per endpoint)](#endpoints-de-la-web-ui-fixats-per-endpoint)
 - [Capcaleres de seguretat (OWASP)](#capcaleres-de-seguretat-owasp)
 - [Validacio d'input](#validacio-dinput)
@@ -60,24 +60,23 @@ server-nexe 1.0.6 esta dissenyat per a entorns locals de confiança. Totes les d
 - Validacio: `secrets.compare_digest()` (comparacio segura contra timing attacks)
 - Capcalera: `X-API-Key`
 
-**Bootstrap token:** Token d'un sol us generat a l'arrencada. Entropia de 256 bits, persistent a SQLite, TTL de 30 minuts. Regeneracio nomes des de localhost.
+**Bootstrap token:** Token d'un sol us generat a l'arrencada. Entropia de 128 bits, persistent a SQLite, TTL de 30 minuts. Regeneracio nomes des de localhost.
 
 ## Rate Limiting
 
 El rate limiting s'aplica a **tots els endpoints** — tant a l'API (`/v1/*`) com a la Web UI (`/ui/*`).
 
-### Endpoints de l'API (configurables via `.env`)
+### Endpoints de l'API (límits fixats al codi)
 
-| Variable | Per defecte | Endpoints |
-|----------|---------|-----------|
-| NEXE_RATE_LIMIT_CHAT | 20/min | /v1/chat/completions |
-| NEXE_RATE_LIMIT_MEMORY | 30/min | /v1/memory/* (nota: `/v1/memory/search` esta hardcoded a **60/min** a `memory/memory/api/v1.py`) |
-| NEXE_RATE_LIMIT_RAG | 30/min | /v1/rag/* (stubs, retornen 501) |
-| NEXE_RATE_LIMIT_UPLOAD | 5/min | /ui/upload |
-| NEXE_RATE_LIMIT_DEFAULT | 120/min | Resta d'endpoints |
-| NEXE_RATE_LIMIT_GLOBAL | 100/min | Limit global |
+| Endpoint | Límit | On |
+|----------|-------|-----|
+| /v1/chat/completions | 20/min | hardcoded a `core/endpoints/chat.py` |
+| /v1/memory/store | 30/min | hardcoded a `memory/memory/api/v1.py` |
+| /v1/memory/search | 60/min | hardcoded a `memory/memory/api/v1.py` |
+| /v1/rag/* | — | stubs, retornen 501 |
+| /ui/upload | 5/min | hardcoded a `plugins/web_ui_module/api/routes_files.py` |
 
-**Nota:** Aquestes variables estan reservades per a implementació futura. Els límits actuals estan configurats al codi font.
+**Nota:** Els límits per endpoint de dalt estan fixats al codi font (decorador `@limiter.limit()`), **no** són configurables via `.env`. Les úniques variables d'entorn que es llegeixen realment són `NEXE_RATE_LIMIT_GLOBAL` (per defecte 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) i `NEXE_RATE_LIMIT_HEALTH` (1000/min) — vegeu `plugins/security/core/rate_limiting.py` i `core/dependencies.py`. Les variables `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` només apareixen comentades a `.env.example` i el codi no les llegeix (reservades per a implementació futura).
 
 ### Endpoints de la Web UI (fixats per endpoint)
 
@@ -145,7 +144,7 @@ L'endpoint `POST /v1/chat/completions` valida i sanititza l'input a traves del s
 
 **Normalitzacio Unicode:** Els 6 detectors apliquen `unicodedata.normalize('NFKC', text)` abans del matching de patrons. Aixo preveu bypasses via homoglifs Unicode o variacions d'encoding (p. ex., caracters fullwidth, formes compostes vs descompostes).
 
-**47 patrons de jailbreak** a `plugins/security/sanitizer/`: Matching de patrons multilingue per a intents d'injeccio de prompts.
+**49 patrons de jailbreak** a `plugins/security/sanitizer/`: Matching de patrons multilingue per a intents d'injeccio de prompts.
 
 **Neutralitzacio de tags RAG injection** (`_filter_rag_injection`, v0.9.9): a ingest i retrieval, el sistema **neutralitza tags de control** que podrien manipular la memoria per rebot:
 
@@ -172,7 +171,7 @@ Logging d'events de seguretat **compatible amb RFC5424** via `plugins/security/s
 
 ## Encriptacio at-rest (default `auto`)
 
-**Afegida a la v0.9.0, default `auto` des de v0.9.2.** L'encriptacio at-rest s'activa automaticament si `sqlcipher3` es disponible (mode `auto`). S'ha testejat (68 tests) pero encara no ha passat per us en produccio amb usuaris reals fora del desenvolupament.
+**Afegida a la v0.9.0, default `auto` des de v0.9.2.** L'encriptacio at-rest s'activa automaticament si `sqlcipher3` es disponible (mode `auto`). S'ha testejat (72 tests) pero encara no ha passat per us en produccio amb usuaris reals fora del desenvolupament.
 
 ### CryptoProvider
 

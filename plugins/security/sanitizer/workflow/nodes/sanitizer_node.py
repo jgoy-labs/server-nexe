@@ -59,6 +59,9 @@ else:
     - threats: List[str] - Detected threats
     - clean_text: str - Processed text (same as input)
     - scan_time_ms: float - Scan time
+    - patterns_matched: List[str] - Specific patterns that matched (for logging)
+    - text: str - The sanitized input text
+    - user_message: str - Alias for text (compatibility)
 
     Graceful Degradation philosophy:
     - severity != critical -> continue (is_safe=True)
@@ -90,6 +93,9 @@ else:
           NodeOutput(name="threats", type="array", description="Detected threats"),
           NodeOutput(name="clean_text", type="string", description="Processed text"),
           NodeOutput(name="scan_time_ms", type="number", description="Scan time in ms"),
+          NodeOutput(name="patterns_matched", type="array", description="Specific patterns that matched (for logging)"),
+          NodeOutput(name="text", type="string", description="The sanitized input text"),
+          NodeOutput(name="user_message", type="string", description="Alias for text (compatibility)"),
         ],
         icon="🛡️",
         color="#e74c3c"

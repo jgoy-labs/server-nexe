@@ -16,14 +16,17 @@ from .installer_i18n import t, get_lang
 def generate_env_file(project_root, model_config=None):
     """Generate .env file with security and model config.
 
-    Security: API key is NOT printed to stdout to prevent exposure
-    in CI/CD logs or shared terminal sessions.
+    Security (INST-005): the API key is printed to stdout ONLY on an
+    interactive TTY (the CLI user expects to copy it). In non-interactive mode
+    (headless / GUI wizard) it is NEVER printed — the wizard receives it via the
+    [API_KEY] IPC marker, and the GUI mirrors stdout into a visible log.
     """
     print_step(f"{BOLD}{t('generating_security')}{RESET}")
     print(f"  {DIM}{t('security_explanation')}{RESET}")
     import os
     import secrets
     import stat
+    import sys
     secure_key = secrets.token_hex(32)
     env_file = project_root / ".env"
 
@@ -78,7 +81,7 @@ def generate_env_file(project_root, model_config=None):
                         f.write(f"NEXE_OLLAMA_MODEL={model_config['id']}\n")
                 else:
                     # No model selected — install without a model, user will add one manually
-                    f.write("# NEXE_DEFAULT_MODEL=  (configure via 'nexe model pull <name>')\n")
+                    f.write("# NEXE_DEFAULT_MODEL=  (configure via 'nexe model install <name>')\n")
                     f.write("NEXE_MODEL_ENGINE=ollama\n")
                     f.write("NEXE_PROMPT_TIER=small\n")
                 f.write("NEXE_QDRANT_PATH=storage/vectors\n")
@@ -102,12 +105,17 @@ def generate_env_file(project_root, model_config=None):
         env_file.chmod(stat.S_IRUSR | stat.S_IWUSR)  # chmod 600
 
         print_success(t('env_created'))
-        print(f"  🔑 {t('api_key')}:")
-        print()
-        print(f"  {CYAN}{secure_key}{RESET}")
-        print()
-        print(f"  {YELLOW}{t('copy_api_key')}{RESET}")
-        print(f"  {DIM}⚠️  No comparteixis aquesta clau (screenshots, logs, xats){RESET}")
+        # INST-005: only reveal the key on an interactive TTY. In headless/GUI
+        # mode stdout is mirrored into the wizard's visible (selectable) log, so
+        # printing the key here would expose it on screen. The GUI receives the
+        # key out-of-band via the [API_KEY] marker emitted by install_headless.
+        if sys.stdout.isatty():
+            print(f"  🔑 {t('api_key')}:")
+            print()
+            print(f"  {CYAN}{secure_key}{RESET}")
+            print()
+            print(f"  {YELLOW}{t('copy_api_key')}{RESET}")
+            print(f"  {DIM}⚠️  No comparteixis aquesta clau (screenshots, logs, xats){RESET}")
         print(f"  {DIM}({t('saved_at')} {env_file} · chmod 600){RESET}")
     else:
         # Update existing .env with model configuration
@@ -120,15 +128,16 @@ def generate_env_file(project_root, model_config=None):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _compute_approved_modules(engine):
-    """Return the NEXE_APPROVED_MODULES value for a given engine."""
-    base = "security,web_ui_module"
-    if engine == 'ollama':
-        return f"{base},ollama_module"
-    if engine == 'mlx':
-        return f"{base},mlx_module,ollama_module"
-    if engine == 'llama_cpp':
-        return f"{base},llama_cpp_module,ollama_module"
-    return f"{base},ollama_module,mlx_module,llama_cpp_module"
+    """Return the NEXE_APPROVED_MODULES value.
+
+    B153: always approve all backends (mirroring the fresh-install path at
+    generate_env_file) so the UI Motor dropdown can switch engines after a
+    reinstall without re-running the installer. The previous per-engine gating
+    on the update path left the dropdown offering engines whose module had been
+    removed from the allowlist. The `engine` arg is kept for signature
+    compatibility; each backend module self-disables if its runtime is missing.
+    """
+    return "security,web_ui_module,ollama_module,mlx_module,llama_cpp_module"
 
 
 def _rewrite_mlx_line(line, model_id, model_engine):

@@ -73,7 +73,10 @@ def test_nomic_embed_has_integrity_entry() -> None:
 
 def test_ollama_pull_embeddings_verifies_integrity(monkeypatch) -> None:
     # B146: after a successful pull of nomic-embed-text the installer must run the
-    # SHA256 integrity check on it (it was previously pulled completely unverified).
+    # integrity check on it (it was previously pulled completely unverified).
+    # B251 regression guard: the spy uses the REAL signature (no **kwargs), so a
+    # leftover ollama_bin= kwarg at the call site raises TypeError here instead of
+    # being silently swallowed — the masked-crash that the adversarial review caught.
     from installer import installer_setup_models as sm
 
     class _Proc:
@@ -84,7 +87,7 @@ def test_ollama_pull_embeddings_verifies_integrity(monkeypatch) -> None:
     monkeypatch.setattr(sm, "t", lambda key, **kw: key)
     calls: list[tuple[str, str]] = []
 
-    def _spy(engine, model_id, target, **kwargs):
+    def _spy(engine, model_id, target):
         calls.append((engine, model_id))
         return True
 

@@ -10,7 +10,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from fastapi import Request
-from slowapi import Limiter
 from slowapi.util import get_remote_address
 from typing import Any, DefaultDict, Dict
 from collections import defaultdict
@@ -94,30 +93,12 @@ def get_endpoint_identifier(request: Request) -> str:
 
   return f"endpoint:{ip}:{path}"
 
-limiter_global = Limiter(
-  key_func=get_remote_address,
-  default_limits=[DEFAULT_RATE_LIMITS["global"]],
-  storage_uri="memory://",
-  strategy="fixed-window"
-)
-
-limiter_by_key = Limiter(
-  key_func=get_api_key_identifier,
-  storage_uri="memory://",
-  strategy="fixed-window"
-)
-
-limiter_composite = Limiter(
-  key_func=get_composite_identifier,
-  storage_uri="memory://",
-  strategy="fixed-window"
-)
-
-limiter_by_endpoint = Limiter(
-  key_func=get_endpoint_identifier,
-  storage_uri="memory://",
-  strategy="fixed-window"
-)
+# MC-103 dead-code sweep: the limiter objects (global/by_key/composite/by_endpoint)
+# defined here were imported only by core/dependencies.py. The advanced ones were
+# already unwired (MC-123/124) and the per-IP `limiter` now lives in core itself,
+# so all four are dead and have been removed. The identifier helpers above and
+# RateLimitTracker below stay (still used / tested). DEFAULT_RATE_LIMITS is kept as
+# the documented rate-limit configuration.
 
 class RateLimitTracker:
   """

@@ -1,5 +1,5 @@
 """
-Tests for core.config.get_localhost_aliases() — Gemini hardcode fix.
+Tests for core.config.get_localhost_aliases() — AI audit hardcode fix.
 
 Centralizes the previously-hardcoded ["127.0.0.1", "::1", "localhost"]
 lists spread across bootstrap.py and middleware.py.

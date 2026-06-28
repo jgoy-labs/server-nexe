@@ -83,6 +83,33 @@ class TestMemoryRecallNodeExecute:
         assert result["context"] != ""
 
     @pytest.mark.asyncio
+    async def test_execute_query_text_redacted_in_logs(self, caplog, monkeypatch):
+        # MC-113: the recall query is sensitive free text. This node runs inside
+        # the sidecar whose stdout is persisted to disk → the query must be
+        # redacted (RT-05), not logged verbatim.
+        import logging
+        from memory.memory.workflow.nodes.memory_recall_node import MemoryRecallNode
+
+        monkeypatch.delenv("NEXE_LOG_SENSITIVE", raising=False)  # default = redact
+        SENTINEL = "PII_secret_diagnosis_cancer"  # < 30 chars → fully in query[:30]
+        node = MemoryRecallNode()
+        mock_module = MagicMock()
+        mock_module._initialized = True
+        mock_module._flash_memory = MagicMock()
+        mock_module._flash_memory.get_all = AsyncMock(return_value=[self._make_entry()])
+        mock_module._persistence = None
+        mock_rag_log = MagicMock()
+
+        with patch("memory.memory.workflow.nodes.memory_recall_node.MemoryModule") as MockMM:
+            MockMM.get_instance.return_value = mock_module
+            with patch("memory.memory.workflow.nodes.memory_recall_node.get_rag_logger", return_value=mock_rag_log):
+                with caplog.at_level(logging.INFO, logger="memory.memory.workflow.nodes.memory_recall_node"):
+                    await node.execute({"query": SENTINEL, "limit": 10, "entry_type": "episodic"})
+
+        assert SENTINEL not in caplog.text
+        assert "MEMORY RECALL START" in caplog.text  # the recall banner still logs
+
+    @pytest.mark.asyncio
     async def test_execute_auto_initialize(self):
         """Test auto-initialization when module not initialized."""
         from memory.memory.workflow.nodes.memory_recall_node import MemoryRecallNode

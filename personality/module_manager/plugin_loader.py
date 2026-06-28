@@ -137,7 +137,7 @@ class PluginLoaderMixin:
         from core.config import get_module_allowlist
         from personality.module_manager.core_modules import get_core_modules
 
-        core_env = os.getenv("NEXE_ENV", "development")
+        core_env = os.getenv("NEXE_ENV", "production")
         internal_modules = get_core_modules()
 
         approved_modules = get_module_allowlist(self.config_manager.get_config())  # type: ignore[attr-defined]

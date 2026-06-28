@@ -47,7 +47,7 @@ MODEL_REGISTRY: Dict[str, ModelEntry] = {
         short_name="qwen3.5:4b-8bit",
         description="Qwen3.5 4B (8-bit) - Multimodal, thinking, vision. Higher precision.",
         size_gb=3.4,
-        ollama_tag="qwen3.5:4b",
+        ollama_tag="",   # MLX-only (8-bit); Ollama library only ships the 4-bit qwen3.5:4b
         mlx_hf_id="mlx-community/Qwen3.5-4B-MLX-8bit",
     ),
     "qwen3.5:9b": ModelEntry(

@@ -5,6 +5,10 @@ Author: Jordi Goy
 Location: personality/module_manager/module_lifecycle.py
 Description: Individual module lifecycle manager. Controls load, start, stop with
 
+SCAFFOLDING for the plugin-isolation runtime (ADR-001): zero production callers
+today is EXPECTED (wired up when the isolation runtime lands). Do not flag as
+dead code — see docs/NEXE_ARCHITECTURAL_DECISIONS.md.
+
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """

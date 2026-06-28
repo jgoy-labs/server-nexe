@@ -32,27 +32,15 @@ from installer.installer_setup_config import (
 
 
 class TestComputeApprovedModules:
-    def test_ollama(self):
-        result = _compute_approved_modules('ollama')
-        assert 'ollama_module' in result
-        assert 'mlx_module' not in result
-        assert 'llama_cpp_module' not in result
-
-    def test_mlx(self):
-        result = _compute_approved_modules('mlx')
-        assert 'mlx_module' in result
-        assert 'ollama_module' in result
-
-    def test_llama_cpp(self):
-        result = _compute_approved_modules('llama_cpp')
-        assert 'llama_cpp_module' in result
-        assert 'ollama_module' in result
-
-    def test_unknown_engine_returns_all(self):
-        result = _compute_approved_modules('unknown')
-        assert 'ollama_module' in result
-        assert 'mlx_module' in result
-        assert 'llama_cpp_module' in result
+    def test_returns_all_backends_for_every_engine(self):
+        """B153: every engine must approve ALL backends so the UI Motor dropdown
+        can switch engines after a reinstall without re-running the installer
+        (mirroring the fresh-install path). Mutation 'gate per engine' → red."""
+        for engine in ('ollama', 'mlx', 'llama_cpp', 'unknown'):
+            result = _compute_approved_modules(engine)
+            assert 'ollama_module' in result, engine
+            assert 'mlx_module' in result, engine
+            assert 'llama_cpp_module' in result, engine
 
     def test_base_modules_always_present(self):
         for engine in ('ollama', 'mlx', 'llama_cpp', 'other'):
@@ -443,11 +431,12 @@ class TestSha256CheckFailClosed:
         assert result.get("type") == "error"
         assert result.get("code") == "SHA256_FAIL"
 
-    def test_unpinned_digest_still_skips(self, monkeypatch):
-        """Legitimate 'not pinned' (verify returns False) still skips → None.
-
-        Guards against over-correcting INST-003: the fail-closed change must
-        only fire on UNEXPECTED errors, not on the normal unpinned path."""
+    def test_unpinned_digest_warns_not_errors(self, monkeypatch):
+        """Legitimate 'not pinned' (verify returns False) must NOT be a hard
+        error (INST-003: fail-closed only fires on UNEXPECTED errors), but it
+        must also NOT be silent (INST-002: surface a warning so the GUI shows
+        the same ⚠️ the CLI prints). So the unpinned path returns a warning
+        event, not None and not an error."""
         import installer.download_verify as dv
 
         monkeypatch.setattr(dv, "verify_download_integrity", lambda *a, **k: False)
@@ -455,4 +444,6 @@ class TestSha256CheckFailClosed:
         monkeypatch.setattr(inst_mod, "_resolve_model_path", lambda e, m: "/nonexistent")
 
         result = self._run()
-        assert result is None, "unpinned digest (verify→False) must still skip, not error"
+        assert result is not None, "unpinned digest must surface a warning (INST-002), not be silent"
+        assert result.get("type") == "warning", "unpinned must warn, not error (INST-003 intact)"
+        assert result.get("code") == "SHA256_NOT_PINNED"

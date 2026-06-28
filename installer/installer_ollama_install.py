@@ -164,14 +164,21 @@ def _install_ollama_macos() -> bool:
          then 100 % offline).
       2. Online download from ``ollama.com/download/Ollama-darwin.zip``.
 
+    When downloading online, the SHA-256 digest is compared against
+    ``NEXE_OLLAMA_MACOS_SHA256`` (env var) if set; a mismatch aborts the
+    install.  This mirrors the Linux path which already verified against
+    ``NEXE_OLLAMA_INSTALL_SHA256``.
+
     Post-extract we strip quarantine so Gatekeeper does not block the
     launch, open the app (which registers the CLI on first run), and poll
     for the binary to appear at ``/usr/local/bin/ollama``.
     """
+    import hashlib
     import tempfile
 
     url = "https://ollama.com/download/Ollama-darwin.zip"
     dest = Path("/Applications/Ollama.app")
+    expected_sha256 = os.environ.get("NEXE_OLLAMA_MACOS_SHA256", "").strip().lower()
 
     try:
         bundle_zip = _find_bundle_ollama_zip()
@@ -191,6 +198,25 @@ def _install_ollama_macos() -> bool:
                 print_warn(t('ollama_install_failed'))
                 print(f"  {CYAN}Download: {url}{RESET}")
                 return False
+
+            with open(zip_path, "rb") as _f:
+                observed_sha256 = hashlib.sha256(_f.read()).hexdigest()
+            print(f"  {DIM}Ollama-darwin.zip SHA-256: {observed_sha256}{RESET}")
+
+            if expected_sha256:
+                if observed_sha256 != expected_sha256:
+                    print_warn(
+                        f"Ollama-darwin.zip SHA-256 mismatch: "
+                        f"expected {expected_sha256}, got {observed_sha256}. Aborting install."
+                    )
+                    os.unlink(zip_path)
+                    return False
+                print(f"  {DIM}SHA-256 matches NEXE_OLLAMA_MACOS_SHA256 pin{RESET}")
+            else:
+                print(
+                    f"  {DIM}(no NEXE_OLLAMA_MACOS_SHA256 pin set — pin the "
+                    f"digest above to fail-fast on future drift){RESET}"
+                )
 
         print("  📦 Installing to /Applications/Ollama.app...")
         # Zip Slip protection. zipfile.extractall

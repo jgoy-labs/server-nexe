@@ -78,7 +78,14 @@ async def cleanup_ollama_startup(server_state, _translate, health_timeout: float
 
 
 async def cleanup_ollama_shutdown(health_timeout: float, unload_timeout: float) -> None:
-  """Unload Ollama models from RAM during server shutdown."""
+  """Unload Ollama models from RAM during server shutdown.
+
+  B090 (accepted): this unloads EVERY model reported by /api/ps, not only the
+  ones server-nexe loaded. In sidecar mode that is a dedicated Ollama instance,
+  so it is exactly right; in non-sidecar mode it targets the user's shared
+  Ollama host, so a model another app loaded is also unloaded — accepted for a
+  local single-user tool (Ollama would drop it at keep_alive expiry anyway).
+  """
   try:
     import httpx
     # C-001: same resolver as startup/autostart to avoid leaving models in RAM
@@ -96,12 +103,18 @@ async def cleanup_ollama_shutdown(health_timeout: float, unload_timeout: float) 
           for model_info in loaded_models:
             model_name = model_info.get("name") or model_info.get("model")
             if model_name:
-              await client.post(
-                f"{ollama_url}/api/generate",
-                json={"model": model_name, "keep_alive": 0},
-                timeout=unload_timeout
-              )
-              logger.debug("  - Unloaded: %s", model_name)
+              # B103: per-model try/except so one failed unload (timeout/connref)
+              # does not abort the unloads of the remaining models, matching the
+              # startup variant cleanup_ollama_startup above.
+              try:
+                await client.post(
+                  f"{ollama_url}/api/generate",
+                  json={"model": model_name, "keep_alive": 0},
+                  timeout=unload_timeout
+                )
+                logger.debug("  - Unloaded: %s", model_name)
+              except Exception as e:  # noqa: BLE001 — best-effort per-model unload
+                logger.warning("Could not unload Ollama model %s: %s", model_name, e)
 
           logger.info("Ollama models unloaded successfully")
         else:

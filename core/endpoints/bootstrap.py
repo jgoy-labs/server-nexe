@@ -30,9 +30,9 @@ router = APIRouter(tags=["bootstrap"])
 
 def _t(request: Request, key: str, fallback: str, **kwargs) -> str:
   """Translate helper with fallback from request.app.state"""
-  # la resolució + maneig d'error viu a core.i18n_utils.translate.
-  # getattr es manté dins el try via translate (defensiu), però aquí
-  # l'accés a request.app.state també pot fallar, així que el cobrim.
+  # the resolution + error handling lives in core.i18n_utils.translate.
+  # getattr stays inside the try via translate (defensive), but here
+  # access to request.app.state can also fail, so we cover it too.
   try:
     i18n = getattr(request.app.state, 'i18n', None)
   except Exception:
@@ -197,7 +197,7 @@ async def bootstrap_session(
     f"| {session_from:<52}|\n"
     f"| {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'):<52}|\n"
     f"|                            |\n"
-    f"| Session token sent to client (15 min TTL)       |\n"
+    f"| {f'Session token sent to client ({session_ttl // 60} min TTL)':<52}|\n"
     f"| API key NOT exposed                   |\n"
     f"|                            |\n"
     f"+========================================================+"
@@ -209,10 +209,15 @@ async def bootstrap_session(
     expires_in=session_ttl,
     status="initialized",
     message=msg,
+    # B195: the previous next_steps pointed at POST /api/keys/generate (no such
+    # route → 404) and told clients to use X-Session-Token, which no dependency
+    # validates. Describe the real auth path instead: X-API-Key with the
+    # installer-provisioned NEXE_PRIMARY_API_KEY. (Note: /installer/finalize only
+    # serves the key once, during onboarding, and 404s afterwards — so we point
+    # at the provisioning, not a runtime retrieval endpoint that may be closed.)
     next_steps=[
-      "1. Use X-Session-Token header for initial requests",
-      "2. Generate permanent API key via POST /api/keys/generate",
-      "3. The session_token expires in 15 minutes"
+      f"1. This session_token is issued for local bootstrap and expires in {session_ttl // 60} minutes.",
+      "2. Authenticate requests with the X-API-Key header using the NEXE_PRIMARY_API_KEY provisioned during installation.",
     ]
   )
 

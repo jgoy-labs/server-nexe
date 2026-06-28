@@ -254,15 +254,3 @@ def test_create_app_multiple_sequential_calls(monkeypatch):
 
   for i, app in enumerate(apps[1:], start=1):
     assert app is apps[0], f"Call {i} should return cached instance"
-
-def test_create_app_after_exception_in_previous_call(monkeypatch):
-  """
-  Test that cache does not remain in an inconsistent state after an error.
-
-  If the first create_app() fails, the second call should succeed.
-  """
-  pytest.skip(
-      "Requires deep mocking of factory internals (config loader, lifespan, "
-      "module discovery). Tracked for future improvement — add integration "
-      "test instead of unit mock."
-  )

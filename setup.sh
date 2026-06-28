@@ -5,6 +5,9 @@
 
 set -euo pipefail
 
+# Ancorem-nos al root del projecte (on viu setup.sh)
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Colors
 BLUE='\033[1;34m'
 CYAN='\033[1;36m'

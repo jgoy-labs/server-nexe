@@ -40,6 +40,28 @@ class TestGetMessage:
         assert result == "Invalid IP address"
 
     def test_format_key_error_returns_template(self):
+        """T15: the except (KeyError, IndexError) fallback in get_message must
+        return the raw template when format() raises KeyError.
+
+        The original test-theatre asserted:
+            'status' in result or 'http_error' in result.lower() or '{' in result
+        which is true for ANY return value (formatted string, raw key, raw template),
+        so a broken except block that raised instead of returning template was invisible.
+
+        Correct behaviour: calling get_message with a known template key but WITHOUT
+        the required format kwarg must return the raw template unchanged (not raise,
+        not return the key).
+
+        Mutation target: change `except (KeyError, IndexError): return template` to
+        `raise` in messages.py → this test raises instead of returning → RED.
+        """
         from core.messages import get_message
-        result = get_message(None, "core.ollama.http_error")
-        assert "status" in result or "http_error" in result.lower() or "{" in result
+
+        # "core.ollama.http_error" template = "Ollama error (HTTP {status})"
+        # Calling without the required {status} kwarg triggers KeyError inside format().
+        result = get_message(None, "core.ollama.http_error")  # no status= kwarg
+
+        assert result == "Ollama error (HTTP {status})", (
+            f"Expected raw template on KeyError fallback, got: {result!r}"
+        )
+

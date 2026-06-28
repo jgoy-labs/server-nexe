@@ -66,13 +66,15 @@ async def module_manager_health():
       }
     })
 
-  except Exception as e:
-    logger.error(f"Health check failed: {e}")
+  except Exception:
+    # MC-132: la traça completa va NOMÉS al log intern; el cos de la resposta
+    # mai retorna str(e) (evita info-disclosure d'estructura interna sense auth).
+    logger.exception("Health check failed")
     return JSONResponse(
       content={
         "name": "module_manager",
         "status": "UNHEALTHY",
-        "error": str(e)
+        "error": "internal error"
       },
       status_code=500
     )
@@ -99,14 +101,16 @@ async def module_manager_info():
         "Configuration validation",
         "Management web UI"
       ],
-      "path": str(MODULE_PATH),
+      # MC-132: "location" relativa (no la ruta absoluta del filesystem) per no
+      # filtrar l'estructura interna de directoris a un endpoint sense auth.
+      "location": "personality/module_manager/",
       "ui_available": UI_PATH.exists()
     })
 
-  except Exception as e:
-    logger.error(f"Error getting module info: {e}")
+  except Exception:
+    logger.exception("Error getting module info")
     return JSONResponse(
-      content={"error": str(e)},
+      content={"error": "internal error"},
       status_code=500
     )
 
@@ -122,15 +126,18 @@ async def list_registered_modules():
     from .registry import ModuleRegistry
 
     registry = ModuleRegistry()
-    modules = registry.get_all_modules()  # pyright: ignore[reportAttributeAccessIssue]  # method exists on ModuleRegistry runtime; stubs incomplete
+    # B133: list_modules() is the real API (returns List[ModuleRegistration]);
+    # get_all_modules() never existed and would raise AttributeError.
+    modules = registry.list_modules()
 
     module_list = []
-    for name, info in modules.items():
+    for reg in modules:
       module_list.append({
-        "name": name,
-        "status": getattr(info, 'status', 'unknown'),
-        "version": getattr(info, 'version', 'unknown'),
-        "path": str(getattr(info, 'path', '')),
+        "name": reg.name,
+        "status": getattr(reg, 'status', 'unknown'),
+        "version": getattr(reg, 'version', 'unknown'),
+        # MC-132: només el nom del directori, no la ruta absoluta del filesystem.
+        "path": Path(str(getattr(reg, 'path', ''))).name,
       })
 
     return JSONResponse(content={
@@ -138,10 +145,10 @@ async def list_registered_modules():
       "total": len(module_list)
     })
 
-  except Exception as e:
-    logger.error("Error listing modules: %s", e)
+  except Exception:
+    logger.exception("Error listing modules")
     return JSONResponse(
-      content={"error": str(e), "modules": [], "total": 0},
+      content={"error": "internal error", "modules": [], "total": 0},
       status_code=500
     )
 

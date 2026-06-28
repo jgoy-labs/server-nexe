@@ -152,7 +152,7 @@ routes_chat.py — _extract_safe_mem_saves()
     ├─── text net → flux visible (l'usuari no veu el marcador)
     │
     ▼
-chat_memory.py — auto_save_to_memory()
+chat_memory.py — _save_conversation_to_memory()
     │  · Crea col·leccio personal_memory si no existeix
     │  · Comprova duplicats (similitud > 0.80 → descarta)
     │
@@ -165,7 +165,7 @@ Qdrant — col·leccio personal_memory
 
 **Intent d'esborrat (MEM_DELETE):** Quan l'usuari diu "oblida que X", cerca entrades amb similitud >= **DELETE_THRESHOLD (0.20 des de v0.9.9)**. Esborra la coincidencia mes propera. Guard anti-re-save: `_recently_deleted_facts` evita que el model torni a guardar un fet acabat d'esborrar dins la mateixa sessio.
 
-> **A la v0.9.9 es va abaixar el threshold de memòria:** el valor anterior (0.70) era massa alt i cap coincidència passava la prova. Es va ajustar a **0.20** després de 8 tests e2e reals (`tests/integration/test_mem_delete_e2e.py`) contra Qdrant embedded + fastembed. Ara l'esborrat funciona consistentment.
+> **A la v0.9.9 es va abaixar el threshold de memòria:** el valor anterior (0.55) era massa alt i cap coincidència passava la prova (cadena històrica completa: 0.82 → 0.70 → 0.55 → 0.20). Es va ajustar a **0.20** després de 8 tests e2e reals (`tests/integration/test_mem_delete_e2e.py`) contra Qdrant embedded + fastembed. Ara l'esborrat funciona consistentment.
 
 ### Confirmacio `clear_all` 2-torns
 
@@ -217,7 +217,7 @@ Els documents pujats via la Web UI s'indexen a la col·leccio `user_knowledge` a
 
 ### Documentació del sistema via CLI (nexe_documentation)
 - Font: carpeta `knowledge/` (subcarpetes ca/en/es)
-- Col·lecció destí: `nexe_documentation` (per defecte des del fix F7; `user_knowledge` és possible amb `--collection` explícit)
+- Col·lecció destí: `nexe_documentation` (per defecte des del fix F7; l'API `ingest_knowledge` encara accepta `target_collection="user_knowledge"` per a documents ad-hoc)
 - Chunking: 1500 caracters per chunk per defecte (configurable via capcalera RAG chunk_size), solapament = max(50, chunk_size/10)
 - Ingerit via `core/ingest/ingest_knowledge.py`
 - Suporta capcaleres RAG amb metadades (`#!RAG id=..., priority=...`)
@@ -230,7 +230,7 @@ Quan RAG troba resultats rellevants, s'injecten al prompt del LLM en 3 categorie
 |----------|-----------|-----------|-----------|-------------------|
 | Docs del sistema | SYSTEM DOCUMENTATION | DOCUMENTACIO DEL SISTEMA | DOCUMENTACION DEL SISTEMA | nexe_documentation |
 | Docs tecnics | TECHNICAL DOCUMENTATION | DOCUMENTACIO TECNICA | DOCUMENTACION TECNICA | user_knowledge |
-| Memoria de l'usuari | USER MEMORY | MEMORIA USUARI | MEMORIA USUARIO | personal_memory |
+| Memoria de l'usuari | USER MEMORY | MEMORIA DE L'USUARI | MEMORIA DEL USUARIO | personal_memory |
 
 **Limits de context:**
 - `MAX_CONTEXT_CHARS` = 24000 (configurable via variable d'entorn `NEXE_MAX_CONTEXT_CHARS`)
@@ -294,6 +294,6 @@ storage/vectors/
 ## Endpoints principals per a RAG
 
 - `POST /v1/chat/completions` — Xat amb RAG (use_rag: true per defecte)
-- `POST /v1/memory/store` — Guardar text a una col·leccio
+- `POST /v1/memory/store` — Guardar text a una col·leccio (usa MemoryService quan esta inicialitzat, en cas contrari fa fallback a una escriptura directa a Qdrant per resiliencia)
 - `POST /v1/memory/search` — Cerca semantica directa en una col·leccio
-- `DELETE /v1/rag/documents/{id}` — Esborrar una entrada especifica
+- `DELETE /v1/rag/documents/{id}` — **[planificat, NO implementat]** retorna 501 Not Implemented (router tagged `future`; els tres endpoints `/v1/rag/*` — search, add, documents/{id} — encara no estan operatius)

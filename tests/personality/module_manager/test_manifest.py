@@ -55,9 +55,13 @@ class TestModuleManagerInfo:
 class TestModuleManagerList:
 
     def test_list_returns_modules(self):
+        from personality.module_manager.registry import ModuleRegistry
         client = TestClient(make_app())
-        mock_registry = MagicMock()
-        mock_registry.get_all_modules.return_value = {}
+        # spec=ModuleRegistry so calling a non-existent method (the old
+        # get_all_modules bug, B133) raises AttributeError instead of being
+        # silently absorbed by a permissive MagicMock.
+        mock_registry = MagicMock(spec=ModuleRegistry)
+        mock_registry.list_modules.return_value = []
 
         with patch("personality.module_manager.registry.ModuleRegistry", return_value=mock_registry):
             resp = client.get("/modules/list")
@@ -67,15 +71,18 @@ class TestModuleManagerList:
         assert "modules" in data
 
     def test_list_with_modules(self):
+        from personality.module_manager.registry import ModuleRegistry
         client = TestClient(make_app())
-        mock_registry = MagicMock()
+        mock_registry = MagicMock(spec=ModuleRegistry)
 
-        mock_info = MagicMock()
-        mock_info.status = "active"
-        mock_info.version = "1.0"
-        mock_info.path = "/some/path"
+        mock_reg = MagicMock()
+        mock_reg.name = "test_module"
+        mock_reg.status = "active"
+        mock_reg.version = "1.0"
+        mock_reg.path = "/some/path"
 
-        mock_registry.get_all_modules.return_value = {"test_module": mock_info}
+        # list_modules() returns List[ModuleRegistration], not a dict (B133).
+        mock_registry.list_modules.return_value = [mock_reg]
 
         with patch("personality.module_manager.registry.ModuleRegistry", return_value=mock_registry):
             resp = client.get("/modules/list")
@@ -122,6 +129,56 @@ class TestModuleManagerUi:
 
         assert resp.status_code == 200
         assert "Module Manager" in resp.text
+
+
+class TestModuleManagerErrorSanitization:
+    """MC-132: the response body never leaks str(e) nor absolute filesystem
+    paths (info-disclosure in endpoints without auth)."""
+
+    def test_list_error_does_not_leak_exception_detail(self):
+        client = TestClient(make_app(), raise_server_exceptions=False)
+        leak = "/Users/secret/abs/path/leak.db boom"
+        with patch("personality.module_manager.registry.ModuleRegistry", side_effect=RuntimeError(leak)):
+            resp = client.get("/modules/list")
+        assert resp.status_code == 500
+        assert leak not in resp.text
+        assert "/Users/secret" not in resp.text
+        assert resp.json()["error"] == "internal error"
+
+    def test_health_error_does_not_leak_exception_detail(self):
+        client = TestClient(make_app(), raise_server_exceptions=False)
+        leak = "/private/secret/path boom"
+        mock_path = MagicMock()
+        mock_path.exists.side_effect = RuntimeError(leak)
+        with patch("personality.module_manager.manifest.UI_PATH", mock_path):
+            resp = client.get("/modules/health")
+        assert resp.status_code == 500
+        assert leak not in resp.text
+        assert resp.json().get("error") == "internal error"
+
+    def test_info_does_not_leak_absolute_filesystem_path(self):
+        client = TestClient(make_app())
+        resp = client.get("/modules/info")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert not str(data.get("path", "")).startswith("/")
+        assert "location" in data and not data["location"].startswith("/")
+
+    def test_list_module_path_is_basename_not_absolute(self):
+        from personality.module_manager.registry import ModuleRegistry
+        client = TestClient(make_app())
+        mock_registry = MagicMock(spec=ModuleRegistry)
+        mock_reg = MagicMock()
+        mock_reg.name = "test_module"
+        mock_reg.status = "active"
+        mock_reg.version = "1.0"
+        mock_reg.path = "/abs/secret/dir/test_module"
+        mock_registry.list_modules.return_value = [mock_reg]
+        with patch("personality.module_manager.registry.ModuleRegistry", return_value=mock_registry):
+            resp = client.get("/modules/list")
+        data = resp.json()
+        assert data["modules"][0]["path"] == "test_module"
+        assert "/abs/secret" not in resp.text
 
 
 class TestGetRouterAndMetadata:

@@ -65,6 +65,14 @@ JAILBREAK_PATTERNS = [
   r"finge\s+que\s+eres",
   r"ahora\s+eres\s+",
   r"actúa\s+como\s+si",
+
+  # B031: system-prompt extraction via a technical pretext (debug/verification/maintenance/
+  # diagnostics) asking for the SYSTEM instructions/configuration. The required proximity
+  # to the system-object avoids false positives with "debug del meu codi" or "configuració del SO".
+  r"(debug|verificaci[oó]n?|mantenim(ent|iento)?|diagn[oò]stic[oa]?)[^.?!\n]{0,40}(system\s*prompt|prompt\s+del?\s+sistema|instruccions?\s+del?\s+sistema|instruccion(es)?\s+del\s+sistema|configuraci[oó]n?\s+del?\s+sistema|system\s+(instructions|configuration))",
+  # B031: reveal the OWN assistant's initial instructions/prompt (possessive required
+  # → avoids FP with "necessito instruccions per..." or "mostra'm un exemple").
+  r"(mostra|revela|recita|repeteix|imprimeix|ensenya|show|reveal|recite|repeat|print)[^.?!\n]{0,25}(your|teves|teu|tus|tu)\s+(initial\s+)?(system\s+)?(prompt\s+de\s+sistema|system\s*prompt|instruccions?|instruccion(es)?|instructions|setup)",
 ]
 
 INJECTION_PATTERNS = [
@@ -107,6 +115,8 @@ SEVERITY_KEYWORDS = {
     "[system]", "<<sys>>", "<<system>>", "system prompt", "reveal",
     "ignora", "instruccions", "oblida", "regles", "revela", "mostra", "filtres", "seguretat", "comporta't", "respon",
     "instrucciones", "olvida", "reglas", "finge", "muestra",
+    # B031: the system-object of the extraction framing (only escalates within an already-matched threat)
+    "configuració", "configuración", "configuration",
   ],
   "medium": ["[assistant]", "[user]", "```system", "[inst]"],
 }

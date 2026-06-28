@@ -135,6 +135,15 @@ class TestSanitizeOllamaResponse:
         result = sanitize_ollama_response("Config at /home/user/.config")
         assert "[REDACTED_PATH]" in result
 
+    def test_redact_windows_path_full(self):
+        """B117: Windows user path redaction must cover the FULL path, not just the first segment."""
+        from plugins.ollama_module.workflow.nodes.ollama_node import sanitize_ollama_response
+        result = sanitize_ollama_response(r"File at C:\Users\admin\Documents\secret.txt")
+        assert "[REDACTED_PATH]" in result
+        assert "secret.txt" not in result
+        assert "Documents" not in result
+        assert "admin" not in result
+
     def test_redact_env_var(self):
         """Test environment variable redaction."""
         from plugins.ollama_module.workflow.nodes.ollama_node import sanitize_ollama_response

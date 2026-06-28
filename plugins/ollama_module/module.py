@@ -248,7 +248,8 @@ class OllamaModule:
     def chat(
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
         images: Optional[List[str]] = None, thinking_enabled: bool = False,
+        top_p: Optional[float] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         """Send a chat request to Ollama, yielding streamed response chunks."""
         return self.chat_mgr.chat(model, messages, stream=stream, images=images,
-                                  thinking_enabled=thinking_enabled)
+                                  thinking_enabled=thinking_enabled, top_p=top_p)

@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import hashlib
 import logging
 import os
@@ -89,11 +90,25 @@ async def build_rag_context(
                 ("personal_memory", RAG_MEMORY_THRESHOLD, 2, None),
             ]
 
+            # MC-001: embed the (already NFKC-normalized) query ONCE and reuse it
+            # for every collection instead of recomputing the identical embedding
+            # three times. Falls back to per-search embedding if this fails.
+            query_embedding = None
+            try:
+                query_embedding = await memory.embed_query(last_user_msg)
+            except Exception as emb_err:
+                logger.debug("RAG: query embedding precompute unavailable: %s", emb_err)
+
+            # MC-001: run the per-collection searches concurrently (was serial).
+            # gather preserves argument order, so all_results keeps the original
+            # docs→knowledge→memory ordering that dedup/context rely on.
+            per_collection = await asyncio.gather(*(
+                _search_collection(memory, name, last_user_msg, threshold, top_k, filter_md, query_embedding)
+                for name, threshold, top_k, filter_md in collections
+            ))
             all_results: list = []
-            for name, threshold, top_k, filter_md in collections:
-                all_results.extend(
-                    await _search_collection(memory, name, last_user_msg, threshold, top_k, filter_md)
-                )
+            for results in per_collection:
+                all_results.extend(results)
 
             if all_results:
                 context_text = _build_context_from_results(all_results)
@@ -106,7 +121,7 @@ async def build_rag_context(
             context_text = await _rag_module_fallback(app_state, last_user_msg)
 
     except Exception as e:
-        logger.error("RAG Error: %s", e)
+        logger.error("RAG Error: %s", e, exc_info=True)
         # Continue without context rather than failing
 
     return context_text
@@ -122,6 +137,7 @@ async def _search_collection(
     threshold: float,
     top_k: int,
     filter_metadata: dict | None = None,
+    query_embedding: "list[float] | None" = None,
 ) -> list:
     """Search a single MemoryAPI collection, returning [] on error or no results."""
     try:
@@ -129,12 +145,17 @@ async def _search_collection(
             kwargs: dict = dict(query=query, collection=name, top_k=top_k, threshold=threshold)
             if filter_metadata:
                 kwargs["filter_metadata"] = filter_metadata
+            if query_embedding is not None:
+                kwargs["query_embedding"] = query_embedding
             results = await memory.search(**kwargs)
             if results:
                 logger.info("RAG: Found %d docs from %s", len(results), name)
                 return results
     except Exception as e:
-        logger.debug("RAG %s search failed: %s", name, e)
+        # MC-017: a failing search is NOT the same as the legitimate 0-results
+        # case — log at warning so a broken RAG (Qdrant down) is visible in
+        # production instead of looking like an empty knowledge base.
+        logger.warning("RAG %s search failed: %s", name, e)
     return []
 
 

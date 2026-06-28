@@ -152,7 +152,7 @@ routes_chat.py — _extract_safe_mem_saves()
     ├─── texto limpio → flujo visible (el usuario no ve el marcador)
     │
     ▼
-chat_memory.py — auto_save_to_memory()
+chat_memory.py — _save_conversation_to_memory()
     │  · Crea colección personal_memory si no existe
     │  · Comprueba duplicados (similitud > 0.80 → descarta)
     │
@@ -165,7 +165,7 @@ Qdrant — colección personal_memory
 
 **Intent de borrado (MEM_DELETE):** Cuando el usuario dice "olvida que X", busca entradas con similitud >= **DELETE_THRESHOLD (0.20 desde v0.9.9)**. Borra la coincidencia mas cercana. Guard anti-re-save: `_recently_deleted_facts` evita que el modelo vuelva a guardar un hecho recien borrado dentro de la misma sesion.
 
-> **En v0.9.9 se bajo el threshold de memoria:** el valor anterior (0.70) era demasiado alto y ninguna coincidencia pasaba la prueba. Se ajusto a **0.20** tras 8 tests e2e reales (`tests/integration/test_mem_delete_e2e.py`) contra Qdrant embedded + fastembed. Ahora el borrado funciona consistentemente.
+> **En v0.9.9 se bajo el threshold de memoria:** el valor anterior (0.55) era demasiado alto y ninguna coincidencia pasaba la prueba (cadena historica completa: 0.82 → 0.70 → 0.55 → 0.20). Se ajusto a **0.20** tras 8 tests e2e reales (`tests/integration/test_mem_delete_e2e.py`) contra Qdrant embedded + fastembed. Ahora el borrado funciona consistentemente.
 
 ### Confirmacion `clear_all` 2-turnos
 
@@ -230,7 +230,7 @@ Cuando el RAG encuentra resultados relevantes, se inyectan en el prompt del LLM 
 |----------|-----------|-----------|-----------|-------------------|
 | Docs sistema | SYSTEM DOCUMENTATION | DOCUMENTACIO DEL SISTEMA | DOCUMENTACION DEL SISTEMA | nexe_documentation |
 | Docs tecnicos | TECHNICAL DOCUMENTATION | DOCUMENTACIO TECNICA | DOCUMENTACION TECNICA | user_knowledge |
-| Memoria usuario | USER MEMORY | MEMORIA USUARI | MEMORIA USUARIO | personal_memory |
+| Memoria usuario | USER MEMORY | MEMORIA DE L'USUARI | MEMORIA DEL USUARIO | personal_memory |
 
 **Limites de contexto:**
 - `MAX_CONTEXT_CHARS` = 24000 (configurable via variable de entorno `NEXE_MAX_CONTEXT_CHARS`)
@@ -294,6 +294,6 @@ storage/vectors/
 ## Endpoints principales para RAG
 
 - `POST /v1/chat/completions` — Chat con RAG (use_rag: true por defecto)
-- `POST /v1/memory/store` — Guardar texto en una coleccion
+- `POST /v1/memory/store` — Guardar texto en una coleccion (usa MemoryService cuando esta inicializado, en caso contrario hace fallback a una escritura directa en Qdrant por resiliencia)
 - `POST /v1/memory/search` — Busqueda semantica directa en una coleccion
-- `DELETE /v1/rag/documents/{id}` — Borrar una entrada especifica
+- `DELETE /v1/rag/documents/{id}` — **[planificado, NO implementado]** devuelve 501 Not Implemented (router tagged `future`; los tres endpoints `/v1/rag/*` — search, add, documents/{id} — aun no estan operativos)

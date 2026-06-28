@@ -7,11 +7,6 @@ omit =
     */__pycache__/*
     */conftest.py
     */install_nexe.py
-    core/app.py
-    core/lifespan.py
-    core/server/*.py
-    core/loader/*.py
-    core/cli/*.py
     core/ingest/tests/*.py
     */__main__.py
     plugins/mlx_module/generate_helpers.py

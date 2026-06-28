@@ -1590,7 +1590,7 @@ class NexeUI {
                             loadingEl.className = 'model-loading-indicator';
                             loadingEl.innerHTML = `
                                 <div class="loading-spinner"></div>
-                                <span>${this.t('model_loading')}… <strong>${loadingModel}</strong>${backendLabel ? ` <em class="loading-backend">[${backendLabel}]</em>` : ''} — <em class="loading-timer">0s</em></span>
+                                <span>${this.t('model_loading')}… <strong>${this.escapeHtml(loadingModel)}</strong>${backendLabel ? ` <em class="loading-backend">[${this.escapeHtml(backendLabel)}]</em>` : ''} — <em class="loading-timer">0s</em></span>
                             `;
                             lastMsg.querySelector('.message-content').insertBefore(loadingEl, assistantMessageDiv);
                             // During model loading into VRAM, the blue loadingEl
@@ -1812,7 +1812,7 @@ class NexeUI {
                                     const f = Math.round(item.score * 10);
                                     const bar = '▓'.repeat(f) + '░'.repeat(10 - f);
                                     const color = item.score >= 0.8 ? 'rag-high' : item.score >= 0.6 ? 'rag-mid' : 'rag-low';
-                                    return `<div class="rag-detail-row ${color}"><span class="rag-col">${item.col}</span><span class="rag-detail-bar">${bar}</span><span class="rag-score">${(item.score * 100).toFixed(0)}%</span></div>`;
+                                    return `<div class="rag-detail-row ${color}"><span class="rag-col">${this.escapeHtml(item.col)}</span><span class="rag-detail-bar">${bar}</span><span class="rag-score">${(item.score * 100).toFixed(0)}%</span></div>`;
                                 }).join('');
                                 ragDetail = `<div class="rag-detail" style="display:none">${detailRows}</div>`;
                             }
@@ -1827,7 +1827,7 @@ class NexeUI {
                         statsEl.innerHTML = `
                             <span class="stat-item"><i data-lucide="activity"></i><span>${finalTok} tok</span></span>
                             ${timeStr ? `<span class="stat-item"><i data-lucide="timer"></i><span>${timeStr}${spdStr}</span></span>` : ''}
-                            ${modelShort ? `<span class="stat-item stat-model"><i data-lucide="cpu"></i><span>${modelShort}</span></span>` : ''}
+                            ${modelShort ? `<span class="stat-item stat-model"><i data-lucide="cpu"></i><span>${this.escapeHtml(modelShort)}</span></span>` : ''}
                             ${ragBadge}
                             ${compactBadge}
                             ${memBadge}

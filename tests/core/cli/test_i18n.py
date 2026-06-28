@@ -91,3 +91,54 @@ class TestCache:
         i18n.clear_cache()
         monkeypatch.setenv("NEXE_LANG", "en-US")
         assert i18n.t("cli.greetings.hello") == "Hello"
+
+
+class TestMC047I18nIntegrity:
+    """Guards for the MC-047 dead-code removal: the orphan `module_ok` strings
+    (which named the deleted `CLIModule`) were dropped, while the live keys the
+    deletion had to PRESERVE must still resolve in all three languages."""
+
+    _LANGS = ("ca-ES", "es-ES", "en-US")
+
+    def test_all_common_json_still_valid(self):
+        """The hand edits left every common.json as parseable JSON."""
+        import json
+        from pathlib import Path
+
+        lang_dir = Path(i18n.__file__).parent / "languages"
+        for lang in self._LANGS:
+            with (lang_dir / lang / "common.json").open(encoding="utf-8") as f:
+                data = json.load(f)  # raises if invalid
+            assert "cli" in data
+
+    def test_module_ok_removed_in_all_langs(self):
+        """The orphan `module_ok` keys (both occurrences) no longer resolve:
+        `t()` returns the raw key when a key is absent. Mutation-proof: re-add
+        `module_ok` to any common.json and this turns red."""
+        for lang in self._LANGS:
+            assert (
+                i18n.t("cli.health_checks.basic_functionality.module_ok", lang=lang)
+                == "cli.health_checks.basic_functionality.module_ok"
+            )
+            assert (
+                i18n.t("cli.check.module_ok", lang=lang)
+                == "cli.check.module_ok"
+            )
+
+    def test_sibling_keys_not_over_deleted(self):
+        """The keys adjacent to the removed `module_ok` must still resolve —
+        guards against over-deletion during the surgical edit."""
+        for lang in self._LANGS:
+            assert (
+                i18n.t("cli.health_checks.basic_functionality.methods_ok", lang=lang)
+                != "cli.health_checks.basic_functionality.methods_ok"
+            )
+            assert i18n.t("cli.check.methods_ok", lang=lang) != "cli.check.methods_ok"
+            assert i18n.t("cli.check.config_ok", lang=lang) != "cli.check.config_ok"
+
+    def test_preserved_greetings_resolve(self):
+        """`cli.greetings.*` are LIVE i18n fixtures (used by this module's own
+        tests) — the dead-code sweep must not have touched them."""
+        assert i18n.t("cli.greetings.hello", lang="ca-ES") == "Hola"
+        assert i18n.t("cli.greetings.welcome", lang="en-US").strip() != ""
+        assert i18n.t("cli.greetings.welcome", lang="en-US") != "cli.greetings.welcome"

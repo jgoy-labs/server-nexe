@@ -12,14 +12,16 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 
+from core.env_utils import parse_truthy
+
 logger = logging.getLogger(__name__)
 
 
 async def _startup_auto_clean(server_state, _translate) -> None:
     """Run auto-clean on startup if NEXE_AUTO_CLEAN_ENABLED is set."""
-    auto_clean_enabled = os.getenv(
+    auto_clean_enabled = parse_truthy(os.getenv(
         'NEXE_AUTO_CLEAN_ENABLED', os.getenv('AUTO_CLEAN_ENABLED', 'false')
-    ).lower() == 'true'
+    ))
 
     if not auto_clean_enabled:
         return
@@ -31,9 +33,9 @@ async def _startup_auto_clean(server_state, _translate) -> None:
             "Auto-Clean: Running automatic cleanup...")
         logger.info(msg)
 
-        dry_run = os.getenv(
+        dry_run = parse_truthy(os.getenv(
             'NEXE_AUTO_CLEAN_DRY_RUN', os.getenv('AUTO_CLEAN_DRY_RUN', 'true')
-        ).lower() == 'true'
+        ))
         result = await run_auto_clean(
             core_root=server_state.project_root,
             dry_run=dry_run,

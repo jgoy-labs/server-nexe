@@ -1,14 +1,14 @@
-// NexeButtonStyle.swift — Button style consistent per tot el wizard.
+// NexeButtonStyle.swift — Button style consistent across the whole wizard.
 //
-// Substitueix `.buttonStyle(.borderedProminent)` que macOS converteix en
-// transparent quan la finestra perd el focus (apareix només el text, sense
-// fons vermell). Això es veu com si el botó desaparegués.
+// Replaces `.buttonStyle(.borderedProminent)`, which macOS turns
+// transparent when the window loses focus (only the text appears, without
+// a red background). This looks as if the button disappeared.
 //
-// NexePrimaryButtonStyle pinta sempre el fons explícitament, independent
-// de l'estat de focus de la finestra.
+// NexePrimaryButtonStyle always paints the background explicitly, independent
+// of the window's focus state.
 //
-// Ús:
-//   Button("Següent") { ... }
+// Usage:
+//   Button("Next") { ... }
 //       .nexePrimaryButton()
 //       .disabled(!canContinue)
 
@@ -38,7 +38,7 @@ struct NexePrimaryButtonStyle: ButtonStyle {
 }
 
 extension View {
-    /// Aplica el botó primari (vermell Nexe) amb fons sempre visible.
+    /// Applies the primary button (Nexe red) with an always-visible background.
     func nexePrimaryButton() -> some View {
         buttonStyle(NexePrimaryButtonStyle())
     }

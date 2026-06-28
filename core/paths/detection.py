@@ -18,6 +18,7 @@ from functools import lru_cache
 from enum import Enum
 
 from .validation import _is_valid_core_root, _log_detection_success, _log_detection_failure
+from .constants import BASE_CONFIG_RELATIVE
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class DetectionMethod(Enum):
   FALLBACK_CWD = "Path.cwd() fallback (UNSAFE, deprecated)"
 
 REQUIRED_MARKERS = [
-  "personality/server.toml",
+  BASE_CONFIG_RELATIVE,
 ]
 
 OPTIONAL_MARKERS = [

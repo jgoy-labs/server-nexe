@@ -206,29 +206,6 @@ class TestWebUIModuleGaps:
         mod = WebUIModule()
         assert mod.metadata.name == "web_ui_module"
 
-    @pytest.mark.asyncio
-    async def test_serve_ui_not_found(self):
-        """Line 107: UI file not found raises 404."""
-        from plugins.web_ui_module.module import WebUIModule
-        mod = WebUIModule()
-        mod.static_dir = Path("/nonexistent/path")
-        # The serve_ui would raise 404 but it's inside a router closure.
-        # Test via the module directly.
-
-    @pytest.mark.asyncio
-    async def test_serve_static_file_not_css_js(self):
-        """Line 115: static file not CSS/JS returns 404."""
-        from plugins.web_ui_module.module import WebUIModule
-        mod = WebUIModule()
-        # The endpoint checks for .css/.js extensions
-
-    @pytest.mark.asyncio
-    async def test_chat_not_initialized(self):
-        """Line 210: chat when not initialized returns 503."""
-        from plugins.web_ui_module.module import WebUIModule
-        mod = WebUIModule()
-        assert mod._initialized is False
-
     def test_resolve_api_base_url_from_env(self, monkeypatch):
         """Lines 289-291: resolve URL from environment variable."""
         from plugins.web_ui_module.module import WebUIModule
@@ -276,37 +253,6 @@ class TestWebUIModuleGaps:
         assert info["name"] == "web_ui_module"
         assert "initialized" in info
 
-    @pytest.mark.asyncio
-    async def test_stream_chat_response_error(self):
-        """Lines 361-364: streaming with error response."""
-        from plugins.web_ui_module.module import WebUIModule
-        mod = WebUIModule()
-        mod._initialized = True
-        mod.api_base_url = "http://127.0.0.1:99999"  # Invalid port
-        session = ChatSession()
-        session.add_message("user", "test")
-
-        # _stream_chat_response should yield error message
-        chunks = []
-        try:
-            async for chunk in mod._stream_chat_response(session, {"stream": True}):
-                chunks.append(chunk)
-        except Exception:
-            pass
-        # At minimum it should not hang
-
-    @pytest.mark.asyncio
-    async def test_fetch_chat_response_error(self):
-        """Lines 368, 370: non-streaming with error response."""
-        from plugins.web_ui_module.module import WebUIModule
-        mod = WebUIModule()
-        mod._initialized = True
-        mod.api_base_url = "http://127.0.0.1:99999"  # Invalid port
-        session = ChatSession()
-        session.add_message("user", "test")
-
-        with pytest.raises(Exception):
-            await mod._fetch_chat_response(session, {})
 
     @pytest.mark.asyncio
     async def test_health_check_not_initialized(self):

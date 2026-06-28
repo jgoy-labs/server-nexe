@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import pytest
 import asyncio
+from datetime import datetime, timezone, timedelta
 
 from memory.memory.engines.flash_memory import FlashMemory
 from memory.memory.models.memory_entry import MemoryEntry
@@ -64,20 +65,69 @@ class TestFlashMemory:
     assert await flash.get(entry.id) is not None       # live entry survives
 
   async def test_ttl_expiration(self):
-    """Entry expires after TTL"""
+    """Entry with a real TTL whose creation timestamp is older than the TTL is
+    expired and evicted on get() (no time.sleep — drive it via the timestamp)."""
     flash = FlashMemory(default_ttl_seconds=60)
+    old = datetime.now(timezone.utc) - timedelta(seconds=120)
     entry = MemoryEntry(
       entry_type=MemoryType.EPISODIC,
       content="Will expire",
       source="test",
-      ttl_seconds=60
+      ttl_seconds=60,
+      timestamp=old,
     )
 
     await flash.store(entry)
 
-    assert await flash.get(entry.id) is not None
+    assert flash._is_expired(entry) is True
+    assert await flash.get(entry.id) is None  # expired → evicted on read
 
-    assert await flash.get(entry.id) is not None
+  async def test_none_ttl_is_permanent(self):
+    """B113: ttl_seconds=None means permanent — even an entry with a very old
+    creation timestamp never expires (consistent with the SQLite / Document
+    layers). Mutation gate: under the old `ttl or default` fallback the default
+    would expire this entry over its old timestamp."""
+    flash = FlashMemory(default_ttl_seconds=60)
+    old = datetime.now(timezone.utc) - timedelta(days=3650)
+    entry = MemoryEntry(
+      entry_type=MemoryType.EPISODIC,
+      content="Permanent fact",
+      source="test",
+      ttl_seconds=None,
+      timestamp=old,
+    )
+
+    await flash.store(entry)
+
+    assert flash._is_expired(entry) is False
+    assert await flash.get(entry.id) is not None  # survives despite old timestamp
+    # Permanent entries push no expiry tuple onto the heap.
+    assert len(flash._expiry_heap) == 0
+
+  async def test_permanent_survives_alongside_expired_entry(self):
+    """B113: a permanent (None) entry coexists with a real-TTL entry. Only the
+    TTL entry occupies the expiry heap; on read the expired one is lazily
+    evicted while the permanent one survives — the heap carries no dead
+    reference to the permanent entry."""
+    flash = FlashMemory(default_ttl_seconds=60)
+    old = datetime.now(timezone.utc) - timedelta(seconds=120)
+    permanent = MemoryEntry(
+      entry_type=MemoryType.EPISODIC, content="permanent fact",
+      source="test", ttl_seconds=None, timestamp=old,
+    )
+    expired = MemoryEntry(
+      entry_type=MemoryType.EPISODIC, content="will expire",
+      source="test", ttl_seconds=60, timestamp=old,  # timestamp+ttl already past
+    )
+
+    await flash.store(permanent)
+    await flash.store(expired)
+
+    # only the TTL entry scheduled an expiry tuple; the permanent one did not
+    assert len(flash._expiry_heap) == 1
+    # lazy eviction on read: expired gone, permanent stays
+    assert await flash.get(expired.id) is None
+    assert await flash.get(permanent.id) is not None
 
   async def test_cleanup_expired(self):
     """Cleanup removes expired entries"""

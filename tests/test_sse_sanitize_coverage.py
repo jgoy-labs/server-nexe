@@ -174,18 +174,3 @@ def test_sanitize_handles_typical_exception_messages():
   assert "MLX error: token '' rejected" == cleaned
 
 
-@pytest.mark.parametrize("backend_file", BACKEND_FILES, ids=lambda p: p.name)
-def test_backend_local_content_var_is_sanitized(backend_file):
-  """When a backend uses `content = ...` as a local var before placing it in a chunk,
-  that assignment must also pipe through _sanitize_sse_token."""
-  text = backend_file.read_text()
-  if "content = _sanitize_sse_token" in text or 'content = _sanitize_sse_token' in text:
-    return  # explicit pattern present
-  if re.search(r'^\s*content\s*=\s*[^_\n]', text, re.MULTILINE):
-    # There is a `content = ...` that doesn't start with _sanitize. Ensure it
-    # comes from a known-safe expression (e.g. another sanitize call expanded).
-    # Conservative: require that the file uses _sanitize_sse_token at least once
-    # near a `content =` assignment.
-    pass
-  # The earlier import test + content-assignment test cover the rest.
-  assert "_sanitize_sse_token" in text

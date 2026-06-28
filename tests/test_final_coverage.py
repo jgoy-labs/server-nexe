@@ -400,35 +400,60 @@ class TestIngestKnowledgeFinal:
         assert result == ""
 
     def test_ingest_with_rag_header(self, tmp_path):
-        """Lines 203-211, 215, 232: files with RAG headers."""
-        from core.ingest.ingest_knowledge import ingest_knowledge
+        """T7 REFORÇAT — _build_file_items() ha de preservar rag_id/priority/tags al metadata.
+        Bug tapat: un bug al parse_rag_header que perdés rag_id/rag_priority/rag_tags
+        ingeriria els chunks sense etiquetes i l'assert original (result is True) seguiria verd.
+        Prova de mutació: posar `header.id = ""` a header_parser.py:148 posa VERMELL.
+        """
+        from core.ingest.ingest_knowledge import _build_file_items
 
         knowledge_dir = tmp_path / "knowledge"
         knowledge_dir.mkdir()
-        doc = knowledge_dir / "test.md"
-        doc.write_text("""---
-rag_id: test-doc
-rag_priority: P1
-rag_tags: test, docs
-rag_abstract: A test document
-rag_type: reference
----
+        doc = knowledge_dir / "test-doc.md"
+        # Format CORRECTE del parser (header_parser.py:195): "METADATA RAG" + camps id/priority/tags
+        doc.write_text(
+            "# === METADATA RAG ===\n"
+            "versio: \"1.0\"\n"
+            "data: 2026-06-15\n"
+            "id: my-test-doc\n"
+            "abstract: Document de prova per a la suite de tests\n"
+            "tags: [test, docs, reforç]\n"
+            "chunk_size: 800\n"
+            "priority: P1\n"
+            "lang: en\n"
+            "type: docs\n"
+            "---\n"
+            "\n"
+            "This is the body content of the document.\n"
+            "It has multiple sentences for chunking purposes.\n"
+            "A third sentence to ensure at least one chunk is produced.\n"
+        )
 
-This is the body content of the document.
-It has multiple sentences for chunking purposes.
-""")
+        batch_items, doc_collection, num_chunks = _build_file_items(
+            file_path=doc,
+            ingest_cfg=None,          # no s'usa dins _build_file_items
+            target_collection="nexe_documentation",
+            log=lambda msg: None,     # silenci
+            perf_chunking_ns_ref=[0],
+        )
 
-        mock_memory = AsyncMock()
-        mock_memory.initialize = AsyncMock()
-        mock_memory.collection_exists = AsyncMock(return_value=False)
-        mock_memory.delete_collection = AsyncMock()
-        mock_memory.create_collection = AsyncMock()
-        mock_memory.store = AsyncMock(return_value="chunk-1")
-        mock_memory.close = AsyncMock()
+        assert num_chunks >= 1, "Ha de produir almenys un chunk"
+        assert len(batch_items) >= 1, "Ha de retornar almenys un item"
 
-        with patch("memory.memory.api.MemoryAPI", return_value=mock_memory):
-            result = asyncio.run(ingest_knowledge(folder=knowledge_dir, quiet=True))
-            assert result is True
+        meta = batch_items[0]["metadata"]
+
+        assert meta["doc_id"] == "my-test-doc", (
+            f"doc_id ha de ser 'my-test-doc' (del rag_id), obtingut: {meta['doc_id']!r}"
+        )
+        assert meta["priority"] == "P1", (
+            f"priority ha de ser 'P1', obtingut: {meta['priority']!r}"
+        )
+        assert "test" in meta["tags"], (
+            f"tags ha de contenir 'test', obtingut: {meta['tags']!r}"
+        )
+        assert "docs" in meta["tags"], (
+            f"tags ha de contenir 'docs', obtingut: {meta['tags']!r}"
+        )
 
     def test_ingest_connection_error(self, tmp_path):
         """Lines 168-171: connection to Qdrant fails."""
@@ -2078,15 +2103,6 @@ class TestOllamaCliFinal:
         from plugins.ollama_module import cli
         assert hasattr(cli, "RICH_AVAILABLE")
 
-    def test_app_is_none_without_typer(self):
-        """Lines 36-37: app is None if typer not available."""
-        # If typer is installed, app will not be None
-        from plugins.ollama_module.cli import main as cli_main
-        if cli_main.typer is None:
-            assert cli_main.app is None
-        else:
-            assert cli_main.app is not None
-
     def test_run_async_helper(self):
         """Lines 41-43: _run_async helper."""
         from plugins.ollama_module.cli import _run_async
@@ -2104,15 +2120,33 @@ class TestOllamaCliFinal:
 
 class TestOllamaModuleFinal:
 
-    def test_module_creates_with_defaults(self):
-        """Basic OllamaModule instantiation."""
-        from plugins.ollama_module.module import OllamaModule
-        m = OllamaModule()
-        assert m is not None
-
     def test_module_custom_base_url(self, monkeypatch):
-        """Custom base_url via env var."""
+        """T1 REFORÇAT — resolve_base_url() ha de llegir NEXE_OLLAMA_HOST (no BASE_URL).
+        Prova que OllamaModule.base_url reflecteix el host configurat.
+        Bug tapat B7: si resolve_base_url() ignorés l'env var el client
+        es connectaria silenciosament a localhost en lloc del host configurat.
+        Prova de mutació: comentar la línia `raw = os.getenv("NEXE_OLLAMA_HOST")...`
+        a client.py:85 posa aquest test VERMELL.
+        """
+        from plugins.ollama_module.core.client import resolve_base_url
         from plugins.ollama_module.module import OllamaModule
-        monkeypatch.setenv("NEXE_OLLAMA_BASE_URL", "http://custom:1234")
+
+        # Esborrem possibles herències de l'entorn
+        monkeypatch.delenv("NEXE_OLLAMA_HOST", raising=False)
+        monkeypatch.delenv("OLLAMA_HOST", raising=False)
+        monkeypatch.delenv("NEXE_OLLAMA_BASE_URL", raising=False)
+
+        # NEXE_OLLAMA_HOST és la var que resolve_base_url() llegeix (client.py:85)
+        monkeypatch.setenv("NEXE_OLLAMA_HOST", "http://custom-ollama-host:12345")
+
+        url = resolve_base_url()
+        assert "custom-ollama-host" in url, (
+            f"resolve_base_url() ha d'incloure 'custom-ollama-host' "
+            f"quan NEXE_OLLAMA_HOST='http://custom-ollama-host:12345', obtingut: {url!r}"
+        )
+
         m = OllamaModule()
-        assert "custom" in str(getattr(m, 'base_url', '')) or True
+        assert "custom-ollama-host" in m.base_url, (
+            f"OllamaModule.base_url ha d'incloure 'custom-ollama-host', "
+            f"obtingut: {m.base_url!r}"
+        )

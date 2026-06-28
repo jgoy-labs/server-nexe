@@ -37,6 +37,9 @@ MODULE_METADATA = {
     "auto_discover": True
 }
 
+# finding #473: this try/except is retro-compat (keep the exported name resolvable),
+# NOT a cycle break — it pairs with the optional import in core/dependencies.py and
+# is covered by tests. No import-deadlock risk.
 try:
     from core.dependencies import limiter  # noqa: E402,F401
     RATE_LIMITING_AVAILABLE = True

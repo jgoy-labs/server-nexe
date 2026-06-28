@@ -407,42 +407,6 @@ class TestSQLiteStore:
         assert stats["staging_count"] == 1
 
 
-# ══════════════════════════════════════════════════════════════════
-# WORKING MEMORY TESTS (4)
-# ══════════════════════════════════════════════════════════════════
-
-class TestWorkingMemory:
-    """Working memory: RAM cache per session. Stub for v1 contract."""
-
-    def test_add_entry(self):
-        """Working memory should accept new entries."""
-        # v1 contract: working memory is a simple dict
-        wm = {}
-        wm["fact1"] = {"content": "Em dic Anna", "importance": 0.8}
-        assert "fact1" in wm
-
-    def test_search_returns_matches(self):
-        """Working memory search should find relevant entries."""
-        wm = {
-            "fact1": {"content": "Em dic Anna", "importance": 0.8},
-            "fact2": {"content": "Visc a Barcelona", "importance": 0.7},
-        }
-        results = [v for v in wm.values() if "Anna" in v["content"]]
-        assert len(results) == 1
-
-    def test_flush_empties(self):
-        """Flush should empty working memory."""
-        wm = {"fact1": {"content": "test"}}
-        flushed = list(wm.values())
-        wm.clear()
-        assert len(wm) == 0
-        assert len(flushed) == 1
-
-    def test_clear(self):
-        """Clear should empty working memory without flushing."""
-        wm = {"fact1": {"content": "test"}}
-        wm.clear()
-        assert len(wm) == 0
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -470,13 +434,6 @@ class TestRetriever:
         cfg = get_config("m1_8gb")
         assert cfg.retrieve.max_tokens_cap == 800
 
-    def test_multi_layer_order(self):
-        """Retrieve order: working -> profile -> vector -> rerank."""
-        # Contract: retrieve layers defined
-        layers = ["working_memory", "profile", "staging", "vector"]
-        assert len(layers) == 4
-        assert layers[0] == "working_memory"
-        assert layers[1] == "profile"
 
 
 # ══════════════════════════════════════════════════════════════════

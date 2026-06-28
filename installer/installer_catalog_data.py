@@ -16,10 +16,16 @@ Description: Model catalog data (MODEL_CATALOG).
 
 from __future__ import annotations
 
+import json
+import logging
+from functools import lru_cache
+from pathlib import Path
 from typing import Optional, cast
 
+_logger = logging.getLogger(__name__)
+
 # ═══════════════════════════════════════════════════════════════════════════
-# MODEL CATALOG - 16 models across 4 RAM tiers
+# MODEL CATALOG - 14 models across 4 RAM tiers
 # Engines: mlx (Apple Silicon), ollama (universal), llama.cpp (GGUF)
 #
 # Color code from empirical testing:
@@ -71,7 +77,7 @@ MODEL_CATALOG = {
             "ram_gb": 10.0,
             "description": {"ca": "👁 🧠 Multimodal, thinking, visió. Precisió 8-bit.", "es": "👁 🧠 Multimodal, thinking, visión. Precisión 8-bit.", "en": "👁 🧠 Multimodal, thinking, vision. 8-bit precision."},
             "mlx": "mlx-community/Qwen3.5-4B-MLX-8bit",
-            "ollama": "qwen3.5:4b",
+            "ollama": None,  # B166: 8-bit is MLX-only; the ollama tag 'qwen3.5:4b' resolves to the 4-bit (Q4_K_M)
             "gguf": None,
             "chat_format": "chatml",
             "prompt_tier": "small",
@@ -165,24 +171,6 @@ MODEL_CATALOG = {
             "gguf": None,
             "chat_format": "chatml",
             "prompt_tier": "full",
-        },
-        {
-            "key": "gemma4_31b",
-            "name": "Gemma 4 31B",
-            "origin": "Google",
-            "year": 2026,
-            "lang": {"ca": "Multilingüe", "es": "Multilingüe", "en": "Multilingual"},
-            "params": "31B (dense)",
-            "disk_gb": 18.5,
-            "ram_gb": 10.0,
-            "description": {"ca": "👁 🧠 Raonament potent, visió, context 256K.", "es": "👁 🧠 Razonamiento potente, visión, contexto 256K.", "en": "👁 🧠 Powerful reasoning, vision, 256K context."},
-            "mlx": "mlx-community/gemma-4-31b-it-8bit",
-            "ollama": "gemma4:31b",
-            "gguf": None,
-            "chat_format": "chatml",
-            "prompt_tier": "full",
-            "gated": "manual",
-            "license_url": "https://huggingface.co/google/gemma-4-31b-it",
         },
         {
             "key": "mistral_small_24b",
@@ -358,23 +346,30 @@ MODEL_WEIGHT_SHA256: dict[tuple[str, str], Optional[str]] = {
     ("mlx", "mlx-community/Qwen3.5-27B-4bit"): None,
     ("mlx", "mlx-community/Qwen3.5-35B-A3B-4bit"): None,
     ("mlx", "mlx-community/Mixtral-8x7B-Instruct-v0.1"): None,
-    # ── Ollama manifest digests (config digest, verified 2026-05-06) ────────
-    ("ollama", "qwen3.5:4b"): "de9fed2251b37295b763727a59ca35cf5cfe5c7379bc3e2104b2ce3c145aa887",
-    ("ollama", "gemma4:e4b"): "f0988ff50a2458c598ff6b1b87b94d0f5c44d73061c2795391878b00b2285e11",
-    ("ollama", "hdnh2006/salamandra-7b-instruct:q4_K_M"): "b7c01a6aaa23015739006a60492f84ae5931712c32e42638c4022b5c5a175d73",
-    ("ollama", "qwen3.5:9b"): "be595b49fe22012bd1f5605ec14c7ffa58331783a88a4fd8c22e5fc8ec42cf9f",
+    # ── Ollama — NOT client-side pinned (ADR B251) ──────────────────────────
+    # Integrity is delegated to Ollama's own content-addressed pull (the daemon
+    # verifies every layer against the manifest digest; THREAT_MODEL §4.3).
+    # Ollama catalog tags are mutable upstream, so a client pin would
+    # false-positive on a legitimate re-publish. Entries stay here (value None)
+    # only so the smoke test (`test_installer_sha256_catalog`) confirms every
+    # downloadable artefact is accounted for; verify_download_integrity
+    # short-circuits Ollama to True and never reads these values.
+    ("ollama", "qwen3.5:4b"): None,
+    ("ollama", "gemma4:e4b"): None,
+    ("ollama", "hdnh2006/salamandra-7b-instruct:q4_K_M"): None,
+    ("ollama", "qwen3.5:9b"): None,
     ("ollama", "mistral-nemo:12b"): None,
-    ("ollama", "gemma4:31b"): "0940386273ff9ddd5ede7c5ddaa0e925b50154e198ea977fb64aa1ca94a3a137",
+    ("ollama", "gemma4:31b"): None,
     ("ollama", "mistral-small3.2"): None,
     ("ollama", "gpt-oss:20b"): None,
-    ("ollama", "qwen3.5:27b"): "ba0915cbf15878a68d300f640d3d575f5805cac42dd8f83746eb31a0e8afec22",
+    ("ollama", "qwen3.5:27b"): None,
     ("ollama", "mixtral:8x7b"): None,
     ("ollama", "deepseek-r1:32b"): None,
-    ("ollama", "qwen3.5:35b-a3b"): "606ad9f1ecbcd0d400a89572f49d9a8e80b11a346be74883245e24ecbbc3ac81",
+    ("ollama", "qwen3.5:35b-a3b"): None,
     ("ollama", "csala/ALIA-40B:Q8_0"): None,
     # ── Bundled embeddings (pulled on every install for the RAG) ──────────
     # B146: not a user-selectable MODEL_CATALOG entry, but downloaded every
-    # time — must carry an integrity entry (None = not yet pinned → warn).
+    # time — Ollama-pulled, so likewise content-addressed (None entry).
     ("ollama", "nomic-embed-text"): None,
     # ── GGUF direct downloads (single-file hash) ──────────────────────────
     (
@@ -444,3 +439,66 @@ def iter_catalog_model_ids() -> list[tuple[str, str]]:
     # MODEL_CATALOG — surface it so the integrity map must carry its entry.
     pairs.append(("ollama", "nomic-embed-text"))
     return pairs
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Provider-published pins (ADR B046b)
+# ═══════════════════════════════════════════════════════════════════════════
+# Two tiers of integrity pin, in order of strength:
+#   1. Self-computed pins in MODEL_WEIGHT_SHA256 above (MLX dir-hash, GGUF file
+#      hash). Strongest — also defend a compromised provider repo — but require
+#      downloading the artefact once to compute.
+#   2. Provider-published pins in installer/provider_pins.json (this section):
+#      HF per-LFS-file sha256 (the big MLX .safetensors weights). Fetched
+#      metadata-only by bootstrap_catalog_pins.py — no model download. Defend
+#      MITM / in-transit corruption, NOT a compromised provider repo. See
+#      THREAT_MODEL §4.3.
+#
+# Ollama is NOT pinned at either tier (ADR B251): its content-addressed pull
+# verifies layer integrity on its own, and its tags are mutable upstream.
+# MLX needs a per-file tier (``_verify_mlx_files`` in download_verify) because
+# HF cannot reproduce ``sha256_of_dir`` from metadata.
+
+_PROVIDER_PINS_PATH = Path(__file__).with_name("provider_pins.json")
+
+
+@lru_cache(maxsize=1)
+def _load_provider_pins() -> dict[str, dict]:
+    """Load installer/provider_pins.json. Missing/invalid → empty maps.
+
+    A missing or unreadable file is NOT an error: it degrades each model to
+    the explicit-consent path (never a silent fail-open).
+    """
+    empty = {"mlx_file_hashes": {}}
+    try:
+        data = json.loads(_PROVIDER_PINS_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return empty
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.warning("provider_pins.json unreadable (%s) — treating as empty", exc)
+        return empty
+    return {"mlx_file_hashes": dict(data.get("mlx_file_hashes") or {})}
+
+
+def get_expected_mlx_file_hashes(model_id: str) -> Optional[dict[str, str]]:
+    """Return ``{lfs_filename: sha256}`` for an MLX repo, or ``None`` if unpinned.
+
+    Tier-2 (provider-published) pin for MLX snapshots. Only meaningful when the
+    model has no self-computed dir-hash in MODEL_WEIGHT_SHA256 (tier-1 wins).
+    """
+    files = _load_provider_pins()["mlx_file_hashes"].get(model_id)
+    return dict(files) if files else None
+
+
+def has_pin(engine: str, model_id: str) -> bool:
+    """True when ANY integrity pin (tier-1 or tier-2 MLX) exists for the artefact.
+
+    Drives the consent gate: a downloaded MLX/GGUF artefact with no pin must not
+    install silently — the caller asks for explicit consent instead (ADR B046b).
+    Ollama is never consent-gated (content-addressed pull, ADR B251).
+    """
+    if get_expected_sha256(engine, model_id) is not None:
+        return True
+    if engine == "mlx" and get_expected_mlx_file_hashes(model_id):
+        return True
+    return False

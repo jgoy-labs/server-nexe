@@ -19,19 +19,6 @@ from unittest.mock import patch, MagicMock, AsyncMock
 
 class TestOllamaCliGaps:
 
-    def test_rich_not_available_fallback(self):
-        """Lines 24-26: RICH_AVAILABLE=False fallback."""
-        from plugins.ollama_module.cli import RICH_AVAILABLE
-        # Test that RICH_AVAILABLE is set (either True or False)
-        assert isinstance(RICH_AVAILABLE, bool)
-
-    def test_typer_none_app_none(self):
-        """Line 37: when typer is None, app is None."""
-        # We can't easily re-import with typer missing, but verify the module
-        from plugins.ollama_module import cli
-        # app should be a Typer instance (since typer is available)
-        assert cli.app is not None
-
     def test_run_async_helper(self):
         """Line 43: _run_async helper runs coroutine."""
         from plugins.ollama_module.cli import _run_async
@@ -49,12 +36,6 @@ class TestOllamaCliGaps:
 # ═══════════════════════════════════════════════════════════════
 
 class TestOllamaModuleGaps:
-
-    def test_httpx_import_fallback(self):
-        """Lines 21-22: httpx is available (testing that the import works)."""
-        from plugins.ollama_module.module import OllamaModule
-        mod = OllamaModule()
-        assert mod.metadata.name == "ollama_module"
 
     def test_metadata_property(self):
         """metadata property returns ModuleMetadata."""
@@ -76,7 +57,6 @@ class TestOllamaModuleGaps:
     @pytest.mark.asyncio
     async def test_initialize_and_shutdown(self):
         """initialize and shutdown lifecycle."""
-        from unittest.mock import AsyncMock, patch
         from plugins.ollama_module.module import OllamaModule
         mod = OllamaModule()
         with patch.object(mod.client, 'ensure_ollama_running', new=AsyncMock()), \
@@ -108,14 +88,3 @@ class TestOllamaHealthGaps:
             health.httpx = original_httpx
 
 
-# ═══════════════════════════════════════════════════════════════
-# workflow/nodes/ollama_node.py — uncovered lines
-# ═══════════════════════════════════════════════════════════════
-
-class TestOllamaNodeGaps:
-
-    def test_httpx_import_required(self):
-        """Lines 15-16: httpx ImportError raises with helpful message."""
-        # Just verify the module imports correctly (httpx is available)
-        from plugins.ollama_module.workflow.nodes.ollama_node import OllamaNode
-        assert OllamaNode is not None

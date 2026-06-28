@@ -227,8 +227,8 @@ def verify_sha256(
         ``allow_missing=False`` (strict mode used by CI-time build checks).
 
     Comparison is case-insensitive and strips surrounding whitespace:
-    ``ollama show --json`` emits lowercase digests with a trailing newline,
-    some build tools emit uppercase, and manifest JSON files round-trip
+    ``sha256sum`` / ``sha256_of_dir`` emit lowercase digests with a trailing
+    newline, some build tools emit uppercase, and manifest JSON files round-trip
     through ``json.dumps`` — callers should not have to normalise.
     """
     actual_norm = _normalise_hex(actual)

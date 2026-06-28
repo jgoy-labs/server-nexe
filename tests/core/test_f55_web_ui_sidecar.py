@@ -81,15 +81,15 @@ def test_manifest_disabled_in_sidecar_is_false():
 
 
 # ─────────────────────────────────────────────────────────────────────
-# initialize() — retorna True en sidecar (perquè manifest disabled=false)
+# initialize() — returns True in sidecar (because manifest disabled=false)
 # ─────────────────────────────────────────────────────────────────────
 
 
 def test_web_ui_module_is_disabled_in_sidecar_returns_false(sidecar_env):
-    """`_is_disabled_in_sidecar()` retorna False quan manifest=false.
+    """`_is_disabled_in_sidecar()` returns False when manifest=false.
 
-    Anti-regressió de la decisió anterior — el helper continua existint per si
-    en el futur volem tornar a desactivar el plugin en sidecar mode.
+    Anti-regression of the previous decision — the helper still exists in case
+    in the future we want to disable the plugin in sidecar mode again.
     """
     from plugins.web_ui_module.module import WebUIModule
 

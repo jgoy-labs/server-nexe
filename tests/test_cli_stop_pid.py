@@ -131,3 +131,83 @@ class TestStopFallbackPgrep:
                 "No Nexe services are running" in result.output
                 or "Cap servei Nexe actiu" in result.output
             ), f"Output inesperat: {result.output!r}"
+
+
+class TestPgrepPatternMatchesRealProcess:
+    """B109 — el patró pgrep ha de casar amb el cmdline real de llançament,
+    no amb 'uvicorn.*nexe' (que mai apareix al cmdline)."""
+
+    # cmdlines reals possibles del servidor viu:
+    #  - abans del setproctitle: 'python -m core.app' (cli.py:184)
+    #  - després del setproctitle: 'server-nexe' (runner.py:201)
+    REAL_CMDLINES = [
+        "/usr/bin/python3 -m core.app",
+        "server-nexe",
+    ]
+
+    def _capture_pattern(self):
+        import re  # noqa: F401  (usat als mètodes que el criden)
+        from core.cli.cli import _stop_find_via_pgrep
+        captured = {}
+
+        def fake_run(cmd, *a, **k):
+            captured["cmd"] = cmd
+            m = MagicMock()
+            m.stdout = ""  # 0 PIDs: només volem capturar el patró
+            return m
+
+        with patch("subprocess.run", side_effect=fake_run):
+            _stop_find_via_pgrep()
+        return captured["cmd"]
+
+    def test_pgrep_invoked_with_f_flag(self):
+        cmd = self._capture_pattern()
+        assert cmd[0] == "pgrep" and cmd[1] == "-f"
+
+    def test_pgrep_pattern_matches_a_real_server_cmdline(self):
+        import re
+        cmd = self._capture_pattern()
+        pattern = cmd[2]
+        matched = any(re.search(pattern, cl) for cl in self.REAL_CMDLINES)
+        assert matched, (
+            f"El patró pgrep {pattern!r} no casa amb cap cmdline real "
+            f"del servidor {self.REAL_CMDLINES!r}; 'nexe stop' no trobarà el procés."
+        )
+
+    def test_pgrep_pattern_is_not_the_phantom_uvicorn(self):
+        cmd = self._capture_pattern()
+        assert "uvicorn" not in cmd[2], (
+            "El patró encara busca 'uvicorn', que mai apareix al cmdline "
+            "(es llança 'python -m core.app' i setproctitle='server-nexe')."
+        )
+
+
+class TestStopPermissionDenied:
+    """B111 — no s'ha de reportar 'Services stopped' si tots els SIGTERM fallen per permisos."""
+
+    def test_stop_no_false_success_on_permission_denied(self):
+        import os
+        target_pid = 99999
+        runner = CliRunner()
+        with patch.dict(os.environ, {"NEXE_LANG": "en-US"}), \
+             patch("os.kill") as mock_kill, \
+             patch("subprocess.run") as mock_subproc, \
+             patch("pathlib.Path.exists") as mock_exists, \
+             patch("pathlib.Path.read_text") as mock_read_text, \
+             patch("pathlib.Path.unlink"):
+            mock_exists.return_value = True
+            mock_read_text.return_value = json.dumps({"pid": target_pid, "port": 9119})
+
+            def kill_side_effect(pid, sig):
+                if sig == 0:
+                    return None  # PID viu (comprovació del PID-file)
+                raise PermissionError("Operation not permitted")  # SIGTERM denegat
+            mock_kill.side_effect = kill_side_effect
+            mock_subproc.return_value = type("R", (), {"stdout": ""})()
+
+            result = runner.invoke(app, ["stop", "--force"])
+
+        assert "permission denied" in result.output, result.output
+        assert "Services stopped" not in result.output, (
+            f"Fals èxit reportat malgrat PermissionError: {result.output!r}")
+        assert call(target_pid, signal.SIGTERM) in mock_kill.call_args_list

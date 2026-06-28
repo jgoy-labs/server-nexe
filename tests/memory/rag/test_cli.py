@@ -133,6 +133,34 @@ class TestRAGCLI:
     cli_with_mock.module.get_info.assert_called_once()
 
   @pytest.mark.asyncio
+  async def test_cmd_info_emits_no_empty_log_records(self, cli_with_mock, caplog):
+    # MC-115: blank logger.info("") spacers emit empty LogRecords (structural
+    # noise). Spacing must be folded into the adjacent message instead, so no
+    # empty record is ever emitted — while the section headers stay visible.
+    import logging
+    args = MagicMock()
+    with caplog.at_level(logging.INFO, logger="memory.rag.cli"):
+      await cli_with_mock.cmd_info(args)
+    assert [r for r in caplog.records if r.getMessage() == ""] == []
+    assert "RAG Module Info" in caplog.text
+
+  @pytest.mark.asyncio
+  async def test_cmd_health_emits_no_empty_log_records(self, cli_with_mock, caplog):
+    # MC-115: same for the health command.
+    import logging
+    args = MagicMock(json=False)
+    with caplog.at_level(logging.INFO, logger="memory.rag.cli"):
+      await cli_with_mock.cmd_health(args)
+    assert [r for r in caplog.records if r.getMessage() == ""] == []
+    assert "RAG Module Health" in caplog.text
+
+  def test_no_empty_logger_info_in_source(self):
+    # MC-115: the logger.info("") anti-pattern must be gone from the whole file.
+    import inspect
+    import memory.rag.cli as ragcli
+    assert 'logger.info("")' not in inspect.getsource(ragcli)
+
+  @pytest.mark.asyncio
   async def test_cmd_health_healthy_returns_zero(self, cli_with_mock):
     """Test health command returns 0 when healthy."""
     args = MagicMock(json=False)

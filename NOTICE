@@ -1,0 +1,11 @@
+server-nexe
+Copyright (c) 2024-2026 Jordi Goy (www.jgoy.net)
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party components included in or downloaded by this distribution:
+
+- marked.js v15.0.12 — MIT License — https://github.com/markedjs/marked
+- Qdrant (binary, auto-downloaded) — Apache 2.0 — https://github.com/qdrant/qdrant
+- Models from Hugging Face Hub — individual model licenses apply (see model cards)
+- Ollama models — individual model licenses apply (see https://ollama.com)

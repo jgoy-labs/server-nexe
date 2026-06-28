@@ -38,7 +38,7 @@ La mayoria de endpoints requieren cabecera `X-API-Key`. Valor del fichero `.env`
 - `NEXE_SECONDARY_API_KEY` — periodo de gracia para rotacion
 - Seguimiento de expiracion via `NEXE_PRIMARY_KEY_EXPIRES`, `NEXE_SECONDARY_KEY_EXPIRES`
 
-**Token bootstrap:** Para configuracion inicial, se genera un token de un solo uso al arranque (256-bit, TTL 30min). Se muestra en la salida de consola.
+**Token bootstrap:** Para configuracion inicial, se genera un token de un solo uso al arranque (128-bit, TTL 30min). Se muestra en la salida de consola.
 
 ## Rate Limiting
 
@@ -68,6 +68,7 @@ El rate limiting se aplica a **todos los endpoints** — tanto API como Web UI.
 | POST /ui/files/cleanup | 5/minuto |
 | GET /ui/session/{id} | 30/minuto |
 | DELETE /ui/session/{id} | 10/minuto |
+| PATCH /ui/session/{id} | 10/minuto |
 | PATCH /ui/session/{id}/thinking | 10/minuto |
 
 ## Endpoints principales
@@ -81,7 +82,7 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 ```json
 {
   "messages": [{"role": "user", "content": "Hola"}],
-  "model": "auto",
+  "model": null,
   "engine": "auto",
   "use_rag": true,
   "stream": false,
@@ -90,17 +91,19 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 }
 ```
 
+- `model`: null por defecto (no "auto"). Para **Ollama** un valor pasado selecciona el modelo con fallback por nombre parcial (p. ej. `llama3` → `llama3.1:8b`); 404 solo si ningún modelo de chat encaja. Para **MLX / llama.cpp** el valor se **ignora** — corren el único modelo configurado — y la respuesta reporta el nombre del modelo realmente cargado, nunca el solicitado
 - `use_rag`: true por defecto — busca en 3 colecciones Qdrant
 - `engine`: "auto" (defecto), "ollama", "mlx", "llama_cpp"
 - `stream`: true retorna stream SSE con marcadores
 - `temperature`: 0.0-2.0 (defecto 0.7)
+- `top_p`: 0 < top_p ≤ 1 (null por defecto) — nucleus sampling; null deja que cada motor use su propio default (≈ 0.9)
 - `max_tokens`: null = usar defecto del modelo, maximo 32000
 
 **Marcadores de streaming** (inyectados en el stream SSE, parseados por la UI):
 - `[MODEL:nombre]` — modelo activo
 - `[MODEL_LOADING]` / `[MODEL_READY]` — estado de carga del modelo con timing
 - `[RAG_AVG:0.75]` — puntuacion media de relevancia RAG
-- `[RAG_ITEM:0.82|nexe_documentation|ARCHITECTURE.md]` — detalle por fuente
+- `[RAG_ITEM:nexe_documentation|0.82]` — detalle por fuente (coleccion primero, luego puntuacion; solo 2 campos)
 - `[MEM:2]` — numero de hechos auto-guardados via MEM_SAVE
 - `[COMPACT:N]` — indicador de compactacion de contexto
 - `[THINKING]` / `[/THINKING]` — tokens de razonamiento (modelos Ollama como qwen3.5)
@@ -116,8 +119,8 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 | `/health` | GET | No | Health check basico |
 | `/health/ready` | GET | No | Readiness check (verifica modulos requeridos) |
 | `/health/circuits` | GET | Sí (X-API-Key) | Estado de circuit breakers (Ollama, Qdrant) |
-| `/status` | GET | Sí (X-API-Key) | Estado en tiempo real: engine activo, modelo, modulos cargados |
-| `/api/info` | GET | No | Info de la API y lista de endpoints disponibles |
+| `/status` | GET | Sí (X-API-Key) | Estado en tiempo real: `configured_engine` (intención), `resolved_engine` (el engine que el chat correrá efectivamente, node-aware), `model` (el default configurado — MLX/llama.cpp reportan el modelo realmente cargado solo en la respuesta de chat), modulos cargados |
+| `/api/info` | GET | No | Info de la API y un subconjunto representativo de endpoints publicos (no exhaustivo) |
 | `/docs` | GET | No | Documentacion interactiva Swagger/OpenAPI |
 
 ### Modulos
@@ -146,7 +149,7 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 **Peticion de almacenamiento:**
 ```json
 {
-  "text": "Informacion a guardar",
+  "content": "Informacion a guardar",
   "collection": "user_knowledge",
   "metadata": {"source": "api", "tags": ["ejemplo"]}
 }
@@ -157,8 +160,7 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 {
   "query": "consulta de busqueda",
   "collection": "user_knowledge",
-  "limit": 5,
-  "threshold": 0.35
+  "limit": 5
 }
 ```
 
@@ -212,7 +214,7 @@ Estos endpoints sirven la interfaz web y son usados por el frontend JavaScript. 
 | `/ui/session/{id}` | GET | Si | 30/min | Obtener datos de sesion (valida session_id) |
 | `/ui/session/{id}/history` | GET | Si | 30/min | Obtener historial de chat de la sesion |
 | `/ui/session/{id}` | DELETE | Si | 10/min | Borrar sesion |
-| `/ui/session/{id}` | PATCH | Si | default | Renombrar sesion (nuevo 2026-04-01) |
+| `/ui/session/{id}` | PATCH | Si | 10/min | Renombrar sesion (nuevo 2026-04-01) |
 | `/ui/session/{id}/thinking` | PATCH | Si | 10/min | Interruptor del modo thinking (reasoning tokens) por sesion (nuevo v0.9.9) |
 | `/ui/session/{id}/clear-document` | POST | Si | default | Limpiar documento adjunto de la sesion (nuevo 2026-04-02) |
 | `/ui/sessions` | GET | Si | default | Listar todas las sesiones |
@@ -256,7 +258,7 @@ Compatible con herramientas que usan formato de API OpenAI: Cursor, Continue, Ze
 | Host/Puerto | server.toml `[core.server]` | Direccion de enlace del servidor |
 | API keys | .env | NEXE_PRIMARY_API_KEY, NEXE_SECONDARY_API_KEY |
 | Rate limits | .env | Variables NEXE_RATE_LIMIT_* |
-| Timeout | .env | NEXE_DEFAULT_MAX_TOKENS (defecto 4096) |
+| Timeout | .env | NEXE_OLLAMA_STREAM_TIMEOUT (defecto 300, segundos) |
 | Origenes CORS | server.toml `[core.server]` | Origenes permitidos |
 | Encriptacion | .env | NEXE_ENCRYPTION_ENABLED (defecto auto) |
 
@@ -276,7 +278,7 @@ curl -X POST http://127.0.0.1:9119/v1/chat/completions \
 curl -X POST http://127.0.0.1:9119/v1/memory/store \
   -H "X-API-Key: TU_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Me llamo Jordi", "collection": "user_knowledge"}'
+  -d '{"content": "Me llamo Jordi", "collection": "user_knowledge"}'
 
 # Buscar en memoria
 curl -X POST http://127.0.0.1:9119/v1/memory/search \

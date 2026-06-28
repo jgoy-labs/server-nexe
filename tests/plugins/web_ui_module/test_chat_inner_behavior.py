@@ -88,7 +88,7 @@ class _MockOllamaEngine:
         return True
 
 
-def _make_server_state(engine=None):
+def _make_server_state(engine=None, module_name="ollama_module"):
     """Return a mock server_state with module_manager and engine configured."""
     if engine is None:
         engine = _MockOllamaEngine()
@@ -100,11 +100,11 @@ def _make_server_state(engine=None):
     reg.instance = manifest
 
     mod_item = MagicMock()
-    mod_item.name = "ollama_module"
+    mod_item.name = module_name
 
     registry = MagicMock()
     registry.list_modules.return_value = [mod_item]
-    registry.get_module.side_effect = lambda name: reg if name == "ollama_module" else None
+    registry.get_module.side_effect = lambda name: reg if name == module_name else None
 
     mm = MagicMock()
     mm.registry = registry
@@ -497,6 +497,54 @@ class TestChatLLM:
         assert len(assistant_msgs) >= 1
         assert assistant_msgs[-1]["content"] == "Resposta de prova"
 
+    async def test_streaming_model_mem_delete_arms_text_confirmation(self):
+        """MC-117: when the MODEL emits a [MEM_DELETE: ...] tag INSIDE the streamed
+        response, the streaming generator must arm session._pending_partial_delete
+        (mirroring the non-stream _handle_delete_intent path) so a typed 'sí' next
+        turn can execute the delete. The pre-existing delete tests only covered the
+        non-stream / detect_intent path; this drives the async streaming generator.
+
+        Mutation guard: remove the arming block (or its await) in the streaming
+        delete loop and this goes RED — the flag stays None after the stream drains.
+        entries is the single best global match ([:1], B028/RT-04 anti-collateral).
+        """
+        class _MemDeleteEngine:
+            def chat(self, model, messages, stream=False, images=None, thinking_enabled=False):
+                if stream:
+                    return self._astream()
+                return {"message": {"content": ""}, "done": True}
+
+            async def _astream(self):
+                yield {"message": {"content": "D'acord, ho oblido. "}}
+                yield {"message": {"content": "[MEM_DELETE: el meu nom es Joan]"}}
+
+            async def is_model_loaded(self, model_name):
+                return True
+
+        engine = _MemDeleteEngine()
+        h = _Harness(intent="chat")
+        h.session._pending_partial_delete = None
+        state = _make_server_state(engine=engine)
+
+        result = await h.call(
+            {"message": "oblida el meu nom", "stream": True}, server_state=state
+        )
+        assert isinstance(result, StreamingResponse)
+        # the arming happens INSIDE the generator → must drain the streamed body
+        async for _ in result.body_iterator:
+            pass
+
+        pending = h.session._pending_partial_delete
+        assert pending is not None, (
+            "a model-emitted [MEM_DELETE] in the stream must arm the 2-turn text "
+            "confirmation (MC-117)"
+        )
+        assert pending["content"] == "el meu nom es Joan"
+        # B028/RT-04: best single global match only (same as the non-stream path)
+        assert len(pending["entries"]) == 1
+        assert pending["entries"][0]["id"] == "id-1"
+        h.mh.preview_delete_from_memory.assert_awaited()
+
 
 # ═══════════════════════════════════════════════════════════════
 # Section 5 — Final return
@@ -533,3 +581,209 @@ class TestRetornFinal:
         h = _Harness(intent="save", mem_content="test")
         result = await h.call({"message": "Recorda test", "stream": True})
         assert isinstance(result, StreamingResponse)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Section — MC-011: cancel_event wiring from the route to the engine
+# Regression guard for the cancel_kwargs tuple in register_chat_routes.
+# If someone reverts `engine_name in ("mlx_module","llama_cpp_module")`
+# back to just "mlx_module" (or drops llama_cpp), these tests fail loudly
+# instead of MC-011 silently coming back for llama.cpp.
+# ═══════════════════════════════════════════════════════════════
+
+
+class _CapturingInProcessEngine:
+    """Engine with the in-process signature (no 'model' param) that records the
+    kwargs the route passes — used to assert cancel_event reaches it."""
+
+    def __init__(self):
+        self.received_kwargs = None
+
+    async def chat(self, messages, system="", session_id="default",
+                   stream_callback=None, images=None, thinking_enabled=True, **kwargs):
+        self.received_kwargs = dict(kwargs)
+        if callable(stream_callback):
+            stream_callback("ok")
+        return {
+            "response": "ok", "tokens": 1, "prompt_tokens": 0, "context_used": 0,
+            "tokens_per_second": 0.0, "system_tokens": 0, "elapsed_ms": 1,
+            "model_used": "fake", "session_id": session_id, "cache_hit": False, "timing": {},
+        }
+
+    async def is_model_loaded(self, model_name):
+        return True
+
+
+class _CapturingOllamaEngine:
+    """Ollama-signature engine (has 'model') that records kwargs — for the
+    negative case: Ollama must NOT receive cancel_event (it cancels via httpx)."""
+
+    def __init__(self):
+        self.received_kwargs = None
+
+    def chat(self, model, messages, stream=False, images=None, thinking_enabled=False, **kwargs):
+        self.received_kwargs = dict(kwargs)
+        return self._astream()
+
+    async def _astream(self):
+        yield {"message": {"content": "ok"}}
+
+    async def is_model_loaded(self, model_name):
+        return True
+
+
+async def _drain(result):
+    if isinstance(result, StreamingResponse):
+        try:
+            async for _ in result.body_iterator:
+                pass
+        except Exception:
+            pass  # the route mechanics aren't under test; cancel wiring is
+
+
+@pytest.mark.asyncio
+class TestMC011CancelWiring:
+
+    async def test_llama_cpp_receives_cancel_event_from_route(self):
+        """MC-011: the route MUST pass cancel_event to llama_cpp_module."""
+        engine = _CapturingInProcessEngine()
+        state = _make_server_state(engine, module_name="llama_cpp_module")
+        h = _Harness()
+        result = await h.call(
+            {"message": "hola", "stream": True, "backend": "llamacpp"},
+            server_state=state,
+        )
+        await _drain(result)
+
+        assert engine.received_kwargs is not None, "engine.chat was never called"
+        assert engine.received_kwargs.get("cancel_event") is not None, (
+            "MC-011 regression: routes_chat did not wire cancel_event to "
+            "llama_cpp_module — the orphan-worker bug is back for llama.cpp"
+        )
+
+    async def test_mlx_receives_cancel_event_from_route(self):
+        """Parity guard: MLX must keep receiving cancel_event too."""
+        engine = _CapturingInProcessEngine()
+        state = _make_server_state(engine, module_name="mlx_module")
+        h = _Harness()
+        result = await h.call(
+            {"message": "hola", "stream": True, "backend": "mlx"},
+            server_state=state,
+        )
+        await _drain(result)
+
+        assert engine.received_kwargs is not None, "engine.chat was never called"
+        assert engine.received_kwargs.get("cancel_event") is not None
+
+    async def test_ollama_does_not_receive_cancel_event(self):
+        """Negative guard: Ollama cancels via httpx, must NOT get cancel_event."""
+        engine = _CapturingOllamaEngine()
+        state = _make_server_state(engine, module_name="ollama_module")
+        h = _Harness()
+        result = await h.call(
+            {"message": "hola", "stream": True, "backend": "ollama"},
+            server_state=state,
+        )
+        await _drain(result)
+
+        assert engine.received_kwargs is not None, "engine.chat was never called"
+        assert "cancel_event" not in engine.received_kwargs, (
+            "Ollama must not receive cancel_event (it would mean the tuple "
+            "wrongly includes ollama_module)"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# Section 6 — Anomalies TUR (2026-06-23)
+#   TUR-NS-MEMORIA : non-streaming [MEMORIA:] alias parity with stream
+#   TUR-PHANTOM-DEL: streaming confirm token only on an armed delete
+# ═══════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+class TestAnomaliesTUR20260623:
+
+    async def test_nonstreaming_memoria_alias_saved_and_stripped(self):
+        """TUR-NS-MEMORIA: in the NON-streaming path a model that emits the
+        [MEMORIA: ...] alias (e.g. gpt-oss:20b) must be normalised to
+        [MEM_SAVE:] — mirror of the streaming _clean_full_response — so the
+        fact (a) gets SAVED and (b) the raw tag never leaks to the JSON/disk
+        response_text.
+
+        Mutation guard: drop the _MEMORIA_RE.sub normalisation in
+        _handle_nonstreaming_response and this goes RED — save_to_memory is
+        never awaited and '[MEMORIA:' survives in the returned text.
+        """
+        from plugins.web_ui_module.api.routes_chat import _handle_nonstreaming_response
+
+        session = MagicMock()
+        session.id = "sess-ns-memoria"
+        # 2 user turns → NOT first turn (first-turn saves are skipped as
+        # likely hallucinations in _save_mem_saves_nonstreaming).
+        session.messages = [
+            {"role": "user", "content": "hola"},
+            {"role": "assistant", "content": "ep!"},
+            {"role": "user", "content": "recorda les meves preferencies"},
+        ]
+        mh = MagicMock()
+        mh.save_to_memory = AsyncMock(return_value={"document_id": "doc-1"})
+
+        out_text, action, _delta = await _handle_nonstreaming_response(
+            "Clar! [MEMORIA: the user works as a graphic designer]",
+            session, mh, "recorda les meves preferencies", None,
+        )
+
+        mh.save_to_memory.assert_awaited_once()
+        assert mh.save_to_memory.await_args.kwargs["content"] == "the user works as a graphic designer"
+        assert "[MEMORIA:" not in out_text, "raw [MEMORIA:] tag leaked to non-stream response"
+        assert "[MEM_SAVE:" not in out_text
+        assert action == "mem_save_inline"
+
+    async def test_streaming_failed_delete_preview_emits_no_phantom_button(self):
+        """TUR-PHANTOM-DEL: in the streaming path the [PENDING_DELETE:] token
+        (which makes the web UI show a confirm dialog) must be emitted ONLY
+        when the preview actually armed a pending delete. A failed/empty/raising
+        preview must NOT leave a dead confirm button — parity with the
+        non-stream _arm_mem_deletes_nonstreaming (token only on success+candidates).
+
+        Mutation guard: make the yield unconditional (pre-fix behaviour) and
+        every case below goes RED — the token appears in the streamed body.
+        """
+        class _MemDeleteEngine:
+            def chat(self, model, messages, stream=False, images=None, thinking_enabled=False):
+                if stream:
+                    return self._astream()
+                return {"message": {"content": ""}, "done": True}
+
+            async def _astream(self):
+                yield {"message": {"content": "D'acord, ho oblido. "}}
+                yield {"message": {"content": "[MEM_DELETE: el meu nom es Joan]"}}
+
+            async def is_model_loaded(self, model_name):
+                return True
+
+        cases = {
+            "empty_candidates": AsyncMock(return_value={"success": True, "candidates": []}),
+            "preview_failed":   AsyncMock(return_value={"success": False, "candidates": []}),
+            "preview_raises":   AsyncMock(side_effect=RuntimeError("Qdrant down")),
+        }
+        for label, preview_mock in cases.items():
+            h = _Harness(intent="chat")
+            h.session._pending_partial_delete = None
+            h.mh.preview_delete_from_memory = preview_mock
+            state = _make_server_state(engine=_MemDeleteEngine())
+
+            result = await h.call(
+                {"message": "oblida el meu nom", "stream": True}, server_state=state
+            )
+            assert isinstance(result, StreamingResponse)
+            body = ""
+            async for chunk in result.body_iterator:
+                body += chunk if isinstance(chunk, str) else chunk.decode()
+
+            assert "[PENDING_DELETE:" not in body, (
+                f"[{label}] phantom confirm button: PENDING_DELETE token emitted "
+                f"although the preview did not arm a pending delete"
+            )
+            assert h.session._pending_partial_delete is None, (
+                f"[{label}] pending armed despite a failed/empty preview"
+            )

@@ -119,14 +119,3 @@ def test_wheels_checksums_match_bundle() -> None:
             f"SHA256 mismatch for {wheel_name}: "
             f"pinned={expected_hash}, actual={actual}"
         )
-
-
-@pytest.mark.skipif(
-    True,  # Skip by default; flip to False on Apple Silicon CI runners
-    reason="MPS check requires Apple Silicon hardware + torch installed",
-)
-def test_torch_mps_available() -> None:
-    """Apple Silicon hardware: MPS backend must be available for VL inference."""
-    import torch  # noqa: E402
-
-    assert torch.backends.mps.is_available(), "MPS not available on Apple Silicon"

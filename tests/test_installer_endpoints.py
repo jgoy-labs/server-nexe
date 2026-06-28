@@ -349,3 +349,103 @@ class TestValidEngines:
     def test_does_not_contain_unknown(self):
         assert "bad" not in _VALID_ENGINES
         assert "torchscript" not in _VALID_ENGINES
+
+
+# ---------------------------------------------------------------------------
+# POST /installer/hf-token  (B054: hand the HF token to the live sidecar env
+# BEFORE a gated-model download in the same onboarding run)
+# ---------------------------------------------------------------------------
+
+class TestSetHfToken:
+    """The endpoint must load the token into os.environ['HF_TOKEN'] (where the
+    gated preflight + snapshot_download read it from) and best-effort persist
+    it to the Keychain — without ever touching the real Keychain in tests."""
+
+    @pytest.fixture()
+    def no_keychain(self, monkeypatch):
+        """Stub the Keychain writer so tests never prompt/persist for real;
+        capture the token it was handed so we can assert on it."""
+        import core.endpoints.installer as inst
+        seen = {}
+
+        def fake_store(tok):
+            seen["token"] = tok
+            return True
+
+        monkeypatch.setattr(inst, "_store_hf_token_in_keychain", fake_store)
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+        yield seen
+        # The endpoint writes os.environ directly (outside monkeypatch's
+        # bookkeeping); scrub it so it never leaks into sibling tests.
+        os.environ.pop("HF_TOKEN", None)
+
+    def test_loads_token_into_env(self, client, no_keychain):
+        resp = client.post("/installer/hf-token", json={"token": "hf_secret123"})
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        # The whole point of the fix: the live env now carries the token, so a
+        # gated download in this same run authenticates. Mutation: drop the
+        # `os.environ["HF_TOKEN"] = token` line and this assertion goes red.
+        assert os.environ.get("HF_TOKEN") == "hf_secret123"
+
+    def test_persists_to_keychain(self, client, no_keychain):
+        resp = client.post("/installer/hf-token", json={"token": "hf_abc"})
+        assert resp.json()["persisted"] is True
+        # Mutation: remove the _store_hf_token_in_keychain call → not captured.
+        assert no_keychain["token"] == "hf_abc"
+
+    def test_persisted_false_propagates_when_keychain_declines(self, client, monkeypatch):
+        """`persisted` must reflect the REAL return of the Keychain write, not be
+        hardcoded True. Pairs with test_persists_to_keychain (True case) so a
+        mutation that ignores the bool (persisted = True) is caught here."""
+        import core.endpoints.installer as inst
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+        monkeypatch.setattr(inst, "_store_hf_token_in_keychain", lambda _t: False)
+        try:
+            resp = client.post("/installer/hf-token", json={"token": "hf_x"})
+            assert resp.status_code == 200
+            assert resp.json()["persisted"] is False
+            assert os.environ.get("HF_TOKEN") == "hf_x"  # env set regardless
+        finally:
+            os.environ.pop("HF_TOKEN", None)
+
+    def test_trims_whitespace_before_loading(self, client, no_keychain):
+        resp = client.post("/installer/hf-token", json={"token": "  hf_xyz  "})
+        assert resp.status_code == 200
+        assert os.environ.get("HF_TOKEN") == "hf_xyz"
+
+    def test_whitespace_only_rejected_and_env_untouched(self, client, no_keychain):
+        resp = client.post("/installer/hf-token", json={"token": "   "})
+        assert resp.status_code == 400
+        # The guard runs BEFORE the env write, so a blank token must not clobber
+        # HF_TOKEN (mutation: move the write above the guard → this goes red).
+        assert os.environ.get("HF_TOKEN") is None
+
+    def test_keychain_failure_does_not_break_env_load(self, client, monkeypatch):
+        """A04/CRY-01: the Keychain write runs off-thread with a timeout and is
+        best-effort. If it raises (or would hang), the endpoint still returns
+        200 with the env set — the download path depends on the env, not the
+        Keychain. Mutation: drop the try/except and this goes 500."""
+        import core.endpoints.installer as inst
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+
+        def boom(_tok):
+            raise RuntimeError("keyring exploded")
+
+        monkeypatch.setattr(inst, "_store_hf_token_in_keychain", boom)
+        try:
+            resp = client.post("/installer/hf-token", json={"token": "hf_resilient"})
+            assert resp.status_code == 200
+            assert resp.json()["persisted"] is False
+            assert os.environ.get("HF_TOKEN") == "hf_resilient"
+        finally:
+            os.environ.pop("HF_TOKEN", None)
+
+    def test_missing_token_field_is_422(self, client, no_keychain):
+        resp = client.post("/installer/hf-token", json={})
+        assert resp.status_code == 422
+
+    def test_empty_token_field_is_422(self, client, no_keychain):
+        # Field(min_length=1) rejects "" at the validation layer.
+        resp = client.post("/installer/hf-token", json={"token": ""})
+        assert resp.status_code == 422

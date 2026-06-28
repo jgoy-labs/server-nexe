@@ -56,7 +56,7 @@ expires: null
 |-------|-------|----------|
 | 401 Missing X-API-Key | No auth header | Add `-H "X-API-Key: YOUR_KEY"` to request |
 | 429 Rate Limited | Too many requests | Wait and retry. Check rate limits in `.env` |
-| 408 Timeout | Model inference too slow | Increase NEXE_DEFAULT_MAX_TOKENS timeout. Large models need 600s. |
+| 500 Timeout | Model inference too slow (Ollama stream timeout, default 300s; httpx.ReadTimeout is not caught and surfaces as 500) | Increase `NEXE_OLLAMA_STREAM_TIMEOUT` (in seconds). Large models may need 600s or more. |
 | Empty error message | httpx.ReadTimeout has empty str() | Fixed with repr(e). Check server logs. |
 
 ## Model Errors

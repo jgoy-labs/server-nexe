@@ -60,7 +60,7 @@ Descarga el ultimo paquete desde la pagina de [Releases](https://github.com/jgoy
 - **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64).
 - **Ollama bundled** o auto-instalado.
 
-El wizard lee el catalogo de modelos del fichero mantenido `models.json` (sincronizado en el binario Tauri via `catalog_fallback.json`). Consulta el catalogo completo mas abajo.
+El wizard lee el catalogo de modelos del fichero mantenido `models.json`. El binario Tauri (repo nexe-app) lleva una copia de fallback empotrada en tiempo de compilacion (`nexe-app/src-tauri/resources/catalog_fallback.json`), no en este repo. Consulta el catalogo completo mas abajo.
 
 ### Seleccion de backend
 
@@ -104,7 +104,7 @@ Wizard nativo SwiftUI con 6 pantallas, con Python 3.12 bundled e instalacion 100
 
 ## Catalogo de modelos (4 tiers por RAM)
 
-El catalogo canonico vive en `installer/swift-wizard/Resources/models.json` (fuente de verdad, mantenida en el repo y leida por el onboarding wizard). La tabla siguiente lo refleja (actualmente 14 modelos en 4 tiers):
+El catalogo canonico vive en `installer/swift-wizard/Resources/models.json` (fuente de verdad, mantenida en el repo y leida por el onboarding wizard). La tabla siguiente lo refleja (actualmente 15 entradas de modelo en 4 tiers; 14 modelos distintos, ya que Gemma 4 31B aparece en 2 tiers):
 
 ### tier_8 (8 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
@@ -115,6 +115,7 @@ El catalogo canonico vive en `installer/swift-wizard/Resources/models.json` (fue
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
 | Qwen3.5 9B | Ollama, MLX | 👁 | 🧠 | |
+| Qwen3.5 4B (8-bit) | Ollama, MLX | 👁 | 🧠 | |
 | Gemma 4 E4B | Ollama, MLX | 👁 | 🧠 | |
 | Mistral Nemo 12B | Ollama, MLX | | 🧠 | |
 | Salamandra 7B | Ollama, llama.cpp | | | iberic |
@@ -217,7 +218,7 @@ Desde la remediacion de la revision interna de seguridad asistida por IA `AUD-IN
 |---------|-----------------|------|
 | **Hugging Face MLX** | SHA256 del directorio del snapshot local (`local_dir` de `snapshot_download`) | `core.integrity.sha256_of_dir` ignorando dotfiles (`.lock`, `.no_exist`, ...) |
 | **GGUF** | SHA256 del fichero `.gguf` descargado via `curl` | `core.integrity.sha256_of_file` (stream 64 KB chunks) |
-| **Ollama** | Digest del manifest devuelto por `ollama show --json <model>` | Parsea `details.digest` (o `digest` en schemes antiguos); elimina el prefijo `sha256:` |
+| **Ollama** | Delegado al `pull` content-addressed de Ollama (sin pin propio del cliente, ADR B251) | Ollama verifica cada layer contra el digest del manifest durante `ollama pull`; los tags del catalogo son mutables upstream, asi que un pin de cliente daria falsos positivos en una re-publicacion legitima |
 | **fastembed (bundle DMG)** | SHA256 de `model*.onnx`, `tokenizer.json` y `config.json` leidos del manifest `embeddings.manifest.json` generado por `build-embedding-bundle.sh` | `core.integrity.sha256_of_file` via `installer.download_verify.verify_embedding_bundle` |
 
 ### Politica en caso de mismatch
@@ -226,7 +227,7 @@ Cuando el catalogo lleva un pin (SHA256 concreto) y el valor observado no coinci
 
 - Hash esperado vs hash observado (completo, 64 chars).
 - Ruta del fichero o directorio descargado.
-- Instrucciones de reintento especificas por backend (`ollama rm && ollama pull`, `rm storage/models/<file> && ./nexe model pull`, etc.).
+- Instrucciones de reintento especificas por backend (`ollama rm && ollama pull`, `rm storage/models/<file> && ./nexe model install <name>`, etc.).
 
 ### Modo legacy
 
@@ -240,7 +241,7 @@ Para el embedding bundle, un DMG sin `embeddings.manifest.json` (build anterior 
 
 ### Refresco de los hashes
 
-Cuando un modelo publica una revision nueva en Hugging Face o Ollama, hay que actualizar `MODEL_WEIGHT_SHA256` con el nuevo digest. El metodo manual es descargar el modelo, ejecutar `sha256sum` (GGUF), `sha256_of_dir` (MLX) o `ollama show --json` (Ollama) y editar el dict en `installer_catalog_data.py`. El test `tests/test_installer_sha256_catalog.py` valida que cada artefacto del catalogo tiene una entrada en el dict (aunque sea `None`).
+Para MLX y GGUF, cuando un modelo publica una revision nueva en Hugging Face hay que actualizar los pins con el nuevo digest: tier-1 (`MODEL_WEIGHT_SHA256`) descargando el modelo y ejecutando `sha256_of_dir` (MLX) o `sha256sum` (GGUF); tier-2 MLX (por fichero LFS) se regenera metadata-only con `installer/bootstrap_catalog_pins.py`. Ollama **no** tiene pins de cliente (ADR B251): su integridad la garantiza el `pull` content-addressed, asi que no hay que refrescar nada. El test `tests/test_installer_sha256_catalog.py` valida que cada artefacto del catalogo tiene una entrada en el dict (aunque sea `None`).
 
 ## Verificacion post-instalacion
 
@@ -270,29 +271,29 @@ Esto encripta las bases de datos SQLite (via SQLCipher), sesiones de chat (.json
 
 ## App de bandeja (NexeTray, macOS)
 
-App de la barra de menu para controlar el servidor sin terminal. Construida sobre el framework `rumps` como la clase `NexeTray` (`installer/tray.py`, 655 lineas). Se arranca automaticamente en modo `--attach` una vez el servidor esta en marcha (lanzada por `core/server/runner.py`). El bundle `installer/NexeTray.app` (bash wrapper, `LSUIElement=true`, `CFBundleIdentifier=net.servernexe.tray`) evita las restricciones de provenance de macOS Sequoia.
+App de la barra de menu para controlar el servidor sin terminal. Construida sobre el framework `rumps` como la clase `NexeTray` (`installer/tray.py`, 711 lineas). Se arranca automaticamente en modo `--attach` una vez el servidor esta en marcha (lanzada por `core/server/runner.py`). El bundle `installer/NexeTray.app` (bash wrapper, `LSUIElement=true`, `CFBundleIdentifier=net.servernexe.tray`) evita las restricciones de provenance de macOS Sequoia.
 
 ### Items del menu (de arriba a abajo)
 
 | Item | Que hace | Codigo |
 |------|----------|--------|
-| **server.nexe v1.0.6** | Cabecera no clicable. Version leida dinamicamente de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
-| **Servidor activo / detenido** | Indicador de estado no clicable. El icono de la barra cambia: `ICON_RUNNING` (verde) cuando esta vivo, `ICON_STOPPED` (gris) cuando no. | `tray.py:197` |
-| **Detener / Iniciar servidor** | Arranca o detiene el proceso `core.app` (uvicorn + FastAPI + Qdrant). SIGTERM y, si hace falta, SIGKILL. PID en `storage/run/server.pid`. | `_toggle_server` → `tray.py:296` |
-| **Abrir Web UI** | Abre `http://127.0.0.1:9119/ui` en el navegador por defecto. | `_open_web_ui` → `tray.py:509` |
-| **Abrir logs** | Abre `storage/logs/server.log` en el editor asociado a `.log`. | `_open_logs` → `tray.py:512` |
-| **Server RAM** | RAM consumida por el proceso servidor + modelo cargado. El polling (`psutil`) corre en un daemon thread (`_RamMonitor`, `installer/tray_monitor.py`, 141 lineas) para no bloquear el menu (fix post-v0.9.0 — antes congelaba el teclado). | `tray_monitor.py`; `tray.py:205` |
-| **Tiempo (uptime)** | Tiempo vivo del servidor calculado desde `server_start_time`. | `tray.py:208` |
-| **Documentacion** | Abre la documentacion oficial. Item anadido al menu principal para reemplazar un enlace duplicado. | `_open_docs` → `tray.py:523` |
-| **Configuracion** | Submenu con 3 opciones: | `tray.py:227-243` |
-| ↳ server-nexe.com | Abre la web oficial en el navegador. | `_open_website` → `tray.py:520` |
-| ↳ Apoyar el proyecto | Abre GitHub Sponsors. | `_open_donate` → `tray.py:528` |
-| ↳ Desinstalar Nexe | Lanza el desinstalador con doble confirmacion, calcula el espacio, elimina entradas Dock/Login Items, hace backup de `storage/` con timestamp. **NO elimina la carpeta del proyecto** (opcion de seguridad). | `_uninstall` → `tray.py:531` + `installer/tray_uninstaller.py` (284 lineas) |
-| **Salir** | Detiene el servidor (si esta corriendo) y cierra la app de la bandeja. | `_quit` → `tray.py:581` |
+| **server.nexe v1.0.6** | Cabecera no clicable. Version leida dinamicamente de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:196-206, 272` |
+| **Servidor activo / detenido** | Indicador de estado no clicable. El icono de la barra cambia: `ICON_RUNNING` (verde) cuando esta vivo, `ICON_STOPPED` (gris) cuando no. | `tray.py:223` |
+| **Detener / Iniciar servidor** | Arranca o detiene el proceso `core.app` (uvicorn + FastAPI + Qdrant). SIGTERM y, si hace falta, SIGKILL. PID en `storage/run/server.pid`. | `_toggle_server` → `tray.py:324` |
+| **Abrir Web UI** | Abre `http://127.0.0.1:9119/ui` en el navegador por defecto. | `_open_web_ui` → `tray.py:564` |
+| **Abrir logs** | Abre `storage/logs/server.log` en el editor asociado a `.log`. | `_open_logs` → `tray.py:567` |
+| **Server RAM** | RAM consumida por el proceso servidor + modelo cargado. El polling (`psutil`) corre en un daemon thread (`RamMonitor`, `installer/tray_monitor.py`, 142 lineas) para no bloquear el menu (fix post-v0.9.0 — antes congelaba el teclado). | `tray_monitor.py`; `tray.py:231` |
+| **Tiempo (uptime)** | Tiempo vivo del servidor calculado desde `server_start_time`. | `tray.py:234` |
+| **Documentacion** | Abre la documentacion oficial. Item anadido al menu principal para reemplazar un enlace duplicado. | `_open_docs` → `tray.py:578` |
+| **Configuracion** | Submenu con 3 opciones: | `tray.py:253-269` |
+| ↳ server-nexe.com | Abre la web oficial en el navegador. | `_open_website` → `tray.py:575` |
+| ↳ Apoyar el proyecto | Abre GitHub Sponsors. | `_open_donate` → `tray.py:583` |
+| ↳ Desinstalar Nexe | Lanza el desinstalador con doble confirmacion, calcula el espacio, elimina entradas Dock/Login Items, hace backup de `storage/` con timestamp. **NO elimina la carpeta del proyecto** (opcion de seguridad). | `_uninstall` → `tray.py:586` + `installer/tray_uninstaller.py` (349 lineas) |
+| **Salir** | Detiene el servidor (si esta corriendo) y cierra la app de la bandeja. | `_quit` → `tray.py:636` |
 
 ### Actualizacion automatica
 
-Un `rumps.Timer(self._update_stats, 5)` ejecuta el callback `_update_stats` (`tray.py:458`) cada 5 segundos: refresca RAM, uptime, y verifica estado (si el proceso murio inesperadamente → cambia icono y status).
+Un `rumps.Timer(self._update_stats, 5)` (`tray.py:302`) ejecuta el callback `_update_stats` (`tray.py:513`) cada 5 segundos: refresca RAM, uptime, y verifica estado (si el proceso murio inesperadamente → cambia icono y status).
 
 ### Traducciones
 
@@ -323,7 +324,7 @@ Accesible desde el menu de la bandeja. Doble confirmacion, calcula espacio, elim
 | NEXE_OLLAMA_MODEL | Modelo Ollama | (seleccionado durante la instalacion) |
 | NEXE_LLAMA_CPP_MODEL | Ruta del modelo GGUF | storage/models/*.gguf |
 | NEXE_DEFAULT_MAX_TOKENS | Tokens maximos de respuesta | 4096 |
-| NEXE_LANG | Idioma del servidor | ca |
+| NEXE_LANG | Idioma del servidor | en |
 | NEXE_ENV | Entorno | production |
 | NEXE_ENCRYPTION_ENABLED | Activar encriptacion en reposo | auto (se activa si sqlcipher3 disponible) |
 | NEXE_OLLAMA_THINK | Default global de thinking tokens para modelos Ollama | false |

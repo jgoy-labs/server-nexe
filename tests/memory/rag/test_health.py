@@ -16,8 +16,6 @@ from memory.rag.health import (
   check_module_initialized,
   check_qdrant_available,
   check_storage_paths,
-  check_transaction_ledger,
-  check_write_coordinator,
   check_rag_sources,
   check_disk_space,
   check_health,
@@ -91,28 +89,6 @@ class TestCheckStoragePaths:
 
     assert "message" in result
     assert result["status"] in ["pass", "fail"]
-
-class TestCheckTransactionLedger:
-  """Tests for transaction_ledger check."""
-
-  def test_ledger_check(self):
-    """Verify ledger importability check."""
-    result = check_transaction_ledger()
-
-    assert result["name"] == "transaction_ledger"
-    assert result["status"] in ["pass", "fail"]
-    assert "message" in result
-
-class TestCheckWriteCoordinator:
-  """Tests for write_coordinator check."""
-
-  def test_coordinator_check(self):
-    """Verify coordinator importability check."""
-    result = check_write_coordinator()
-
-    assert result["name"] == "write_coordinator"
-    assert result["status"] in ["pass", "fail"]
-    assert "message" in result
 
 class TestCheckRagSources:
   """Tests for rag_sources check."""
@@ -254,6 +230,44 @@ class TestCheckHealth:
 
     assert result["metadata"]["module_id"] == "TEST-ID"
     assert result["metadata"]["name"] == "rag"
+
+  def test_check_health_has_no_phantom_subchecks(self):
+    """B064 anti-regression: check_health must NOT emit the lobotomised
+    transaction_ledger / write_coordinator sub-checks.
+
+    Those checks reported 'pass' unconditionally for components that do not
+    exist in this codebase (TransactionLedger / WriteCoordinator), so the
+    health report lied. The real contract is exactly 5 sub-checks, none of
+    which is a phantom (non-existent) component.
+    """
+    mock_source = MagicMock()
+    mock_source.health.return_value = {"status": "healthy"}
+
+    mock_module = MagicMock()
+    mock_module._initialized = True
+    mock_module._sources = {"personality": mock_source}
+    mock_module.module_id = "TEST"
+    mock_module.name = "rag"
+    mock_module.version = "0.1"
+    mock_module._stats = {}
+
+    result = check_health(mock_module)
+
+    names = {c["name"] for c in result["checks"]}
+    assert "transaction_ledger" not in names, (
+      "phantom transaction_ledger sub-check still emitted"
+    )
+    assert "write_coordinator" not in names, (
+      "phantom write_coordinator sub-check still emitted"
+    )
+    assert names == {
+      "module_initialized",
+      "rag_sources",
+      "qdrant_available",
+      "storage_paths",
+      "disk_space",
+    }
+    assert len(result["checks"]) == 5
 
 class TestHealthCheckEdgeCases:
   """Edge case tests for health checks."""

@@ -40,14 +40,20 @@ class I18nHelper:
       str: Translated text or fallback
     """
     try:
-      return self._manager.t(key, **kwargs)
-    except (KeyError, Exception):
-      if fallback and kwargs:
+      result = self._manager.t(key, **kwargs)
+    except Exception:
+      result = key
+    # I18nManager.t returns the key unchanged when no translation is found (it
+    # does not raise), so the documented fallback must also trigger on that miss
+    # — otherwise raw i18n keys leak into logs (e.g. the security audit log).
+    if result == key and fallback:
+      if kwargs:
         try:
           return fallback.format(**kwargs)
         except (KeyError, ValueError):
           return fallback
-      return fallback or key
+      return fallback
+    return result
 
 def get_i18n() -> I18nHelper:
   """

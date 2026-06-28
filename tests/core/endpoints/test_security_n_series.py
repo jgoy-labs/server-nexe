@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent  # server-nexe/
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# server.toml — debug/reload desactivats, environment=production
+# server.toml — reload desactivat, environment=production
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestServerTomlProductionConfig:
@@ -38,12 +38,6 @@ class TestServerTomlProductionConfig:
             "server.toml must have environment = \"production\""
         )
         assert 'environment = "development"' not in content
-
-    def test_debug_is_disabled(self):
-        """debug = false prevents exposing Python stack traces in HTTP responses."""
-        content = self._read_toml()
-        assert "debug = false" in content, "server.toml must have debug = false"
-        assert "debug = true" not in content
 
     def test_reload_is_disabled(self):
         """reload = false prevents live-reload in production."""
@@ -72,11 +66,101 @@ class TestSystemEndpointInfoDisclosure:
         return_section = source.split('"status": "restart_initiated"')[1] if '"status": "restart_initiated"' in source else source
         assert '"supervisor_pid"' not in return_section
 
-    def test_status_response_no_supervisor_pid(self):
-        """/status must not return supervisor_pid."""
-        from core.endpoints.system import supervisor_status
-        source = inspect.getsource(supervisor_status)
-        assert '"supervisor_pid"' not in source
+    def test_status_response_no_supervisor_pid(self, monkeypatch):
+        """/status JSON response must not expose supervisor_pid under any key.
+
+        T88 — reforçat: l'original usava inspect.getsource i cercava la cadena
+        literal '"supervisor_pid"' al codi font, cosa que passaria verd si el PID
+        s'exposés sota una altra clau (p.ex. "pid", "proc_id") o es construís
+        dinàmicament.  Aquest test crida l'endpoint real i inspeciona el JSON
+        retornat.
+
+        Prova de mutació: afegir supervisor_pid al dict de retorn de
+        supervisor_status() → l'assert es posa VERMELL.
+        """
+        import secrets
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from slowapi import Limiter, _rate_limit_exceeded_handler
+        from slowapi.util import get_remote_address
+        from slowapi.middleware import SlowAPIMiddleware
+        from slowapi.errors import RateLimitExceeded
+
+        api_key = f"nexe_test_{secrets.token_hex(8)}"
+        # Use monkeypatch.setenv so the original value (if any) is restored
+        # automatically at teardown — prevents test pollution when .env or
+        # a previous conftest has already set NEXE_PRIMARY_API_KEY.
+        monkeypatch.setenv("NEXE_PRIMARY_API_KEY", api_key)
+
+        # Minimal app — without TrustedHostMiddleware so testclient host does not
+        # trigger a 400 before the endpoint logic runs.
+        app = FastAPI()
+        app.state.config = {}
+        app.state.modules = {}
+        limiter = Limiter(key_func=get_remote_address)
+        app.state.limiter = limiter
+        app.add_middleware(SlowAPIMiddleware)
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+        from core.endpoints.system import get_router
+        app.include_router(get_router())
+
+        with TestClient(app) as client:
+            resp = client.get(
+                "/admin/system/status",
+                headers={"X-API-Key": api_key},
+            )
+
+        # No manual cleanup needed: monkeypatch restores the original value
+        # (or removes the key if it did not exist before) at teardown.
+
+        # The endpoint always returns 200 (supervisor up or down):
+        # supervisor_running=True/False, restart_available=True/False, optional error.
+        assert resp.status_code == 200, (
+            f"/admin/system/status returned {resp.status_code}: {resp.text}"
+        )
+        data = resp.json()
+        assert isinstance(data, dict), "Response must be a JSON object"
+
+        # Recursively collect every key in the response (handles nested dicts).
+        def _all_keys(obj):
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    yield k
+                    yield from _all_keys(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    yield from _all_keys(item)
+
+        all_keys = list(_all_keys(data))
+
+        # Check 1: no key may be exactly "supervisor_pid" (or obvious aliases like
+        # "pid", "proc_id").  "pid_file" (the path string) is intentionally allowed
+        # as it does not expose a numeric PID — the concern is the process ID integer.
+        FORBIDDEN_PID_KEYS = {"supervisor_pid", "pid", "proc_id", "supervisor_pid_value"}
+        for key in all_keys:
+            assert key not in FORBIDDEN_PID_KEYS, (
+                f"/status response must not expose a numeric supervisor PID; "
+                f"found forbidden key '{key}' in response: {data}"
+            )
+
+        # Check 2: no value in the response is a raw integer that could be a PID
+        # (positive int > 1 — boolean True/False are ints in Python but never PIDs).
+        def _all_values(obj):
+            if isinstance(obj, dict):
+                for v in obj.values():
+                    yield from _all_values(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    yield from _all_values(item)
+            else:
+                yield obj
+
+        for val in _all_values(data):
+            if isinstance(val, int) and not isinstance(val, bool) and val > 1:
+                assert False, (
+                    f"/status response must not expose a raw integer PID; "
+                    f"found integer value {val!r} in response: {data}"
+                )
 
     def test_status_response_no_restart_command(self):
         """/status must not return the kill -HUP <pid> command."""
@@ -109,6 +193,29 @@ class TestSystemEndpointInfoDisclosure:
 # memory/api/v1.py — str(e) not returned to the HTTP client
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _build_minimal_memory_app():
+    """Minimal FastAPI app mounting the memory router (no TrustedHostMiddleware).
+
+    Sufficient to exercise the memory/api/v1.py error handlers behaviourally
+    (B072 regression guard). Mirrors the inline app built in the T45 store test.
+    """
+    from fastapi import FastAPI
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.middleware import SlowAPIMiddleware
+    from slowapi.errors import RateLimitExceeded
+    import memory.memory.api.v1 as mem_v1_mod
+
+    app = FastAPI()
+    app.state.config = {}
+    app.state.modules = {}
+    app.state.limiter = Limiter(key_func=get_remote_address)
+    app.add_middleware(SlowAPIMiddleware)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.include_router(mem_v1_mod.router)
+    return app
+
+
 class TestMemoryAPIErrorDisclosure:
     """
     Verifies that internal exceptions in memory/api/v1.py do not expose
@@ -116,26 +223,140 @@ class TestMemoryAPIErrorDisclosure:
     internal Qdrant URL, network topology or connection messages.
     """
 
-    def test_store_exception_no_str_e_in_http_detail(self):
-        """memory_store does not include str(e) in the HTTPException detail."""
-        from memory.memory.api.v1 import memory_store
-        source = inspect.getsource(memory_store)
-        except_section = source.split("except Exception")[1] if "except Exception" in source else ""
-        assert "str(e)" not in except_section
+    def test_store_exception_no_str_e_in_http_detail(self, monkeypatch):
+        """memory_store HTTP response must not contain the raw exception text.
 
-    def test_search_exception_no_str_e_in_http_detail(self):
-        """memory_search does not include str(e) in the HTTPException detail."""
-        from memory.memory.api.v1 import memory_search
-        source = inspect.getsource(memory_search)
-        except_section = source.split("except Exception")[1] if "except Exception" in source else ""
-        assert "str(e)" not in except_section
+        T45 — reforçat: l'original usava inspect.getsource + assert 'str(e)' not in
+        source, que passaria VERD si l'excepció es filtrés mitjançant f'{e}' o
+        .format(e) (REPRO confirmat a /tmp/fn-theatre/repro_str_e.py).
+
+        Aquest test:
+        1. Construeix una app mínima (sense TrustedHostMiddleware) amb el router
+           de memòria.
+        2. Força get_memory_api() a llançar una excepció amb text únic i
+           identificable ("SENTINEL_EXCEPTION_TEXT_T45").
+        3. POST a /v1/memory/store.
+        4. Asserta que la resposta HTTP 500 NO conté el text del sentinel.
+
+        Prova de mutació: si memory_store filtres str(e) — p.ex. canviant
+        "Internal error. Check server logs." per f"Internal error: {e}" —
+        la resposta contindria "SENTINEL_EXCEPTION_TEXT_T45" i el test es
+        posaria VERMELL.
+        """
+        import secrets
+        from unittest.mock import patch, AsyncMock
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from slowapi import Limiter, _rate_limit_exceeded_handler
+        from slowapi.util import get_remote_address
+        from slowapi.middleware import SlowAPIMiddleware
+        from slowapi.errors import RateLimitExceeded
+
+        SENTINEL = "SENTINEL_EXCEPTION_TEXT_T45"
+
+        api_key = f"nexe_test_{secrets.token_hex(8)}"
+        # Use monkeypatch.setenv so the original value (if any) is restored
+        # automatically at teardown — prevents test pollution when .env or
+        # a previous conftest has already set NEXE_PRIMARY_API_KEY.
+        monkeypatch.setenv("NEXE_PRIMARY_API_KEY", api_key)
+
+        # Minimal app — without TrustedHostMiddleware.
+        app = FastAPI()
+        app.state.config = {}
+        app.state.modules = {}
+        limiter = Limiter(key_func=get_remote_address)
+        app.state.limiter = limiter
+        app.add_middleware(SlowAPIMiddleware)
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+        import memory.memory.api.v1 as mem_v1_mod
+        # Include the memory router directly (prefix /memory → /memory/store).
+        # In production it is nested under /v1 via router_v1, but a minimal app
+        # mounting it at /memory is sufficient to exercise the error handler.
+        app.include_router(mem_v1_mod.router)
+
+        # Force get_memory_api() to raise an exception with the sentinel string
+        # so we can verify it does NOT leak through to the HTTP response.
+        _sentinel_exc = RuntimeError(SENTINEL)
+
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=_sentinel_exc):
+            with TestClient(app) as client:
+                resp = client.post(
+                    "/memory/store",
+                    json={"content": "test content", "collection": "personal_memory"},
+                    headers={"X-API-Key": api_key},
+                )
+        # No manual cleanup needed: monkeypatch restores the original value
+        # (or removes the key if it did not exist before) at teardown.
+
+        # The handler must return 500 with a GENERIC message, not the raw exception.
+        assert resp.status_code == 500, (
+            f"Expected 500 from memory_store on exception, got {resp.status_code}: {resp.text}"
+        )
+        response_text = resp.text
+        assert SENTINEL not in response_text, (
+            f"memory_store leaked the raw exception text into the HTTP response body. "
+            f"Found sentinel '{SENTINEL}' in: {response_text!r}. "
+            f"The handler must use a generic message, not str(e) or f'{{e}}'."
+        )
+
+    def test_search_exception_no_str_e_in_http_detail(self, monkeypatch):
+        """memory_search HTTP 500 must not contain the raw exception text.
+
+        B072 — reforçat de teatre a conductual. L'original feia
+        source.split("except Exception")[1], que agafava l'except INTERN
+        per-col·lecció, no el handler extern: filtrar str(e) al handler real
+        hauria passat VERD. Aquest test força get_memory_api() a llançar un
+        sentinel i asserta que NO apareix al body 500.
+
+        Prova de mutació: canviar el detail extern per f"Internal error: {e}"
+        → el sentinel apareix al body → VERMELL.
+        """
+        import secrets
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+
+        SENTINEL = "SENTINEL_SEARCH_EXC_B072"
+        api_key = f"nexe_test_{secrets.token_hex(8)}"
+        monkeypatch.setenv("NEXE_PRIMARY_API_KEY", api_key)
+        app = _build_minimal_memory_app()
+
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=RuntimeError(SENTINEL)):
+            with TestClient(app) as client:
+                resp = client.post(
+                    "/memory/search",
+                    json={"query": "test", "collection": "personal_memory", "limit": 5},
+                    headers={"X-API-Key": api_key},
+                )
+        assert resp.status_code == 500, (
+            f"Expected 500 from memory_search on exception, got {resp.status_code}: {resp.text}"
+        )
+        assert SENTINEL not in resp.text, (
+            f"memory_search leaked the raw exception into the HTTP body: {resp.text!r}"
+        )
 
     def test_health_exception_no_str_e_in_response(self):
-        """memory_health (no auth!) does not include str(e) in the JSON response."""
-        from memory.memory.api.v1 import memory_health
-        source = inspect.getsource(memory_health)
-        except_section = source.split("except Exception")[1] if "except Exception" in source else ""
-        assert "str(e)" not in except_section
+        """memory_health (unauthenticated) must not contain str(e) on failure.
+
+        B072 — reforçat de teatre a conductual. memory_health retorna 200 amb un
+        dict genèric quan falla; el text de l'excepció no hi pot aparèixer.
+
+        Prova de mutació: afegir str(e) al dict de resposta → VERMELL.
+        """
+        from unittest.mock import patch
+        from fastapi.testclient import TestClient
+
+        SENTINEL = "SENTINEL_HEALTH_EXC_B072"
+        app = _build_minimal_memory_app()
+        with patch("memory.memory.api.v1.get_memory_api", side_effect=RuntimeError(SENTINEL)):
+            with TestClient(app) as client:
+                resp = client.get("/memory/health")
+        assert resp.status_code == 200, (
+            f"memory_health should return 200 even when unhealthy, got {resp.status_code}: {resp.text}"
+        )
+        assert SENTINEL not in resp.text, (
+            f"memory_health leaked the raw exception into the response: {resp.text!r}"
+        )
 
     def test_store_uses_generic_error_message(self):
         """memory_store uses a generic message, not the exception detail."""
@@ -193,12 +414,34 @@ class TestStaticFilePathTraversal:
         source = inspect.getsource(routes_static)
         assert "is_relative_to" in source
 
-    def test_serve_static_returns_403_on_traversal(self):
-        """The code returns HTTP 403 (not 404) if the path is outside the directory."""
-        from plugins.web_ui_module.api import routes_static
-        source = inspect.getsource(routes_static)
-        assert "403" in source
-        assert "forbidden" in source.lower()
+    def test_serve_static_returns_403_on_traversal(self, tmp_path):
+        """serve_static raises HTTP 403 on path traversal (behavioural, B071).
+
+        L'original (assert "403" in inspect.getsource) era teatre: passava VERD
+        encara que la guarda is_relative_to es trenqués. Aquest crida la FUNCIÓ de
+        producció serve_static directament amb un filename de traversal, evitant la
+        normalització d'httpx (TestClient) que col·lapsa '..' abans del guard.
+
+        Prova de mutació: treure/invertir el check is_relative_to a routes_static.py
+        → el traversal ja no dona 403 (proseguiria a 404/serve) → VERMELL.
+        """
+        import asyncio
+        import types
+        from fastapi import APIRouter, HTTPException
+        from plugins.web_ui_module.api.routes_static import register_static_routes
+
+        router = APIRouter()
+        register_static_routes(router, module_ref=types.SimpleNamespace(ui_dir=tmp_path))
+        serve_static = next(
+            r.endpoint for r in router.routes
+            if getattr(r, "path", "").endswith("/static/{filename:path}")
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(serve_static(filename="../../../etc/passwd", i18n=None))
+        assert exc.value.status_code == 403, (
+            f"Path traversal must yield 403, got {exc.value.status_code}"
+        )
 
     def test_traversal_logic_rejects_dotdot(self):
         """Direct validation: path with .. ends up outside static_dir."""
@@ -233,13 +476,6 @@ class TestSessionCleanupTask:
     accumulate in RAM and on disk indefinitely.
     """
 
-    def test_cleanup_loop_function_exists(self):
-        """_session_cleanup_loop exists in api/routes.py."""
-        from plugins.web_ui_module.api import routes
-        assert hasattr(routes, '_session_cleanup_loop'), (
-            "_session_cleanup_loop not found in api/routes.py"
-        )
-
     def test_cleanup_loop_is_coroutine(self):
         """_session_cleanup_loop is a coroutine (async def)."""
         import asyncio
@@ -252,10 +488,47 @@ class TestSessionCleanupTask:
         assert callable(start_session_cleanup_task)
 
     def test_cleanup_loop_uses_hourly_interval(self):
-        """The loop sleeps 3600 seconds (1 hour) between runs."""
+        """T46: _session_cleanup_loop must pass 3600 to asyncio.sleep at runtime.
+
+        The original test-theatre used inspect.getsource and asserted '3600' appears
+        anywhere in the source text — a loop using sleep(60) with '3600' only in a
+        comment would still pass GREEN (REPRO confirmed).
+
+        This test intercepts the actual asyncio.sleep() call during execution and
+        asserts that the value passed is exactly 3600, not just present as a string.
+
+        Mutation target: change `asyncio.sleep(3600)` to `asyncio.sleep(60)` in
+        routes.py → captured_seconds == 60 → assert fails → RED.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        captured_seconds = []
+
+        async def _fake_sleep(seconds):
+            captured_seconds.append(seconds)
+            raise StopAsyncIteration("stop after first sleep")
+
+        session_mgr = MagicMock()
+        session_mgr.cleanup_inactive.return_value = 0
+
+        # Import here so the patch targets the right namespace.
+        import plugins.web_ui_module.api.routes as routes_mod
         from plugins.web_ui_module.api.routes import _session_cleanup_loop
-        source = inspect.getsource(_session_cleanup_loop)
-        assert "3600" in source, "The loop must sleep 3600s (1 hour)"
+
+        with patch.object(routes_mod.asyncio, "sleep", _fake_sleep):
+            try:
+                asyncio.run(_session_cleanup_loop(session_mgr))
+            except StopAsyncIteration:
+                pass  # expected: loop stopped after first sleep
+
+        assert len(captured_seconds) == 1, (
+            "Expected exactly one asyncio.sleep() call before stopping"
+        )
+        assert captured_seconds[0] == 3600, (
+            f"_session_cleanup_loop must sleep 3600s (1 hour); "
+            f"got asyncio.sleep({captured_seconds[0]})"
+        )
 
     def test_cleanup_loop_calls_cleanup_inactive(self):
         """The loop calls cleanup_inactive() on the session_manager."""

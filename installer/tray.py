@@ -19,6 +19,7 @@ import webbrowser
 from pathlib import Path
 from typing import Any
 
+from .tray_alerts import _ForegroundContext, _front_alert
 from .tray_monitor import RamMonitor as _RamMonitor, format_bytes as _format_bytes, format_uptime as _format_uptime
 from .tray_translations import T, _detect_lang
 
@@ -47,92 +48,6 @@ except ImportError:
             def decorator(f): return f
             return decorator
     rumps = _RumpsStub()
-
-
-NS_STATUS_WINDOW_LEVEL = 25
-
-
-def _front_alert_rumps_fallback(title, message, ok, cancel, other):
-    """Fallback path when AppKit is unavailable: delegate to rumps.alert."""
-    kwargs = {}
-    if title is not None:
-        kwargs["title"] = title
-    if message is not None:
-        kwargs["message"] = message
-    if ok is not None:
-        kwargs["ok"] = ok
-    if cancel is not None:
-        kwargs["cancel"] = cancel
-    if other is not None:
-        kwargs["other"] = other
-    return rumps.alert(**kwargs)
-
-
-def _build_nsalert(title, message, ok, cancel, other):
-    """Construct and configure an NSAlert with buttons."""
-    from AppKit import NSAlert, NSAlertStyleWarning
-    alert = NSAlert.alloc().init()
-    if title is not None:
-        alert.setMessageText_(str(title))
-    if message is not None:
-        alert.setInformativeText_(str(message))
-    alert.setAlertStyle_(NSAlertStyleWarning)
-    alert.addButtonWithTitle_(str(ok) if ok is not None else "OK")
-    if cancel is not None:
-        alert.addButtonWithTitle_(str(cancel))
-    if other is not None:
-        alert.addButtonWithTitle_(str(other))
-    return alert
-
-
-def _nsalert_response_to_int(response):
-    """Convert NSAlertFirstButtonReturn codes to rumps-compat integers."""
-    if response == 1000:
-        return 1
-    elif response == 1001:
-        return 0
-    elif response == 1002:
-        return -1
-    return response
-
-
-def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_):
-    """NSAlert always-on-top (assumes _ForegroundContext already active)."""
-    try:
-        alert = _build_nsalert(title, message, ok, cancel, other)
-    except Exception:
-        return _front_alert_rumps_fallback(title, message, ok, cancel, other)
-
-    window = alert.window()
-    window.setLevel_(NS_STATUS_WINDOW_LEVEL)
-    window.makeKeyAndOrderFront_(None)
-
-    return _nsalert_response_to_int(alert.runModal())
-
-
-class _ForegroundContext:
-    """Promote activation policy to .regular for a block of alerts, and
-    restore it to the previous value on exit. Avoids flip-flop between alerts."""
-    def __init__(self):
-        self.old_policy = None
-
-    def __enter__(self):
-        try:
-            from AppKit import NSApp, NSApplicationActivationPolicyRegular
-            self.old_policy = NSApp.activationPolicy()
-            NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
-            NSApp.activateIgnoringOtherApps_(True)
-        except Exception:  # nosec B110: best-effort AppKit activation policy promotion; non-fatal if AppKit unavailable
-            pass
-        return self
-
-    def __exit__(self, *exc):
-        if self.old_policy is not None:
-            try:
-                from AppKit import NSApp
-                NSApp.setActivationPolicy_(self.old_policy)
-            except Exception:  # nosec B110: best-effort AppKit activation policy restore on context exit; non-fatal
-                pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -334,7 +249,7 @@ class NexeTray(rumps.App):
         if not venv_python.exists():
             _front_alert(
                 title="Nexe",
-                message="Python venv not found. Please run the installer first.",
+                message=self.t("venv_not_found"),
             )
             self.toggle_item.title = self.t("start")
             return
@@ -366,15 +281,32 @@ class NexeTray(rumps.App):
         log_dir = PROJECT_ROOT / "storage" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         self._server_log_path = log_dir / "server.log"
+        # B156: close any stale handle before reopening so a re-clicked Start
+        # after a previous failed launch doesn't leak the old descriptor.
+        if self._server_log_fh:
+            try:
+                self._server_log_fh.close()
+            except Exception:  # nosec B110: best-effort close of a stale handle
+                pass
+            self._server_log_fh = None
         self._server_log_fh = open(self._server_log_path, "a")
 
-        self.server_process = subprocess.Popen(  # nosec B603: venv_python is PROJECT_ROOT-derived absolute Path (venv/bin/python); literal `-m core.app`
-            [str(venv_python), "-m", "core.app"],
-            cwd=str(PROJECT_ROOT),
-            env=env,
-            stdout=self._server_log_fh,
-            stderr=subprocess.STDOUT,
-        )
+        try:
+            self.server_process = subprocess.Popen(  # nosec B603: venv_python is PROJECT_ROOT-derived absolute Path (venv/bin/python); literal `-m core.app`
+                [str(venv_python), "-m", "core.app"],
+                cwd=str(PROJECT_ROOT),
+                env=env,
+                stdout=self._server_log_fh,
+                stderr=subprocess.STDOUT,
+            )
+        except Exception:
+            # B156: release the just-opened log handle if the spawn fails so a
+            # single failed start doesn't leak a descriptor until process exit.
+            try:
+                self._server_log_fh.close()
+            finally:
+                self._server_log_fh = None
+            raise
         self.server_start_time = time.time()
 
         self.status_item.title = self.t("starting")
@@ -408,6 +340,16 @@ class NexeTray(rumps.App):
                 return
 
             time.sleep(0.5)
+
+        # B154: after the readiness timeout, never claim Running over a process
+        # that has died, nor over an absent one (a concurrent Stop sets
+        # server_process=None). The in-loop check above misses a process that
+        # dies between the last poll and the timeout.
+        if self.server_process is None or self.server_process.poll() is not None:
+            self.icon = ICON_STOPPED
+            self.status_item.title = self.t("status_stopped")
+            self.toggle_item.title = self.t("start")
+            return
 
         self.icon = ICON_RUNNING
         self.status_item.title = self.t("status_running")

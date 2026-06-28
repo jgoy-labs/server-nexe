@@ -90,11 +90,12 @@ reportMissingModuleSource = "none"
 testpaths = ["tests"]
 
 [tool.lizard]
-# InstallNexe.app i Nexe.app són bundles pre-compilats (stdlib Python bundlada
-# + binaris), no codi font del projecte. Els seus fitxers generen fals positius
-# de complexitat (ex: re/_parser.py CCN=121) que no hem de corregir nosaltres.
+# InstallNexe.app and Nexe.app are pre-compiled bundles (bundled Python stdlib
+# + binaries), not project source code. Their files generate complexity false
+# positives (e.g. re/_parser.py CCN=121) that we should not fix ourselves.
 exclude = [
     ".test_venv/*",
     "InstallNexe.app/*",
     "Nexe.app/*",
 ]
+

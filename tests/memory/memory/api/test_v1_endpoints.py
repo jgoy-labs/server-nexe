@@ -100,6 +100,41 @@ class TestMemoryStoreEndpoint:
         assert data["success"] is True
         assert "document_id" in data
 
+    def test_store_accepts_legacy_text_alias(self):
+        """B066: docs historically taught {"text": ...}; the endpoint must still
+        accept it (AliasChoices back-compat) so old curl recipes don't 422.
+
+        The value sent via ``text`` must land in ``body.content`` and be passed
+        to the memory store unchanged.
+        """
+        client = TestClient(make_app())
+        mock_mem = make_mock_memory()
+
+        with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
+            resp = client.post(
+                "/memory/store",
+                json={"text": "Legacy alias payload", "collection": "personal_memory"},
+                headers={"X-Api-Key": API_KEY}
+            )
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["success"] is True
+        # The aliased value must reach the store as the document text.
+        call_kwargs = mock_mem.store.call_args[1]
+        assert call_kwargs["text"] == "Legacy alias payload"
+
+    def test_store_legacy_text_alias_not_exposed_in_openapi(self):
+        """B066: the ``text`` alias is invisible back-compat — the OpenAPI schema
+        must keep advertising the canonical ``content`` field only.
+        """
+        app = make_app()
+        schema = app.openapi()
+        model = schema["components"]["schemas"]["MemoryStoreRequest"]
+        props = model["properties"]
+        assert "content" in props
+        assert "text" not in props
+
     def test_store_creates_collection_if_not_exists(self):
         client = TestClient(make_app())
         mock_mem = make_mock_memory()
@@ -150,6 +185,27 @@ class TestMemoryStoreEndpoint:
         client = TestClient(make_app(), raise_server_exceptions=False)
         resp = client.post("/memory/store", json={"content": "Test"})
         assert resp.status_code == 401
+
+    def test_search_query_not_logged(self, caplog):
+        # MC-113: the user search query is sensitive free text. It must not be
+        # written to the server logs (which persist to disk next to encrypted
+        # stores → RT-05). The debug log keeps only result/collection counts.
+        import logging
+        SENTINEL = "PII_what_is_my_bank_password"
+        client = TestClient(make_app())
+        mock_mem = make_mock_memory()  # search returns [] — log still fires
+
+        with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
+            with caplog.at_level(logging.DEBUG, logger="memory.memory.api.v1"):
+                resp = client.post(
+                    "/memory/search",
+                    json={"query": SENTINEL, "limit": 5},
+                    headers={"X-Api-Key": API_KEY},
+                )
+
+        assert resp.status_code == 200
+        assert SENTINEL not in caplog.text
+        assert "Memory search returned" in caplog.text  # counts still logged
 
     def test_store_default_collection(self):
         """If no collection is specified, uses personal_memory."""
@@ -286,6 +342,60 @@ class TestMemorySearchEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["results"][0]["metadata"]["source_collection"] == "nexe_documentation"
+
+    def test_search_partial_degradation_is_flagged(self):
+        """MC-125: when some collections fail but others succeed, the response
+        must surface the degradation (partial=True + failed_collections) instead
+        of returning a silent 200 that looks like a complete result.
+
+        Mutation guard: revert memory_search to swallow per-collection errors
+        without setting `partial`/`failed_collections` and this goes RED.
+        """
+        client = TestClient(make_app())
+        mock_mem = make_mock_memory()
+        mock_mem.collection_exists = AsyncMock(return_value=True)
+
+        async def _search(query, collection, top_k, threshold):
+            if collection == "user_knowledge":
+                raise Exception("qdrant timeout on user_knowledge")
+            return [self._make_result(text=f"hit from {collection}")]
+
+        mock_mem.search = AsyncMock(side_effect=_search)
+
+        with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
+            # no `collection` → default fan-out over the 3 default collections
+            resp = client.post(
+                "/memory/search",
+                json={"query": "test"},
+                headers={"X-Api-Key": API_KEY},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["partial"] is True, "partial degradation must be flagged (MC-125)"
+        assert "user_knowledge" in data["failed_collections"]
+        # the two surviving collections still contributed results
+        assert data["total"] >= 1
+
+    def test_search_all_ok_is_not_partial(self):
+        """Sanity counterpart: when every collection succeeds, partial is False
+        and failed_collections is empty (guards against partial=True false positives)."""
+        client = TestClient(make_app())
+        mock_mem = make_mock_memory()
+        mock_mem.collection_exists = AsyncMock(return_value=True)
+        mock_mem.search = AsyncMock(return_value=[self._make_result()])
+
+        with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
+            resp = client.post(
+                "/memory/search",
+                json={"query": "test"},
+                headers={"X-Api-Key": API_KEY},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["partial"] is False
+        assert data["failed_collections"] == []
 
 
 class TestMemorySearchRateLimit:

@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/sanitizer/workflow/nodes/resistencia_node.py
+Location: plugins/security/sanitizer/workflow/nodes/intervention_node.py
 Description: Intervention Node - Predefined response when a jailbreak is detected.
 
 www.jgoy.net · https://server-nexe.org

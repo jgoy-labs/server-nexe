@@ -9,8 +9,9 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import asyncio
 from typing import Dict, Any
+
+from plugins._shared.health_facade import get_health_facade
 
 
 def get_health() -> Dict[str, Any]:
@@ -21,24 +22,4 @@ def get_health() -> Dict[str, Any]:
     Delegates to SecurityModule.health_check() (async).
     """
     from .manifest import get_module_instance  # type: ignore[attr-defined]  # FP: install_lazy_manifest() dynamically injects get_module_instance() into the module namespace
-
-    module = get_module_instance()
-
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    if loop and loop.is_running():
-        # Already inside event loop (e.g. FastAPI) — cannot call asyncio.run()
-        # Return a basic synchronous result
-        return {
-            "status": "healthy" if module._initialized else "unknown",
-            "module": module.metadata.name,
-            "version": module.metadata.version,
-            "initialized": module._initialized,
-        }
-
-    # Outside event loop — can run the async health_check
-    result = asyncio.run(module.health_check())
-    return result.to_dict()
+    return get_health_facade(get_module_instance)

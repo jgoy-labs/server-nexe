@@ -17,7 +17,11 @@ import sys
 import subprocess
 from pathlib import Path
 
-from .download_verify import DownloadIntegrityError, verify_download_integrity
+from .download_verify import (
+    DownloadIntegrityError,
+    consent_for_unpinned,
+    verify_download_integrity,
+)
 from .installer_display import (
     APP_LOGO, clear,
     GREEN, RED, YELLOW, CYAN, BOLD, DIM, RESET,
@@ -113,20 +117,16 @@ def _ollama_verify_and_report(ollama_bin, model_id):
     result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal subcommand (post-download verification)
     model_base = model_id.split(":")[0]
     if model_base in result.stdout or model_id in result.stdout:
-        # compare the manifest
-        # digest reported by Ollama against the catalog pin.
+        # ADR B251: Ollama integrity is delegated to its content-addressed
+        # pull (the daemon verifies every layer against the manifest digest).
+        # verify_download_integrity short-circuits Ollama to True and logs it;
+        # no client-side pin (tags are mutable upstream).
         try:
-            matched = verify_download_integrity(
-                "ollama", model_id, Path("."),
-                ollama_bin=ollama_bin,
-            )
+            verify_download_integrity("ollama", model_id, Path("."))
         except DownloadIntegrityError as exc:
             print_warn(f"✗ Integrity check failed for {model_id}")
             print(str(exc))
             raise
-        if not matched:
-            print(f"{YELLOW}⚠️  {model_id}: SHA256 not pinned in catalog "
-                  f"— install proceeded without integrity check{RESET}")
         print_success(t('model_downloaded_ok').format(id=model_id))
     else:
         print_warn(t('model_not_in_list'))
@@ -145,20 +145,16 @@ def _ollama_pull_embeddings(ollama_bin):
     embed_return = embed_process.wait()
     if embed_return == 0:
         print_success(t('embeddings_downloaded'))
-        # B146: the embeddings model is downloaded on every install — verify its
-        # manifest digest against the catalog pin, same as the chat model.
+        # B146 + ADR B251: the embeddings model is pulled on every install via
+        # Ollama, so its integrity is delegated to Ollama's content-addressed
+        # pull (no client-side pin). verify_download_integrity short-circuits
+        # Ollama to True and logs it.
         try:
-            matched = verify_download_integrity(
-                "ollama", "nomic-embed-text", Path("."),
-                ollama_bin=ollama_bin,
-            )
+            verify_download_integrity("ollama", "nomic-embed-text", Path("."))
         except DownloadIntegrityError as exc:
             print_warn("✗ Integrity check failed for nomic-embed-text")
             print(str(exc))
             raise
-        if not matched:
-            print(f"{YELLOW}⚠️  nomic-embed-text: SHA256 not pinned in catalog "
-                  f"— install proceeded without integrity check{RESET}")
     else:
         print_warn(t('embeddings_failed'))
         print(f"  {DIM}{t('embeddings_manual')}{RESET}")
@@ -251,8 +247,10 @@ def _gguf_fetch_and_verify(model_config, project_root):
         print(str(exc))
         raise
     if not matched:
-        print(f"{YELLOW}⚠️  {filename}: SHA256 not pinned in catalog "
-              f"— install proceeded without integrity check{RESET}")
+        # ADR B046b: no pin → explicit consent, never a silent fail-open.
+        consent_for_unpinned("gguf", model_config['id'])
+        print(f"{YELLOW}⚠️  {filename}: installed WITHOUT weight verification "
+              f"(no pin; user-consented){RESET}")
 
     print_success(t('download_success'))
     print(f"  📁 {output_path}")
@@ -394,8 +392,10 @@ def _mlx_validate_and_verify(model_id, local_model_path):
     if matched:
         print(f"{GREEN}✓{RESET} SHA256 pin verified")
     else:
-        print(f"{YELLOW}⚠️  {model_id}: SHA256 not pinned in catalog "
-              f"— install proceeded without integrity check{RESET}")
+        # ADR B046b: no pin → explicit consent, never a silent fail-open.
+        consent_for_unpinned("mlx", model_id)
+        print(f"{YELLOW}⚠️  {model_id}: installed WITHOUT weight verification "
+              f"(no pin; user-consented){RESET}")
 
 
 def _download_mlx_model(model_config, project_root, python_path, headless=False):

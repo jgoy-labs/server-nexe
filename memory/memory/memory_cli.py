@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: memory/memory/cli.py
+Location: memory/memory/memory_cli.py
 Description: CLI executable per Memory Module.
 
 www.jgoy.net · https://server-nexe.org

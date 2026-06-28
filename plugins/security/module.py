@@ -31,7 +31,7 @@ class SecurityModule:
     - Dual-key authentication (primary + secondary) with secrets.compare_digest
     - 6 injection detectors (XSS, SQL, NoSQL, command, path, LDAP)
     - Advanced rate limiting with RateLimitTracker
-    - Sanitizer subplugin with 69 multilingual jailbreak patterns
+    - Sanitizer subplugin with 67 multilingual patterns (49 jailbreak + 18 injection)
     - Security logging RFC5424 (IRONCLAD)
     """
 

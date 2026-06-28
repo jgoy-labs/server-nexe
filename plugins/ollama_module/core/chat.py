@@ -65,7 +65,8 @@ class OllamaChat:
         return self.client.base_url
 
     def _build_payload(self, model: str, messages: List[Dict[str, str]], stream: bool,
-                       images: Optional[List[str]] = None, thinking_enabled: bool = False) -> Dict[str, Any]:
+                       images: Optional[List[str]] = None, thinking_enabled: bool = False,
+                       top_p: Optional[float] = None) -> Dict[str, Any]:
         """Builds the /api/chat payload."""
         # Env var override (global) takes precedence if explicitly set
         env_think = os.getenv("NEXE_OLLAMA_THINK")
@@ -85,6 +86,10 @@ class OllamaChat:
                 "num_ctx": auto_num_ctx(),
             },
         }
+        # Opt-in nucleus sampling (mirror of the /v1 path): forward only when set
+        # so omitting it preserves the prior payload (Ollama uses its own default).
+        if top_p is not None:
+            payload["options"]["top_p"] = top_p
         if images:
             # Ollama /api/chat: images must go inside the last user message
             # (not at the top-level — that is the format of /api/generate, not /api/chat)
@@ -131,6 +136,7 @@ class OllamaChat:
     async def chat(
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
         images: Optional[List[str]] = None, thinking_enabled: bool = False,
+        top_p: Optional[float] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         """Chat with Ollama model (streaming or direct). images: optional base64 strings."""
         p = _parent()
@@ -145,7 +151,7 @@ class OllamaChat:
         url = f"{self.base_url}/api/chat"
         # Build payload outside try so it's always bound in the except clause.
         payload = self._build_payload(model, messages, stream, images=images,
-                                      thinking_enabled=thinking_enabled)
+                                      thinking_enabled=thinking_enabled, top_p=top_p)
         try:
             if stream:
                 async for chunk in self._stream_request(httpx, ollama_breaker, url, payload):
@@ -156,10 +162,19 @@ class OllamaChat:
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 400 and payload.get("think"):
-                async for chunk in self._retry_without_thinking(
-                    httpx, ollama_breaker, url, payload, stream, model
-                ):
-                    yield chunk
+                # B119: the retry runs INSIDE this except clause, so a failure
+                # here would bypass record_failure (sibling except clauses don't
+                # catch each other) and leave the circuit breaker blind to real
+                # infra failures during the retry. Guard it explicitly.
+                try:
+                    async for chunk in self._retry_without_thinking(
+                        httpx, ollama_breaker, url, payload, stream, model
+                    ):
+                        yield chunk
+                except Exception as retry_exc:
+                    await ollama_breaker.record_failure(retry_exc)
+                    logger.error("Chat retry (no-think) failed with model %s: %s", model, repr(retry_exc))
+                    raise
                 return
             if e.response.status_code == 404:
                 logger.warning("Ollama chat: model %s not found (404)", model)

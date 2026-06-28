@@ -269,7 +269,11 @@ def _handle_mlx_engine(model_config: dict, project_root: Path, python_path: Path
                 model_config['engine'] = 'ollama'
                 model_config['id'] = selected_model['ollama']
                 print(f"\n{GREEN}✓{RESET} {t('switched_to_ollama_msg').format(id=model_config['id'])}\n")
-                ensure_ollama_installed()
+                # B161: ensure_ollama_installed() returns False on failure — stop
+                # cleanly instead of falling through to a confusing download error.
+                if not ensure_ollama_installed():
+                    print_error(t('ollama_install_failed'))
+                    sys.exit(1)
                 _download_ollama_model(model_config)
             else:
                 print_error(t('no_ollama_alternative'))
@@ -455,7 +459,11 @@ def run_installer():
     # 6. If Ollama selected: install Ollama and download model NOW
     engine = model_config.get("engine", "ollama")
     if engine == "ollama":
-        ensure_ollama_installed()
+        # B161: stop cleanly if Ollama could not be installed (the headless path
+        # already does this) — don't continue to the model download.
+        if not ensure_ollama_installed():
+            print_error(t('ollama_install_failed'))
+            sys.exit(1)
         _download_ollama_model(model_config)
     elif engine == "llama_cpp":
         _download_gguf_model(model_config, project_root)

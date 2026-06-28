@@ -46,7 +46,7 @@ Los modelos locales son menos capaces que los modelos en la nube (GPT-4, Claude,
 El backend MLX soporta modelos de vision (imagen + texto) via `mlx-vlm 0.4.4`. Lista de arquitecturas detectadas: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (todos), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama y mas. Desde **v0.9.8** el detector "any-of" de 3 senales (architectures + vision_config en el `config.json` + weight_map en el `model.safetensors.index.json`) cubre arquitecturas nuevas sin claves clasicas.
 
 Limitaciones actuales:
-- **Familia Qwen3.5 (Omni VLM, tamanos 2B/4B/9B/27B):** Funciona via MLX y Ollama con vision. El bundle DMG y el venv de dev incluyen `PyTorch` + `torchvision` (sprint v1.0.4-beta TODO 1.3, wheels cp312 macOS-arm64, ~92 MB net). El detector VLM detecta arquitectura `Qwen3_5ForConditionalGeneration` + `vision_config` y carga via `mlx-vlm.load()`. Verificado empiricamente 2026-05-13 con `qwen3.5:4b` describiendo imagenes correctamente. **Aun no soportados en el pipeline:** `Qwen3-Omni` y `Kimi-VL` (audio/video branch en `mlx-vlm` no expuesto).
+- **Familia Qwen3.5 (Omni VLM, tamanos 2B/4B/9B/27B):** Funciona via MLX y Ollama con vision. El bundle DMG y el venv de dev incluyen `PyTorch` + `torchvision` (wheels cp312 macOS-arm64, ~92 MB net). El detector VLM detecta arquitectura `Qwen3_5MoeForConditionalGeneration` + `vision_config` y carga via `mlx-vlm.load()`. Verificado empiricamente 2026-05-13 con `qwen3.5:4b` describiendo imagenes correctamente. **Aun no soportados en el pipeline:** `Qwen3-Omni` y `Kimi-VL` (audio/video branch en `mlx-vlm` no expuesto).
 - **Modelo por defecto recomendado:** `gemma-4-e4b-4bit` (4.9 GB) o `gemma-4-31b-8bit` (20 GB). Imagen only, sin dependencias torch.
 - **Audio/voz:** No soportado. Modelos como Qwen3-Omni, Kimi-VL o DeepSeek-VL-V2 tienen rama de audio en `mlx-vlm` pero el pipeline de server-nexe aun no lo expone.
 - **Video nativamente:** No soportado (ver modelos omni).
@@ -86,7 +86,7 @@ Parcialmente compatible con el formato de API de OpenAI:
 
 ## Seguridad
 
-- **Inyeccion de prompt:** Los modelos locales pueden seguir instrucciones inyectadas. El sanitizer detecta patrones comunes (47 patrones de jailbreak, 6 detectores de inyeccion con normalizacion Unicode) pero no todos.
+- **Inyeccion de prompt:** Los modelos locales pueden seguir instrucciones inyectadas. El sanitizer detecta patrones comunes (49 patrones de jailbreak, 6 detectores de inyeccion con normalizacion Unicode) pero no todos.
 - **Sin TLS por defecto:** HTTP en localhost. Usar reverse proxy para HTTPS.
 - **Usuario unico:** Sin aislamiento multi-usuario. Una API key = acceso completo.
 - **Auditorias IA, no auditorias externas:** La seguridad ha sido revisada por sesiones autonomas de IA, no por empresas de seguridad externas. Esto es exhaustivo pero no completo.
@@ -95,9 +95,9 @@ Parcialmente compatible con el formato de API de OpenAI:
 ## Advertencias sobre encriptacion
 
 - **Default `auto`:** La encriptacion en reposo se activa automaticamente si `sqlcipher3` esta disponible. Se puede forzar con `NEXE_ENCRYPTION_ENABLED=true` o desactivar con `false`.
-- **Funcionalidad nueva:** Anadida en v0.9.0, disponible desde v0.9.7. Probada (68 tests, 0 fallos) pero aun no probada en batalla en produccion con usuarios reales.
+- **Funcionalidad nueva:** Anadida en v0.9.0, disponible desde v0.9.7. Probada (72 tests, 0 fallos) pero aun no probada en batalla en produccion con usuarios reales.
 - **Gestion de claves:** Clave maestra almacenada en OS Keyring, variable de entorno, o fichero. Si se pierde la clave, los datos encriptados no se pueden recuperar.
-- **Dependencia SQLCipher:** Requiere el paquete `sqlcipher3`. Cae a SQLite en texto plano con aviso si no esta instalado.
+- **Dependencia SQLCipher:** Requiere el paquete de Python `sqlcipher3` — instala `sqlcipher3-binary` (wheel precompilado, recomendado) o `sqlcipher3` (necesita `libsqlcipher`, p. ej. via Homebrew en macOS). Cae a SQLite en texto plano con aviso si no esta instalado.
 - **Migracion:** Migrar grandes conjuntos de datos (muchas memorias, muchas sesiones) puede llevar tiempo. Hacer backup antes de migrar.
 
 ## Carencias funcionales

@@ -72,7 +72,7 @@ def script_content() -> str:
 def test_build_wheels_target_platform_is_macos_14_arm64(script_content: str) -> None:
     """Platform must match project decision: macOS 14 Sonoma, arm64 only.
     macOS 13 Ventura was dropped 2026-04-16: mlx 0.30.4+ (required by our
-    pinned mlx-lm 0.31.2) publishes wheels only for macosx_14_0_arm64+."""
+    pinned mlx-lm 0.31.3) publishes wheels only for macosx_14_0_arm64+."""
     assert "macosx_14_0_arm64" in script_content
     assert "macosx_13_0_arm64" not in script_content  # regression guard
 
@@ -91,7 +91,7 @@ def test_build_wheels_enforces_only_binary(script_content: str) -> None:
 def test_build_wheels_includes_inference_engines(script_content: str) -> None:
     """llama-cpp-python + mlx-lm + mlx-vlm must be in the engines list."""
     assert "llama-cpp-python" in script_content
-    assert "mlx-lm==0.31.2" in script_content
+    assert "mlx-lm==0.31.3" in script_content
     assert "mlx-vlm==0.4.4" in script_content
 
 

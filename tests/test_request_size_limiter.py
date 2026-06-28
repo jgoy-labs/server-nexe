@@ -112,15 +112,35 @@ class TestRequestSizeLimiterMiddleware:
         assert resp.status_code == 413
         mock_logger.log_request_too_large.assert_called_once()
 
-    def test_streaming_body_too_large_rejected(self):
-        """Body too large without Content-Length → 413 during reading."""
-        client = TestClient(make_app(max_size=5))
-        # POST without explicit Content-Length triggers streaming check
-        resp = client.post(
-            "/echo",
-            data=b"x" * 100,
+    async def test_streaming_body_too_large_rejected(self):
+        """T8 — chunked body without Content-Length must hit _read_streaming_body → 413.
+
+        TestClient always injects Content-Length, so we use httpx.ASGITransport with
+        an async generator.  The generator yields chunks that exceed max_size=5, forcing
+        the streaming branch (request_size_limiter.py:94-98) to return 413.
+
+        Mutation gate: commenting out line 97-98 (the streaming reject) makes this RED.
+        """
+        import httpx
+        app = make_app(max_size=5)
+
+        async def big_body():
+            yield b"xxx"   # 3 bytes
+            yield b"xxx"   # 3 bytes → total 6 > max 5
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            resp = await client.post("/echo", content=big_body())
+
+        # Confirm we actually went through the streaming path (no CL header)
+        assert "content-length" not in resp.request.headers, (
+            "Content-Length was set — test used the wrong path (CL branch, not streaming)"
         )
-        assert resp.status_code in (200, 413)  # depends on client behavior
+        assert resp.status_code == 413
+        body = resp.json()
+        assert "streaming" in body["error"].lower()
 
     def test_default_max_size_is_100mb(self):
         """Default maximum size is 100MB."""
@@ -187,26 +207,3 @@ class TestReceiveFunction:
         assert data["size"] == 11
 
 
-class TestStreamingReadError:
-    """Cover lines 144-146: error reading request body."""
-
-    def test_body_read_error_returns_400(self):
-        """Lines 144-149: exception during body read -> 400."""
-        from core.request_size_limiter import RequestSizeLimiterMiddleware
-        from fastapi import Request
-        from unittest.mock import patch, AsyncMock
-
-        app = FastAPI()
-        app.add_middleware(RequestSizeLimiterMiddleware, max_size=1000)
-
-        @app.post("/echo")
-        async def echo(request: Request):
-            body = await request.body()
-            return {"size": len(body)}
-
-        client = TestClient(app)
-        # This is hard to trigger via TestClient directly since it manages
-        # the body reading internally. We verify the middleware handles it
-        # by testing a normal request passes.
-        resp = client.post("/echo", content=b"hello")
-        assert resp.status_code == 200

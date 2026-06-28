@@ -38,16 +38,6 @@ class TestRAGRouterFunctions:
 
 
 class TestRAGRouterEndpoints:
-    def test_health_endpoint(self):
-        app = make_app()
-        client = TestClient(app, raise_server_exceptions=False)
-        # Patch the delegated function on the router (not endpoints, but the handler)
-        from memory.rag import router as rag_router_module
-        with patch.object(rag_router_module, "health_endpoint",
-                          new=AsyncMock(return_value={"status": "healthy"})):
-            resp = client.get("/rag/health")
-        assert resp.status_code in (200, 503)  # 503 if RAG is not available
-
     def test_info_endpoint(self):
         app = make_app()
         client = TestClient(app, raise_server_exceptions=False)

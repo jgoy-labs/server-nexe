@@ -1,4 +1,4 @@
-// HardwareDetector.swift — Detecció de hardware natiu (RAM, chip, Metal, disc)
+// HardwareDetector.swift — Native hardware detection (RAM, chip, Metal, disk)
 
 import Foundation
 import Metal
@@ -11,7 +11,7 @@ struct HardwareInfo {
     let diskFreeGB: Int
     let diskTotalGB: Int
 
-    /// Tier de RAM recomanat — 4 tiers actius (tier_48/tier_64 eliminats del catàleg)
+    /// Recommended RAM tier — 4 active tiers (tier_48/tier_64 removed from the catalog)
     var ramTier: String {
         if ramGB >= 32  { return "tier_32" }
         if ramGB >= 24  { return "tier_24" }
@@ -26,7 +26,7 @@ struct HardwareInfo {
         sysctlbyname("hw.memsize", &ramBytes, &size, nil, 0)
         let ramGB = Int(ramBytes / (1024 * 1024 * 1024))
 
-        // Arquitectura
+        // Architecture
         let machine = ProcessInfo.processInfo.machineHardwareName
         let isAppleSilicon = machine == "arm64"
 
@@ -43,7 +43,7 @@ struct HardwareInfo {
         // Metal GPU
         let hasMetal = MTLCreateSystemDefaultDevice() != nil
 
-        // Disc
+        // Disk
         var diskFreeGB = 0
         var diskTotalGB = 0
         if let attrs = try? FileManager.default.attributesOfFileSystem(
@@ -68,7 +68,7 @@ struct HardwareInfo {
     }
 }
 
-// Extension per obtenir el nom de l'arquitectura
+// Extension to get the architecture name
 extension ProcessInfo {
     var machineHardwareName: String {
         var sysinfo = utsname()

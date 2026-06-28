@@ -36,8 +36,8 @@ external_services = []
 
 [module.endpoints]
 router_prefix = "/llama-cpp"
-public_routes = ["/health", "/info"]
-protected_routes = ["/chat"]
+public_routes = []
+protected_routes = []
 removed_direct_routes = ["/chat"]
 
 [module.entry]

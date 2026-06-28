@@ -87,6 +87,66 @@ class TestNormalizeEngine:
         assert _normalize_engine("  ollama  ") == "ollama"
 
 
+class TestResolveEngineNodeAware:
+    """B260 (consolidates the ex-B075-C6 TestResolveEffectiveEngine): /status and
+    chat now share ONE resolver. The deleted _resolve_effective_engine is gone;
+    these cases exercise the canonical routing._resolve_engine directly. Same
+    priority order (explicit > config preferred > mlx→llama_cpp→ollama cascade),
+    node-aware at the single source of truth.
+    """
+
+    def _resolve(self, preferred, *, mlx=False, llama=False, ollama=False):
+        # Build the app_state the canonical resolver consumes. `preferred` is fed
+        # via NEXE_MODEL_ENGINE (env-shadows-config), exactly as production does;
+        # "auto"/"" mean "no preference" → cascade. A live node is modelled with a
+        # non-None _node; an absent module models an unavailable engine.
+        from core.endpoints.chat_engines.routing import _resolve_engine
+        modules = {}
+        if mlx:
+            m = MagicMock(); m._node = MagicMock(); modules["mlx_module"] = m
+        if llama:
+            m = MagicMock(); m._node = MagicMock(); modules["llama_cpp_module"] = m
+        if ollama:
+            modules["ollama_module"] = MagicMock()
+        app_state = MagicMock()
+        app_state.modules = modules
+        app_state.config = {}
+        with patch.dict("os.environ", {"NEXE_MODEL_ENGINE": preferred}):
+            engine, _ = _resolve_engine(None, app_state)
+        return engine
+
+    def test_auto_resolves_cascade_to_mlx(self):
+        assert self._resolve("auto", mlx=True, ollama=True) == "mlx"
+
+    def test_auto_resolves_cascade_to_ollama_when_only_ollama(self):
+        assert self._resolve("auto", ollama=True) == "ollama"
+
+    def test_empty_preferred_resolves_cascade(self):
+        assert self._resolve("", mlx=True, ollama=True) == "mlx"
+
+    def test_preferred_available_wins(self):
+        assert self._resolve("mlx", mlx=True, ollama=True) == "mlx"
+
+    def test_preferred_dead_engine_falls_through_to_cascade(self):
+        # The crux: plain _resolve_engine would return "mlx" (no node check);
+        # node-aware resolution reports what the user actually gets: ollama.
+        assert self._resolve("mlx", mlx=False, ollama=True) == "ollama"
+
+    def test_preferred_wins_over_cascade_order(self):
+        # preferred=ollama must WIN over the cascade, which would pick llama_cpp
+        # first (mlx→llama_cpp→ollama). Isolates the preferred branch.
+        assert self._resolve("ollama", llama=True, ollama=True) == "ollama"
+
+    def test_preferred_unavailable_falls_to_cascade(self):
+        assert self._resolve("mlx", llama=True, ollama=True) == "llama_cpp"
+
+    def test_normalizes_engine_aliases(self):
+        assert self._resolve("llama.cpp", llama=True, ollama=True) == "llama_cpp"
+
+    def test_nothing_available_defaults_ollama(self):
+        assert self._resolve("auto") == "ollama"
+
+
 class TestRequiredModulesFromConfig:
     def test_empty_config(self):
         from core.endpoints.root import _required_modules_from_config
@@ -209,7 +269,10 @@ class TestHealthEndpoint:
         assert "status" in data
         assert "message" in data
         assert "version" in data
-        assert "uptime" in data
+        # B075-C1: uptime is real whole seconds since startup, not the old fixed
+        # "operational" label. Mutation (revert to the label) → isdigit() False.
+        assert data["uptime"].isdigit(), f"uptime must be whole seconds, got {data['uptime']!r}"
+        assert int(data["uptime"]) >= 0
 
     def test_health_with_i18n(self):
         mock_i18n = MagicMock()
@@ -367,6 +430,21 @@ class TestApiInfoEndpoint:
         data = resp.json()
         assert "t:" in data["description"]
 
+    def test_api_info_summary_does_not_promise_exhaustiveness(self):
+        """B075-C2: /api/info returns a curated 3-endpoint subset, so its summary
+        must not claim to be the full 'list of available endpoints' (40+ routes).
+        Mutation: restore that summary → this assert fails."""
+        app = make_app()
+        route = next(
+            r for r in app.routes
+            if getattr(r, "path", None) == "/api/info"
+        )
+        summary = (route.summary or "").lower()
+        assert "list of available endpoints" not in summary, (
+            "summary over-promises an exhaustive endpoint list"
+        )
+        assert "subset" in summary, "summary should signal the list is a subset"
+
 
 class TestStatusEndpoint:
     @pytest.fixture(autouse=True)
@@ -445,6 +523,88 @@ class TestStatusEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["engine"] == "ollama"
+
+    def test_status_resolved_engine_auto_reports_concrete(self):
+        """B075-C6: with env=auto and mlx alive, resolved_engine is the concrete
+        engine chat will run — not the literal 'auto' the legacy field keeps."""
+        mock_mlx = MagicMock()
+        mock_mlx._node = MagicMock()  # live node
+        mock_ollama = MagicMock()
+        app = make_app(modules={"mlx_module": mock_mlx, "ollama_module": mock_ollama})
+        client = TestClient(app)
+        with patch.dict("os.environ", {"NEXE_MODEL_ENGINE": "auto"}):
+            resp = client.get("/status", headers=_HEADERS)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["resolved_engine"] == "mlx"
+        assert data["engine"] == "auto"  # legacy field unchanged (backward-compat)
+
+    def test_status_resolved_engine_node_aware_with_dead_node(self):
+        """B260: explicit mlx with a DEAD node resolves to ollama (node-aware), and
+        /status stays in lockstep with the canonical resolver even under a dead
+        node — parity asserted DYNAMICALLY against _resolve_engine, not a literal."""
+        from core.endpoints.chat_engines.routing import _resolve_engine
+        mock_mlx = MagicMock()
+        mock_mlx._node = None  # ghost module: key present, node dead
+        mock_ollama = MagicMock()
+        app = make_app(modules={"mlx_module": mock_mlx, "ollama_module": mock_ollama})
+        client = TestClient(app)
+        with patch.dict("os.environ", {"NEXE_MODEL_ENGINE": "mlx"}):
+            resp = client.get("/status", headers=_HEADERS)
+            router_choice, _ = _resolve_engine(None, app.state)
+        assert resp.status_code == 200
+        assert resp.json()["resolved_engine"] == router_choice == "ollama"
+
+    def test_status_resolved_engine_honors_config_preferred_when_env_unset(self, monkeypatch):
+        """B075-C6: when NEXE_MODEL_ENGINE is unset, resolved_engine honors the
+        config preferred_engine (the legacy ad-hoc field ignored it entirely)."""
+        # preferred=ollama must win over the cascade (which picks llama_cpp first),
+        # proving /status actually reads config preferred_engine via the canonical
+        # _get_preferred_engine path.
+        monkeypatch.delenv("NEXE_MODEL_ENGINE", raising=False)
+        config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
+        mock_llama = MagicMock()
+        mock_ollama = MagicMock()
+        app = make_app(config=config, modules={"llama_cpp_module": mock_llama, "ollama_module": mock_ollama})
+        client = TestClient(app)
+        resp = client.get("/status", headers=_HEADERS)
+        assert resp.status_code == 200
+        assert resp.json()["resolved_engine"] == "ollama"
+
+    def test_status_resolved_engine_env_auto_shadows_config_preferred(self):
+        """B075-C6 regression guard: env=auto SHADOWS config preferred_engine —
+        the chat router ignores config when env is set, so resolved_engine must
+        too (cascade), NOT silently honour config. This is the exact divergence
+        the field was meant to eliminate."""
+        config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
+        # mlx dead, llama_cpp + ollama alive: chat resolves "llama_cpp" (cascade);
+        # honouring config would wrongly give "ollama".
+        mock_mlx = MagicMock(); mock_mlx._node = None
+        mock_llama = MagicMock()
+        mock_ollama = MagicMock()
+        app = make_app(config=config, modules={
+            "mlx_module": mock_mlx, "llama_cpp_module": mock_llama, "ollama_module": mock_ollama,
+        })
+        client = TestClient(app)
+        with patch.dict("os.environ", {"NEXE_MODEL_ENGINE": "auto"}):
+            resp = client.get("/status", headers=_HEADERS)
+        assert resp.status_code == 200
+        assert resp.json()["resolved_engine"] == "llama_cpp"
+
+    def test_status_resolved_engine_parity_with_router_when_nodes_live(self):
+        """B075-C6 anti-drift: when every module has a live node (node-aware ==
+        key-presence), resolved_engine must MATCH the canonical chat resolver
+        _resolve_engine(None, app_state) string exactly."""
+        from core.endpoints.chat_engines.routing import _resolve_engine
+        mock_mlx = MagicMock(); mock_mlx._node = MagicMock()
+        mock_ollama = MagicMock()
+        app = make_app(modules={"mlx_module": mock_mlx, "ollama_module": mock_ollama})
+        client = TestClient(app)
+        with patch.dict("os.environ", {"NEXE_MODEL_ENGINE": "auto"}):
+            resp = client.get("/status", headers=_HEADERS)
+            router_choice, _ = _resolve_engine(None, app.state)
+        assert resp.status_code == 200
+        assert resp.json()["resolved_engine"] == router_choice
 
     def test_status_without_api_key_returns_401(self, monkeypatch):
         """Q2.3 anti-regression: /status without X-API-Key must return 401."""

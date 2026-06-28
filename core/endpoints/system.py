@@ -19,6 +19,7 @@ from typing import Dict, Any
 from core.paths import get_logs_dir
 from core.version import __version__
 from core.i18n_utils import translate
+from core.uptime import uptime_str
 from plugins.security.core.auth import require_api_key
 
 router_admin = APIRouter(prefix="/admin/system", tags=["system-admin"])
@@ -305,7 +306,8 @@ async def system_health() -> Dict[str, Any]:
     {
       "status": "healthy",
       "version": "1.0.6",
-      "platform": "Nexe Framework"
+      "platform": "Nexe Framework",
+      "uptime": "3600"
     }
   """
   try:
@@ -317,7 +319,9 @@ async def system_health() -> Dict[str, Any]:
     "status": "healthy",
     "version": version,
     "platform": "Nexe Framework",
-    "uptime": "available"
+    # B075-C1: real seconds since startup (shared source of truth), not the
+    # fixed "available" label that pretended to be a metric.
+    "uptime": uptime_str()
   }
 
 def get_router() -> APIRouter:

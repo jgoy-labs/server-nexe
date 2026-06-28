@@ -187,11 +187,38 @@ def _ensure_system_message(messages: list, app_state: Any, server_lang: str) -> 
         messages.insert(0, {"role": "system", "content": nexe_prompt})
 
 
-def _trim_rag_context(safe_context: str, messages: list) -> str:
-    """Trim RAG context to fit within the available token budget."""
+def get_effective_context_window(engine: str) -> int:
+    """MC-090: the RAG token budget must reflect the context window the serving
+    engine actually uses, not a fixed 8192.
+
+    For **Ollama** that is ``auto_num_ctx()`` (e.g. 4096 on a 16GB machine),
+    capped at the configured budget so we never plan for more than the engine
+    can hold (the silent-truncation bug) nor more than the user asked for. Other
+    engines keep ``DEFAULT_CONTEXT_WINDOW`` for 1.0.7 — MLX's ``max_kv_size`` is
+    a KV-cache budget, not a context window, so adjusting it is deferred (1.1.0).
+    """
+    if engine and engine.lower() == "ollama":
+        try:
+            from .chat_engines.ollama_helpers import auto_num_ctx
+            return min(auto_num_ctx(), DEFAULT_CONTEXT_WINDOW)
+        except Exception as exc:
+            # Never let context-window detection (e.g. a bad NEXE_OLLAMA_NUM_CTX
+            # or a psutil hiccup) break the chat request — fall back to default.
+            logger.warning("Could not resolve Ollama context window, using default: %s", exc)
+            return DEFAULT_CONTEXT_WINDOW
+    return DEFAULT_CONTEXT_WINDOW
+
+
+def _trim_rag_context(safe_context: str, messages: list, effective_ctx_window: int = None) -> str:
+    """Trim RAG context to fit within the available token budget.
+
+    ``effective_ctx_window`` (MC-090) is the real context window of the serving
+    engine; when None it falls back to ``DEFAULT_CONTEXT_WINDOW`` (back-compat).
+    """
+    ctx_window = effective_ctx_window if effective_ctx_window is not None else DEFAULT_CONTEXT_WINDOW
     total_messages_text = "".join(m.get('content', '') for m in messages)
     used_tokens = _estimate_tokens(total_messages_text)
-    max_rag_tokens = int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO)
+    max_rag_tokens = int(ctx_window * MAX_CONTEXT_RATIO)
     rag_tokens = _estimate_tokens(safe_context)
 
     if rag_tokens > max_rag_tokens:
@@ -199,7 +226,7 @@ def _trim_rag_context(safe_context: str, messages: list) -> str:
         safe_context = safe_context[:max_chars]
         logger.info("RAG context trimmed to fit context window: %s -> %s est. tokens", rag_tokens, max_rag_tokens)
 
-    remaining_budget = DEFAULT_CONTEXT_WINDOW - used_tokens - _estimate_tokens(safe_context)
+    remaining_budget = ctx_window - used_tokens - _estimate_tokens(safe_context)
     if remaining_budget < 256:
         safe_context = safe_context[:1000]
         logger.warning("RAG context aggressively trimmed — only %s tokens remaining for response", remaining_budget)
@@ -207,7 +234,7 @@ def _trim_rag_context(safe_context: str, messages: list) -> str:
     return safe_context
 
 
-def _inject_rag_context_into_messages(messages: list, context_text: str, server_lang: str) -> None:
+def _inject_rag_context_into_messages(messages: list, context_text: str, server_lang: str, effective_ctx_window: int = None) -> None:
     """Inject RAG context as its own turn pair before the last user message (in-place).
 
     B030 (RT-01): the retrieved content is wrapped in nonce'd delimiters with a
@@ -223,7 +250,7 @@ def _inject_rag_context_into_messages(messages: list, context_text: str, server_
     if not (context_text and messages):
         return
     safe_context = _sanitize_rag_context(context_text)
-    safe_context = _trim_rag_context(safe_context, messages)
+    safe_context = _trim_rag_context(safe_context, messages, effective_ctx_window)
     _labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])
     _instruction = _labels["intro"]
     wrapped = wrap_untrusted_context(f"{_instruction}\n{safe_context}", server_lang)
@@ -236,9 +263,12 @@ def _inject_rag_context_into_messages(messages: list, context_text: str, server_
 
 
 async def _build_rag_and_system_prompt(
-    body: ChatCompletionRequest, app_state: Any, server_lang: str
+    body: ChatCompletionRequest, app_state: Any, server_lang: str, effective_ctx_window: int = None
 ) -> tuple[list[dict], str]:
     """Build the final messages list with system prompt and injected RAG context.
+
+    ``effective_ctx_window`` (MC-090) is the serving engine's real context window,
+    used to size the RAG token budget; None falls back to DEFAULT_CONTEXT_WINDOW.
 
     Returns:
         Tuple of (messages, raw_context_text).
@@ -249,7 +279,7 @@ async def _build_rag_and_system_prompt(
 
     _ensure_system_message(messages, app_state, server_lang)
 
-    _inject_rag_context_into_messages(messages, context_text, server_lang)
+    _inject_rag_context_into_messages(messages, context_text, server_lang, effective_ctx_window)
 
     return messages, context_text
 
@@ -301,7 +331,7 @@ def _schedule_episodic_memory(
                     content
                 )
         except Exception as e:
-            logger.error("Failed to schedule memory save: %s", e)
+            logger.error("Failed to schedule memory save: %s", e, exc_info=True)
 
 
 def _inject_response_headers(
@@ -348,7 +378,9 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
     # Reply language follows the user's message (not just the install language).
     _server_lang = detect_user_lang(last_user_msg or "", fallback=os.getenv("NEXE_LANG", "en"))
 
-    messages, context_text = await _build_rag_and_system_prompt(body, request.app.state, _server_lang)
+    # MC-090: size the RAG budget to the engine's real context window (Ollama).
+    _effective_ctx = get_effective_context_window(engine)
+    messages, context_text = await _build_rag_and_system_prompt(body, request.app.state, _server_lang, _effective_ctx)
 
     response = None
     try:

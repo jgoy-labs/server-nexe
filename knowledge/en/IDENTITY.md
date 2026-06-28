@@ -74,7 +74,7 @@ server-nexe combines five capabilities:
 - **Linux x86_64:** Supported (Ollama backend, CPU). Unit tests pass, CLI install validated.
 - **Windows:** In development (no public ETA)
 - **Default port:** 9119
-- **Tests:** 6776 test functions collected (6991 total — 215 deselected by markers), 0 failures in latest run
+- **Tests:** 7165 test functions collected (7400 total — 235 deselected by markers), 0 failures in latest run
 
 ## AI-Ready Documentation
 

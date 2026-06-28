@@ -60,7 +60,7 @@ Download the latest package from the [Releases](https://github.com/jgoy-labs/ser
 - **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64).
 - **Ollama bundled** or auto-installed.
 
-The wizard reads the model catalog from the maintained `models.json` file (synced into the Tauri binary via `catalog_fallback.json`). See the full catalog below.
+The wizard reads the model catalog from the maintained `models.json` file. The Tauri binary (nexe-app repo) carries an embedded fallback copy baked in at compile time (`nexe-app/src-tauri/resources/catalog_fallback.json`), not in this repo. See the full catalog below.
 
 ### Backend selection
 
@@ -104,7 +104,7 @@ Native SwiftUI wizard with 6 screens, with bundled Python 3.12 and 100% offline 
 
 ## Model Catalog (4 tiers by RAM)
 
-The canonical catalog lives in `installer/swift-wizard/Resources/models.json` (source of truth, maintained in the repo and read by the onboarding wizard). The table below mirrors it (currently 14 models in 4 tiers):
+The canonical catalog lives in `installer/swift-wizard/Resources/models.json` (source of truth, maintained in the repo and read by the onboarding wizard). The table below mirrors it (currently 15 model entries in 4 tiers; 14 distinct models, since Gemma 4 31B appears in 2 tiers):
 
 ### tier_8 (8 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
@@ -115,6 +115,7 @@ The canonical catalog lives in `installer/swift-wizard/Resources/models.json` (s
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
 | Qwen3.5 9B | Ollama, MLX | 👁 | 🧠 | |
+| Qwen3.5 4B (8-bit) | Ollama, MLX | 👁 | 🧠 | |
 | Gemma 4 E4B | Ollama, MLX | 👁 | 🧠 | |
 | Mistral Nemo 12B | Ollama, MLX | | 🧠 | |
 | Salamandra 7B | Ollama, llama.cpp | | | iberic |
@@ -217,7 +218,7 @@ Since the internal AI-assisted security review `AUD-INT-001` remediation (§2.7)
 |---------|-----------------|-----|
 | **Hugging Face MLX** | SHA256 of the local snapshot directory (`local_dir` argument of `snapshot_download`) | `core.integrity.sha256_of_dir`, ignoring dotfiles (`.lock`, `.no_exist`, …) |
 | **GGUF** | SHA256 of the `.gguf` file downloaded via `curl` | `core.integrity.sha256_of_file` (streamed in 64 KB chunks) |
-| **Ollama** | Manifest digest reported by `ollama show --json <model>` | Parses `details.digest` (or top-level `digest` in older schemas); strips any `sha256:` prefix |
+| **Ollama** | Delegated to Ollama's own content-addressed pull (no client-side pin, ADR B251) | Ollama verifies every layer against the manifest digest during `ollama pull`; catalog tags are mutable upstream, so a client pin would false-positive on a legitimate re-publish |
 | **fastembed (DMG bundle)** | SHA256 of `model*.onnx`, `tokenizer.json` and `config.json` listed in `embeddings.manifest.json` (written by `build-embedding-bundle.sh`) | `installer.download_verify.verify_embedding_bundle` via `core.integrity.sha256_of_file` |
 
 ### Mismatch policy
@@ -226,7 +227,7 @@ When the catalog carries a pin (a concrete SHA256) and the observed digest does 
 
 - Expected vs actual digest, full 64 hex chars.
 - Path to the downloaded file or snapshot directory.
-- Backend-specific retry instructions (`ollama rm && ollama pull`, `rm storage/models/<file> && ./nexe model pull`, etc.).
+- Backend-specific retry instructions (`ollama rm && ollama pull`, `rm storage/models/<file> && ./nexe model install <name>`, etc.).
 
 ### Legacy mode
 
@@ -240,7 +241,7 @@ For the embedding bundle, a DMG without `embeddings.manifest.json` (a build from
 
 ### Refreshing pinned hashes
 
-When a model publishes a new revision on Hugging Face or Ollama, `MODEL_WEIGHT_SHA256` must be updated. The manual workflow is: download the model, compute `sha256sum` (GGUF), `sha256_of_dir` (MLX) or `ollama show --json` (Ollama), then edit the dict in `installer_catalog_data.py`. `tests/test_installer_sha256_catalog.py` enforces that every downloadable artefact in the catalog has a corresponding entry (even if the value is `None`).
+For MLX and GGUF, when a model publishes a new revision on Hugging Face the pins must be updated: tier-1 (`MODEL_WEIGHT_SHA256`) by downloading the model and computing `sha256_of_dir` (MLX) or `sha256sum` (GGUF); tier-2 MLX (per-LFS-file) is regenerated metadata-only with `installer/bootstrap_catalog_pins.py`. Ollama has **no** client-side pins (ADR B251): its integrity is guaranteed by the content-addressed pull, so nothing needs refreshing. `tests/test_installer_sha256_catalog.py` enforces that every downloadable artefact in the catalog has a corresponding entry (even if the value is `None`).
 
 ## Post-Install Verification
 
@@ -270,29 +271,29 @@ This encrypts SQLite databases (via SQLCipher), chat sessions (.json → .enc), 
 
 ## Tray App (NexeTray, macOS)
 
-Menu bar app for controlling the server without a terminal. Built on the `rumps` framework as the `NexeTray` class (`installer/tray.py`, 655 lines). Launched automatically in `--attach` mode once the server is running (via `core/server/runner.py`). The `installer/NexeTray.app` bundle (bash wrapper, `LSUIElement=true`, `CFBundleIdentifier=net.servernexe.tray`) avoids macOS Sequoia provenance restrictions.
+Menu bar app for controlling the server without a terminal. Built on the `rumps` framework as the `NexeTray` class (`installer/tray.py`, 711 lines). Launched automatically in `--attach` mode once the server is running (via `core/server/runner.py`). The `installer/NexeTray.app` bundle (bash wrapper, `LSUIElement=true`, `CFBundleIdentifier=net.servernexe.tray`) avoids macOS Sequoia provenance restrictions.
 
 ### Menu items (top to bottom)
 
 | Item | What it does | Code |
 |------|--------------|------|
-| **server.nexe v1.0.6** | Non-clickable header. Version read dynamically from `pyproject.toml` via `tomllib` (SSOT). | `tray.py:170-180, 246` |
-| **Server running / stopped** | Non-clickable status indicator. Menu bar icon changes: `ICON_RUNNING` (green) when alive, `ICON_STOPPED` (grey) when not. | `tray.py:197` |
-| **Start / Stop server** | Spawns or stops the `core.app` process (uvicorn + FastAPI + Qdrant). SIGTERM then SIGKILL if needed. PID stored in `storage/run/server.pid`. | `_toggle_server` → `tray.py:296` |
-| **Open Web UI** | Opens `http://127.0.0.1:9119/ui` in the default browser. | `_open_web_ui` → `tray.py:509` |
-| **Open logs** | Opens `storage/logs/server.log` in the `.log`-associated editor. | `_open_logs` → `tray.py:512` |
-| **Server RAM** | RAM consumed by the server process + loaded model. `psutil` polling runs in a daemon thread (`_RamMonitor`, `installer/tray_monitor.py`, 141 lines) to avoid blocking the menu (post-v0.9.0 fix — previously froze the keyboard). | `tray_monitor.py`; `tray.py:205` |
-| **Uptime** | Server uptime calculated from `server_start_time`. | `tray.py:208` |
-| **Documentation** | Opens the official documentation. Item added to the main menu to replace a duplicate link. | `_open_docs` → `tray.py:523` |
-| **Settings** | Submenu with 3 options: | `tray.py:227-243` |
-| ↳ server-nexe.com | Opens the official website in the browser. | `_open_website` → `tray.py:520` |
-| ↳ Support the project | Opens GitHub Sponsors. | `_open_donate` → `tray.py:528` |
-| ↳ Uninstall Nexe | Launches the uninstaller with double confirmation, calculates space, removes Dock/Login Items, backs up `storage/` with a timestamp. **Does NOT delete the project folder** (safety option). | `_uninstall` → `tray.py:531` + `installer/tray_uninstaller.py` (284 lines) |
-| **Quit** | Stops the server (if running) and closes the tray app. | `_quit` → `tray.py:581` |
+| **server.nexe v1.0.6** | Non-clickable header. Version read dynamically from `pyproject.toml` via `tomllib` (SSOT). | `tray.py:196-206, 272` |
+| **Server running / stopped** | Non-clickable status indicator. Menu bar icon changes: `ICON_RUNNING` (green) when alive, `ICON_STOPPED` (grey) when not. | `tray.py:223` |
+| **Start / Stop server** | Spawns or stops the `core.app` process (uvicorn + FastAPI + Qdrant). SIGTERM then SIGKILL if needed. PID stored in `storage/run/server.pid`. | `_toggle_server` → `tray.py:324` |
+| **Open Web UI** | Opens `http://127.0.0.1:9119/ui` in the default browser. | `_open_web_ui` → `tray.py:564` |
+| **Open logs** | Opens `storage/logs/server.log` in the `.log`-associated editor. | `_open_logs` → `tray.py:567` |
+| **Server RAM** | RAM consumed by the server process + loaded model. `psutil` polling runs in a daemon thread (`RamMonitor`, `installer/tray_monitor.py`, 142 lines) to avoid blocking the menu (post-v0.9.0 fix — previously froze the keyboard). | `tray_monitor.py`; `tray.py:231` |
+| **Uptime** | Server uptime calculated from `server_start_time`. | `tray.py:234` |
+| **Documentation** | Opens the official documentation. Item added to the main menu to replace a duplicate link. | `_open_docs` → `tray.py:578` |
+| **Settings** | Submenu with 3 options: | `tray.py:253-269` |
+| ↳ server-nexe.com | Opens the official website in the browser. | `_open_website` → `tray.py:575` |
+| ↳ Support the project | Opens GitHub Sponsors. | `_open_donate` → `tray.py:583` |
+| ↳ Uninstall Nexe | Launches the uninstaller with double confirmation, calculates space, removes Dock/Login Items, backs up `storage/` with a timestamp. **Does NOT delete the project folder** (safety option). | `_uninstall` → `tray.py:586` + `installer/tray_uninstaller.py` (349 lines) |
+| **Quit** | Stops the server (if running) and closes the tray app. | `_quit` → `tray.py:636` |
 
 ### Auto-refresh
 
-A `rumps.Timer(self._update_stats, 5)` runs the `_update_stats` callback (`tray.py:458`) every 5 seconds: refreshes RAM, uptime, and verifies server state (if the process died unexpectedly → icon and status change).
+A `rumps.Timer(self._update_stats, 5)` (`tray.py:302`) runs the `_update_stats` callback (`tray.py:513`) every 5 seconds: refreshes RAM, uptime, and verifies server state (if the process died unexpectedly → icon and status change).
 
 ### Translations
 
@@ -323,7 +324,7 @@ Accessible from tray menu. Double confirmation, calculates space, removes Dock/L
 | NEXE_OLLAMA_MODEL | Ollama model | (selected during install) |
 | NEXE_LLAMA_CPP_MODEL | GGUF model path | storage/models/*.gguf |
 | NEXE_DEFAULT_MAX_TOKENS | Max response tokens | 4096 |
-| NEXE_LANG | Server language | ca |
+| NEXE_LANG | Server language | en |
 | NEXE_ENV | Environment | production |
 | NEXE_ENCRYPTION_ENABLED | Enable encryption at rest | auto (activates if sqlcipher3 available) |
 | NEXE_OLLAMA_THINK | Global default for thinking tokens on Ollama models | false |

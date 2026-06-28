@@ -298,7 +298,12 @@ class TestHandleMlxEngine:
 
         ensure_calls = []
         download_calls = []
-        monkeypatch.setattr(inst, "ensure_ollama_installed", lambda: ensure_calls.append(True))
+
+        def _ensure_ollama_ok():
+            ensure_calls.append(True)
+            return True  # B161: a successful install must return truthy
+
+        monkeypatch.setattr(inst, "ensure_ollama_installed", _ensure_ollama_ok)
         monkeypatch.setattr(inst, "_download_ollama_model", lambda cfg: download_calls.append(cfg["id"]))
 
         _handle_mlx_engine(model_config, tmp_path, Path("/venv/bin/python"))

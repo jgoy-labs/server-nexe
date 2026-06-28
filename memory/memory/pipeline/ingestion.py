@@ -34,10 +34,16 @@ class IngestionPipeline:
   - Automatic rollback if persistence fails
   """
 
-  OLLAMA_URL = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-  OLLAMA_EMBED_URL = f"{OLLAMA_URL}/api/embeddings"
+  # MC-089: the Ollama base URL is resolved at CALL time via the shared cascade
+  # (SidecarConfig → NEXE_OLLAMA_HOST → OLLAMA_HOST → default), not pinned to
+  # NEXE_OLLAMA_HOST at import time. See _embed_url().
   OLLAMA_MODEL = os.environ.get("NEXE_OLLAMA_EMBED_MODEL", "nomic-embed-text")
   OLLAMA_TIMEOUT = float(os.environ.get("NEXE_OLLAMA_EMBED_TIMEOUT", "30.0"))
+
+  @staticmethod
+  def _embed_url() -> str:
+    from core.ollama_utils import resolve_ollama_url
+    return f"{resolve_ollama_url()}/api/embeddings"
 
   def __init__(
     self,
@@ -185,7 +191,7 @@ class IngestionPipeline:
     try:
       async with httpx.AsyncClient(timeout=self.OLLAMA_TIMEOUT) as client:
         response = await client.post(
-          self.OLLAMA_EMBED_URL,
+          self._embed_url(),
           json={
             "model": self.OLLAMA_MODEL,
             "prompt": truncated,

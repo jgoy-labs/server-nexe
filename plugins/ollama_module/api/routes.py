@@ -20,8 +20,11 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 
+import httpx
+
 from plugins.security.core.validators import validate_safe_path
 from plugins.security.core.auth import require_api_key
+from plugins.ollama_module.core.errors import ModelNotFoundError, OllamaSemanticError
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +79,11 @@ class PullModelRequest(BaseModel):
             raise ValueError("path traversal segments ('..') not allowed in model name")
         allowlist = _ollama_allowlist_patterns()
         if allowlist is not None and not any(fnmatch(v, pat) for pat in allowlist):
+            # B256: do not echo the user-supplied model name in the message. For a
+            # custom field_validator Pydantic surfaces ``msg`` in the 422 body and
+            # the error log; ``loc`` already identifies the offending field.
             raise ValueError(
-                f"model {v!r} not in NEXE_OLLAMA_ALLOWED_MODELS allowlist"
+                "model not in NEXE_OLLAMA_ALLOWED_MODELS allowlist"
             )
         return v
 
@@ -89,6 +95,12 @@ def create_router(module_instance) -> APIRouter:
     Args:
         module_instance: OllamaModule instance
     """
+    # Deferred (function-local) import: keeps the plugins -> core.resilience
+    # edge OUT of the import-time layering baseline (finding #471 / check_layering).
+    # Only used in the except clauses of the nested get_model_info / delete_model
+    # handlers below; the closure captures it once per router creation.
+    from core.resilience.circuit_breaker import CircuitOpenError
+
     router = APIRouter(prefix="/ollama")
     ui_path = Path(__file__).parent.parent / "ui"
 
@@ -116,10 +128,10 @@ def create_router(module_instance) -> APIRouter:
         safe_path = validate_safe_path(css_base / path, css_base)
         return FileResponse(safe_path, media_type="text/css")
 
-    @router.get("/ui/js/{path:path}", operation_id="ollama_serve_js")
+    @router.get("/ui/assets/js/{path:path}", operation_id="ollama_serve_js")
     async def serve_js(path: str):
-        """Serves JavaScript files"""
-        js_base = ui_path / "js"
+        """Serves JavaScript files from assets/js (matches index.html script src)"""
+        js_base = ui_path / "assets" / "js"
         safe_path = validate_safe_path(js_base / path, js_base)
         return FileResponse(safe_path, media_type="application/javascript")
 
@@ -133,8 +145,9 @@ def create_router(module_instance) -> APIRouter:
             models = await module.list_models()
             return {"status": "ok", "total": len(models), "models": models}
         except Exception as e:
+            # MC-074: `str(e)` only in the log; the client gets a generic message.
             logger.error("Failed to list Ollama models: %s", e)
-            raise HTTPException(status_code=503, detail=f"Ollama connection failed: {str(e)}")
+            raise HTTPException(status_code=503, detail="Ollama connection failed")
 
     @router.post("/api/pull", operation_id="ollama_pull_model")
     async def pull_model(request: PullModelRequest, _: str = Depends(require_api_key)):
@@ -147,8 +160,9 @@ def create_router(module_instance) -> APIRouter:
                     data = json.dumps(progress)
                     yield f"data: {data}\n\n"
             except Exception as e:
+                # MC-074: don't leak `str(e)` into the SSE; generic message to the client.
                 logger.error("Pull model failed: %s", e)
-                yield f"data: {json.dumps({'error': str(e), 'status': 'error'})}\n\n"
+                yield f"data: {json.dumps({'error': 'Pull failed', 'status': 'error'})}\n\n"
 
         return StreamingResponse(
             progress_stream(),
@@ -163,9 +177,20 @@ def create_router(module_instance) -> APIRouter:
         try:
             info = await module.get_model_info(model_name)
             return {"status": "ok", "model": model_name, "info": info}
+        except ModelNotFoundError:
+            # MC-073: a non-existent model is 404 (not infra), generic message.
+            raise HTTPException(status_code=404, detail="Model not found")
+        except OllamaSemanticError as e:
+            # MC-073: semantic 4xx from Ollama → propagate its status, without `str(e)`.
+            logger.error("Ollama semantic error for model info %s: %s", model_name, e)
+            raise HTTPException(status_code=e.status_code, detail="Ollama request error")
+        except (CircuitOpenError, httpx.HTTPError, ConnectionError, TimeoutError) as e:
+            # MC-073: infrastructure error → 503, not 404; `str(e)` only in the log.
+            logger.error("Ollama unavailable for model info %s: %s", model_name, e)
+            raise HTTPException(status_code=503, detail="Ollama service unavailable")
         except Exception as e:
-            logger.error("Failed to get model info: %s", e)
-            raise HTTPException(status_code=404, detail=f"Model not found or error: {str(e)}")
+            logger.error("Unexpected error getting model info %s: %s", model_name, e, exc_info=True)
+            raise HTTPException(status_code=500, detail="Internal error")
 
     @router.delete("/api/models/{model_name}", operation_id="ollama_delete_model")
     async def delete_model(model_name: str, _: str = Depends(require_api_key)):
@@ -174,9 +199,16 @@ def create_router(module_instance) -> APIRouter:
         try:
             await module.delete_model(model_name)
             return {"status": "ok", "message": f"Model {model_name} deleted successfully"}
+        except ModelNotFoundError:
+            # MC-074: deleting a non-existent model is 404, not 500.
+            raise HTTPException(status_code=404, detail="Model not found")
+        except (CircuitOpenError, httpx.HTTPError, ConnectionError, TimeoutError) as e:
+            logger.error("Ollama unavailable for delete %s: %s", model_name, e)
+            raise HTTPException(status_code=503, detail="Ollama service unavailable")
         except Exception as e:
-            logger.error("Failed to delete model: %s", e)
-            raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
+            # MC-074: `str(e)` only in the log; generic message to the client.
+            logger.error("Failed to delete model %s: %s", model_name, e, exc_info=True)
+            raise HTTPException(status_code=500, detail="Delete failed")
 
     # --- Health & Info ---
 

@@ -55,30 +55,35 @@ class BootstrapTokenManager:
     os.chmod(storage_dir, 0o700)
     self._db_path = storage_dir / "system_core.db"
 
+    # MC-013: guard the connection in try/finally so a failing PRAGMA/CREATE/
+    # commit during init does not leak the handle (parity with the rest of the
+    # class, e.g. create_session_token).
     conn = sqlite3.connect(str(self._db_path))
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("""
-      CREATE TABLE IF NOT EXISTS session_tokens (
-        token TEXT PRIMARY KEY,
-        expires REAL NOT NULL
-      )
-    """)
-    cursor.execute("""
-      CREATE TABLE IF NOT EXISTS bootstrap_config (
-        key TEXT PRIMARY KEY,
-        value TEXT,
-        expires REAL
-      )
-    """)
-    cursor.execute("""
-      CREATE TABLE IF NOT EXISTS bootstrap_attempts (
-        ip TEXT NOT NULL,
-        ts REAL NOT NULL
-      )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+      cursor = conn.cursor()
+      cursor.execute("PRAGMA journal_mode=WAL")
+      cursor.execute("""
+        CREATE TABLE IF NOT EXISTS session_tokens (
+          token TEXT PRIMARY KEY,
+          expires REAL NOT NULL
+        )
+      """)
+      cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bootstrap_config (
+          key TEXT PRIMARY KEY,
+          value TEXT,
+          expires REAL
+        )
+      """)
+      cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bootstrap_attempts (
+          ip TEXT NOT NULL,
+          ts REAL NOT NULL
+        )
+      """)
+      conn.commit()
+    finally:
+      conn.close()
 
     # El fitxer .db conté tokens en plaintext → restringeix lectura a l'usuari
     os.chmod(self._db_path, 0o600)

@@ -16,6 +16,7 @@ import hashlib
 import logging
 import time
 import uuid
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from fastapi import Request
@@ -53,6 +54,27 @@ def derive_session_id(req: Request) -> str:
     """Derive session_id from X-Session-Id header or API key hash."""
     _api_key = (req.headers.get("x-api-key") or req.headers.get("authorization", "")).encode()
     return req.headers.get("x-session-id") or f"sess_{hashlib.sha256(_api_key).hexdigest()[:16]}"
+
+
+def resolve_loaded_model_name(module, fallback: str) -> str:
+    """Return the basename of the model actually loaded by a single-model engine.
+
+    MLX and llama.cpp run one fixed model (NEXE_MLX_MODEL / NEXE_LLAMA_CPP_MODEL)
+    and ignore the per-request ``model`` field. Echoing ``request.model`` back
+    would lie about which model answered (B075-C3): a client asking for
+    ``"gpt-4"`` would see ``"gpt-4"`` while a local Qwen/Gemma actually ran.
+
+    This returns the real loaded model's *basename* — never the absolute
+    ``model_path``, which leaks the home directory (see the warnings in each
+    engine's ``config.py``). When no model is loaded (e.g. ``_node`` is ``None``
+    pre-onboarding) it falls back to the stable engine literal, matching the
+    previous behaviour for the unconfigured case.
+    """
+    node = getattr(module, "_node", None)
+    model_path = getattr(getattr(node, "config", None), "model_path", "")
+    if isinstance(model_path, str) and model_path:
+        return Path(model_path).name
+    return fallback
 
 
 def build_openai_response(result: dict, model_name: str, engine_prefix: str) -> dict:

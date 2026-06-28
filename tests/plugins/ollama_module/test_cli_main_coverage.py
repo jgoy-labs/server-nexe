@@ -16,6 +16,3 @@ class TestOllamaCLIModule:
         result = _run_async(_coro())
         assert result == 42
 
-    def test_rich_available(self):
-        from plugins.ollama_module.cli.main import RICH_AVAILABLE
-        assert isinstance(RICH_AVAILABLE, bool)

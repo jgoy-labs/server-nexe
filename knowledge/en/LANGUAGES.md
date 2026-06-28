@@ -5,7 +5,7 @@ id: nexe-languages
 collection: nexe_documentation
 
 # === RAG CONTENT (REQUIRED) ===
-abstract: "How server-nexe handles languages: it detects the language of each user message (about 75 languages, offline detection with lingua) and replies in that same language, not in the install language (NEXE_LANG). Explains the detection pipeline and the reply directive, the role of NEXE_LANG as a fallback, and the behaviour on short messages or language switches. Documents the fix for the bug where, up to 1.0.5, it always replied in the fixed install language (Catalan by default)."
+abstract: "How server-nexe handles languages: it detects the language of each user message (about 75 languages, offline detection with lingua) and replies in that same language, not in the install language (NEXE_LANG). Explains the detection pipeline and the reply directive, the role of NEXE_LANG as a fallback, and the behaviour on short messages or language switches. Documents the fix for the bug where, up to 1.0.4, it always replied in the fixed install language (Catalan by default); automatic detection was added in 1.0.5."
 tags: [languages, language, i18n, multilingual, detection, lingua, nexe-lang, multi-language]
 chunk_size: 600
 priority: P2
@@ -43,4 +43,4 @@ If the message is too short or ambiguous (for example "ok", "thanks") or is just
 ## Notes
 
 - **Switching language mid-conversation:** you can switch language anytime and Nexe adapts. Within a conversation already started in one language, the switch may be a bit harder (the conversation history weighs in); for a clean switch, start a new conversation.
-- **Fix (1.0.5):** up to version 1.0.5, Nexe always replied in the fixed install language (Catalan by default) even when the user wrote in another language. This was **fixed in 1.0.5** with automatic detection of the message language.
+- **Fix (1.0.5):** up to version 1.0.4, Nexe always replied in the fixed install language (Catalan by default) even when the user wrote in another language. This was **fixed in 1.0.5** with automatic detection of the message language.

@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -70,6 +71,8 @@ class MemoryService:
         # SQLiteStore access across instances (file lock or per-call conn).
         self._store = SQLiteStore(self._db_path, crypto_provider=crypto_provider)
         self._vector_index = None  # Lazy init to avoid Qdrant dependency in tests
+        self._embedder = None  # Injected via set_embedder() (lifespan) or lazy
+        self._retriever = None  # Cached semantic engine, built on first use
         self._initialized = False
 
     def _ensure_vector_index(self):
@@ -81,10 +84,50 @@ class MemoryService:
             except Exception as e:
                 logger.warning("VectorIndex init failed: %s", e)
 
+    def set_embedder(self, embedder) -> None:
+        """Inject the shared embedder (the SimpleEmbedder singleton built by the
+        lifespan in a worker thread) so recall() can run semantic vector search
+        using the SAME instance DreamingCycle indexes with. Resets the cached
+        Retriever so a later-injected embedder is picked up. Best-effort:
+        passing None leaves recall() in recency-only mode."""
+        self._embedder = embedder
+        self._retriever = None
+
+    def _semantic_available(self) -> bool:
+        """Whether recall() can run semantic vector search right now."""
+        return bool(
+            self._vector_index
+            and self._vector_index.available
+            and self._embedder
+        )
+
+    def _get_retriever(self):
+        """Build and cache the multi-layer Retriever (semantic engine). Shares
+        this service's SQLite store + vector index + injected embedder."""
+        if self._retriever is None:
+            from .retrieve.retriever import Retriever
+            self._retriever = Retriever(
+                config=self._config,
+                sqlite_store=self._store,
+                vector_index=self._vector_index,
+                working_memory=None,
+                embedder=self._embedder,
+            )
+        return self._retriever
+
     @property
     def initialized(self) -> bool:
-        """Whether the service has been initialized (store + vector index ready)."""
+        """Whether the service has been initialized. NOTE: this only reflects the
+        SQLite-backed core (profile + episodic recall), which works without the
+        vector index. For vector-index availability use `vector_index_available`."""
         return self._initialized
+
+    @property
+    def vector_index_available(self) -> bool:
+        """MC-018: whether the (optional) Qdrant vector index loaded successfully.
+        False means recall still works via SQLite but semantic vector search is
+        degraded — the health signal must not pretend everything is fine."""
+        return self._vector_index is not None
 
     async def initialize(self) -> bool:
         """Initialize the memory service."""
@@ -92,10 +135,19 @@ class MemoryService:
             return True
         self._ensure_vector_index()
         self._initialized = True
-        logger.info(
-            "MemoryService initialized (db=%s, encrypted=%s)",
-            self._db_path, self._store._encrypted,
-        )
+        # MC-018: report the vector index state honestly instead of always
+        # logging plain 'initialized' even when Qdrant failed to load.
+        if self._vector_index is None:
+            logger.warning(
+                "MemoryService initialized WITHOUT vector index (db=%s, encrypted=%s) "
+                "— SQLite recall works, semantic vector search degraded",
+                self._db_path, self._store._encrypted,
+            )
+        else:
+            logger.info(
+                "MemoryService initialized (db=%s, encrypted=%s, vector_index=ok)",
+                self._db_path, self._store._encrypted,
+            )
         return True
 
     # ── Write path ──
@@ -235,41 +287,88 @@ class MemoryService:
         mode: str = "normal",
     ) -> List[MemoryCard]:
         """
-        Retrieve relevant memories as MemoryCards.
+        Retrieve memories as MemoryCards.
 
-        Layers: profile → episodic → (vector search if available).
+        The result is ALWAYS a superset of the historical "profile + recent
+        episodic" baseline — enabling semantic search never removes a durable
+        profile fact or a recently-stored episodic memory (B112 regression
+        guard). When the embedder is injected (lifespan) and the vector index is
+        available, semantic vector hits are merged into the episodic layer and
+        re-rank it so relevant memories surface above merely-recent ones; a
+        memory that is both recent and relevant keeps its higher semantic score.
+        Without the embedder, or for an empty query, recall returns the baseline
+        only (and never triggers a model load — CLI/tests stay deterministic).
+
+        Layers, in order: profile facts (critical first) → episodic ranked by
+        score (semantic similarity when matched, else recency importance),
+        trimmed to ``limit``.
         """
-        cards: List[MemoryCard] = []
+        profile_cards = self._profile_cards(user_id)
+        # Recency baseline keyed by id for merge/dedup with semantic hits.
+        episodic: Dict[str, MemoryCard] = {
+            c.entry_id: c for c in self._recent_episodic_cards(user_id, limit)
+        }
 
-        # 1. Profile facts (high confidence)
-        profiles = self._store.get_profile(user_id)
-        for p in profiles:
+        if query and self._semantic_available():
+            try:
+                retriever = self._get_retriever()
+                # _retrieve_vector is synchronous and calls a blocking
+                # embedder.encode(); run it off the event loop. It hydrates
+                # content from SQLite and applies a relevance threshold.
+                hits = await asyncio.to_thread(
+                    retriever._retrieve_vector, user_id, query, None, mode
+                )
+                for c in hits:
+                    prev = episodic.get(c.entry_id)
+                    # A recent+relevant memory keeps its higher semantic score.
+                    if prev is None or c.score > prev.score:
+                        episodic[c.entry_id] = c
+            except Exception as e:
+                logger.warning("Semantic recall failed, baseline only: %s", e)
+
+        ranked_episodic = sorted(
+            episodic.values(), key=lambda c: c.score, reverse=True
+        )
+        # Profile first, critical profile facts ahead of the rest, so the
+        # ``limit`` trim never evicts a critical fact before a recency filler.
+        profile_cards.sort(key=lambda c: not c.metadata.get("is_critical", False))
+        return (profile_cards + ranked_episodic)[:limit]
+
+    def _profile_cards(self, user_id: str) -> List[MemoryCard]:
+        """All active profile facts as high-confidence cards — the durable
+        layer, always present in recall regardless of mode."""
+        cards: List[MemoryCard] = []
+        for p in self._store.get_profile(user_id):
             value = json.loads(p["value_json"])
-            card = MemoryCard(
+            cards.append(MemoryCard(
                 content=f"{p['attribute']}: {value}",
                 confidence="high",
                 source_store="profile",
                 score=1.0,
                 entry_id=p["id"],
-                metadata={"entity": p["entity"], "attribute": p["attribute"]},
-            )
-            cards.append(card)
+                metadata={
+                    "entity": p["entity"],
+                    "attribute": p["attribute"],
+                    "is_critical": bool(p.get("is_critical", False)),
+                },
+            ))
+        return cards
 
-        # 2. Recent episodic (moderate confidence)
-        episodes = self._store.get_episodic(user_id, limit=limit * 2)
-        for ep in episodes[:limit]:
-            card = MemoryCard(
+    def _recent_episodic_cards(
+        self, user_id: str, limit: int
+    ) -> List[MemoryCard]:
+        """The most-recent episodic entries as moderate-confidence cards — the
+        recency baseline, always present so a just-stored memory is recallable
+        even before the dreaming cycle has indexed it for vector search."""
+        cards: List[MemoryCard] = []
+        for ep in self._store.get_episodic(user_id, limit=limit * 2)[:limit]:
+            cards.append(MemoryCard(
                 content=ep["content"],
                 confidence="moderate",
                 source_store="episodic",
                 score=ep.get("importance", 0.5),
                 entry_id=ep["id"],
-            )
-            cards.append(card)
-
-        # 3. Token budget — trim to limit
-        cards = cards[:limit]
-
+            ))
         return cards
 
     async def get_profile(

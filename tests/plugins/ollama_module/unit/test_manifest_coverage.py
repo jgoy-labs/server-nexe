@@ -80,8 +80,8 @@ class TestServeCssJs:
         assert r.status_code == 200
 
     def test_serve_js(self, tmp_path):
-        """Serve JS file."""
-        js_dir = tmp_path / "js"
+        """Serve JS file (B225: ruta nova /ui/assets/js/)."""
+        js_dir = tmp_path / "assets" / "js"
         js_dir.mkdir(parents=True)
         js_file = js_dir / "app.js"
         js_file.write_text("console.log('test');")
@@ -96,7 +96,7 @@ class TestServeCssJs:
         app = FastAPI()
         app.include_router(router)
         c = TestClient(app, raise_server_exceptions=False)
-        r = c.get("/ollama/ui/js/app.js")
+        r = c.get("/ollama/ui/assets/js/app.js")
         assert r.status_code == 200
 
 
@@ -115,20 +115,6 @@ class TestPullModelError:
         r = c.post("/ollama/api/pull", json={"name": "llama3"}, headers=auth)
         assert r.status_code == 200  # StreamingResponse always returns 200
         assert "error" in r.text.lower() or "data:" in r.text
-
-
-class TestHealthError:
-    """Test health endpoint exception."""
-
-    def test_health_error(self, auth):
-        """Exception in health check returns error."""
-        mock_module = MagicMock()
-        mock_module.health_check = AsyncMock(side_effect=Exception("Health broken"))
-
-        c = _make_client(mock_module)
-        r = c.get("/ollama/health", headers=auth)
-        # When health_check raises, the endpoint returns 500
-        assert r.status_code in (200, 500)
 
 
 class TestInfoEndpoint:

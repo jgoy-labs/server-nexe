@@ -9,11 +9,14 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from .detection import get_repo_root
+
+logger = logging.getLogger(__name__)
 
 def get_project_path(*parts: str) -> Path:
   """
@@ -180,6 +183,37 @@ def get_models_dir() -> Path:
   return get_repo_root() / "storage" / "models"
 
 
+def discover_first_model(predicate: Callable[[Path], bool], label: str) -> str:
+  """
+  Auto-discover the first model under get_models_dir() matching a predicate.
+
+  Scans the models directory (sorted alphabetically for determinism) and
+  returns the absolute, resolved path of the first entry for which
+  `predicate(path)` is True. Enables the "drop a model, restart, it just works"
+  UX for engine configs (MLX, llama.cpp) without requiring an env var.
+
+  Args:
+    predicate: Callable applied to each entry in the models dir; the first
+      match (alphabetically) is selected.
+    label: Human-readable model description used in the discovery log line.
+
+  Returns:
+    Absolute path to the first matching model, or "" if the models directory
+    is missing, empty, or nothing matches.
+  """
+  try:
+    models_dir = get_models_dir()
+    if models_dir.exists():
+      candidates = sorted(p for p in models_dir.iterdir() if predicate(p))
+      if candidates:
+        path = str(candidates[0].resolve())
+        logger.info("Auto-discovered %s at %s", label, path)
+        return path
+  except Exception as e:
+    logger.debug("Auto-discover scan for %s failed: %s", label, e)
+  return ""
+
+
 get_system_logs_dir = get_logs_dir
 get_core_root = get_repo_root
 
@@ -195,6 +229,7 @@ __all__ = [
   "get_data_dir",
   "get_cache_dir",
   "get_models_dir",
+  "discover_first_model",
   "get_system_logs_dir",
   "get_core_root",
 ]

@@ -9,6 +9,8 @@ www.jgoy.net · https://server-nexe.org
 ------------------------------------
 """
 
+import inspect
+
 import pytest
 from unittest.mock import AsyncMock, patch
 
@@ -132,6 +134,30 @@ class TestAtomizeAndSave_JunkFiltered:
         memory_helper.save_to_memory.assert_not_called()
 
 
+class TestFilterFactsPersonalDataHallucination:
+    """B126 (decisió Jordi): el filtre de streaming descarta afirmacions fabricades
+    de dades personals — paritat amb el camí no-streaming (_MEMSAVE_JUNK_RE).
+    Prioritat: menys al·lucinacions persistides, encara que es perdi algun nom real."""
+
+    def test_personal_data_hallucinations_filtered(self):
+        from plugins.web_ui_module.api.routes_chat import _filter_facts
+
+        hallucinations = [
+            "el usuario se llama Juan",
+            "the user's name is Alice",
+            "l'usuari es diu Carles",
+            "se llama Pedro y vive en Madrid",
+        ]
+        assert _filter_facts(hallucinations, []) == []
+
+    def test_legitimate_non_name_fact_survives(self):
+        """Don't over-filter: a real preference (without a name) is preserved."""
+        from plugins.web_ui_module.api.routes_chat import _filter_facts
+
+        facts = ["a l'usuari li agrada molt el cafè amb llet"]
+        assert _filter_facts(facts, []) == facts
+
+
 class TestAtomizeAndSave_ShortFactsSkipped:
 
     @pytest.mark.asyncio
@@ -237,3 +263,50 @@ class TestAtomizeAndSave_MutatesMemSaves:
 
         # mem_saves[:] = _atomized mutates the original list
         assert mem_saves == ["likes cats a lot", "likes dogs a lot"]
+
+
+class TestAtomizeFactLLM_MLXEngine:
+    """B088: the LLM atomizer must work with MLX (chat = async def → a coroutine
+    that returns a dict), not only with Ollama (chat sync → async-generator)."""
+
+    @pytest.mark.asyncio
+    async def test_mlx_async_chat_atomizes_via_llm(self):
+        # MLX: chat is 'async def' -> calling it returns a coroutine, and
+        # execute() returns a dict {"response": text}. There is NO streaming
+        # without stream_callback (which the atomizer doesn't pass).
+        from plugins.web_ui_module.api.routes_chat import _atomize_fact_llm
+
+        class _MLXEngine:
+            # MLX-style signature: it does NOT have the 'model' parameter -> else branch
+            async def chat(self, messages, stream=True, thinking_enabled=False, **kw):
+                return {"response": "L'usuari es diu Aran\nL'usuari té 8 anys"}
+
+        engine = _MLXEngine()
+        sig = inspect.signature(engine.chat)  # 'model' is NOT there -> MLX branch
+
+        fact = "L'usuari es diu Aran i té 8 anys"  # contains ' i ' -> passes the guard
+        parts = await _atomize_fact_llm(fact, engine, "mlx-model", sig, lang="ca")
+
+        # Current RED: parts == [fact] (1 element, not atomized).
+        # GREEN with fix: 2 atomic facts extracted from the dict.
+        assert parts == ["L'usuari es diu Aran", "L'usuari té 8 anys"]
+        assert len(parts) == 2
+
+    @pytest.mark.asyncio
+    async def test_ollama_async_gen_chat_still_works(self):
+        # No-regressió: Ollama chat és SYNC i retorna un async-generator.
+        from plugins.web_ui_module.api.routes_chat import _atomize_fact_llm
+
+        async def _agen(*_a, **_kw):
+            for line in ("L'usuari es diu Aran\n", "L'usuari té 8 anys\n"):
+                yield {"message": {"content": line}}
+
+        class _OllamaEngine:
+            def chat(self, model, messages, stream=True, images=None, thinking_enabled=False):
+                return _agen()
+
+        engine = _OllamaEngine()
+        sig = inspect.signature(engine.chat)  # 'model' hi és -> branca Ollama
+        fact = "L'usuari es diu Aran i té 8 anys"
+        parts = await _atomize_fact_llm(fact, engine, "ollama-model", sig, lang="ca")
+        assert parts == ["L'usuari es diu Aran", "L'usuari té 8 anys"]

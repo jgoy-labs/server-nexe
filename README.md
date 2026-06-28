@@ -79,7 +79,7 @@ Server Nexe started as a learning-by-doing experiment: *"What would it take to h
 
 **This entire project — code, tests, audits, documentation — has been built by one person orchestrating different AI models**, both local (MLX, Ollama) and cloud (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), as collaborators. The human decides what to build, designs the architecture, reviews lines and runs tests. The AIs write, audit, and stress-test under human direction.
 
-What began as a prototype has turned into a genuinely useful product: 6776 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
+What began as a prototype has turned into a genuinely useful product: 7165 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
 
 This is not trying to compete with ChatGPT or Claude. But it can be complementary for less demanding tasks. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with AI as co-pilot, music, and stubbornness.
 
@@ -157,7 +157,7 @@ Upload `.txt`, `.md` or `.pdf` and they're automatically indexed for RAG. Each d
 <td width="50%">
 
 ### Built to Grow
-6776 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
+7165 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
 
 </td>
 </tr>
@@ -224,12 +224,12 @@ The installer auto-detects your hardware and recommends the best backend. You ca
 
 ## Available Models by RAM Tier
 
-The installer organizes the 14 catalog models by the RAM available on your machine (4 tiers):
+The installer organizes the 15 catalog models by the RAM available on your machine (4 tiers):
 
 | Tier | Models | Origin |
 |------|--------|--------|
 | **8 GB** | Qwen3.5 4B | Alibaba |
-| **16 GB** | Qwen3.5 9B, Gemma 4 E4B, Mistral Nemo 12B, Salamandra 7B | Alibaba, Google, Mistral AI, BSC/AINA |
+| **16 GB** | Qwen3.5 9B, Qwen3.5 4B (8-bit), Gemma 4 E4B, Mistral Nemo 12B, Salamandra 7B | Alibaba, Alibaba, Google, Mistral AI, BSC/AINA |
 | **24 GB** | Qwen3.5 27B, Gemma 4 31B, Mistral Small 3.2 24B, GPT-OSS 20B | Alibaba, Google, Mistral AI, OpenAI |
 | **32 GB** | Qwen3.5 35B-A3B, Gemma 4 31B, Mixtral 8x7B, DeepSeek R1 32B, ALIA-40B | Alibaba, Google, Mistral AI, DeepSeek, BSC (Barcelona Supercomputing Center) |
 
@@ -287,14 +287,14 @@ Server Nexe uses a duck typing protocol (NexeModule Protocol) — no class inher
 | **mlx_module** | LLM Backend | Apple Silicon native, prefix caching (trie), Metal GPU |
 | **llama_cpp_module** | LLM Backend | Universal GGUF, LRU ModelPool, CPU/GPU |
 | **ollama_module** | LLM Backend | HTTP bridge to Ollama, auto-start, VRAM cleanup |
-| **security** | Core | Dual-key auth, 6 injection detectors + NFKC, 47 jailbreak patterns, rate limiting, RFC5424 audit logging |
+| **security** | Core | Dual-key auth, 6 injection detectors + NFKC, 49 jailbreak patterns, rate limiting, RFC5424 audit logging |
 | **web_ui_module** | Interface | Web chat, sessions, document upload, MEM_SAVE, RAG sanitization, i18n |
 
 ## AI-Ready Documentation
 
 The `knowledge/` folder contains 15 thematic documents × 3 languages = 45 files, structured with YAML frontmatter for RAG ingestion:
 
-API, Architecture, Use Cases, Errors, Identity, Installation, Limitations, Plugins, RAG, README, Security, Testing, Threat Model, Usage.
+API, Architecture, Use Cases, Errors, Identity, Installation, Languages, Limitations, Plugins, RAG, README, Security, Testing, Threat Model, Usage.
 
 Point any AI assistant at this repo and it can understand the complete architecture.
 
@@ -313,7 +313,7 @@ Server Nexe includes a security module enabled by default:
 - **CSRF protection** with token validation
 - **Rate limiting** per IP
 - **Input sanitization** — 6 injection detectors + Unicode normalization
-- **Jailbreak detection** — 47 pattern speed-bump detector
+- **Jailbreak detection** — 11 pattern speed-bump detector
 - **Upload denylist** — blocks accidental upload of API keys, PEM keys
 - **Memory injection protection** — tag stripping on all input paths
 - **RAG injection sanitization** — `[MEM_SAVE:]`, `[MEM_DELETE:]`, `[OLVIDA|OBLIT|FORGET:]`, `[MEMORIA:]` neutralized at ingest and retrieval (v0.9.9)
@@ -351,7 +351,7 @@ Server Nexe includes a security module enabled by default:
 
 ## Testing
 
-6776 tests collected (of 6991 total, 215 deselected by default markers) with ~85% code coverage. CI runs the full suite on every push.
+7165 tests collected (of 7400 total, 235 deselected by default markers) with ~85% code coverage. CI runs the full suite on every push.
 
 ```bash
 # Unit tests

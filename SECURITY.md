@@ -31,7 +31,7 @@ It does **not** defend against:
 - Upload content denylist (v0.9.1+): scans first 8KB of uploads for API tokens (`sk-ant-`, `sk-proj-`, `ghp_`, `github_pat_`, `AIzaSy`), PEM private keys, and `/etc/passwd` signatures. Speed-bump only — protects against accidental upload, not determined adversaries.
 
 ### Jailbreak detection (v0.9.1+)
-- 47 pattern speed-bump detector for common jailbreak attempts (multilingual: ca/en/es)
+- 11 pattern speed-bump detector for common jailbreak attempts (multilingual: ca/en/es)
 - Injects `[SECURITY NOTICE]` prefix instead of rejecting — preserves UX on false positives
 - Defense-in-depth only. Sophisticated attacks evade trivially. Real protection requires model-level content moderation.
 
@@ -91,9 +91,9 @@ and report them.
 
 ### Transport and headers
 - CSRF protection
-- CSP headers (`script-src 'self'` without `unsafe-inline`; `style-src 'self' 'unsafe-inline'` allowed for Web UI inline styles — documented trade-off)
+- CSP headers (`script-src 'self'` without `unsafe-inline` in standalone mode; in Tauri sidecar mode `'unsafe-inline'` is added to `script-src` because the Web UI relies on inline scripts and XSS isolation is provided by Tauri's sandboxed webview; `style-src 'self' 'unsafe-inline'` allowed for Web UI inline styles — documented trade-off)
 - Trusted host middleware
-- No inline scripts — language injection via `data-` HTML attributes
+- No inline scripts in standalone mode — language injection via `data-` HTML attributes (the packaged Tauri sidecar build does use inline scripts in the Web UI, which is why `script-src` is relaxed in sidecar mode; see above)
 
 ### Encryption at rest (default `auto`; fail-closed only with `NEXE_ENCRYPTION_ENABLED=true`, v0.9.2+)
 - AES-256-GCM with HKDF-SHA256 key derivation
@@ -114,7 +114,7 @@ and report them.
 
 Honest disclosure:
 
-- **Not tested in production.** Server Nexe has not been deployed in a production environment with real users. All testing has been done in development by the author. The 6776 automated tests cover code correctness, not real-world adversarial conditions.
+- **Not tested in production.** Server Nexe has not been deployed in a production environment with real users. All testing has been done in development by the author. The 7165 automated tests cover code correctness, not real-world adversarial conditions.
 - **No human security audit.** All security testing has been performed by AI (Claude, Gemini, and other models). AI can find patterns and run systematic checks, but it is not a substitute for a professional penetration test.
 - **Formal threat model** — the implicit threat model described above is now formalized in [THREAT_MODEL.md](THREAT_MODEL.md) (STRIDE, 8 trust boundaries, 6 asset categories, out-of-scope enumerated, residual risks declared). The summary above remains; see the formal document for the detail, mitigations and file:line citations.
 - **No bug bounty program.** This is a personal project with no budget for bounties.

@@ -113,6 +113,11 @@ def _apply_crypto_provider(server_state, crypto_enabled: bool, normalized_env: s
 
 async def _startup_encryption(server_state) -> None:
     """Initialize encryption-at-rest (opt-in). Modifies server_state.crypto_provider."""
+    # B044: track whether encryption was actually requested so the outer handler
+    # fails CLOSED when init breaks. Silently nulling crypto_provider after the
+    # user asked for encryption would boot in plaintext on a fresh install,
+    # writing PII unencrypted. Only crypto-disabled boots may swallow init errors.
+    crypto_enabled = False
     try:
         from core.crypto import check_encryption_status
         from memory.memory.engines.persistence import SQLCIPHER_AVAILABLE
@@ -140,7 +145,10 @@ async def _startup_encryption(server_state) -> None:
                 logger.debug("check_encryption_status failed (non-fatal): %s", warn_exc)
 
     except Exception as e:
-        if isinstance(e, RuntimeError):
+        # Fail-closed when encryption was requested: re-raise ANY exception (not
+        # just RuntimeError) so we never boot in plaintext when crypto was asked
+        # for (B044). Swallow only when crypto was off (best-effort init).
+        if isinstance(e, RuntimeError) or crypto_enabled:
             raise
         logger.warning("Encryption init failed (non-fatal): %s", e)
         server_state.crypto_provider = None

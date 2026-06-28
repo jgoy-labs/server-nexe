@@ -198,20 +198,28 @@ async def _flush_legacy_batch(memory, batch_items: list, doc_collection: str, nu
     return total
 
 
-async def _flush_mega_batch(memory, mega_items_by_collection: dict, log) -> None:
-    """Flush all accumulated mega-batch items (Bug #16). One store_batch per collection."""
+async def _flush_mega_batch(memory, mega_items_by_collection: dict, log) -> int:
+    """Flush all accumulated mega-batch items (Bug #16). One store_batch per collection.
+
+    Returns:
+        int: Number of chunks actually stored (may be less than built on partial failure).
+    """
+    stored_total = 0
     for coll, items in mega_items_by_collection.items():
         if not items:
             continue
         try:
             await memory.store_batch(items, collection=coll)
+            stored_total += len(items)
         except Exception as e:
             log(f"       [WARN] mega_batch fallback for {coll}: {e}")
             for item in items:
                 try:
                     await memory.store(text=item["text"], collection=coll, metadata=item["metadata"])
+                    stored_total += 1
                 except Exception as e2:
                     log(f"       [ERROR] chunk failed: {e2}")
+    return stored_total
 
 
 def _emit_perf_log(perf_record: dict) -> None:
@@ -554,7 +562,11 @@ async def ingest_knowledge(
 
     try:
         memory, ingest_cfg, _perf_model_init_ns = await _ingest_initialize_memory_and_config(log)
-    except Exception:
+    except Exception as e:
+        # MC-021: log the root cause at the capture site. The Qdrant-connection
+        # sub-path is logged inside the helper, but config/warmup errors were
+        # otherwise lost behind an opaque False returned to the caller.
+        logger.error("Ingest init failed: %s", e, exc_info=True)
         return False
 
     _default_root = PROJECT_ROOT / "knowledge"
@@ -578,7 +590,10 @@ async def ingest_knowledge(
     )
 
     if mega_batch_on:
-        await _flush_mega_batch(memory, mega_items_by_collection, log)
+        stored_chunks = await _flush_mega_batch(memory, mega_items_by_collection, log)
+        if stored_chunks < total_chunks:
+            log(f"       [WARN] Partial store: {stored_chunks}/{total_chunks} chunks emmagatzemats")
+        total_chunks = stored_chunks
 
     # Bug #16: capture perf snapshot BEFORE close().
     _perf_snap = memory.get_perf_snapshot() if hasattr(memory, "get_perf_snapshot") else None

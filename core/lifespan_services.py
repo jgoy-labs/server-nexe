@@ -12,11 +12,12 @@ www.jgoy.net · https://server-nexe.org
 import asyncio
 import logging
 import os
-import shutil
 import signal as _signal
-import subprocess
 from pathlib import Path
 from typing import Any, Dict
+
+from core.env_utils import parse_truthy
+from core.ollama_utils import resolve_ollama_url as _resolve_ollama_url
 
 logger = logging.getLogger(__name__)
 
@@ -60,69 +61,58 @@ def _setup_qdrant(project_root: Path, server_state) -> None:
     server_state.qdrant_available = True
 
 
-def _resolve_ollama_url() -> str:
-    """Resolve the Ollama base URL from environment variables.
-
-    In sidecar mode use SidecarConfig.ollama_host;
-    fallback NEXE_OLLAMA_HOST → OLLAMA_HOST → default.
-    """
-    try:
-        from core.sidecar_config import get_sidecar_config
-        cfg = get_sidecar_config()
-        if cfg.is_sidecar and cfg.ollama_host:
-            return cfg.ollama_host.rstrip("/")
-    except Exception as exc:
-        logger.debug("SidecarConfig unavailable in _resolve_ollama_url: %s", exc)
-
-    _nexe_ollama = os.getenv("NEXE_OLLAMA_HOST")
-    if _nexe_ollama:
-        return _nexe_ollama.rstrip("/")
-    return os.getenv("OLLAMA_HOST", "http://localhost:11434")
-
-
 async def _check_ollama_running(client, ollama_url: str) -> bool:
     """Return True if Ollama is already responding, False otherwise."""
     try:
-        await client.get(f"{ollama_url}/api/tags", timeout=OLLAMA_HEALTH_TIMEOUT)
-        logger.info("Ollama: OK (already running)")
-        return True
+        # MC-120: httpx .get() does not raise on 4xx/5xx; check the status so a
+        # non-200 responder on the Ollama host isn't mistaken for a healthy Ollama
+        # (cleanup_ollama_* already validates status_code==200).
+        resp = await client.get(f"{ollama_url}/api/tags", timeout=OLLAMA_HEALTH_TIMEOUT)
+        if resp.status_code == 200:
+            logger.info("Ollama: OK (already running)")
+            return True
+        logger.debug("Ollama health check: unexpected status %s", resp.status_code)
+        return False
     except Exception as e:
         logger.debug("Ollama health check failed during startup: %s", e)
         return False
 
 
 async def _launch_ollama(client, ollama_url: str, server_state) -> None:
-    """Spawn `ollama serve` and wait up to 15s for it to become ready."""
-    ollama_path = shutil.which("ollama")
-    if not ollama_path:
-        logger.warning("Ollama: Not installed. Install manually from https://ollama.com/download")
-        logger.info("  Or run: curl -fsSL https://ollama.com/install.sh | sh")
+    """Spawn `ollama serve` and wait up to 15s for it to become ready.
+
+    MC-028: the binary selection + headless detached spawn are centralised in
+    :func:`ollama_runtime.spawn_ollama_serve` (so this call site now also
+    honours NEXE_OLLAMA_BIN and the macOS Ollama.app bundle, not just PATH).
+    The readiness wait stays here, reusing the shared startup ``client``.
+    """
+    from plugins.ollama_module.core.ollama_runtime import spawn_ollama_serve
+
+    process = spawn_ollama_serve()
+    if process is None:
+        # spawn_ollama_serve already logged the PRECISE cause just above:
+        #   - not installed  → INFO  "Ollama not installed — skipping auto-start"
+        #   - spawn failure   → WARNING "Could not start ollama serve (<bin>): <err>"
+        # Don't assert "not installed" here (the binary may exist but have failed
+        # to spawn); keep the operator hint generic and point at the cause above.
+        logger.warning("Ollama: auto-start skipped (see cause above). Install: https://ollama.com/download")
         return
 
     logger.info("Ollama: Starting...")
-    try:
-        process = subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; system tool resolved via PATH (mono-user local)
-            ["ollama", "serve"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            # nova sessió/grup de procés perquè el shutdown pugui
-            # senyalar el grup sencer (os.killpg) i propagar als runners-fills.
-            start_new_session=True,
-        )
-        server_state.ollama_process = process
-        # Wait for Ollama to be ready (non-blocking)
-        for _ in range(30):  # 15 seconds max
-            await asyncio.sleep(0.5)
-            try:
-                await client.get(f"{ollama_url}/api/tags", timeout=OLLAMA_HEALTH_TIMEOUT)
+    server_state.ollama_process = process
+    # Wait for Ollama to be ready (non-blocking)
+    for _ in range(30):  # 15 seconds max
+        await asyncio.sleep(0.5)
+        try:
+            resp = await client.get(f"{ollama_url}/api/tags", timeout=OLLAMA_HEALTH_TIMEOUT)
+            if resp.status_code == 200:  # MC-120: only ready on 200, keep polling otherwise
                 logger.info("Ollama: OK (started)")
                 break
-            except Exception as e:
-                logger.debug("Ollama not ready yet during startup wait: %s", e)
-        else:
-            logger.warning("Ollama: Failed to start (timeout 15s)")
-    except Exception as e:
-        logger.warning(f"Ollama: Failed to start: {e}")
+            logger.debug("Ollama not ready yet (status %s)", resp.status_code)
+        except Exception as e:
+            logger.debug("Ollama not ready yet during startup wait: %s", e)
+    else:
+        logger.warning("Ollama: Failed to start (timeout 15s)")
 
 
 async def _auto_start_services(config: Dict[str, Any], project_root: Path, server_state) -> None:
@@ -134,7 +124,7 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path, serve
         _setup_qdrant(project_root, server_state)
 
         # === OLLAMA (fallback engine) ===
-        auto_start_ollama = os.getenv("NEXE_AUTOSTART_OLLAMA", "true").lower() == "true"
+        auto_start_ollama = parse_truthy(os.getenv("NEXE_AUTOSTART_OLLAMA", "true"))
         ollama_url = _resolve_ollama_url()
 
         ollama_running = await _check_ollama_running(client, ollama_url)

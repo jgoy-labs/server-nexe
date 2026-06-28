@@ -1,4 +1,4 @@
-// WelcomeView.swift — Pantalla 1: Benvinguda amb logo server.nexe i detecció d'idioma
+// WelcomeView.swift — Screen 1: Welcome with server.nexe logo and language detection
 
 import SwiftUI
 import AppKit
@@ -11,11 +11,11 @@ struct WelcomeView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            // Logo server.nexe des de Resources
+            // server.nexe logo from Resources
             NexeLogo()
                 .frame(width: 200, height: 60)
 
-            // Títol
+            // Title
             Text(t("welcome_title"))
                 .font(.system(size: 28, weight: .bold))
 
@@ -23,7 +23,7 @@ struct WelcomeView: View {
                 .font(.title3)
                 .foregroundColor(.secondary)
 
-            // Descripció
+            // Description
             Text(t("welcome_desc"))
                 .font(.body)
                 .multilineTextAlignment(.center)
@@ -39,7 +39,7 @@ struct WelcomeView: View {
             }
             .padding(.horizontal, 40)
 
-            // Selector d'idioma + tema
+            // Language + theme selector
             HStack(spacing: 16) {
                 ForEach(Lang.allCases, id: \.rawValue) { lang in
                     Button(action: { engine.lang = lang }) {
@@ -80,7 +80,7 @@ struct WelcomeView: View {
 
             Spacer()
 
-            // Botó
+            // Button
             Button(action: {
                 engine.detectHardware()
                 engine.loadCatalog()
@@ -101,7 +101,7 @@ struct WelcomeView: View {
     }
 }
 
-// MARK: - Logo carregat des de Resources/logo.png
+// MARK: - Logo loaded from Resources/logo.png
 
 struct NexeLogo: View {
     var body: some View {
@@ -111,7 +111,7 @@ struct NexeLogo: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
         } else {
-            // Fallback: buscar al costat del binary (dev)
+            // Fallback: look next to the binary (dev)
             let binaryDir = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
             let devLogo = binaryDir
                 .deletingLastPathComponent()
@@ -121,7 +121,7 @@ struct NexeLogo: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
-                // Últim fallback: text estilitzat
+                // Last fallback: styled text
                 Text("> server.nexe")
                     .font(.system(size: 32, weight: .bold))
                     .foregroundColor(.nexeRed)
@@ -145,7 +145,7 @@ struct FeatureRow: View {
     }
 }
 
-// MARK: - Color de marca server.nexe
+// MARK: - server.nexe brand color
 
 extension Color {
     static let nexeRed = Color(red: 0.88, green: 0.22, blue: 0.21) // #E03835

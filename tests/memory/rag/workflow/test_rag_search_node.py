@@ -114,10 +114,16 @@ class TestExecute:
         node = RAGSearchNode()
         node.config = {"top_k": 3, "score_threshold": 0.5, "prompt_template": "Context:\n{context}\n\nQuestion: {query}"}
 
+        # B115: search() returns List[SearchHit] (Pydantic), not dicts.
+        # Exercising the node with the real contract guards against the
+        # AttributeError that dict-mocked tests used to hide.
+        from memory.rag_sources.base import SearchHit
         mock_source = MagicMock()
         mock_source.search = AsyncMock(return_value=[
-            {"text": "Document text 1", "score": 0.9, "metadata": {"file_path": "file1.md"}},
-            {"text": "Document text 2", "score": 0.7, "metadata": {"file_path": "file2.md"}},
+            SearchHit(doc_id="d1", chunk_id="c1", score=0.9,
+                      text="Document text 1", metadata={"file_path": "file1.md"}),
+            SearchHit(doc_id="d2", chunk_id="c2", score=0.7,
+                      text="Document text 2", metadata={"file_path": "file2.md"}),
         ])
 
         mock_search_request_cls = MagicMock()
@@ -132,6 +138,7 @@ class TestExecute:
                 assert result["num_results"] == 2
                 assert "test query" in result["prompt"]
                 assert "Document text 1" in result["context"]
+                assert "file1.md" in result["context"]
 
         asyncio.run(run())
 

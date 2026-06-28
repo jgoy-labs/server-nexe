@@ -36,13 +36,6 @@ def make_app(api_integrator=None, i18n=None):
     return app
 
 
-class TestConfigureDependencies:
-    def test_configure_dependencies_noop(self):
-        from core.endpoints.modules import configure_dependencies
-        # Must not raise exceptions
-        configure_dependencies(MagicMock(), MagicMock())
-
-
 class TestListIntegratedModules:
     def test_with_api_integrator(self):
         mock_integrator = MagicMock()

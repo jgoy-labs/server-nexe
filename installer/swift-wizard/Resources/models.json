@@ -50,6 +50,28 @@
       }
     },
     {
+      "key": "qwen35_4b_8bit",
+      "name": "Qwen3.5 4B (8-bit)",
+      "origin": "Alibaba",
+      "year": 2026,
+      "role": "general",
+      "params": "4B",
+      "ram_gb": 10.0,
+      "disk_gb": 3.4,
+      "backends": [
+        "mlx"
+      ],
+      "mlx": true,
+      "ollama": null,
+      "gguf": null,
+      "iberic": false,
+      "description": {
+        "ca": "👁 🧠 Multimodal, thinking, visió. Precisió 8-bit (més fidel que el 4B base).",
+        "es": "👁 🧠 Multimodal, thinking, visión. Precisión 8-bit (más fiel que el 4B base).",
+        "en": "👁 🧠 Multimodal, thinking, vision. 8-bit precision (more faithful than base 4B)."
+      }
+    },
+    {
       "key": "gemma4_e4b",
       "name": "Gemma 4 E4B",
       "origin": "Google",
@@ -141,29 +163,6 @@
         "ca": "👁 🧠 Thinking excel·lent, visió, tool calling. MLX Apple Silicon.",
         "es": "👁 🧠 Thinking excelente, visión, tool calling. MLX Apple Silicon.",
         "en": "👁 🧠 Excellent thinking, vision, tool calling. MLX Apple Silicon."
-      }
-    },
-    {
-      "key": "gemma4_31b",
-      "name": "Gemma 4 31B",
-      "origin": "Google",
-      "year": 2026,
-      "role": "reasoning",
-      "params": "31B (dense)",
-      "ram_gb": 10.0,
-      "disk_gb": 18.5,
-      "backends": [
-        "ollama",
-        "mlx"
-      ],
-      "mlx": true,
-      "ollama": "gemma4:31b",
-      "gguf": null,
-      "iberic": false,
-      "description": {
-        "ca": "👁 🧠 Raonament potent, visió, context 256K. Thinking excel·lent.",
-        "es": "👁 🧠 Razonamiento potente, visión, contexto 256K. Thinking excelente.",
-        "en": "👁 🧠 Powerful reasoning, vision, 256K context. Excellent thinking."
       }
     },
     {

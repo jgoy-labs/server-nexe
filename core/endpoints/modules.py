@@ -9,7 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, HTTPException, Request, Depends
 
 from core.dependencies import limiter, get_i18n
 from plugins.security.core.auth_dependencies import require_api_key
@@ -44,9 +44,9 @@ async def list_integrated_modules(
   api_integrator=Depends(get_api_integrator)
 ) -> ModulesListResponse:
   """List integrated modules and their APIs"""
-  # Si app.state.minimal_mode, l'api_integrator no està set
-  # (no s'arrenca a _startup_services). Detectem-ho per donar
-  # un missatge UX clar al client.
+  # If app.state.minimal_mode, the api_integrator is not set
+  # (it isn't started in _startup_services). We detect it to give
+  # a clear UX message to the client.
   minimal = bool(getattr(request.app.state, "minimal_mode", False))
   if api_integrator:
     stats = api_integrator.get_integration_stats()
@@ -88,6 +88,8 @@ async def get_module_routes(
   """Get routes for a specific module"""
 
   if api_integrator:
+    if not api_integrator.is_module_integrated(module_name):
+      raise HTTPException(status_code=404, detail=f"Module '{module_name}' not found")
     routes = api_integrator.get_module_routes(module_name)
     return ModuleRoutesResponse(  # type: ignore[call-arg]  # Pydantic Field(None, ...) defaults — plugin pendent (BACKLOG M5-pydantic-mypy-plugin)
       status=i18n.t('server_core.api.responses.success') if i18n else "ok",

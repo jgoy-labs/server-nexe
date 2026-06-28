@@ -157,7 +157,11 @@ class DreamingCycle:
                 ("pending",),
             )
             return cursor.fetchone()[0]
-        except Exception:
+        except Exception as e:
+            # MC-019: surface the failure instead of silently reporting an
+            # empty queue (a persistent counter error would otherwise look
+            # like 'nothing to dream about' forever).
+            logger.warning("_count_pending failed: %s", e)
             return 0
         finally:
             if conn is not None:

@@ -5,7 +5,7 @@ id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest, thinking toggle. Models by RAM tiers (8GB to 32GB, 13 models, 4 tiers), 2 installation methods (offline DMG 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux supported (Ollama, CPU)."
+abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest, thinking toggle. Models by RAM tiers (8GB to 32GB, 14 models, 4 tiers), 3 installation methods (nexe-app Tauri desktop recommended, CLI, SwiftUI DMG legacy). macOS 14+ Apple Silicon only, Linux supported (Ollama, CPU)."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -46,14 +46,14 @@ What started as a learning-by-doing project and a giant spaghetti monster evolve
 6. **Multilingual (ca/es/en)** — Full i18n: UI, system prompts, RAG context labels, error messages, installer. Server is source of truth for language selection.
 7. **Document Upload with Session Isolation** — Upload documents via Web UI. Indexed into user_knowledge with session_id metadata. Documents only visible within the session they were uploaded to.
 8. **Encryption at Rest (default `auto`)** — AES-256-GCM encryption for SQLite (via SQLCipher), chat sessions (.enc), and RAG document text (TextStore). Activates automatically if sqlcipher3 is available. Key management via OS Keyring, env var, or file. Recently added — not yet battle-tested in production.
-9. **Comprehensive Input Validation** — All endpoints (API and Web UI) have rate limiting, input validation (`validate_string_input`), and RAG context sanitization. 6 injection detectors with Unicode normalization. 47 jailbreak patterns.
+9. **Comprehensive Input Validation** — All endpoints (API and Web UI) have rate limiting, input validation (`validate_string_input`), and RAG context sanitization. 6 injection detectors with Unicode normalization. 49 jailbreak patterns.
 
 ## Technology stack
 
 | Component | Technology |
 |-----------|-----------|
 | Language | Python 3.11+ (bundled 3.12 in installer) |
-| Web framework | FastAPI 0.115+ |
+| Web framework | FastAPI 0.136.3 (pinned) |
 | Vector database | Qdrant (embedded, no external process required) |
 | LLM backends | MLX, llama.cpp (llama-cpp-python 0.3.19 pinned), Ollama |
 | Embeddings | **fastembed ONNX (paraphrase-multilingual-mpnet-base-v2, 768D) — primary offline** / nomic-embed-text via Ollama (optional) |
@@ -62,7 +62,7 @@ What started as a learning-by-doing project and a giant spaghetti monster evolve
 | CLI | Click + Rich |
 | API | OpenAI-compatible (/v1/chat/completions) |
 | Authentication | X-API-Key (dual-key with rotation) |
-| Security | 6 injection detectors + Unicode normalization, 47 jailbreak patterns, rate limiting, CSP headers |
+| Security | 6 injection detectors + Unicode normalization, 49 jailbreak patterns, rate limiting, CSP headers |
 
 ## Architecture
 
@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # System prompts, module manager, i18n, server.toml
 ├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (6776 collected / 6991 total)
+├── tests/                 # Test suite (7165 collected / 7400 total)
 └── nexe                   # Main CLI executable
 ```
 
@@ -110,20 +110,20 @@ The knowledge base (`knowledge/`) is designed for both human and AI consumption:
 
 ## Available models (by RAM tier)
 
-13 empirically tested models, 4 tiers. Icons: 👁 = vision (images), 🧠 = thinking (step-by-step reasoning).
+14 empirically tested models, 4 tiers. Icons: 👁 = vision (images), 🧠 = thinking (step-by-step reasoning).
 
 ### tier_8 (8 GB RAM)
 - 👁 🧠 **Qwen3.5 4B** — Alibaba, 2026. Ollama + MLX. **Recommended.**
 
 ### tier_16 (16 GB RAM)
 - 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Qwen3.5 4B (8-bit) — Alibaba, 2026. Ollama + MLX. 8-bit precision (more faithful than base 4B).
 - 👁 🧠 Gemma 4 E4B — Google, 2026. Ollama + MLX.
 - 🧠 Mistral Nemo 12B — Mistral AI, 2024. Ollama + MLX.
 - Salamandra 7B — BSC/AINA, 2025. Ollama + llama.cpp (GGUF). Best for Catalan.
 
 ### tier_24 (24 GB RAM)
 - 👁 🧠 Qwen3.5 27B — Alibaba, 2026. Ollama + MLX.
-- 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
 - 👁 🧠 Mistral Small 3.2 24B — Mistral AI, 2025. Ollama + MLX.
 - 🧠 GPT-OSS 20B — OpenAI, 2025. Ollama + MLX. Apache 2.0.
 
@@ -145,8 +145,8 @@ Custom models also supported via Ollama (name) or Hugging Face (GGUF repo).
 
 ## Installation methods
 
-### 1. macOS DMG Installer (recommended)
-SwiftUI native wizard with 6 screens: welcome, destination folder, model selection (hardware detection by RAM tier), confirmation, progress, completion. Bundles Python 3.12.
+### 1. Desktop App — nexe-app (Tauri v2, recommended)
+Desktop application embedding server-nexe as a Python sidecar inside a Tauri v2 shell. Download the latest `nexe-app_*_aarch64.dmg` (macOS) or `.AppImage` (Linux ARM64) from the [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest) page. Includes an onboarding wizard, system tray, and automatic sidecar management.
 
 ### 2. CLI headless
 ```bash
@@ -155,6 +155,11 @@ cd server-nexe
 ./setup.sh
 ./nexe go
 ```
+
+### 3. SwiftUI DMG Installer (legacy)
+> **Status:** superseded by the Desktop App (Method 1). Kept for existing installations.
+
+Native SwiftUI wizard with 6 screens, bundled Python 3.12, 100% offline install (~1.2 GB). macOS Apple Silicon only.
 
 ## Quick start
 
@@ -201,6 +206,8 @@ Other knowledge documents in this folder:
 - IDENTITY.md — What server-nexe is and is NOT (disambiguation)
 - INSTALLATION.md — Detailed installation guide
 - USAGE.md — Usage examples and practical cases
+- USE_CASES.md — Use cases and when server-nexe does (or does not) make sense
+- LANGUAGES.md — Per-message language detection and response directive
 - ARCHITECTURE.md — Technical architecture in detail
 - RAG.md — How the memory system works
 - PLUGINS.md — Plugin system

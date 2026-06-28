@@ -13,7 +13,13 @@ backends:
 
   * ``mlx``    — the local ``snapshot_download`` directory.
   * ``gguf``   — the single .gguf file returned by ``curl``.
-  * ``ollama`` — the manifest digest reported by ``ollama show --json``.
+  * ``ollama`` — delegated to Ollama's own content-addressed pull. We keep
+                 NO client-side pin (ADR B251 / THREAT_MODEL §4.3): Ollama
+                 verifies every layer against the manifest digest during
+                 ``ollama pull``, and its catalog tags are mutable upstream
+                 (a client pin would false-positive on a legitimate
+                 re-publish). ``verify_download_integrity`` therefore
+                 short-circuits Ollama to a logged ``True``.
 
 On a mismatch this module raises :class:`DownloadIntegrityError` with
 actionable retry instructions. On an unpinned catalog entry (the current
@@ -28,10 +34,10 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
-import subprocess
+import os
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from core.integrity.hashing import (
     HashMismatchError,
@@ -41,15 +47,11 @@ from core.integrity.hashing import (
 )
 from installer.installer_catalog_data import (
     VALID_SHA256_ENGINES,
+    get_expected_mlx_file_hashes,
     get_expected_sha256,
 )
 
 logger = logging.getLogger(__name__)
-
-# Seconds; ``ollama show --json`` is a local call and returns in
-# milliseconds on a warm daemon. Ten seconds leaves ample headroom for a
-# cold boot without letting a wedged daemon block the installer.
-_OLLAMA_SHOW_TIMEOUT = 10
 
 
 class DownloadIntegrityError(RuntimeError):
@@ -75,6 +77,67 @@ class DownloadIntegrityError(RuntimeError):
         super().__init__(message)
 
 
+class UnpinnedModelError(RuntimeError):
+    """Raised when an unpinned artefact is refused install-time consent.
+
+    Replaces the previous silent fail-open (ADR B046b): an MLX/GGUF artefact
+    with no integrity pin is never installed silently — the caller obtains
+    explicit consent or aborts.
+    """
+
+
+_ALLOW_UNPINNED_ENV = "NEXE_ALLOW_UNPINNED"
+
+
+def consent_for_unpinned(
+    engine: str,
+    model_id: str,
+    *,
+    prompt: Callable[[str], str] = input,
+    isatty: Optional[bool] = None,
+) -> bool:
+    """Decide whether to install an MLX/GGUF artefact that has NO integrity pin.
+
+    Returns ``True`` to proceed; raises :class:`UnpinnedModelError` to abort.
+    Policy (ADR B046b) — never a silent fail-open:
+
+      * ``NEXE_ALLOW_UNPINNED`` truthy → proceed (explicit headless/CI opt-in,
+        logged at WARNING).
+      * an interactive TTY → ask ``[y/N]``; raise on anything but yes.
+      * non-interactive without the opt-in → raise (the user can re-run with
+        the env var or pin the model).
+
+    Ollama is NOT routed here: its content-addressed pull already verifies
+    layer integrity against the manifest (see THREAT_MODEL §4.3).
+    """
+    if os.environ.get(_ALLOW_UNPINNED_ENV, "").strip().lower() in {"1", "true", "yes"}:
+        logger.warning(
+            "Installing UNPINNED %s model %r — %s is set; weight integrity is "
+            "NOT verified.", engine, model_id, _ALLOW_UNPINNED_ENV,
+        )
+        return True
+
+    interactive = sys.stdin.isatty() if isatty is None else isatty
+    if interactive:
+        answer = prompt(
+            f"\n⚠️  No integrity pin is available for {engine} model "
+            f"{model_id!r}. Install it WITHOUT weight verification? [y/N] "
+        ).strip().lower()
+        if answer in {"y", "yes"}:
+            logger.warning(
+                "User consented to unpinned install of %s %r.", engine, model_id)
+            return True
+        raise UnpinnedModelError(
+            f"User declined the unpinned install of {engine} model {model_id!r}."
+        )
+
+    raise UnpinnedModelError(
+        f"No integrity pin for {engine} model {model_id!r} and no interactive "
+        f"terminal to confirm. Re-run with {_ALLOW_UNPINNED_ENV}=1 to allow it "
+        f"explicitly, or add a pin to the catalog."
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # Retry text — engine-specific so the UI can paste it verbatim.
 # ═══════════════════════════════════════════════════════════════════════
@@ -83,12 +146,6 @@ class DownloadIntegrityError(RuntimeError):
 def _retry_instructions(
     engine: str, model_id: str, target: Optional[Path] = None
 ) -> str:
-    if engine == "ollama":
-        return (
-            "To retry:\n"
-            f"  ollama rm {model_id}\n"
-            f"  ollama pull {model_id}\n"
-        )
     # mlx/gguf: prefer the real on-disk path (verify_download_integrity always
     # passes `target`). Fall back to the legacy placeholder only when the
     # caller didn't provide one (defensive — never hit in practice).
@@ -98,7 +155,7 @@ def _retry_instructions(
         return (
             "To retry:\n"
             f"  rm {location}\n"
-            "  ./nexe model pull\n"
+            "  ./nexe model install <model-name>\n"
         )
     if engine == "mlx":
         local_name = model_id.split("/")[-1]
@@ -106,143 +163,104 @@ def _retry_instructions(
         return (
             "To retry:\n"
             f"  rm -rf {location}\n"
-            "  ./nexe model pull\n"
+            "  ./nexe model install <model-name>\n"
         )
     # Defensive: unreachable — dispatch already rejects unknown engines.
     return ""
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Ollama — read the manifest digest via the local daemon.
-# ═══════════════════════════════════════════════════════════════════════
-
-
-def _resolve_ollama_bin(ollama_bin: str, model_id: str) -> Optional[str]:
-    """Return the resolved ollama binary path or None if not found."""
-    if shutil.which(ollama_bin):
-        return ollama_bin
-    if Path(ollama_bin).is_file():
-        return ollama_bin
-    logger.warning(
-        "Integrity: ollama binary not found at %r — cannot verify digest for %r",
-        ollama_bin, model_id,
-    )
-    return None
-
-
-def _run_ollama_show(resolved: str, model_id: str) -> Optional[str]:
-    """Run ``ollama show --json`` and return stdout or None on failure."""
-    try:
-        result = subprocess.run(  # nosec B603: resolved is validated via shutil.which/Path.is_file; model_id is from internal MODEL_CATALOG (supply chain trust)
-            [resolved, "show", "--json", model_id],
-            capture_output=True,
-            text=True,
-            timeout=_OLLAMA_SHOW_TIMEOUT,
-        )
-    except (subprocess.TimeoutExpired, OSError) as e:
-        logger.warning(
-            "Integrity: `ollama show --json %s` failed (%s) — cannot verify digest",
-            model_id, e,
-        )
-        return None
-    if result.returncode != 0 or not result.stdout.strip():
-        logger.warning(
-            "Integrity: `ollama show --json %s` returned %d; stderr=%s — cannot verify digest",
-            model_id,
-            result.returncode,
-            (result.stderr or "").strip()[:200],
-        )
-        return None
-    return result.stdout
-
-
-def _parse_ollama_digest(stdout: str, model_id: str) -> Optional[str]:
-    """Parse the digest field from ollama show JSON output."""
-    try:
-        payload = json.loads(stdout)
-    except json.JSONDecodeError as e:
-        logger.warning(
-            "Integrity: `ollama show --json %s` emitted invalid JSON (%s) — cannot verify digest",
-            model_id, e,
-        )
-        return None
-    digest = (
-        (payload.get("details") or {}).get("digest")
-        or payload.get("digest")
-        or None
-    )
-    if digest is None:
-        logger.warning(
-            "Integrity: `ollama show --json %s` has no details.digest — older Ollama? "
-            "Falling back to legacy mode.",
-            model_id,
-        )
-        return None
-    # Schema drift: some Ollama versions emit ``digest`` as a structured
-    # object (dict/list) instead of a string.
-    if not isinstance(digest, str):
-        logger.warning(
-            "Integrity: `ollama show --json %s` returned non-string digest %r — "
-            "falling back to legacy mode.",
-            model_id, type(digest).__name__,
-        )
-        return None
-    # Normalise away the optional ``sha256:`` prefix some versions emit.
-    if digest.lower().startswith("sha256:"):
-        digest = digest[len("sha256:"):]
-    return digest
-
-
-def get_ollama_digest(
-    model_id: str,
-    *,
-    ollama_bin: str = "ollama",
-) -> Optional[str]:
-    """Return the SHA256 digest reported by ``ollama show --json <model>``.
-
-    Accepted schemas:
-      * recent builds → ``{"details": {"digest": "<hex>"}}``
-      * older builds  → ``{"digest": "<hex>"}``
-
-    Some Ollama versions prefix the hex with ``sha256:``; that prefix is
-    stripped before returning. Any failure (binary missing, non-zero exit,
-    invalid JSON, timeout, or absent ``digest`` field) is logged as a
-    WARNING and returns ``None`` — the installer treats that as the
-    legacy condition ("verify not available for this environment") rather
-    than as a mismatch.
-    """
-    resolved = _resolve_ollama_bin(ollama_bin, model_id)
-    if resolved is None:
-        return None
-    stdout = _run_ollama_show(resolved, model_id)
-    if stdout is None:
-        return None
-    return _parse_ollama_digest(stdout, model_id)
-
-
-# ═══════════════════════════════════════════════════════════════════════
 # Dispatch — one place per engine to compute the actual digest.
+# Ollama is not here: it is short-circuited in verify_download_integrity
+# (delegated to Ollama's content-addressed pull, ADR B251).
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _compute_actual(
-    engine: str,
-    target: Path,
-    *,
-    ollama_bin: str,
-    model_id: str,
-) -> Optional[str]:
+def _compute_actual(engine: str, target: Path) -> Optional[str]:
     """Compute the actual SHA256 digest of a downloaded artifact by engine type."""
     if engine == "mlx":
         return sha256_of_dir(target)
     if engine == "gguf":
         return sha256_of_file(target)
-    if engine == "ollama":
-        return get_ollama_digest(model_id, ollama_bin=ollama_bin)
     raise ValueError(
         f"Unknown engine for integrity check: {engine!r}. "
         f"Expected one of: {sorted(VALID_SHA256_ENGINES)}"
     )
+
+
+def _locate_in_dir(root: Path, rfilename: str) -> Optional[Path]:
+    """Find ``rfilename`` inside ``root`` (snapshot layout or HF-cache), safely.
+
+    Tries the natural snapshot path ``root/rfilename`` first, then falls back
+    to a basename search at any depth (HF cache stores the real bytes under
+    ``snapshots/<rev>/`` symlinked from ``blobs/``). Symlink safety mirrors
+    ``_find_bundle_file``: the resolved target must stay inside ``root`` so a
+    tampered snapshot cannot point a pinned name at an attacker-known file.
+    """
+    root_resolved = root.resolve()
+
+    def _safe(p: Path) -> Optional[Path]:
+        try:
+            resolved = p.resolve()
+            resolved.relative_to(root_resolved)
+        except (ValueError, OSError):
+            return None
+        return p if resolved.is_file() else None
+
+    direct = _safe(root / rfilename)
+    if direct is not None:
+        return direct
+    basename = Path(rfilename).name
+    for p in root.rglob(basename):
+        if any(part.startswith(".") for part in p.relative_to(root).parts):
+            continue
+        safe = _safe(p)
+        if safe is not None:
+            return safe
+    return None
+
+
+def _verify_mlx_files(
+    target: Path, model_id: str, expected_files: dict[str, str]
+) -> bool:
+    """Verify each pinned LFS file of an MLX snapshot against its HF sha256.
+
+    Tier-2 (provider-published) MLX pin, ADR B046b. For every published
+    ``{rfilename: sha256}`` (the big ``.safetensors`` weights), locate the file
+    inside ``target`` and re-hash it. A missing or mismatching pinned weight
+    file raises ``DownloadIntegrityError`` (fail-closed); the artefact is
+    preserved on disk for post-mortem. ``expected_files`` is non-empty (the
+    caller checks), so a True result always means real verification happened.
+    """
+    for rfilename, expected_sha in expected_files.items():
+        located = _locate_in_dir(target, rfilename)
+        if located is None:
+            msg = (
+                f"Pinned MLX weight {rfilename!r} missing from {model_id!r} "
+                f"snapshot at {target} — the download is incomplete or tampered.\n"
+                f"{_retry_instructions('mlx', model_id, target)}"
+            )
+            raise DownloadIntegrityError(artifact=model_id, message=msg)
+        actual_sha = sha256_of_file(located)
+        try:
+            verify_sha256(
+                actual_sha,
+                expected_sha,
+                artifact=f"mlx:{model_id}:{rfilename}",
+                allow_missing=False,
+            )
+        except HashMismatchError as exc:
+            msg = (
+                f"SHA256 mismatch for MLX weight {rfilename!r} of {model_id!r}.\n"
+                f"  expected: {exc.expected}\n"
+                f"  actual:   {exc.actual}\n"
+                f"The downloaded artefact has been preserved at {target} for inspection.\n"
+                f"{_retry_instructions('mlx', model_id, target)}"
+            )
+            raise DownloadIntegrityError(
+                artifact=model_id, message=msg, cause=exc
+            ) from exc
+    return True
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -254,20 +272,19 @@ def verify_download_integrity(
     engine: str,
     model_id: str,
     target: Path,
-    *,
-    ollama_bin: str = "ollama",
 ) -> bool:
     """Verify the SHA256 of a freshly downloaded artefact against the catalog.
 
     Returns
     -------
     bool
-        * ``True``  — a pin exists AND the downloaded artefact matches it.
-        * ``False`` — the catalog has no pin for this ``(engine, model_id)``
-          OR the actual digest could not be computed (e.g. missing
-          ``ollama`` binary, older daemon without a ``digest`` field).
+        * ``True``  — a pin exists AND the downloaded artefact matches it,
+          OR the engine is ``ollama`` (integrity delegated to Ollama's own
+          content-addressed pull — see below).
+        * ``False`` — the catalog has no pin for this ``(engine, model_id)``.
           The caller has already seen a WARNING in the log and should
-          continue with the install while surfacing a "not pinned" notice.
+          continue with the install while surfacing a "not pinned" notice
+          (or asking for explicit consent — ADR B046b).
 
     Raises
     ------
@@ -285,12 +302,34 @@ def verify_download_integrity(
             f"Expected one of: {sorted(VALID_SHA256_ENGINES)}"
         )
 
+    # Ollama (ADR B251): integrity is delegated to Ollama's own
+    # content-addressed pull — the daemon verifies every layer against the
+    # manifest digest during `ollama pull` (THREAT_MODEL §4.3). We keep no
+    # redundant client-side pin: Ollama catalog tags are mutable upstream, so
+    # a pinned digest would raise a false DownloadIntegrityError every time
+    # the provider re-publishes a tag. Short-circuit to a logged True.
+    if engine == "ollama":
+        logger.info(
+            "Integrity: ollama %r verified by Ollama's content-addressed pull "
+            "(no client-side pin; tags are mutable upstream).", model_id,
+        )
+        return True
+
+    # Tier-2 MLX (ADR B046b): no self-computed dir-hash, but Hugging Face
+    # publishes per-LFS-file sha256. Verify each weight file individually.
+    # Tier-1 dir-hash (when present) is stronger and wins via the path below.
+    if engine == "mlx" and get_expected_sha256(engine, model_id) is None:
+        mlx_files = get_expected_mlx_file_hashes(model_id)
+        if mlx_files:
+            return _verify_mlx_files(target, model_id, mlx_files)
+        # No tier-1 and no tier-2 → genuinely unpinned: fall through to the
+        # generic path, which returns False (allow_missing) → consent gate.
+
     expected = get_expected_sha256(engine, model_id)
-    actual = _compute_actual(engine, target, ollama_bin=ollama_bin, model_id=model_id)
+    actual = _compute_actual(engine, target)
     if actual is None:
-        # Could not determine the actual digest — Ollama-only path when the
-        # daemon is absent or too old. Treat as legacy; the user sees a
-        # warning already.
+        # Could not determine the actual digest. Treat as legacy; the user
+        # sees a warning already.
         return False
 
     try:
@@ -469,7 +508,6 @@ def verify_embedding_bundle(bundle_dir: Path) -> bool:
 
 __all__ = [
     "DownloadIntegrityError",
-    "get_ollama_digest",
     "verify_download_integrity",
     "verify_embedding_bundle",
 ]

@@ -17,6 +17,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from core.env_utils import parse_port
+from core.paths.constants import BASE_CONFIG_RELATIVE
+
 # ═══════════════════════════════════════════════════════════════════════════
 # LOAD .env AT MODULE LEVEL (before any imports that depend on env vars)
 # This ensures environment variables are available for all module-level code
@@ -40,21 +43,21 @@ logger = logging.getLogger(__name__)
 from .helpers import setup_signal_handlers, is_port_in_use, translate  # noqa: E402  # after load_dotenv()
 from .factory import create_app  # noqa: E402  # after load_dotenv()
 from core.version import __version__  # noqa: E402  # after load_dotenv()
-# F2.A11 refactor: parent watchdog mogut a core/server/watchdog.py per trencar
-# cicle imports (lifespan → runner → factory → endpoints → lifespan). Re-exportat
-# aquí per backward compatibility amb runner.main() i tests.
+# F2.A11 refactor: parent watchdog moved to core/server/watchdog.py to break
+# the import cycle (lifespan → runner → factory → endpoints → lifespan). Re-exported
+# here for backward compatibility with runner.main() and tests.
 from .watchdog import start_parent_watchdog as _start_parent_watchdog  # noqa: E402  # after load_dotenv()
-# utilitats de ports mogudes a core/server/port_utils.py.
-# Re-exportat aquí perquè _handle_port_conflict el resol al namespace de runner
-# (els tests fan patch de core.server.runner.kill_process_on_port).
+# port utilities moved to core/server/port_utils.py.
+# Re-exported here so _handle_port_conflict resolves it in the runner namespace
+# (the tests patch core.server.runner.kill_process_on_port).
 from .port_utils import kill_process_on_port  # noqa: E402  # after load_dotenv()
-# lògica del tray moguda a core/server/tray_launcher.py.
-# Re-exportats aquí per backward compatibility amb runner.main() i tests.
+# tray logic moved to core/server/tray_launcher.py.
+# Re-exported here for backward compatibility with runner.main() and tests.
 from .tray_launcher import (  # noqa: E402  # after load_dotenv()
-    _is_tray_already_running,
-    _is_tray_supported,
-    _kill_stale_tray,
-    _launch_tray_process,
+    _is_tray_already_running,  # noqa: F401
+    _is_tray_supported,  # noqa: F401
+    _kill_stale_tray,  # noqa: F401
+    _launch_tray_process,  # noqa: F401
     _maybe_launch_tray,
 )
 
@@ -230,7 +233,7 @@ def _log_quick_commands_banner(host: str, port: int) -> None:
     f"  {CYAN}System status:{RESET}     ./nexe status\n"
     f"\n{BOLD}QUICK CONFIG:{RESET}\n"
     f"  To change personality (System Prompt):\n"
-    f"  edit {YELLOW}personality/server.toml{RESET}\n"
+    f"  edit {YELLOW}{BASE_CONFIG_RELATIVE}{RESET}\n"
     f"{YELLOW}Server running at: {host}:{port}{RESET}"
   )
 
@@ -290,10 +293,11 @@ def main():
   from core.config import DEFAULT_HOST, DEFAULT_PORT, get_default_host, get_default_port
   server_config = config.get('core', {}).get('server', {})
   # NEXE_PORT/NEXE_HOST (injected by Tauri in sidecar mode)
-  # tenen prioritat màxima sobre server_config. Sense aquest override, el
-  # sidecar arrencaria al port del config.yaml i Tauri no el trobaria.
-  env_port = os.environ.get("NEXE_PORT")
-  port = int(env_port) if env_port else server_config.get('port', DEFAULT_PORT)
+  # take top priority over server_config. Without this override, the
+  # sidecar would start on the config.yaml port and Tauri wouldn't find it.
+  # MC-093: validate + range-check NEXE_PORT (fail-fast, shared with config.py).
+  env_port = parse_port(os.environ.get("NEXE_PORT"), var_name="NEXE_PORT")
+  port = env_port if env_port is not None else server_config.get('port', DEFAULT_PORT)
   env_host = os.environ.get("NEXE_HOST")
   host = env_host if env_host else server_config.get('host', DEFAULT_HOST)
   # NOTA: import de get_default_host/get_default_port reservat per a M0-bis

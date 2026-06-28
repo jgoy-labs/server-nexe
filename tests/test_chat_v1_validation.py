@@ -58,10 +58,14 @@ class TestChatV1Validation:
     """Bug 21 — string input validation at /v1/chat/completions."""
 
     def test_sql_injection_in_chat_passes_through_to_llm(self, client):
-        """Bug 21 r1 — SQLi in `messages.content` (context='chat') is NOT blocked by the
-        sanitizer: the payload goes to the LLM, not to a SQL DB. RAG uses Qdrant
-        (vector DB). The sanitizer DOES block SQLi in `context='param'` (model,
-        engine, etc.) — see `test_sql_injection_in_model_field_rejected`.
+        """T6 REFORÇAT — SQLi en messages.content (context='chat') NO ha de ser bloquejat (400).
+        Bug tapat: si una regressió re-activés check_sql en context 'chat'
+        (input_sanitizers.py:152-153), el sanititzador retornaria 400 i els usuaris
+        que escriuen SQL legítim serien rebutjats. L'assert original acceptava 400
+        com a vàlid, tapant la regressió.
+        Prova de mutació: canviar `return False, False, False, False` per
+        `return check_sql, check_command, check_path_traversal, check_ldap` a
+        input_sanitizers.py:153 fa que el test es posi VERMELL.
         """
         payload = {
             "messages": [
@@ -71,12 +75,14 @@ class TestChatV1Validation:
             "use_rag": False,
         }
         r = client.post("/v1/chat/completions", json=payload, headers=_HEADERS)
-        # Accept 200 (LLM handles the text), 400 (if check_sql is re-activated in chat),
-        # 404 (model not available in this env) or 503 (engine/Ollama down on CI). 404/503
-        # both mean the request PASSED sanitization (not blocked with 400) — which is what
-        # this test verifies (no-block of SQLi in chat content).
-        assert r.status_code in (200, 400, 404, 503), (
-            f"Esperat 200 (passthrough LLM), 400 (rejected), 404 (model absent) o 503 (engine avall), rebut {r.status_code}: {r.text}"
+        # El sanititzador en context='chat' ha de desactivar check_sql (L152-153).
+        # 400 = bloquejat pel sanititzador → regressió detectada.
+        # Qualsevol altre codi (200 LLM, 503 engine avall, 422 validació Pydantic)
+        # indica que el passthrough funciona (la petició ha passat la sanitització).
+        assert r.status_code != 400, (
+            f"SQLi en context 'chat' NO ha de ser bloquejat amb 400 "
+            f"(input_sanitizers.py:152-153 deshabilita check_sql en 'chat'). "
+            f"Rebut {r.status_code}: {r.text[:200]}"
         )
 
     def test_xss_in_message_content_rejected(self, client):

@@ -16,6 +16,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import logging
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -141,3 +142,99 @@ class TestLoaderPopOnFalse:
       "_node is None (which happens naturally on initialize exception)."
     )
     exploding_plugin.initialize.assert_awaited_once()
+
+
+class TestDegradedModulesSignal:
+  """MC-122: a startup phase that fails silently must NOT be reported as
+  'all operational'. Failed subsystems are appended to server_state.degraded_modules
+  and the final banner logs DEGRADED. These tests use a REAL list for
+  degraded_modules (the older tests used a MagicMock server_state, whose
+  .append() is a no-op and would not catch a regression)."""
+
+  def _state_with_real_degraded_list(self):
+    state = MagicMock()
+    state.config = {}
+    state.project_root = "/tmp"
+    state.degraded_modules = []  # real list, not a MagicMock attribute
+    return state
+
+  @pytest.mark.asyncio
+  async def test_plugin_init_exception_marks_degraded(self):
+    """A plugin that raises during initialize() is recorded in degraded_modules.
+
+    Mutation guard: drop the `server_state.degraded_modules.append(module_name)`
+    in the except branch of initialize_plugin_modules and this goes RED."""
+    exploding = MagicMock()
+    exploding.initialize = AsyncMock(side_effect=RuntimeError("boom"))
+    app = _make_app_with_modules({"exploding": exploding})
+    state = self._state_with_real_degraded_list()
+
+    await initialize_plugin_modules(app, state)
+
+    assert "exploding" in state.degraded_modules, (
+      "a plugin that raised during initialize() must be flagged in degraded_modules (MC-122)"
+    )
+
+  @pytest.mark.asyncio
+  async def test_plugin_init_returns_false_marks_degraded(self):
+    """A plugin whose initialize() returns False is recorded in degraded_modules.
+
+    Mutation guard: drop the append() in the 'returned False' branch → RED."""
+    bad = MagicMock()
+    bad.initialize = AsyncMock(return_value=False)
+    app = _make_app_with_modules({"bad": bad})
+    state = self._state_with_real_degraded_list()
+
+    await initialize_plugin_modules(app, state)
+
+    assert "bad" in state.degraded_modules, (
+      "a plugin whose initialize() returned False must be flagged in degraded_modules (MC-122)"
+    )
+
+  @pytest.mark.asyncio
+  async def test_healthy_plugin_not_marked_degraded(self):
+    """A plugin that initializes cleanly leaves degraded_modules empty."""
+    good = MagicMock()
+    good.initialize = AsyncMock(return_value=True)
+    app = _make_app_with_modules({"good": good})
+    state = self._state_with_real_degraded_list()
+
+    await initialize_plugin_modules(app, state)
+
+    assert state.degraded_modules == [], "a healthy plugin must not be flagged"
+
+  def test_banner_warns_degraded_when_modules_failed(self, monkeypatch, caplog):
+    """MC-122: the final banner logs DEGRADED (not 'all operational') when a
+    subsystem failed.
+
+    Mutation guard: revert the banner back to the unconditional
+    'All systems operational' log and this goes RED."""
+    import core.lifespan as lifespan
+    monkeypatch.setattr(lifespan.server_state, "config", {"core": {"server": {}}}, raising=False)
+    monkeypatch.setattr(lifespan.server_state, "crypto_provider", None, raising=False)
+    monkeypatch.setattr(lifespan.server_state, "degraded_modules", ["memory", "mlx"], raising=False)
+
+    with caplog.at_level(logging.WARNING):
+      lifespan._startup_final_banner()
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert any("DEGRADED" in m for m in messages), (
+      "banner must warn DEGRADED when degraded_modules is non-empty (MC-122)"
+    )
+    assert any("memory" in m and "mlx" in m for m in messages), (
+      "banner must name the failed subsystems"
+    )
+
+  def test_banner_operational_when_nothing_degraded(self, monkeypatch, caplog):
+    """With no degraded modules the banner reports 'All systems operational'."""
+    import core.lifespan as lifespan
+    monkeypatch.setattr(lifespan.server_state, "config", {"core": {"server": {}}}, raising=False)
+    monkeypatch.setattr(lifespan.server_state, "crypto_provider", None, raising=False)
+    monkeypatch.setattr(lifespan.server_state, "degraded_modules", [], raising=False)
+
+    with caplog.at_level(logging.INFO):
+      lifespan._startup_final_banner()
+
+    messages = [r.getMessage() for r in caplog.records]
+    assert any("All systems operational" in m for m in messages)
+    assert not any("DEGRADED" in m for m in messages)

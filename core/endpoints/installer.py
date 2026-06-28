@@ -26,13 +26,18 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import AsyncIterator
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from core.installer_constants import VALID_ENGINES as _VALID_ENGINES
-from core.onboarding_state import OnboardingState
+from core.onboarding_state import (
+    OnboardingState,
+    _read_hf_token_from_keychain,
+    _store_hf_token_in_keychain,
+)
 
 # cleanup: import DownloadIntegrityError at top to
 # avoid pyright `reportPossiblyUnboundVariable` when the lazy import inside
@@ -63,10 +68,10 @@ _SSE_HEADERS = {
 # Single-worker executor for blocking download tasks (MLX snapshot_download).
 _dl_executor = ThreadPoolExecutor(max_workers=1)
 
-# Module-level lock to prevent concurrent Ollama installs
-# concurrents. Si l'usuari clica "instal·lar" 2 cops, el primer agafa el lock i
-# el segon retorna un missatge informatiu. Sense això, dos threads farien
-# zip_extract a /Applications/Ollama.app simultàniament → app corrupta.
+# Module-level lock to prevent concurrent Ollama installs.
+# If the user clicks "install" twice, the first one grabs the lock and
+# the second returns an informational message. Without this, two threads would
+# run zip_extract on /Applications/Ollama.app simultaneously → corrupt app.
 _ollama_install_lock = _threading.Lock()
 
 
@@ -136,13 +141,14 @@ def _find_ollama_bin() -> str | None:
     found = shutil.which("ollama")
     if found:
         return found
-    for candidate in [
-        "/usr/local/bin/ollama",  # nosemgrep: absolute_path
-        "/opt/homebrew/bin/ollama",  # nosemgrep: absolute_path
-        os.path.expanduser("~/bin/ollama"),
-        "/Applications/Ollama.app/Contents/Resources/ollama",  # nosemgrep: absolute_path
-        os.path.expanduser("~/Applications/Ollama.app/Contents/Resources/ollama"),
-    ]:
+    # MC-028: the well-known install paths are the canonical list shared with
+    # ollama_runtime (deferred import keeps the layering gate green: core must
+    # not import-time depend on plugins). Here we LOCATE an executable binary
+    # (X_OK) for model installs — a different concern from spawning `serve`.
+    from plugins.ollama_module.core.ollama_runtime import OLLAMA_BIN_CANDIDATES
+
+    for candidate in OLLAMA_BIN_CANDIDATES:
+        candidate = os.path.expanduser(candidate)  # expand ~ at call time, honouring current $HOME
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
             return candidate
     return None
@@ -294,6 +300,60 @@ async def _stream_mlx(model_id: str, request: Request) -> AsyncIterator[dict]:
         set_tqdm_queue(None)
 
 
+async def _install_ollama_and_locate() -> str:
+    """Run ensure_ollama_installed and return the Ollama binary path.
+
+    Falls back to the bundled Ollama.app binary when the CLI is installed but
+    not yet registered on PATH. Raises RuntimeError with a UX-friendly,
+    platform-specific message on any failure. The caller MUST hold
+    ``_ollama_install_lock``.
+
+    MC-031: single source of truth for the install→locate machine shared by
+    _install_ollama_if_needed (RuntimeError path) and install_ollama_endpoint
+    (SSE path), so the bundle fallback can never diverge between them again.
+    """
+    from installer.installer_ollama_install import ensure_ollama_installed
+    loop = asyncio.get_event_loop()
+    try:
+        installed = await loop.run_in_executor(None, ensure_ollama_installed, True)
+    except PermissionError:
+        logger.exception("Ollama install: permission denied")
+        _system = platform.system().lower()
+        if _system == "darwin":
+            raise RuntimeError(
+                "No s'ha pogut instal.lar Ollama a /Applications/. "
+                "Permis denegat. Instal.la'l manualment des d'ollama.com"
+            ) from None
+        if _system == "linux":
+            raise RuntimeError(
+                "Linux: l'instal.lador d'Ollama necessita sudo. "
+                "Instal.la manualment des d'ollama.com/download/linux"
+            ) from None
+        raise RuntimeError("Ollama install permission denied") from None
+    except Exception as exc:
+        logger.exception("Ollama auto-install failed")
+        raise RuntimeError(f"Ollama auto-install failed: {exc}") from exc
+    if not installed:
+        raise RuntimeError(
+            "Ollama install did not complete. Restart the app or "
+            "install manually from https://ollama.com"
+        )
+    ollama = _find_ollama_bin()
+    if ollama:
+        return ollama
+    for _fallback in [
+        "/Applications/Ollama.app/Contents/Resources/ollama",  # nosemgrep: absolute_path
+        os.path.expanduser("~/Applications/Ollama.app/Contents/Resources/ollama"),
+    ]:
+        if os.path.isfile(_fallback) and os.access(_fallback, os.X_OK):
+            logger.info("ollama: CLI not yet registered; using bundle binary %s", _fallback)
+            return _fallback
+    raise RuntimeError(
+        "Ollama installed but binary still not located. "
+        "Open Ollama.app once to finish setup, then restart server-nexe."
+    )
+
+
 async def _install_ollama_if_needed(request: Request) -> str:
     """Auto-install Ollama and return its binary path. Raises RuntimeError on failure."""
     if await request.is_disconnected():
@@ -301,46 +361,7 @@ async def _install_ollama_if_needed(request: Request) -> str:
     if not _ollama_install_lock.acquire(blocking=False):
         raise RuntimeError("Ja s'esta instal.lant Ollama en un altre proces")
     try:
-        from installer.installer_ollama_install import ensure_ollama_installed
-        loop = asyncio.get_event_loop()
-        try:
-            installed = await loop.run_in_executor(None, ensure_ollama_installed, True)
-        except PermissionError:
-            logger.exception("Ollama install: permission denied")
-            _system = platform.system().lower()
-            if _system == "darwin":
-                raise RuntimeError(
-                    "No s'ha pogut instal.lar Ollama a /Applications/. "
-                    "Permis denegat. Instal.la'l manualment des d'ollama.com"
-                ) from None
-            if _system == "linux":
-                raise RuntimeError(
-                    "Linux: l'instal.lador d'Ollama necessita sudo. "
-                    "Instal.la manualment des d'ollama.com/download/linux"
-                ) from None
-            raise RuntimeError("Ollama install permission denied") from None
-        except Exception as exc:
-            logger.exception("Ollama auto-install failed")
-            raise RuntimeError(f"Ollama auto-install failed: {exc}") from exc
-        if not installed:
-            raise RuntimeError(
-                "Ollama install did not complete. Restart the app or "
-                "install manually from https://ollama.com"
-            )
-        ollama = _find_ollama_bin()
-        if not ollama:
-            for _fallback in [
-                "/Applications/Ollama.app/Contents/Resources/ollama",  # nosemgrep: absolute_path
-                os.path.expanduser("~/Applications/Ollama.app/Contents/Resources/ollama"),
-            ]:
-                if os.path.isfile(_fallback) and os.access(_fallback, os.X_OK):
-                    logger.info("ollama: CLI not yet registered; using bundle binary %s", _fallback)
-                    return _fallback
-            raise RuntimeError(
-                "Ollama installed but binary still not located. "
-                "Open Ollama.app once to finish setup, then restart server-nexe."
-            )
-        return ollama
+        return await _install_ollama_and_locate()
     finally:
         _ollama_install_lock.release()
 
@@ -427,23 +448,6 @@ def _fastembed_cache_dir() -> Path:
     return Path.home() / ".cache" / "fastembed"
 
 
-def _fastembed_cache_size_bytes(cache_dir: Path) -> int:
-    """Sum bytes under the fastembed cache. Returns 0 if dir missing."""
-    if not cache_dir.exists():
-        return 0
-    total = 0
-    try:
-        for f in cache_dir.rglob("*"):
-            if f.is_file():
-                try:
-                    total += f.stat().st_size
-                except OSError:
-                    pass
-    except OSError:
-        return total
-    return total
-
-
 def _fastembed_model_bytes(cache_dir: Path, model_id: str) -> int:
     """Sum bytes for a specific model in the fastembed cache.
 
@@ -451,8 +455,8 @@ def _fastembed_model_bytes(cache_dir: Path, model_id: str) -> int:
       models--{org}--{name}/snapshots/{sha}/onnx/   (HF-style layout)
     or legacy flat layout: {name}/
 
-    use this instead of _fastembed_cache_size_bytes to avoid
-    counting other models already in cache.
+    Sums only the requested model's bytes so size estimates don't count
+    other models already present in the cache.
     """
     safe_id = model_id.replace("/", "--")
     # Try HF-style layout first
@@ -574,6 +578,61 @@ async def _stream_embedder(model_id: str, request: Request) -> AsyncIterator[dic
     }
 
 
+def _is_hf_hub_url(url: str) -> bool:
+    """True iff the URL host is on the HuggingFace Hub.
+
+    Used to decide whether to attach the HF token: we only ever send it to HF
+    hosts, never to an arbitrary catalog host. The endswith check is anchored on
+    a leading dot so ``huggingface.co.evil.com`` and ``evilhuggingface.co`` do
+    not match.
+    """
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except ValueError:
+        return False
+    return host == "huggingface.co" or host == "hf.co" or host.endswith(".huggingface.co")
+
+
+def _hf_repo_id_from_url(url: str) -> "str | None":
+    """Derive the HF repo_id (org/model) from a Hugging Face Hub file URL.
+
+    GGUF models are referenced by a raw .gguf URL like
+    ``https://huggingface.co/<org>/<model>/resolve/<rev>/<file>.gguf``, but the
+    HF preflight (model_info / snapshot_download) expects a repo_id. Returns the
+    ``<org>/<model>`` segment, or None when the URL is not on the HF Hub or the
+    path is too short to carry a repo_id (caller should then skip the HF probe).
+    """
+    if not _is_hf_hub_url(url):
+        return None
+    try:
+        path = urlparse(url).path.strip("/")
+    except ValueError:
+        return None
+    parts = [p for p in path.split("/") if p]
+    # Cut at the first path marker; the repo_id is everything before it.
+    for marker in ("resolve", "blob", "tree", "raw"):
+        if marker in parts:
+            parts = parts[: parts.index(marker)]
+            break
+    if len(parts) < 2:
+        return None
+    return "/".join(parts[:2])
+
+
+def _preflight_repo_id(model_id: str) -> "str | None":
+    """Map a preflight model_id to the HF repo_id to probe, or None to skip (B257).
+
+    mlx model_ids are already repo_ids (``org/model``) → returned as-is. gguf
+    model_ids are raw HF file URLs → derive the repo_id. A gguf URL on a non-HF
+    catalog host has no HF gated/size concept → return None so the caller skips
+    the HF probe instead of passing a URL to model_info/snapshot_download (which
+    expect a repo_id and would degrade to a spurious network_error/not_found).
+    """
+    if "://" in model_id:
+        return _hf_repo_id_from_url(model_id)
+    return model_id
+
+
 async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
     """Download a GGUF model via HTTP with progress reporting."""
     import httpx
@@ -582,8 +641,19 @@ async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
     dest = _models_dir() / filename
     dest.parent.mkdir(parents=True, exist_ok=True)
 
+    # B255: a gated GGUF on the HF Hub needs an "Authorization: Bearer <HF_TOKEN>"
+    # header. Attach it ONLY when the URL points at the HF Hub, so the token is
+    # never handed to an arbitrary catalog host. httpx already strips the
+    # Authorization header on cross-origin redirects (verified on 0.28.1), so the
+    # HF→CDN hop that follows a /resolve/ URL does not leak it to the CDN.
+    headers: dict[str, str] = {}
+    if _is_hf_hub_url(model_id):
+        token = await _ensure_hf_token_in_env()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
     async with httpx.AsyncClient(follow_redirects=True, timeout=None) as client:  # nosec B113 — GGUF downloads are unbounded by design; disconnect detection via request.is_disconnected()
-        async with client.stream("GET", model_id) as resp:
+        async with client.stream("GET", model_id, headers=headers) as resp:
             resp.raise_for_status()
             total = int(resp.headers.get("content-length", 0))
             downloaded = 0
@@ -604,6 +674,48 @@ async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
 # ──────────────────────────────────────────────────────────────────────────────
 # Gated-model detection + dry_run preflight
 # ──────────────────────────────────────────────────────────────────────────────
+
+
+# Timeout for the off-thread Keychain read in _ensure_hf_token_in_env (CRY-01).
+# Module-level so tests can shrink it; mirrors the 5s write guard in set_hf_token.
+_HF_KEYCHAIN_READ_TIMEOUT = 5.0
+
+
+async def _ensure_hf_token_in_env() -> str | None:
+    """Return the HF token for gated access, restoring it from the Keychain into
+    ``os.environ`` if the live env lost it (B253).
+
+    ``set_hf_token`` (step 3) stores the token to the Keychain best-effort, but
+    the preflight + ``snapshot_download`` only read ``os.environ['HF_TOKEN']``
+    (process-local). If the sidecar PROCESS restarts mid-download (force-quit +
+    reopen, or a crash), the env is gone and ``apply_to_env`` cannot help — it is
+    only invoked when ``OnboardingState.load()`` succeeds, which does NOT happen
+    while the wizard is still mid-flow (the state file is written at finalize,
+    step 5). The token then sits orphaned in the Keychain. We read it here and
+    re-inject it so the env-based preflight + download pick it up. No-op (zero
+    Keychain access) when the env already holds the token — the common case.
+    """
+    token = os.environ.get("HF_TOKEN") or None
+    if token:
+        return token
+    # Read the Keychain OFF the event loop with a timeout: a headless macOS
+    # Keychain ACL prompt can block for minutes when the bundled Python binary is
+    # not on the item's ACL (precedent CRY-01 — the same guard B054 applied to
+    # the WRITE path in set_hf_token). On timeout/error the wizard keeps going
+    # without a token rather than hanging the whole sidecar.
+    try:
+        loop = asyncio.get_event_loop()
+        token = await asyncio.wait_for(
+            loop.run_in_executor(_dl_executor, _read_hf_token_from_keychain),
+            timeout=_HF_KEYCHAIN_READ_TIMEOUT,
+        )
+    except Exception as exc:  # noqa: BLE001 — timeout or keyring error: never fatal
+        logger.warning("installer: Keychain read for HF_TOKEN skipped (%s)", type(exc).__name__)
+        token = None
+    if token:
+        os.environ["HF_TOKEN"] = token
+        logger.info("installer: HF_TOKEN restored from Keychain (mid-flow restart recovery, B253)")
+    return token
 
 
 def _check_model_access(repo_id: str, token: str | None = None) -> dict:
@@ -700,12 +812,22 @@ async def preflight(engine: str, model_id: str) -> JSONResponse:
 
     # if the user has stored an HF token, the access check
     # and dry-run plan use it so gated repos the user has access to are
-    # reported as "ok" instead of "gated_no_access".
-    token = os.environ.get("HF_TOKEN") or None
+    # reported as "ok" instead of "gated_no_access". Falls back to the Keychain
+    # so a token handed over before a mid-flow sidecar restart is not lost (B253).
+    # gguf model_ids are raw .gguf URLs; HF probes need the repo_id (B257). A
+    # gguf URL on a non-HF host has no HF gated/size concept → report ok/empty.
+    repo_id = _preflight_repo_id(model_id)
+    if repo_id is None:
+        return JSONResponse({
+            "engine": engine,
+            "access": {"status": "ok"},
+            "plan": {"total_bytes": 0, "cached_bytes": 0, "files_count": 0},
+        })
+    token = await _ensure_hf_token_in_env()
     # Run blocking HF calls in the executor so we don't block the event loop.
     loop = asyncio.get_event_loop()
-    access = await loop.run_in_executor(_dl_executor, _check_model_access, model_id, token)
-    plan = await loop.run_in_executor(_dl_executor, _dry_run_plan, model_id, token)
+    access = await loop.run_in_executor(_dl_executor, _check_model_access, repo_id, token)
+    plan = await loop.run_in_executor(_dl_executor, _dry_run_plan, repo_id, token)
     return JSONResponse({
         "engine": engine,
         "access": access,
@@ -721,9 +843,16 @@ async def _preflight_hf_access(engine: str, model_id: str) -> "dict | None":
     """
     if engine not in ("mlx", "gguf"):
         return None
-    token = os.environ.get("HF_TOKEN") or None
+    # gguf model_ids are raw .gguf URLs; HF probes need the repo_id (B257). A
+    # gguf URL on a non-HF host has no HF gated concept → fall through to download.
+    repo_id = _preflight_repo_id(model_id)
+    if repo_id is None:
+        return None
+    # Falls back to the Keychain (re-injecting into the env) so a token handed
+    # over before a mid-flow sidecar restart still authenticates the retry (B253).
+    token = await _ensure_hf_token_in_env()
     loop = asyncio.get_event_loop()
-    access = await loop.run_in_executor(_dl_executor, _check_model_access, model_id, token)
+    access = await loop.run_in_executor(_dl_executor, _check_model_access, repo_id, token)
     status = access.get("status")
     if status == "gated_no_access":
         return {
@@ -731,9 +860,10 @@ async def _preflight_hf_access(engine: str, model_id: str) -> "dict | None":
             "code": "GATED_NO_TOKEN",
             "message": (
                 "This model requires accepting a Hugging Face "
-                "license and a connected HF token. Open the "
-                "URL, accept the terms, and configure your "
-                "token in Step 2 Advanced."
+                "license and a connected HF token. Open the URL, "
+                "accept the terms, paste your token in the model "
+                "download step and retry — or switch this model's "
+                "engine to Ollama, which needs no token."
             ),
             "url": access.get("url"),
         }
@@ -743,21 +873,44 @@ async def _preflight_hf_access(engine: str, model_id: str) -> "dict | None":
 
 
 async def _sha256_check(engine: str, model_id: str) -> "dict | None":
-    """Run SHA256 integrity check. Returns an error event dict on failure, None on success/skip."""
+    """Run SHA256 integrity check.
+
+    Returns:
+      - ``None`` when the weights were verified against a pinned digest.
+      - a ``{"type": "warning", "code": "SHA256_NOT_PINNED", ...}`` event when
+        the model has no pin in the catalog (INST-002: the GUI/SSE path must
+        surface the same ⚠️ notice the CLI already prints, per the
+        download_verify contract — the caller yields it but does NOT abort).
+      - a ``{"type": "error", "code": "SHA256_FAIL", ...}`` event on a digest
+        mismatch or an unexpected verification error (fail-closed, INST-003).
+    """
     try:
         from installer.download_verify import verify_download_integrity  # type: ignore[import]
         loop = asyncio.get_event_loop()
         if engine == "ollama":
-            ollama_bin = _find_ollama_bin() or "ollama"
+            # ADR B251: Ollama integrity is delegated to its content-addressed
+            # pull; verify_download_integrity short-circuits to True (the target
+            # path is unused for Ollama).
             matched = await loop.run_in_executor(
-                None,
-                lambda: verify_download_integrity(engine, model_id, Path("."), ollama_bin=ollama_bin),
+                None, verify_download_integrity, engine, model_id, Path("."),
             )
         else:
             target_path = Path(_resolve_model_path(engine, model_id))
             matched = await loop.run_in_executor(None, verify_download_integrity, engine, model_id, target_path)
         if not matched:
             logger.info("installer: SHA256 not pinned for %s/%s — install continues", engine, model_id)
+            # INST-002: surface the missing-pin condition to the user instead of
+            # only logging it. The CLI prints a yellow ⚠️ and the download_verify
+            # contract requires the caller to make it visible. This is a warning,
+            # not an error: the install continues (the caller does not abort).
+            return {
+                "type": "warning",
+                "code": "SHA256_NOT_PINNED",
+                "message": (
+                    f"{model_id}: installed without weight verification "
+                    "(no SHA256 pin in the catalog)."
+                ),
+            }
         return None
     except DownloadIntegrityError as exc:
         logger.error("installer: SHA256 mismatch for %s/%s: %s", engine, model_id, exc)
@@ -832,10 +985,14 @@ async def download_model(engine: str, model_id: str, request: Request) -> Stream
 
             # SHA256 integrity check post-download (mlx/ollama/gguf only, not embedder).
             if engine in ("mlx", "ollama", "gguf"):
-                err_ev = await _sha256_check(engine, model_id)
-                if err_ev is not None:
-                    yield await _sse(err_ev)
-                    return
+                ev = await _sha256_check(engine, model_id)
+                if ev is not None:
+                    yield await _sse(ev)
+                    # INST-002: only a hard integrity failure aborts the install.
+                    # A SHA256_NOT_PINNED warning is surfaced but the download
+                    # still completes (then falls through to the done event).
+                    if ev.get("type") == "error":
+                        return
 
             yield await _sse({"type": "done", "model_id": model_id})
         except Exception as exc:
@@ -843,6 +1000,65 @@ async def download_model(engine: str, model_id: str, request: Request) -> Stream
             yield await _sse({"type": "error", "message": str(exc)})
 
     return StreamingResponse(generate(), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+class HfTokenBody(BaseModel):
+    """Body for POST /installer/hf-token.
+
+    Carries the Hugging Face access token the user pasted in the model-
+    selection step so a GATED model can be downloaded in the SAME onboarding
+    run. The token travels in a POST body (never a query param), so — unlike
+    the GET /installer/download — it stays out of the uvicorn access log.
+    Length capped like FinalizeBody (HF tokens are ~40 chars; the cap guards
+    against an accidental paste of a huge blob).
+
+    Caveat (B054 follow-up E): a paste OVER ``max_length`` raises a Pydantic
+    validation error whose payload echoes the offending value, which the
+    shared validation handler logs + returns in the 422 body. Real HF tokens
+    are far under the cap, so this needs a deliberate oversized paste; the
+    global redaction fix is tracked as a follow-up.
+    """
+
+    token: str = Field(..., min_length=1, max_length=200)
+
+
+@router.post("/hf-token", operation_id="installer_set_hf_token")
+async def set_hf_token(body: HfTokenBody) -> JSONResponse:
+    """Load the HF token into the live sidecar env so a gated-model download
+    in this same onboarding run can authenticate.
+
+    Why this exists (B054): the token input previously lived only in the
+    Advanced zone (which skips the catalog download), and the only path that
+    persisted the token — POST /installer/finalize (step 5) — runs AFTER the
+    download (step 3). So a first-run user could never download a gated MLX
+    model. This endpoint lets step 3 hand the token over BEFORE the download:
+    it sets ``os.environ['HF_TOKEN']`` (read by ``_preflight_hf_access`` and
+    ``snapshot_download``) and best-effort persists it to the Keychain so a
+    restart between step 3 and step 5 does not lose it. The token value is
+    never logged.
+    """
+    token = body.token.strip()
+    if not token:
+        return JSONResponse(status_code=400, content={"detail": "empty token"})
+    # The env var is what the gated preflight + snapshot_download read, and it is
+    # set synchronously — that is the part the download needs right now.
+    os.environ["HF_TOKEN"] = token
+    # Keychain persistence is best-effort AND must never block the event loop nor
+    # hang the wizard: a headless keyring access can trigger a blocking macOS
+    # authorization dialog the sidecar cannot answer (precedent CRY-01). Run it
+    # off-thread with a short timeout; on timeout/failure the token still lives
+    # in the env for this run's download, and finalize (step 5) persists it later.
+    persisted = False
+    try:
+        loop = asyncio.get_event_loop()
+        persisted = await asyncio.wait_for(
+            loop.run_in_executor(_dl_executor, _store_hf_token_in_keychain, token),
+            timeout=5.0,
+        )
+    except Exception as exc:  # noqa: BLE001 — timeout or keyring error: never fatal
+        logger.warning("installer/hf-token: Keychain persist skipped (%s)", type(exc).__name__)
+    logger.info("installer/hf-token: HF_TOKEN loaded into env (persisted=%s)", persisted)
+    return JSONResponse({"ok": True, "persisted": persisted})
 
 
 @router.post("/ollama", operation_id="installer_ollama_install")
@@ -869,42 +1085,16 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
             yield await _sse({"type": "error", "message": "Ja s'esta instal.lant Ollama en un altre proces"})
             return
         try:
-            from installer.installer_ollama_install import ensure_ollama_installed
-            loop = asyncio.get_event_loop()
-            try:
-                installed = await loop.run_in_executor(None, ensure_ollama_installed, True)
-            except PermissionError as exc:
-                # Platform-specific UX-friendly message.
-                logger.exception("Ollama install: permission denied")
-                _system = platform.system().lower()
-                if _system == "darwin":
-                    yield await _sse({"type": "error", "message": (
-                        "No s'ha pogut instal.lar Ollama a /Applications/. "
-                        "Permis denegat. Instal.la'l manualment des d'ollama.com"
-                    )})
-                elif _system == "linux":
-                    yield await _sse({"type": "error", "message": (
-                        "Linux: l'instal.lador d'Ollama necessita sudo. "
-                        "Instal.la manualment des d'ollama.com/download/linux"
-                    )})
-                else:
-                    yield await _sse({"type": "error", "message": f"Permission denied: {exc}"})
-                return
-            except Exception as exc:
-                # logger.exception preserves the stack trace in the log.
-                logger.exception("Ollama auto-install failed")
-                yield await _sse({"type": "error", "message": f"Install failed: {exc}"})
-                return
-            if not installed:
-                yield await _sse({"type": "error", "message": (
-                    "Ollama install did not complete. Restart the app or "
-                    "install manually from https://ollama.com"
-                )})
-                return
-            binary = _find_ollama_bin()
-            yield await _sse({"type": "done", "already_installed": False, "binary": binary})
+            # MC-031: share the install→locate machine with
+            # _install_ollama_if_needed so the bundle fallback (CLI installed
+            # but not yet on PATH) can never diverge between the two paths.
+            binary = await _install_ollama_and_locate()
+        except RuntimeError as exc:
+            yield await _sse({"type": "error", "message": str(exc)})
+            return
         finally:
             _ollama_install_lock.release()
+        yield await _sse({"type": "done", "already_installed": False, "binary": binary})
 
     return StreamingResponse(generate(), media_type="text/event-stream", headers=_SSE_HEADERS)
 

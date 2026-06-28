@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import json
 import logging
 import statistics
 from typing import Dict, List, Optional
@@ -74,8 +75,12 @@ class Retriever:
             is_critical = p.get("is_critical", False)
             if is_relevant or is_critical:
                 confidence = "high" if p.get("trust_level") == "trusted" else "moderate"
+                try:
+                    value = json.loads(p["value_json"])
+                except (TypeError, ValueError):
+                    value = p["value_json"]
                 cards.append(MemoryCard(
-                    content=f"{p['attribute']}: {p['value_json']}",
+                    content=f"{p['attribute']}: {value}",
                     confidence=confidence,
                     source_store="profile",
                     score=0.9 if is_critical else 0.7,
@@ -101,16 +106,34 @@ class Retriever:
             dyn_threshold = self._dynamic_threshold(candidates)
             if mode == "exploratory":
                 dyn_threshold = rc.base_threshold
-            for c in candidates:
-                if c["score"] >= dyn_threshold:
-                    cards.append(MemoryCard(
-                        content=c["payload"].get("content", f"[episodic:{c['id']}]"),
-                        confidence=self._score_to_confidence(c["score"]),
-                        source_store="episodic",
-                        score=c["score"],
-                        entry_id=c["id"],
-                        metadata=c.get("payload", {}),
-                    ))
+            passing = [c for c in candidates if c["score"] >= dyn_threshold]
+            # Hydrate real content from SQLite by id — the vector payload stores
+            # metadata only, never the text. When a store is wired (the
+            # production path via MemoryService), drop ids that are gone from
+            # SQLite (forgotten / tombstoned) rather than leak a removed memory.
+            # When no store is available (unit doubles), fall back to any
+            # content carried on the payload.
+            hydrated: Dict[str, Dict] = {}
+            if self._store is not None:
+                hydrated = self._store.get_episodic_by_ids(
+                    user_id, [c["id"] for c in passing]
+                )
+            for c in passing:
+                if self._store is not None:
+                    row = hydrated.get(c["id"])
+                    if row is None:
+                        continue
+                    content = row["content"]
+                else:
+                    content = c["payload"].get("content", f"[episodic:{c['id']}]")
+                cards.append(MemoryCard(
+                    content=content,
+                    confidence=self._score_to_confidence(c["score"]),
+                    source_store="episodic",
+                    score=c["score"],
+                    entry_id=c["id"],
+                    metadata=c.get("payload", {}),
+                ))
         except Exception as e:
             logger.warning("Vector search failed: %s", e)
         return cards

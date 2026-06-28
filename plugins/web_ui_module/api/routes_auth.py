@@ -166,15 +166,28 @@ def make_require_ui_auth():
     return _require_ui_auth
 
 
-def _persist_env_vars(updates: dict) -> None:
+def _persist_env_vars(updates: dict, env_path: Path = None) -> None:  # type: ignore[assignment]  # no_implicit_optional
     """Writes/updates key=value pairs in the project's .env file.
 
     - If the key already exists, replaces the value on the same line.
     - If it doesn't exist, appends the line at the end.
     - Does not touch comment lines or other keys.
     - If the .env file doesn't exist (installation without file), silences.
+    - `env_path` is overridable for tests (default: project .env).
+
+    MC-076: refuses any key/value containing a newline (CR/LF) so an
+    attacker-controlled value (e.g. the `model` field of POST /backend) can
+    never inject arbitrary lines into the .env. Fail-closed: raises ValueError.
     """
-    env_path = Path(__file__).parents[3] / ".env"
+    for _k, _v in updates.items():
+        # MC-076: reject ANY line break that splitlines() recognizes
+        # (not only \n/\r, but also \v \f and the Unicode separators U+2028/U+2029):
+        # the re-read of this function uses splitlines(), which would split a value with
+        # non-ASCII separators and corrupt/inject the .env.
+        if any(s != "".join(s.splitlines()) for s in (str(_k), str(_v))):
+            raise ValueError("refusing to persist .env entry containing a line break (MC-076)")
+    if env_path is None:
+        env_path = Path(__file__).parents[3] / ".env"
     if not env_path.exists():
         logger.debug("_persist_env_vars: .env not found at %s, skipping persist", env_path)
         return
@@ -588,41 +601,16 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         return True
 
     async def _ensure_ollama_running() -> bool:
-        """Check if Ollama is reachable; if not, start it headlessly. Returns True if started."""
-        import subprocess
-        import shutil
-        try:
-            import httpx
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(f"{resolve_base_url()}/api/tags")
-                if resp.status_code == 200:
-                    return False  # already running
-        except Exception:  # nosec B110: best-effort Ollama port check — silent pass intencional
-            pass
-        # Ollama is not running — start headless (Bug Ollama GUI 2026-04-06)
-        # Prefer direct `ollama serve`; fallback to Ollama.app bundle binary.
-        # We do NOT run `open -a Ollama` (would launch GUI/Dock window).
-        if shutil.which("ollama"):
-            try:
-                subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; gated by require_ui_auth; mono-user local
-                    ["ollama", "serve"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
-                )
-                logger.info("Ollama service started automatically")
-                return True
-            except Exception as e:
-                logger.warning(f"Could not start Ollama: {e}")
-        elif _os.path.exists("/Applications/Ollama.app/Contents/Resources/ollama"):
-            try:
-                subprocess.Popen(  # nosec B603: absolute path to Ollama.app bundled binary + literal `serve` argv; gated by require_ui_auth (mono-user local)
-                    ["/Applications/Ollama.app/Contents/Resources/ollama", "serve"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
-                )
-                logger.info("ollama serve started headless from Ollama.app bundle")
-                return True
-            except Exception as e:
-                logger.warning(f"Could not start ollama serve from bundle: {e}")
-        return False
+        """Check if Ollama is reachable; if not, start it headlessly. Returns True if started.
+
+        MC-028: delegates to the centralised :func:`ollama_runtime.ensure_ollama_running`
+        (single read point for NEXE_OLLAMA_BIN + the headless bundle binary).
+        ``wait=False`` preserves this call site's fire-and-forget contract: it
+        starts Ollama and returns immediately, WITHOUT waiting for readiness.
+        """
+        from plugins.ollama_module.core.ollama_runtime import ensure_ollama_running
+        process = await ensure_ollama_running(resolve_base_url(), wait=False)
+        return process is not None
 
     async def _unload_previous_ollama_model(old_model: str, new_model: str, old_backend: str) -> None:
         """Unload previous Ollama model from VRAM when switching models."""
@@ -663,6 +651,11 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         """Change the active backend and/or model at runtime. Starts Ollama if needed."""
         raw_backend = request.get("backend", "")
         model = request.get("model", "")
+
+        # MC-076: reject models with line breaks / control characters before
+        # persisting them to the .env (input defense; the writer also rejects them).
+        if model and ((model != "".join(model.splitlines())) or any(ord(c) < 32 for c in model)):
+            raise HTTPException(status_code=400, detail="Invalid model name")
 
         # Bug 27 — normalize before validating
         canonical = _normalize_backend_name(raw_backend)

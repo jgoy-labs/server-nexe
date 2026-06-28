@@ -36,7 +36,6 @@
    },
    "basic_functionality": {
     "name": "Funcionalitat bàsica",
-    "module_ok": "Mòdul CLIModule funciona correctament",
     "methods_ok": "Tots els mètodes responen"
    }
   },
@@ -53,7 +52,6 @@
    "invalid_timeout": "Timeout invàlid",
    "config_ok": "Configuració correcta",
    "config_error": "Error de configuració",
-   "module_ok": "Mòdul CLIModule funciona correctament",
    "methods_ok": "Tots els mètodes responen",
    "assertion_failed": "Test fallit",
    "func_error": "Error de funcionalitat",
@@ -94,7 +92,8 @@
    "services_stopped": "\n✅ Serveis aturats.",
    "stopped_ok": "  ✓ {name} aturat (PID {pid})",
    "no_longer_exists": "  - {name} ja no existeix (PID {pid})",
-   "permission_denied": "  ✗ {name} — permís denegat (PID {pid})"
+   "permission_denied": "  ✗ {name} — permís denegat (PID {pid})",
+   "none_stopped": "\n⚠️  No s'ha aturat cap servei."
   },
   "server_status": {
    "offline": "✗ Servidor offline: {msg}",

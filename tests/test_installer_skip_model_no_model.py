@@ -69,8 +69,8 @@ class TestGenerateEnvFileNone:
         content = env_file.read_text()
         # API key generated
         assert "NEXE_PRIMARY_API_KEY=" in content
-        # Comment instructing to add model manually
-        assert "nexe model pull" in content
+        # Comment instructing to add model manually (B202: text updated to 'nexe model install')
+        assert "nexe model install" in content
         # No active (uncommented) line with NEXE_DEFAULT_MODEL=
         active_model_lines = [line for line in content.splitlines() if line.startswith("NEXE_DEFAULT_MODEL=")]
         assert active_model_lines == [], f"There should be no active NEXE_DEFAULT_MODEL: {active_model_lines}"

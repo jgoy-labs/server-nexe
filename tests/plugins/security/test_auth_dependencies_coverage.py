@@ -1,8 +1,7 @@
 """
 Tests for plugins/security/core/auth_dependencies.py - targeting uncovered lines.
-Lines: 32 (METRICS_ENABLED=True), 42-46 (_is_loopback_ip), 89-94 (secondary key metrics),
-       102-118 (dev mode bypass), 153 (ImportError), 158-176 (secondary key auth),
-       180/182 (expired key reasons), 193 (auth failure logging), 224/227/238 (optional_api_key).
+Covers: _is_loopback_ip, secondary key metrics, dev mode bypass, secondary key
+auth, expired key reasons, auth failure logging, and optional_api_key paths.
 """
 
 import pytest
@@ -285,6 +284,28 @@ class TestOptionalApiKey:
             from plugins.security.core.auth_dependencies import optional_api_key
             result = await optional_api_key(x_api_key="admin-key-match")
             assert result == "admin-key-match"
+
+    @pytest.mark.asyncio
+    async def test_expired_primary_not_accepted_via_admin(self):
+        """A-004: an EXPIRED primary key must NOT be re-accepted via the admin branch.
+        get_admin_api_key() returns primary.key by default, so without the
+        admin_key != primary guard an expired primary would slip through."""
+        from datetime import datetime, timedelta, timezone
+        from plugins.security.core.auth_models import ApiKeyConfig, ApiKeyData
+
+        expired = ApiKeyData(
+            key="pk-expired",
+            expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+        )
+        config = ApiKeyConfig(primary=expired)
+        assert not config.primary.is_valid  # sanity: la primary està caducada
+
+        with patch("plugins.security.core.auth_dependencies.load_api_keys", return_value=config), \
+             patch("plugins.security.core.auth_dependencies.get_admin_api_key", return_value="pk-expired"), \
+             patch("plugins.security.core.auth_dependencies.is_dev_mode", return_value=False):
+            from plugins.security.core.auth_dependencies import optional_api_key
+            result = await optional_api_key(x_api_key="pk-expired")
+            assert result is None  # caducada → rebutjada, no acceptada per la via admin
 
     @pytest.mark.asyncio
     async def test_invalid_key_returns_none(self):

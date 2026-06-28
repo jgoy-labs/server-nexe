@@ -14,6 +14,7 @@ Features:
 """
 import copy
 import logging
+import os
 import threading
 from collections import deque
 from dataclasses import dataclass
@@ -276,7 +277,13 @@ class MLXPromptCacheManager:
                 except ValueError:
                     pass
             else:
-                current["cache"] = CacheEntry(prompt_cache, 1)
+                # B120: store an immutable snapshot. The post-prefill save inserts
+                # `cached_kv` and then generation keeps mutating that SAME object in
+                # place; fetch always hands out deepcopies of the trie "original", so
+                # the trie must OWN a copy, not alias the caller's mutable cache —
+                # otherwise the prompt-only key ends up pointing at a prompt+response
+                # cache (offset desync → garbled output on a later prompt-only hit).
+                current["cache"] = CacheEntry(copy.deepcopy(prompt_cache), 1)
 
             self._lru.append((model, tokens_key))
 
@@ -330,7 +337,7 @@ _prompt_cache_manager: Optional[MLXPromptCacheManager] = None
 _singleton_lock = threading.Lock()
 
 
-def get_prompt_cache_manager(max_size: int = 8) -> MLXPromptCacheManager:
+def get_prompt_cache_manager(max_size: Optional[int] = None) -> MLXPromptCacheManager:
     """
     Get the cache manager singleton.
 
@@ -339,7 +346,12 @@ def get_prompt_cache_manager(max_size: int = 8) -> MLXPromptCacheManager:
     duplicating memory and losing shared cache.
 
     Args:
-        max_size: Maximum size (only applied the first time)
+        max_size: Maximum size (only applied the first time the singleton is
+            created). B121: when None, falls back to NEXE_MLX_MAX_SESSION_CACHES
+            (default 4) so every caller — including the bare reset_model() /
+            get_pool_stats() calls — agrees on the operator-configured cap,
+            regardless of which one wins the singleton race. A hardcoded default
+            of 8 here would silently override the lower RAM-driven config.
 
     Returns:
         MLXPromptCacheManager singleton
@@ -348,5 +360,7 @@ def get_prompt_cache_manager(max_size: int = 8) -> MLXPromptCacheManager:
     if _prompt_cache_manager is None:
         with _singleton_lock:
             if _prompt_cache_manager is None:  # double-check
+                if max_size is None:
+                    max_size = int(os.getenv("NEXE_MLX_MAX_SESSION_CACHES", "4"))
                 _prompt_cache_manager = MLXPromptCacheManager(max_size)
     return _prompt_cache_manager

@@ -243,10 +243,10 @@ server-nexe/
 │   ├── tray_uninstaller.py       # Desinstal·lador amb copia de seguretat
 │   └── install_headless.py       # Instal·lador headless (compatible amb Linux)
 │
-├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 14 fitxers)
+├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 15 fitxers)
 │   └── .embeddings/              # KB embeddings precomputats (ONNX, 10.7× speedup a l'arrencada)
 ├── storage/                      # Dades en temps d'execucio (no a git)
-├── tests/                        # 6776 funcions de test col·lectades (6991 totals)
+├── tests/                        # 7165 funcions de test col·lectades (7400 totals)
 └── nexe                          # Executable CLI
 ```
 
@@ -274,7 +274,7 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 4 submoduls.
 7. Inicialitzar moduls de plugins (MLX, llama.cpp, Ollama, Security, Web UI) — timeout 30s
 8. Inicialitzar CryptoProvider segons `NEXE_ENCRYPTION_ENABLED` (`auto` per defecte — actiu si sqlcipher3 disponible)
 9. Auto-ingestio de knowledge/ (nomes la primera execucio, fitxer marcador) — timeout 30s
-10. Generar bootstrap token (256 bits, persistent a SQLite, TTL de 30min)
+10. Generar bootstrap token (128 bits, persistent a SQLite, TTL de 30min)
 
 **Sequencia d'aturada (finally — sempre executa, fins i tot en error):**
 1. Eliminar PID file (`storage/run/server.pid`) — sempre, primer de tot
@@ -389,7 +389,7 @@ Capa d'Embeddings (memory/embeddings/) — generacio de vectors + interficie Qdr
 - `[MODEL:name]` — nom del model actiu
 - `[MODEL_LOADING]` / `[MODEL_READY]` — estat de carrega del model
 - `[RAG_AVG:score]` — mitjana de rellevancia RAG
-- `[RAG_ITEM:score|collection|source]` — detall RAG per font
+- `[RAG_ITEM:collection|score]` — detall RAG per col·lecció (col·lecció primer, després score)
 - `[MEM:N]` — nombre de fets guardats a memoria
 - `[COMPACT:N]` — indicador de compactacio de context
 - `[DOC_TRUNCATED:XX%]` — avis de document truncat per limit de context (nou 2026-04-02)
@@ -408,7 +408,9 @@ Separat en 6 fitxers de rutes:
 
 El prompt del sistema defineix la personalitat i el comportament de Nexe. Viu a `personality/server.toml` sota `[personality.prompt]`.
 
-**6 variants:** 3 idiomes (ca/es/en) x 2 nivells (small per a models <=4B, full per a 7B+).
+**6 variants:** 3 idiomes (ca/es/en) x 2 nivells (`small` i `full`). El nivell `small` és un prompt compacte pensat per a models petits; `full` és la versió completa.
+
+**Selecció del nivell:** el tier el fixa la variable d'entorn `NEXE_PROMPT_TIER` (per defecte `full`). **No** se selecciona automàticament per mida del model — qui vulgui el prompt compacte ha de posar `NEXE_PROMPT_TIER=small` explícitament.
 
 **Logica de seleccio** (`core/endpoints/chat.py` -> `_get_system_prompt()`):
 1. `{lang}_{tier}` (p. ex., `ca_full`) — de server.toml
@@ -447,12 +449,12 @@ Diferencies en mode sidecar:
 
 ## Arquitectura de tests
 
-- 6776 funcions de test col·lectades (6991 totals — 215 deselected per marcadors), 0 errors a l'ultima execucio
+- 7165 funcions de test col·lectades (7400 totals — 235 deselected per marcadors), 0 errors a l'ultima execucio
 - Cobertura real: ~85% global (baseline honest, sense inflar)
 - Tests col·locats amb els moduls (cada modul te una carpeta tests/)
 - conftest.py arrel per a fixtures compartides
 - Closures refactoritzades a funcions per a patchabilitat (decisio clau de refactoritzacio)
-- 68 tests de crypto (CryptoProvider, SQLCipher, sessions, CLI)
+- 72 tests de crypto (CryptoProvider, SQLCipher, sessions, CLI, claus i AAD)
 - 8 tests e2e MEM_DELETE (`tests/integration/test_mem_delete_e2e.py`) amb Qdrant embedded + fastembed real
 - Cobertura rastrejada via .coveragerc
 
@@ -494,19 +496,21 @@ def health(self) -> Dict[str, Any]
 
 ## Detector VLM 3-signal any-of
 
-A partir de v0.9.8, el backend MLX usa un **detector VLM "any-of" amb 3 senyals** per identificar si un model és multimodal abans de carregar-lo (`plugins/mlx_module/core/vlm_detection.py`):
+A partir de v0.9.8, el backend MLX usa un **detector VLM "any-of" amb 3 senyals** per identificar si un model és multimodal abans de carregar-lo. La lògica viu a `plugins/mlx_module/core/chat.py` (`_detect_vlm_capability`, que combina `_vlm_from_config` i `_vlm_from_safetensors`):
 
 1. **`architectures`** al `config.json` — keywords com `VL`, `Vision`, `VLM`, `Llava`, `PaliGemma`, `InternVL`, `MiniCPMV`, `Idefics`, `Mllama`, `Qwen2VL`, `Qwen2_5_VL`, `Qwen3VL`.
 2. **`vision_config`** al `config.json` — bloc de configuració de visió present.
 3. **`weight_map`** al `model.safetensors.index.json` — claus com `vision_tower`, `mm_projector`, `vision_model`, `visual`.
 
-**Lògica "any-of":** si qualsevol dels 3 senyals coincideix, el model es considera VLM i s'enruta a `mlx-vlm` (amb `stream_generate` i `GenerationResult` API de `mlx-vlm 0.4.4`). Aixo cobreix arquitectures noves que no tenen les claus clàssiques (ex: models on només apareix `vision_config` sense `architectures` amb keyword).
+**Lògica "any-of":** si qualsevol dels 3 senyals coincideix, el model es considera VLM i s'enruta a `mlx-vlm` (amb `stream_generate` i `GenerationResult` API de `mlx-vlm 0.4.4`).
+
+**Compte amb `vision_config` sol:** `vision_config` per si sol **no és suficient** — alguns models no-VL (p. ex. Qwen3.5 MoE) l'inclouen com a artefacte de config sense pesos de visió reals. El senyal 2 només es considera VLM si **a més** el nom de l'arquitectura conté un dels keywords VLM. El senyal 1 (`architectures` amb una arquitectura VLM coneguda) i el senyal 3 (`weight_map` amb claus de visió) sí disparen per si sols. Així el detector cobreix models mal etiquetats o arquitectures noves amb claus de pes de visió.
 
 ## Precomputed KB embeddings
 
 Els fitxers de `knowledge/` poden tenir **embeddings precomputats** guardats a `knowledge/.embeddings/` (post-v0.9.8). A l'arrencada, si els hashes coincideixen amb els fitxers `.md` actuals, el sistema salta el càlcul d'embeddings (fastembed ONNX, ~700ms per fitxer) i carrega directament els vectors ja calculats.
 
-**Speedup mesurat:** 10.7× a l'arrencada en fred (cold boot). Útil especialment al DMG offline, on els embeddings venen ja dins el bundle per cada idioma (ca/es/en × 14 fitxers).
+**Speedup mesurat:** 10.7× a l'arrencada en fred (cold boot). Útil especialment al DMG offline, on els embeddings venen ja dins el bundle per cada idioma (ca/es/en × 15 fitxers).
 
 Els embeddings es regeneren automàticament si canvia el contingut dels `.md` o el model d'embeddings.
 
@@ -525,11 +529,15 @@ Els thinking tokens s'emeten al streaming amb marcadors `[THINKING]…[/THINKING
 
 ## Models MLX — Compatibilitat
 
-El catàleg de l'installer (`installer/swift-wizard/Resources/models.json`) inclou models nous com **gemma4** (Google Gemma 4) i **Qwen3.5-VLM** (Alibaba). Aquests models estan marcats amb `"mlx": true` al catàleg, però **no han estat verificats amb `mlx_module`** i no apareixen al registre de models MLX (`personality/models/registry.py`).
+El registre de models (`personality/models/registry.py`) defineix el `MODEL_REGISTRY` amb tots els models suportats, cadascun amb el seu `ollama_tag` i, quan n'hi ha, el seu `mlx_hf_id` (HuggingFace ID de `mlx-community/`). El catàleg de l'installer (`installer/swift-wizard/Resources/models.json`) reflecteix aquests models per al wizard d'instal·lació.
 
-**Comportament actual:**
-- Via Ollama: funcionen (si el tag Ollama és vàlid i el model és disponible al servidor Ollama)
-- Via MLX: poden fallar silenciosament si no existeix el model HF corresponent a `mlx-community/`
-- `nexe model list` i `nexe model pull` no els mostren (no estan al `MODEL_REGISTRY`)
+**Models recents amb suport MLX complet:**
+- **gemma4** (Google Gemma 4): `gemma4:e4b` (`mlx-community/gemma-4-e4b-it-4bit`) i `gemma4:31b` (`mlx-community/gemma-4-31b-it-8bit`) estan al `MODEL_REGISTRY` amb `mlx_hf_id` i descripció "MLX recommended".
+- **qwen3.5** (Alibaba): `qwen3.5:4b`, `qwen3.5:4b-8bit`, `qwen3.5:9b`, `qwen3.5:27b` i `qwen3.5:35b-a3b` (MoE) — multimodals (vision) amb suport MLX a Apple Silicon.
 
-**Recomanació:** Usa Ollama per a gemma4 i Qwen3.5-VLM. El suport MLX s'afegirà al `MODEL_REGISTRY` quan s'hagi verificat la compatibilitat amb `mlx-community/` HuggingFace IDs.
+**Comportament:**
+- Via Ollama: funcionen amb el tag Ollama corresponent.
+- Via MLX: es carreguen des de l'`mlx_hf_id` de `mlx-community/` definit al registre.
+- `nexe model list` i `nexe model install <name>` els mostren, ja que estan al `MODEL_REGISTRY`.
+
+**Nota:** afegir un model nou (Ollama o MLX) passa per donar-lo d'alta al `MODEL_REGISTRY` amb el seu `ollama_tag` i, per a MLX, el `mlx_hf_id` verificat de `mlx-community/`.

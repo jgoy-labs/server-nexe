@@ -203,6 +203,11 @@ class I18nManager:
     """Reload all translation files"""
     try:
       self._load_config()
+      self.translations.clear()
+      # B134: clear before re-loading so keys removed from the files do not
+      # survive in memory (parity with ModularI18nManager.reload_translations).
+      # _load_config() does not touch self.translations and the catalog is
+      # re-read lazily via _ensure_translations_loaded, so clearing here is safe.
       self._translations_loaded = False
       return True
     except Exception:

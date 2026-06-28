@@ -8,7 +8,7 @@
 #
 # Target: Apple Silicon (arm64), macOS 14 Sonoma or newer, Python 3.12.
 # (macOS 13 Ventura was dropped 2026-04-16: mlx 0.30.4+ — required by our
-# pinned mlx-lm 0.31.2 — ships wheels only for macosx_14_0_arm64+.)
+# pinned mlx-lm 0.31.3 — ships wheels only for macosx_14_0_arm64+.)
 # Requires: network access + recent pip at build time (dev Mac).
 # Produces: ~330 MB of wheels (post v1.0.4-beta TODO 1.3 — torch + torchvision
 # included for VL/multimodal model support). Fails clearly if any wheel is
@@ -33,7 +33,7 @@ REQ_MACOS="$PROJECT_ROOT/requirements-macos.txt"
 # We must bundle their wheels here so the client install stays offline.
 ENGINES=(
     "llama-cpp-python==0.3.19"  # 0.3.20 has corrupt wheel on abetlen Metal index (Bad CRC-32)
-    "mlx-lm==0.31.2"
+    "mlx-lm==0.31.3"
     "mlx-vlm==0.4.4"
     # PyTorch + torchvision — required at runtime by Qwen3 VL and other multimodal
     # models (Qwen3VLVideoProcessor needs torchvision for image preprocessing).

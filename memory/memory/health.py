@@ -16,7 +16,8 @@ import structlog
 from personality.i18n import get_i18n
 from memory.shared.health_helpers import (
   check_module_initialized as _shared_check_module_initialized,
-  aggregate_health_checks
+  aggregate_health_checks,
+  check_paths_writable
 )
 
 logger = structlog.get_logger()
@@ -35,45 +36,16 @@ def check_flash_storage_paths() -> Dict[str, Any]:
     storage_dir = _root / "storage" / "memory" / "storage"
     cache_dir = _root / "storage" / "memory" / "cache"
 
-    flash_dir.mkdir(parents=True, exist_ok=True)
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
-    paths_checked = []
-    all_writable = True
-
-    for path in [flash_dir, storage_dir, cache_dir]:
-      test_file = path / ".write_test"
-      try:
-        test_file.write_text("test")
-        test_file.unlink()
-        paths_checked.append(str(path.resolve()))
-      except Exception:
-        all_writable = False
-        break
-
-    if all_writable:
-      return {
-        "name": "storage_paths",
-        "status": "pass",
-        "message": i18n.t("memory.health.storage_paths_ok", "All storage paths writable: {count}/3", count=len(paths_checked)),
-        "details": {
-          "paths": paths_checked,
-          "total": 3,
-          "writable": len(paths_checked)
-        }
-      }
-    else:
-      return {
-        "name": "storage_paths",
-        "status": "fail",
-        "message": i18n.t("memory.health.storage_paths_fail", "Some storage paths not writable"),
-        "details": {
-          "paths": paths_checked,
-          "total": 3,
-          "writable": len(paths_checked)
-        }
-      }
+    return check_paths_writable(
+      check_name="storage_paths",
+      paths=[flash_dir, storage_dir, cache_dir],
+      i18n_prefix="memory.health",
+      writable_key="storage_paths_ok",
+      writable_text="All storage paths writable: {count}/3",
+      not_writable_key="storage_paths_fail",
+      not_writable_text="Some storage paths not writable",
+      with_details=True
+    )
 
   except Exception as e:
     return {

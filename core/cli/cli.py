@@ -23,6 +23,8 @@ from .output import print_banner, print_modules_table, print_status, print_error
 from .config import NexeConfig
 from .i18n import t
 from core.version import __version__
+from core.paths.constants import BASE_CONFIG_RELATIVE
+from core.paths.detection import get_repo_root
 
 class DynamicGroup(click.Group):
   """
@@ -226,31 +228,38 @@ def _stop_find_via_pgrep() -> list:
   """Fallback: find Nexe processes via pgrep. Returns list of found (name, pattern, pids) or empty."""
   import subprocess
   try:
+    # B109: el servidor es llança com 'python -m core.app' (cli.py) i
+    # setproctitle='server-nexe' (core/server/runner.py); mai 'uvicorn'.
+    # El patró ha de cobrir TOTS DOS cmdlines (setproctitle pot no estar instal·lat).
+    _pattern = r"server-nexe|core\.app"
     result = subprocess.run(  # nosec B603 B607: pgrep on hardcoded literal pattern; system tool resolved via PATH (mono-user local)
-      ["pgrep", "-f", "uvicorn.*nexe"],
+      ["pgrep", "-f", _pattern],
       capture_output=True, text=True
     )
     pids = [int(p) for p in result.stdout.strip().split('\n') if p.strip()]
     if pids:
-      return [("Nexe Server", "uvicorn.*nexe", pids)]
+      return [("Nexe Server", _pattern, pids)]
   except Exception:  # nosec B110: best-effort pgrep fallback; empty list reported to user on failure
     pass
   return []
 
 
-def _stop_send_sigterm(found: list) -> None:
-  """Send SIGTERM to all found PIDs, echoing status for each."""
+def _stop_send_sigterm(found: list) -> int:
+  """Send SIGTERM to all found PIDs, echoing status for each. Returns count of successful kills."""
   import os
   import signal
+  stopped = 0
   for name, _, pids in found:
     for pid in pids:
       try:
         os.kill(pid, signal.SIGTERM)
         click.echo(t("cli.stop.stopped_ok", name=name, pid=pid))
+        stopped += 1
       except ProcessLookupError:
         click.echo(t("cli.stop.no_longer_exists", name=name, pid=pid))
       except PermissionError:
         click.echo(t("cli.stop.permission_denied", name=name, pid=pid))
+  return stopped
 
 
 @app.command()
@@ -279,8 +288,12 @@ def stop(ctx: click.Context, force: bool):
       click.echo(t("cli.stop.cancelled"))
       return
 
-  _stop_send_sigterm(found)
-  click.echo(t("cli.stop.services_stopped"))
+  # B111: no reportar èxit si cap SIGTERM ha funcionat (p.ex. PermissionError).
+  stopped = _stop_send_sigterm(found)
+  if stopped > 0:
+    click.echo(t("cli.stop.services_stopped"))
+  else:
+    click.echo(t("cli.stop.none_stopped"))
 
 @app.command()
 @click.option('--json', 'as_json', is_flag=True, help='Output JSON')
@@ -356,7 +369,7 @@ def setup_models(ctx: click.Context, apply: bool):
     click.echo(f"\n📝 Description: {profile.description}")
     
     if apply:
-        config_path = Path("personality/server.toml")
+        config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
         if not config_path.exists():
             click.echo("Error: server.toml not found!", err=True)
             return
@@ -476,7 +489,7 @@ def install_model(name: str, engine: Optional[str]):
     # 2. Detect Engine if not specified
     if not engine:
         # Check configure preferred engine
-        config_path = Path("personality/server.toml")
+        config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
         if config_path.exists():
              config = toml.load(config_path)
              engine = config.get("plugins", {}).get("models", {}).get("preferred_engine", "ollama")
@@ -507,7 +520,7 @@ def install_model(name: str, engine: Optional[str]):
             
             # Ask to set as primary
             if click.confirm("Set as primary model?"):
-                config_path = Path("personality/server.toml")
+                config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
                 config = toml.load(config_path)
                 config['plugins']['models']['primary'] = str(local_dir.absolute())
                 with open(config_path, 'w') as f:
@@ -523,6 +536,9 @@ def install_model(name: str, engine: Optional[str]):
         # Ollama Pull
         import subprocess
         tag = entry.ollama_tag
+        if not tag:
+            click.echo(click.style("⚠️ MLX-only model, not available via Ollama.", fg="yellow"))
+            return
         click.echo(f"   Running: ollama pull {tag}")
         try:
             subprocess.run(["ollama", "pull", tag], check=True)  # nosec B603 B607: tag from registry catalog (entry.ollama_tag); ollama via PATH (mono-user local)
@@ -530,7 +546,7 @@ def install_model(name: str, engine: Optional[str]):
 
              # Ask to set as primary
             if click.confirm("Set as primary model?"):
-                config_path = Path("personality/server.toml")
+                config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
                 config = toml.load(config_path)
                 config['plugins']['models']['primary'] = tag
                 with open(config_path, 'w') as f:
@@ -598,16 +614,19 @@ def knowledge_status():
     async def check_status():
         try:
             from memory.memory.api import MemoryAPI
+            # B108: l'ingest escriu a DOCUMENTATION_COLLECTION ('nexe_documentation')
+            # per defecte; el status mirava 'user_knowledge' → sempre 'does not exist'.
+            from core.ingest.ingest_knowledge import DOCUMENTATION_COLLECTION
             memory = MemoryAPI()
             await memory.initialize()
 
-            if await memory.collection_exists("user_knowledge"):
-                count = await memory.count("user_knowledge")
-                click.echo("📊 Collection 'user_knowledge':")
+            if await memory.collection_exists(DOCUMENTATION_COLLECTION):
+                count = await memory.count(DOCUMENTATION_COLLECTION)
+                click.echo(f"📊 Collection '{DOCUMENTATION_COLLECTION}':")
                 click.echo(f"   - Documents: {count} fragments")
                 click.echo("   - Status: ✅ Active")
             else:
-                click.echo(click.style("ℹ️  Collection 'user_knowledge' does not exist.", fg="yellow"))
+                click.echo(click.style(f"ℹ️  Collection '{DOCUMENTATION_COLLECTION}' does not exist.", fg="yellow"))
                 click.echo("   Run: ./nexe knowledge ingest")
 
             await memory.close()

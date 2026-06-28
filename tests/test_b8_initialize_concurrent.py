@@ -97,52 +97,43 @@ def test_ollama_module_initialize_uses_lock():
 # ──────────────────────────────────────────────────────────────────────────────
 
 async def test_initialize_concurrent_lock_holds():
-    """Anti-reg B8: the Lock+double-check pattern guarantees call_count==1 with 100 calls.
+    """Anti-reg B8 conductual: el lock de PRODUCCIÓ serialitza initialize().
 
-    Verifies that the FIX pattern (asyncio.Lock + double-check) eliminates the race.
-    Remains as a permanent guard: if the Lock breaks, call_count > 1.
+    B047 — reforçat de teatre a conductual. L'original feia gather(100) sobre una
+    classe `_FixedPatternModule` INVENTADA dins el test (+ assert dèbil
+    `_initialized is True`, que passa fins i tot amb race) → no exercia producció.
+    Aquest instancia l'OllamaModule REAL, fa que el pas car (ensure_ollama_running)
+    compti i cedeixi (obrint la finestra de race entre el guard i _initialized=True),
+    i asserta que amb 100 crides concurrents s'executa EXACTAMENT 1 cop (lock retingut).
+
+    Prova de mutació: a plugins/ollama_module/module.py canviar
+    `async with self._init_lock:` per `if True:` → ~100 execucions → VERMELL.
     """
+    from unittest.mock import AsyncMock, MagicMock
+    from plugins.ollama_module.module import OllamaModule
 
-    class _FixedPatternModule:
-        """Post-fix pattern: asyncio.Lock per instance + double-check."""
-        def __init__(self):
-            self._initialized = False
-            self._init_lock = asyncio.Lock()
-
-        async def initialize(self, ctx):
-            if self._initialized:
-                return True
-            async with self._init_lock:
-                if self._initialized:   # double-check dins lock
-                    return True
-                await asyncio.sleep(0)  # simula ensure_ollama_running()
-                self._initialized = True
-                return True
-
-    module = _FixedPatternModule()
+    module = OllamaModule()
     call_count = 0
-    _original_init = module.initialize
 
-    async def _counted(ctx):
+    async def _counted_ensure():
         nonlocal call_count
-        result = await _original_init(ctx)
-        return result
+        call_count += 1
+        await asyncio.sleep(0)  # finestra de race entre el guard i _initialized=True
 
-    init_entered = 0
-    _orig = module.initialize
+    # Neutralitza el setup de routing i el daemon real; només ens importa que el
+    # cos car de initialize() s'executi un sol cop sota concurrència.
+    module._init_router = MagicMock()
+    module.client.ensure_ollama_running = _counted_ensure
+    module.client.check_connection = AsyncMock(return_value=True)
 
-    class _CountingModule(_FixedPatternModule):
-        async def initialize(self, ctx):
-            nonlocal init_entered
-            if not self._initialized:
-                pass
-            return await _FixedPatternModule.initialize(self, ctx)
+    await asyncio.gather(*[module.initialize({}) for _ in range(100)])
 
-    m2 = _CountingModule()
-    await asyncio.gather(*[m2.initialize({}) for _ in range(100)])
-
-    # The fix pattern guarantees that _initialized is set to True exactly 1 time
-    assert m2._initialized is True, "Anti-reg B8: _initialized ha de ser True post-gather"
+    assert call_count == 1, (
+        f"B8: el pas car d'init s'ha executat {call_count} cops amb 100 crides "
+        f"concurrents — el lock no serialitza (race de doble-init)"
+    )
+    assert module._initialized is True
+    assert module._state == "ready"
 
 
 # ──────────────────────────────────────────────────────────────────────────────

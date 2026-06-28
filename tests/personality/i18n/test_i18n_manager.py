@@ -273,6 +273,34 @@ path_traduccions = "languages"
 
     assert i18n.t("key") == "modified"
 
+  def test_reload_clears_obsolete_keys(self, tmp_path):
+    """B134: a key removed from the file must NOT survive a reload in memory."""
+    config_file = tmp_path / "server.toml"
+    config_file.write_text("""
+[personality.location]
+idioma_principal = "ca-ES"
+fallback_idioma = "ca-ES"
+path_traduccions = "languages"
+""")
+
+    lang_dir = tmp_path / "languages" / "ca-ES"
+    lang_dir.mkdir(parents=True)
+    (lang_dir / "messages.json").write_text('{"greeting": "Hola", "farewell": "Adeu"}')
+
+    i18n = I18nManager(config_path=config_file, base_path=tmp_path)
+    assert i18n.t("greeting") == "Hola"
+    assert i18n.t("farewell") == "Adeu"
+
+    # 'farewell' is removed from the file.
+    (lang_dir / "messages.json").write_text('{"greeting": "Hola"}')
+    assert i18n.reload_translations() is True
+
+    # Obsolete key must be gone (t() returns the key itself when not found).
+    assert i18n.t("farewell") == "farewell"
+    # The kept key must still resolve — guards against a wrong clear() ordering
+    # that would wipe everything instead of just the obsolete key.
+    assert i18n.t("greeting") == "Hola"
+
 class TestI18nLazyLoading:
   """Tests for lazy loading behavior."""
 

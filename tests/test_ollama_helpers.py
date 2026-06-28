@@ -84,7 +84,10 @@ class TestValidateOllamaModel:
 class TestBuildOllamaPayload:
     def test_builds_payload_with_correct_keys(self):
         from core.endpoints.chat_engines.ollama import _build_ollama_payload
-        request = MagicMock(stream=False, temperature=0.7, max_tokens=512)
+        # top_p=None explicit: a bare MagicMock would return a truthy Mock child
+        # for request.top_p, so the opt-in guard would inject a non-serializable
+        # object into options. Pin it (mirror of the real schema default).
+        request = MagicMock(stream=False, temperature=0.7, max_tokens=512, top_p=None)
         messages = [{"role": "user", "content": "hi"}]
         payload = _build_ollama_payload(request, messages, "llama3.2")
         assert payload["model"] == "llama3.2"
@@ -95,9 +98,23 @@ class TestBuildOllamaPayload:
     def test_think_enabled_from_env(self, monkeypatch):
         from core.endpoints.chat_engines.ollama import _build_ollama_payload
         monkeypatch.setenv("NEXE_OLLAMA_THINK", "true")
-        request = MagicMock(stream=False, temperature=0.5, max_tokens=None)
+        request = MagicMock(stream=False, temperature=0.5, max_tokens=None, top_p=None)
         payload = _build_ollama_payload(request, [], "phi3")
         assert payload["think"] is True
+
+    # ─── B076/S5-04: top_p wiring (opt-in mirror of temperature) ──────────────
+    def test_top_p_forwarded_into_options_when_set(self):
+        from core.endpoints.chat_engines.ollama import _build_ollama_payload
+        request = MagicMock(stream=False, temperature=0.7, max_tokens=512, top_p=0.42)
+        payload = _build_ollama_payload(request, [], "llama3.2")
+        assert payload["options"]["top_p"] == 0.42
+
+    def test_top_p_absent_from_options_when_none(self):
+        from core.endpoints.chat_engines.ollama import _build_ollama_payload
+        request = MagicMock(stream=False, temperature=0.7, max_tokens=512, top_p=None)
+        payload = _build_ollama_payload(request, [], "llama3.2")
+        # None preserves the prior byte-exact payload: no top_p key at all.
+        assert "top_p" not in payload["options"]
 
 
 # ─── _ollama_streaming_response ──────────────────────────────────────────────

@@ -519,3 +519,31 @@ class TestCorruptedSessionsDiagnosis:
 
         sm2 = SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
         assert sm2.corrupted_sessions_count == 0
+
+
+# ═══════════════════════════════════════════════════════════════
+# MC-116: consecutive same-role dedup keeps the LATEST message
+# ═══════════════════════════════════════════════════════════════
+
+class TestConsecutiveRoleDedupKeepsLatest:
+    """If an interrupted stream leaves an assistant turn unpersisted, two 'user'
+    messages end up adjacent. get_context_messages must keep the NEWEST so the
+    model answers the new message, not the stale (stopped) one."""
+
+    def test_two_consecutive_users_keeps_last(self):
+        s = ChatSession()
+        s.add_message("user", "OLD question (stopped)")
+        s.add_message("user", "NEW question")
+        ctx = s.get_context_messages()
+        users = [m for m in ctx if m["role"] == "user"]
+        assert len(users) == 1
+        assert users[0]["content"] == "NEW question"
+
+    def test_normal_alternation_preserved(self):
+        s = ChatSession()
+        s.add_message("user", "q1")
+        s.add_message("assistant", "a1")
+        s.add_message("user", "q2")
+        ctx = s.get_context_messages()
+        assert [m["role"] for m in ctx] == ["user", "assistant", "user"]
+        assert ctx[-1]["content"] == "q2"

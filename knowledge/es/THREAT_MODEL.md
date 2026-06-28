@@ -89,9 +89,9 @@ Sensibilidad primaria: **confidencialidad** del material secreto, **integridad**
 
 Pesos LLM descargados por el installer en el primer arranque (Hugging Face snapshot_download, Ollama pull, o URL GGUF directa), mas el modelo de embedding fastembed ONNX empaquetado en el DMG. Tras la instalacion viven bajo `~/.cache/huggingface/`, `~/.ollama/`, y el subdirectorio `embeddings/` del arbol de instalacion.
 
-Desde que llego el pinning SHA256 de los pesos (`bff18cc`), cada peso descargado en el primer arranque es verificado SHA-256 contra `installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256` via `core/integrity/hashing.py` e `installer/download_verify.py`. El modelo fastembed empaquetado en el DMG va acompañado de un `embeddings.manifest.json` (tres digests para `model*.onnx`, `tokenizer.json`, `config.json`).
+Los pesos del primer arranque se verifican antes de confiar en ellos — segun el origen, nunca en silencio (ADR B046b). Los snapshots **MLX y GGUF** estan pinnados SHA-256: digests self-computed en `installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256` mas los digests por-fichero-LFS publicados por Hugging Face en `installer/provider_pins.json` (obtenidos solo por metadata, sin descargar ningun modelo). Una discrepancia aborta la instalacion (fail-closed). Los modelos **Ollama** se verifican por el propio pull content-addressed de Ollama (cada layer se contrasta con el digest del manifest); no mantenemos ningun pin de cliente para Ollama (ADR B251 — sus tags son mutables upstream, asi que un pin de cliente daria falsos positivos en una re-publicacion legitima). Riesgo residual: un ataque de sustitucion de tag upstream no se detecta mientras el catalogo use tags mutables. Un artefacto MLX/GGUF sin pin disponible nunca se instala en silencio — el instalador exige consentimiento explicito (`NEXE_ALLOW_UNPINNED=1` o un prompt interactivo). El modelo fastembed empaquetado en el DMG va acompañado de un `embeddings.manifest.json` (tres digests para `model*.onnx`, `tokenizer.json`, `config.json`).
 
-Sensibilidad primaria: **integridad**. Un peso manipulado instala una backdoor en cada inferencia futura; el pinning de los pesos lo cierra en el momento de descarga.
+Sensibilidad primaria: **integridad**. Un peso manipulado instala una backdoor en cada inferencia futura; las comprobaciones anteriores lo cierran en el momento de descarga. Los pins self-computed defienden tambien un repo de proveedor comprometido; los pins publicados por el proveedor (digests por-fichero de HF) defienden MITM y corrupcion en transito pero no un repo de Hugging Face comprometido.
 
 ### 4.4 Integridad del codigo
 
@@ -100,7 +100,7 @@ Modulos Python, installer Swift, scripts shell. Cualquier proceso corriendo como
 ### 4.5 Disponibilidad
 
 - Puerto TCP 9119 (FastAPI).
-- Daemon Ollama en el puerto 11434 (loopback; `core/config.py:526`).
+- Daemon Ollama en el puerto 11434 (loopback; `core/config.py:533`).
 - Qdrant (embedded, in-process; `memory/embeddings/adapters/qdrant_adapter.py`).
 - Un subproceso de inferencia por backend (MLX in-process, llama.cpp in-process via `llama-cpp-python`, daemon externo Ollama).
 
@@ -168,11 +168,11 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 ### 6.1 Spoofing
 
-**El navegador se hace pasar por un usuario autenticado (boundary 1).** Mitigado por validacion dual-key `X-API-Key` con `secrets.compare_digest` en `plugins/security/core/auth_dependencies.py:require_api_key` (linea 167). Los fallos se registran con la IP del cliente. El bypass dev-mode esta gated a loopback solo (la rama `if dev_mode:` en la linea 73 fuerza `_is_loopback_ip` en las lineas 76-80 y lanza 403 salvo que `NEXE_DEV_MODE_ALLOW_REMOTE=true`).
+**El navegador se hace pasar por un usuario autenticado (boundary 1).** Mitigado por validacion dual-key `X-API-Key` con `secrets.compare_digest` en `plugins/security/core/auth_dependencies.py:require_api_key` (linea 161; el `compare_digest` de la clave primaria esta en la linea 96). Los fallos se registran con la IP del cliente. El bypass dev-mode esta gated a loopback solo (la rama `if dev_mode:` en `_check_dev_mode` en la linea 67 fuerza `_is_loopback_ip` en la linea 70 y lanza 403 salvo que `NEXE_DEV_MODE_ALLOW_REMOTE=true`).
 
 **Otro proceso de la misma maquina envia peticiones como si fuese el daemon Ollama (boundary 4).** Parcial: Ollama escucha en loopback sin autenticacion. Cualquier proceso local corriendo como el mismo usuario puede llamarlo. Aceptado — el mismo usuario local puede leer `~/.ollama/` directamente. La defensa de server-nexe es que el pipeline de chat siempre pasa por `/ui/chat` o `/v1/chat/completions` (ambos autenticados); los endpoints por-backend directos (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) estan bloqueados por el middleware `RemovedDirectRoutesGuard` (`core/middleware.py`) — una llamada directa devuelve HTTP 403 con codigo de error `direct_plugin_endpoint_disabled` antes de llegar a ningun handler. Las rutas se declaran como `removed_direct_routes` en el `manifest.toml` de cada plugin y se aplican tanto en tiempo de peticion como en tiempo de carga del plugin (vease §6.6).
 
-**Atacante sirve un peso de modelo manipulado desde Hugging Face (boundary 5).** Mitigado por el pinning SHA-256 de los pesos: `installer/download_verify.py` rechaza cualquier snapshot cuyo hash de directorio (`core/integrity/hashing.py:sha256_of_dir`) no coincida con el pin del catalogo. Single-file GGUF usa `sha256_of_file`; Ollama usa digests `ollama show --json`.
+**Atacante sirve un peso de modelo manipulado desde Hugging Face (boundary 5).** Mitigado por el pinning SHA-256 para las entradas pinnadas del catalogo: `installer/download_verify.py` rechaza cualquier artefacto MLX/GGUF cuyo digest no coincida con el catalogo — `sha256_of_dir` para un snapshot MLX self-computed, `sha256_of_file` por-fichero-LFS contra los digests publicados por Hugging Face para el tier-2 MLX, y `sha256_of_file` para GGUF single-file. Ollama se basa en su pull content-addressed. El MITM y la corrupcion en transito se detectan para cada modelo del catalogo; un repo HF totalmente comprometido solo se detecta con pins self-computed. Una entrada MLX/GGUF sin pin exige consentimiento explicito en lugar de instalarse en silencio.
 
 **Atacante LAN envia un bootstrap token (boundary 8).** Gated por `NEXE_ENV != development` → HTTP 503 (`core/endpoints/bootstrap.py:97-106`), mas allow-list de IP (loopback + RFC1918 + whitelist VPN; `core/endpoints/bootstrap.py:109-117`), mas rate-limit `3/IP + 10 global / 5 min` (`core/endpoints/bootstrap.py:66-96` `check_rate_limit`, implementacion en `core/bootstrap_tokens.py:check_bootstrap_rate_limit`).
 
@@ -182,7 +182,7 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 **Markdown o HTML inyectado y renderizado en el chat (boundary 1).** El detector XSS corre sin condiciones (`plugins/security/core/input_sanitizers.py:validate_string_input`, `check_xss=True` en todos los contextos). `sanitize_html` escapa HTML en cualquier salida renderizada a la UI.
 
-**Inyeccion en memoria / RAG (boundaries 1 y 6).** El input del usuario es limpiado de tags de rol-memoria (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]`…) por `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:93`). Los documentos ingestados en el RAG y los resultados de retrieval pasan por `_filter_rag_injection` y `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:108` y linea 149). Un documento malicioso no puede incrustar un tag `[MEM_DELETE:]` que el LLM copiase verbatim.
+**Inyeccion en memoria / RAG (boundaries 1 y 6).** El input del usuario es limpiado de tags de rol-memoria (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]`…) por `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:93`). Los documentos ingestados en el RAG y los resultados de retrieval pasan por `_filter_rag_injection` y `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:109` y linea 151). Un documento malicioso no puede incrustar un tag `[MEM_DELETE:]` que el LLM copiase verbatim.
 
 **JSON profundamente anidado como tampering de ingenieria de payload (boundary 1).** Acotado por `MAX_NOSQL_DEPTH=100` en `detect_nosql_injection`. Antes hacia crashear el proceso con `RecursionError`; ahora devuelve "sospechoso" en profundidades > 100.
 
@@ -208,7 +208,7 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 ### 6.5 Denial of Service
 
-**Flood de `/ui/chat` o `/v1/chat/completions` con peticiones concurrentes.** Los decorators por-endpoint de `slowapi` imponen 20/min en el chat (`core/endpoints/chat.py:319`), 30/min en la familia `/status` (`core/endpoints/root.py:110+`), 2/min en endpoints de seguridad sensibles (`plugins/security/api/routes.py:117`), 10/min en operaciones de modulo (`plugins/security/api/routes.py:140`).
+**Flood de `/ui/chat` o `/v1/chat/completions` con peticiones concurrentes.** Los decorators por-endpoint de `slowapi` imponen 20/min en el chat (`core/endpoints/chat.py:362`), 30/min en la familia `/status` (`core/endpoints/root.py:110+`), 2/min en endpoints de seguridad sensibles (`plugins/security/api/routes.py:117`), 10/min en operaciones de modulo (`plugins/security/api/routes.py:140`).
 
 **Endpoint bootstrap flooded (boundary 8).** `check_rate_limit` impone 3/IP + 10 global por 5 min en ventana deslizante (`core/endpoints/bootstrap.py:66-96`). En produccion el endpoint devuelve 503 antes de que corra cualquier logica de rate-limit.
 
@@ -220,13 +220,13 @@ Leyenda: ● = amenaza activa con mitigacion, ◐ = parcial / solo defensa-en-pr
 
 ### 6.6 Elevacion de privilegio
 
-**Dev-mode bypass desde un origen no-loopback.** Bloqueado en la linea 73 de `auth_dependencies.py`: `NEXE_DEV_MODE=true` da bypass solo cuando la IP cliente es loopback y `NEXE_DEV_MODE_ALLOW_REMOTE` esta explicitamente set.
+**Dev-mode bypass desde un origen no-loopback.** Bloqueado en la linea 70 de `auth_dependencies.py` (dentro de `_check_dev_mode`): `NEXE_DEV_MODE=true` da bypass solo cuando la IP cliente es loopback y `NEXE_DEV_MODE_ALLOW_REMOTE` esta explicitamente set.
 
 **Bypass del pipeline canonico de chat.** Mitigado por el middleware `RemovedDirectRoutesGuard` (`core/middleware.py`): cualquier peticion a `/mlx/chat`, `/llama-cpp/chat` o `/ollama/api/chat` devuelve HTTP 403 con codigo de error `direct_plugin_endpoint_disabled` antes de llegar a ningun handler (se ejecuta antes de SlowAPI, CORS y el dispatch de rutas). Las rutas se declaran como `removed_direct_routes` en el `manifest.toml` de cada plugin y se aplican tanto en tiempo de peticion como en tiempo de carga — un plugin que declara una ruta como eliminada y al mismo tiempo la registra lanza `PluginLoadError` y es rechazado. Todo chat debe pasar por `/ui/chat` o `/v1/chat/completions` para que corra el pipeline completo (auth → rate → validate → RAG sanitize → LLM → MEM_SAVE strip). Cierra el seguimiento de la revision interna de seguridad §2.11.
 
 **Path traversal en session IDs o filenames.** `validate_string_input(context="path")` corre el detector de path-traversal en inputs tipo path (el contexto chat lo omite, un trade-off documentado). La validacion de filename en uploads se fuerza en servidor.
 
-**Tightening del directorio de master-key falla silenciosamente.** `core/crypto/keys.py:_try_file_set` (linea 122+) ahora loggea un WARNING cuando `chmod 0o700` falla en `~/.nexe/`. El fichero de clave sigue naciendo `0o600` via `os.open(O_CREAT|O_EXCL)` asi que esto es solo un fix defensa-en-profundidad.
+**Tightening del directorio de master-key falla silenciosamente.** `core/crypto/keys.py:_try_file_set` (linea 139+) ahora loggea un WARNING cuando `chmod 0o700` falla en `~/.nexe/` (lineas 157-163). El fichero de clave sigue naciendo `0o600` via `os.open(O_CREAT|O_EXCL)` asi que esto es solo un fix defensa-en-profundidad.
 
 **Intento de jailbreak dentro del chat.** 11 patrones regex (detector speed-bump, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, linea 41; cubre formas imperativas CA/EN y handles conocidos como `DAN mode`, `do anything now`) añaden un prefijo `[SECURITY NOTICE]` en lugar de rechazar — los ataques sofisticados lo evaden trivialmente y esto esta documentado explicitamente (`SECURITY.md:36`). La proteccion real requiere moderacion a nivel de modelo (fuera de alcance, §7).
 
@@ -252,7 +252,7 @@ Declaracion honesta de lo que *no* queda cerrado por §6.
 - **`embeddings.manifest.json` y `MODEL_WEIGHT_SHA256` estan code-signados solo por estar dentro del DMG notarizado o del repo Git firmado.** No hay transparency log externo. Un atacante que comprometa a la vez el pipeline de build notarizado y el repo git podria sustituir el pin y el peso simultaneamente. Fuera de alcance por §7 "Python supply-chain", pero reabierto aqui por honestidad.
 - **Prometheus `/metrics` revela cuenta de sesion, modelo cargado, tasa de error reciente.** Un atacante con la API key los ve. Baja sensibilidad, pero no cero.
 - **Toggle dev-mode allow-remote.** `NEXE_DEV_MODE_ALLOW_REMOTE=true` desactiva la puerta loopback-only. Poner esto en produccion es un mal uso; logeamos un WARNING pero no nos negamos a arrancar.
-- **Sin pipeline automatico de tracking de CVEs.** Las dependencias se auditan manualmente en el momento de release. Un CVE divulgado entre releases no se captura hasta la siguiente revision (vease `SECURITY.md:88`).
+- **Sin pipeline automatico de tracking de CVEs.** Las dependencias se auditan manualmente en el momento de release. Un CVE divulgado entre releases no se captura hasta la siguiente revision (vease `SECURITY.md:121`).
 - **Sin programa bug-bounty; sin pen-test externo.** Todo el testing de seguridad es asistido por IA mas el autor. Este documento sustituye la ausencia de un modelo formal, no la ausencia de una auditoria.
 
 ## 9. Consideraciones de privacidad (apendice LINDDUN)

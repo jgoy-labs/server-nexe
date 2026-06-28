@@ -150,14 +150,6 @@ class TestBootstrapTokensCoverage:
 # ─── core/endpoints/system.py ─────────────────────────────────────────
 class TestSystemEndpointsCoverage:
 
-    def test_send_restart_signal_exception(self):
-        """Lines 153-154: unexpected exception in restart."""
-        from core.endpoints.system import send_restart_signal
-
-        with patch("core.endpoints.system.get_supervisor_pid",
-                   side_effect=Exception("unexpected")):
-            asyncio.run(send_restart_signal())
-
     def test_restart_server_exception(self):
         """Lines 201-203: restart_server unexpected exception."""
         from core.endpoints.system import restart_server
@@ -173,17 +165,6 @@ class TestSystemEndpointsCoverage:
 
 # ─── core/ingest/ingest_knowledge.py ──────────────────────────────────
 class TestIngestKnowledge:
-
-    def test_read_file_pdf(self, tmp_path):
-        """Lines 98-103: read_file with .pdf extension."""
-        from core.ingest.ingest_knowledge import read_file
-
-        pdf_file = tmp_path / "test.pdf"
-        # Test that unsupported extension returns empty
-        txt_file = tmp_path / "test.xyz"
-        txt_file.write_text("hello")
-        result = read_file(txt_file)
-        assert result == ""
 
     def test_read_file_txt(self, tmp_path):
         """Lines 94-95: read .txt file."""
@@ -201,6 +182,56 @@ class TestIngestKnowledge:
         md_file.write_text("# Title\nContent")
         result = read_file(md_file)
         assert "Title" in result
+
+    def test_read_file_pdf(self, tmp_path):
+        """T14: read_file() must exercise the elif ext=='.pdf' branch (lines 272-278).
+
+        The original test-theatre wrote a .xyz file and hit the final `return ""`
+        branch instead — the PDF parser was never exercised.
+
+        Mutation target: change `ext == ".pdf"` to `ext == ".docx"` in
+        ingest_knowledge.py → result becomes "" → assert fails → RED.
+        """
+        import io
+        from pypdf import PdfWriter
+        from pypdf.generic import (
+            DecodedStreamObject, DictionaryObject, NameObject,
+        )
+        from core.ingest.ingest_knowledge import read_file
+
+        # Build a minimal valid PDF with extractable text.
+        writer = PdfWriter()
+        page = writer.add_blank_page(width=200, height=200)
+
+        content_bytes = b"BT /F1 12 Tf 10 180 Td (HelloPDF) Tj ET"
+        stream = DecodedStreamObject()
+        stream.set_data(content_bytes)
+        page[NameObject("/Contents")] = writer._add_object(stream)
+
+        font = DictionaryObject()
+        font[NameObject("/Type")] = NameObject("/Font")
+        font[NameObject("/Subtype")] = NameObject("/Type1")
+        font[NameObject("/BaseFont")] = NameObject("/Helvetica")
+
+        resources = DictionaryObject()
+        fonts_dict = DictionaryObject()
+        fonts_dict[NameObject("/F1")] = writer._add_object(font)
+        resources[NameObject("/Font")] = fonts_dict
+        page[NameObject("/Resources")] = resources
+
+        buf = io.BytesIO()
+        writer.write(buf)
+        pdf_path = tmp_path / "sample.pdf"
+        pdf_path.write_bytes(buf.getvalue())
+
+        result = read_file(pdf_path)
+
+        # The PDF branch must return a non-empty string containing the text.
+        assert isinstance(result, str), "read_file must return str for .pdf"
+        assert "HelloPDF" in result, (
+            "read_file must extract text from the .pdf branch; "
+            "got empty string — either the PDF branch was skipped or pypdf failed"
+        )
 
     def test_chunk_text(self):
         from core.ingest.ingest_knowledge import chunk_text

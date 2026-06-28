@@ -150,7 +150,7 @@ def _write_commands_file(project_root, nexe_cmd, model_config):
 
 ---
 
-📝 **Model actual / Current model**: {model_config['name'] if model_config else 'Cap (afegeix-ne un amb nexe model pull)'}
+📝 **Model actual / Current model**: {model_config['name'] if model_config else 'Cap (afegeix-ne un amb nexe model install <name>)'}
 🔧 **Motor / Engine**: {model_config['engine'] if model_config else 'ollama'}
 💾 **Ubicació / Location**: {project_root}
 

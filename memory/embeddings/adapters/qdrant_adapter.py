@@ -276,16 +276,10 @@ class QdrantAdapter:
 
     def client_delete(self, collection_name: str, points_selector: Any) -> None:
         """Deletes points from a specific collection."""
-        try:
-            self._require_client().delete(
-                collection_name=collection_name,
-                points_selector=points_selector,
-            )
-        except Exception:
-            self._require_client().delete(
-                collection_name=collection_name,
-                points_selector=points_selector,
-            )
+        self._require_client().delete(
+            collection_name=collection_name,
+            points_selector=points_selector,
+        )
 
     def retrieve(self, collection_name: str, ids: List[str], with_payload: bool = True) -> List[Any]:
         """Retrieves points by ID from a collection."""

@@ -17,7 +17,8 @@ import warnings as _warnings
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+
+from core.env_utils import parse_truthy
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Environment setup — must go BEFORE any import that could transitively load
@@ -185,30 +186,12 @@ def _remove_pid_file(project_root: Path) -> None:
     logger.debug("Could not remove PID file %s: %s", pid_path, exc)
 
 
-class ServerState:
-  """Holds server global state"""
-  def __init__(self) -> None:
-    """Initialize all server-wide state slots to their defaults."""
-    self.config: Dict[str, Any] = {}
-    self.api_integrator: Optional[APIIntegrator] = None
-    self.project_root: Optional[Path] = None
-    self.i18n: Optional[Any] = None
-    self.module_manager: Optional[Any] = None
-    self.registry: Optional[Any] = None
-    self.ollama_process: Optional[Any] = None
-    self.qdrant_available: bool = False
-    self.crypto_provider: Optional[Any] = None
-    self._cleanup_task: Optional[asyncio.Task[Any]] = None
-    self._prewarm_task: Optional[asyncio.Task[Any]] = None
-    self._session_cleanup_task: Optional[asyncio.Task[Any]] = None
-    self._knowledge_ingest_task: Optional[asyncio.Task[Any]] = None
-    self.knowledge_ingest_complete: bool = False
-    # flag set by _startup_init. If False, _startup does
-    # early return abans de _startup_services + _startup_phases_and_tokens.
-    self.has_onboarding: bool = False
-    self.configure_modules_callback: Optional[Callable[..., None]] = None
-
-server_state = ServerState()
+# MC-102: ServerState + the singleton + get_server_state() now live in the
+# dependency-free leaf module core/server_state.py, so the lower layers
+# (memory/plugins) no longer import this heavy startup module to read state.
+# Re-exported here so existing `from core.lifespan import server_state /
+# get_server_state / ServerState` keep working and share the SAME singleton.
+from core.server_state import ServerState, server_state, get_server_state  # noqa: E402,F401
 
 
 async def _wrap_knowledge_ingest(state: "ServerState") -> None:
@@ -237,6 +220,10 @@ async def _prewarm_fastembed() -> None:
     """
     import time as _time
     try:
+        # finding #472: this is a DEFERRED (function-local) import on purpose.
+        # memory→core is eager (the intended direction); core→memory is deferred
+        # here to avoid an import-time cycle. This is the normal lifecycle-
+        # orchestrator pattern, not a cycle to "break".
         from memory.memory.api.v1 import get_memory_api
         memory_api = await get_memory_api()
         memory_api.ingest_config.pre_warm = True
@@ -306,7 +293,10 @@ async def _startup_init(app: FastAPI) -> None:
         "Project root: {path}", path=str(server_state.project_root))
     logger.info(msg)
 
-    server_state.config = load_config(server_state.project_root, server_state.i18n)
+    # MC-128: config is already loaded at build time (factory_state). Avoid the
+    # redundant second load; only (re)load if missing.
+    if not server_state.config:
+        server_state.config = load_config(server_state.project_root, server_state.i18n)
     app.state.config = server_state.config
 
     # PID file — single-instance guard (B06, B07, B10)
@@ -414,7 +404,7 @@ async def _startup_phases_and_tokens(app: FastAPI) -> None:
     setup_bootstrap_tokens(server_state, _translate)
     try:
         bootstrap_ttl = int(os.getenv('NEXE_BOOTSTRAP_TTL', os.getenv('BOOTSTRAP_TTL', '30')))
-        auto_renew = os.getenv('NEXE_BOOTSTRAP_AUTO_RENEW', 'true').lower() == 'true'
+        auto_renew = parse_truthy(os.getenv('NEXE_BOOTSTRAP_AUTO_RENEW', 'true'))
         if auto_renew:
             start_bootstrap_token_renewal(ttl_minutes=bootstrap_ttl)
     except Exception as e:
@@ -454,6 +444,12 @@ def _startup_final_banner() -> None:
     logger.info("  Web UI: %s/ui/", _nexe_url)
     logger.info("  API Key: %s", "(configured)" if _api_key else "(not set)")  # nosemgrep: python-logger-credential-disclosure — value is always "(configured)" or "(not set)", never the key itself
     logger.info("  Encryption: %s", _crypto_status)
+    # MC-122: don't claim "all operational" when a startup phase failed silently.
+    if server_state.degraded_modules:
+        logger.warning("  Status: DEGRADED - failed subsystems: %s",
+                       ", ".join(sorted(set(server_state.degraded_modules))))
+    else:
+        logger.info("  Status: All systems operational")
     logger.info("=" * 70)
 
 
@@ -487,14 +483,52 @@ async def _startup(app: FastAPI) -> None:
     _startup_final_banner()
 
 
+def _shutdown_join_timeout() -> float:
+    """Hard ceiling (seconds) for joining a cancelled background task.
+
+    A wedged task that ignores ``CancelledError`` must never block shutdown
+    forever (B215). Configurable via ``NEXE_SHUTDOWN_JOIN_TIMEOUT``; defaults
+    to 5s. Invalid/non-positive values fall back to the default.
+    """
+    raw = os.environ.get("NEXE_SHUTDOWN_JOIN_TIMEOUT")
+    if raw is None or raw.strip() == "":
+        return 5.0
+    try:
+        value = float(raw.strip())
+    except ValueError:
+        return 5.0
+    return value if value > 0 else 5.0
+
+
 async def _cancel_background_tasks() -> None:
-    """Cancels active background tasks (N04)."""
-    for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task', '_knowledge_ingest_task'):
+    """Cancels active background tasks (N04) and joins them with a hard timeout.
+
+    B215: each task is cancelled and then joined under ``asyncio.wait_for`` so a
+    task that swallows ``CancelledError`` cannot wedge the shutdown. This must
+    run BEFORE the stores (Qdrant / MemoryService) are torn down so a still-live
+    ingest can never upsert against a closed store.
+    """
+    timeout = _shutdown_join_timeout()
+    # MC-119: stop the dreaming cycle here too (B215 intent: cancel ALL background
+    # tasks before tearing down the stores). It was previously only cancelled in
+    # _shutdown_memory_service, which runs AFTER _shutdown_qdrant.
+    _dreaming_cycle = getattr(server_state, '_dreaming_cycle', None)
+    if _dreaming_cycle is not None:
+        try:
+            _dreaming_cycle.stop()
+        except Exception:
+            logger.debug("DreamingCycle.stop() during pre-shutdown raised", exc_info=True)
+    for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task', '_knowledge_ingest_task', '_dreaming_task'):
         _task = getattr(server_state, _task_attr, None)
         if _task is not None and not _task.done():
             _task.cancel()
             try:
-                await _task
+                await asyncio.wait_for(asyncio.shield(_task), timeout=timeout)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Background task '%s' did not stop within %.1fs of cancel; "
+                    "continuing shutdown (task left detached)", _task_attr, timeout,
+                )
             except (asyncio.CancelledError, Exception):
                 pass
             logger.debug("Background task '%s' cancelled", _task_attr)
@@ -524,8 +558,15 @@ async def _shutdown(app: FastAPI) -> None:
         except Exception as e:
             logger.debug("Error stopping bootstrap token renewal: %s", e)  # nosemgrep: python-logger-credential-disclosure
 
+        # B215: cancel + join background tasks (e.g. knowledge ingest) BEFORE
+        # tearing down the stores. Until the background tasks have stopped, the
+        # store stays open — otherwise a fire-and-forget ingest could upsert
+        # against an already-closed Qdrant / MemoryService.
+        await _cancel_background_tasks()
+
         await cleanup_ollama_shutdown(OLLAMA_HEALTH_TIMEOUT, OLLAMA_UNLOAD_TIMEOUT)
         _shutdown_qdrant()
+        server_state.qdrant_available = False  # MC-127: reset stale diagnostic flag across in-process cycles
         await _shutdown_memory_service(app, server_state)
         _stop_process(server_state.ollama_process, "Ollama")
 
@@ -539,7 +580,6 @@ async def _shutdown(app: FastAPI) -> None:
         if server_state.module_manager:
             logger.debug("ModuleManager kept alive (stateless registry)")
 
-        await _cancel_background_tasks()
         _reset_circuit_breakers()
 
     except Exception as e:
@@ -578,7 +618,3 @@ async def lifespan(app: FastAPI):
     raise
   finally:
     await _shutdown(app)
-
-def get_server_state() -> ServerState:
-  """Get the global server state"""
-  return server_state

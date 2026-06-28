@@ -180,7 +180,12 @@ class ChatSession:
         cleaned: List[Dict[str, str]] = []
         for m in msgs:
             if cleaned and cleaned[-1]["role"] == m["role"]:
-                continue  # skip duplicate role
+                # MC-116: keep the LATEST of consecutive same-role messages.
+                # If an interrupted stream left an assistant turn unpersisted,
+                # two 'user' messages end up adjacent; keeping the last one
+                # means the model answers the NEW message, not the stale one.
+                cleaned[-1] = m
+                continue
             cleaned.append(m)
         return cleaned
 
@@ -378,10 +383,19 @@ class SessionManager:
         In production (NEXE_ENV=production, the default), refusing to silently
         write plaintext is the only correct behaviour: the operator opted in
         to encryption-at-rest at startup and the .json fallback would leak
-        chat content to disk unencrypted. The exception bubbles up so the
-        upstream handler logs it; the in-memory session is preserved either
-        way (the dict assignment in create_session/update_session has already
-        happened by the time we get here).
+        chat content to disk unencrypted.
+
+        MC-014 — note on error handling: the production RuntimeError raised
+        below is INTENTIONALLY caught by this method's own outer `except` and
+        logged (critical for the refusal marker, error for the catch); it does
+        NOT propagate to the caller. This is a redundant defense-in-depth
+        barrier: the primary guard is WebUIModule.initialize, which aborts
+        plugin startup in production without crypto, so this branch is normally
+        unreachable in production. The contract (logged + no plaintext file on
+        disk, no exception bubbling up) is asserted by
+        tests/.../test_session_manager_production_safety.py. The in-memory
+        session is preserved either way (the dict assignment in
+        create_session/update_session already happened by the time we get here).
 
         In development/test, keep the .json fallback so existing test fixtures
         and crypto-less local runs still work.
@@ -395,11 +409,13 @@ class SessionManager:
                 # _load_sessions() supplies file_path.stem as AAD; mismatch (swap
                 # attack) raises InvalidTag and is logged as corrupted.
                 aad = session.id.encode("utf-8")
-                file_path.write_bytes(self._crypto.encrypt(plaintext, aad=aad))
-                try:
-                    file_path.chmod(0o600)
-                except OSError:
-                    logger.warning("chmod 600 failed on session file %s", file_path)
+                ciphertext = self._crypto.encrypt(plaintext, aad=aad)
+                # Atomic write (MC-081): a crash/disk-full mid-write must NOT
+                # truncate the .enc file. It's authenticated ciphertext — a
+                # partial write makes the WHOLE session unrecoverable (InvalidTag)
+                # at next load. chmod the tmp BEFORE the rename so no laxer-
+                # permission window is ever exposed.
+                self._atomic_write_bytes(file_path, ciphertext, chmod=0o600)
             else:
                 import os as _os
                 _env = _os.environ.get("NEXE_ENV", "production").lower()
@@ -415,10 +431,52 @@ class SessionManager:
                         "refusing to write plaintext session file."
                     )
                 file_path = self._storage_path / f"{session.id}.json"
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
+                # Atomic write (MC-081): same tmp+rename guard for the dev/test
+                # plaintext fallback so a crash can't leave a zero-byte .json.
+                self._atomic_write_bytes(
+                    file_path,
+                    json.dumps(session.to_dict(), indent=2, ensure_ascii=False).encode("utf-8"),
+                )
         except Exception as e:
             logger.error("Failed to save session %s: %s", session.id, e)
+
+    def _atomic_write_bytes(self, file_path: Path, data: bytes, *, chmod: Optional[int] = None) -> None:
+        """Write *data* to *file_path* atomically (MC-081).
+
+        Writes to a tmp file in the SAME directory, fsyncs it, then os.replace.
+        A crash/kill/disk-full mid-write leaves the PREVIOUS file intact instead
+        of a truncated one. Same-dir tmp makes the rename atomic on POSIX (no
+        cross-device copy). On any failure the tmp is cleaned up.
+        """
+        import os as _os
+        import tempfile as _tempfile
+
+        tmp_path: Optional[Path] = None
+        try:
+            with _tempfile.NamedTemporaryFile(
+                mode="wb",
+                dir=file_path.parent,
+                prefix=".session.",
+                suffix=".tmp",
+                delete=False,
+            ) as fh:
+                tmp_path = Path(fh.name)
+                fh.write(data)
+                fh.flush()
+                _os.fsync(fh.fileno())
+            if chmod is not None:
+                try:
+                    tmp_path.chmod(chmod)
+                except OSError:
+                    logger.warning("chmod %o failed on session tmp %s", chmod, tmp_path)
+            _os.replace(tmp_path, file_path)
+            tmp_path = None
+        finally:
+            if tmp_path is not None and tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
 
     def _delete_session_from_disk(self, session_id: str):
         """Delete session file from disk (.enc or .json)."""

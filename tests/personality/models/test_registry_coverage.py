@@ -23,7 +23,9 @@ class TestModelRegistry:
             assert entry.short_name == name
             assert entry.description
             assert entry.size_gb > 0
-            assert entry.ollama_tag
+            # B166: every entry must be reachable on at least one engine, but an
+            # MLX-only model (e.g. qwen3.5:4b-8bit) legitimately has no ollama_tag.
+            assert entry.ollama_tag or entry.mlx_hf_id
 
 
 class TestGetModelEntry:
@@ -75,6 +77,25 @@ class TestV105Catalog:
         assert get_model_entry("salamandra7b").mlx_hf_id == ""
         assert get_model_entry("deepseek-r1:32b").mlx_hf_id == ""
         assert get_model_entry("alia-40b").mlx_hf_id == ""
+
+
+class TestB166MlxOnly:
+    """B166: an MLX-only variant must not resolve to another model's Ollama tag,
+    and ollama_tags must be unique across the registry."""
+
+    def test_8bit_is_mlx_only(self):
+        from personality.models.registry import get_model_entry
+        entry = get_model_entry("qwen3.5:4b-8bit")
+        assert entry is not None
+        # MLX-only: it must NOT inherit the 4-bit's Ollama tag.
+        assert entry.ollama_tag == ""
+        assert entry.ollama_tag != "qwen3.5:4b"
+        assert entry.mlx_hf_id == "mlx-community/Qwen3.5-4B-MLX-8bit"
+
+    def test_ollama_tags_unique(self):
+        from personality.models.registry import MODEL_REGISTRY
+        tags = [e.ollama_tag for e in MODEL_REGISTRY.values() if e.ollama_tag]
+        assert len(tags) == len(set(tags)), "duplicate ollama_tag in registry"
 
 
 class TestListModelsTable:

@@ -167,10 +167,18 @@ class SQLiteStore:
                     "memory_v1.db remains plaintext after migration; opening in "
                     "plaintext mode. PII is NOT encrypted — check sqlcipher3 and disk space."
                 )
+            elif not self._db_path.exists():
+                # B248 #2(b): no live file. This is either a brand-new install or
+                # an anomalous post-crash state (live DB lost between the two
+                # migration renames, with a plaintext .bak as the sole copy). Do
+                # NOT blindly mark _encrypted=True and run the destructive sweep
+                # against a non-existent live DB — that would delete the .bak. A
+                # fresh encrypted DB is created below by _connect/CREATE TABLE.
+                self._encrypted = True
             else:
                 self._encrypted = True
                 self._quarantine_unreadable_encrypted_db()
-            self._sweep_plaintext_leftovers()
+                self._sweep_plaintext_leftovers()
         elif self._crypto and not SQLCIPHER_AVAILABLE:
             logger.warning(
                 "CryptoProvider provided but sqlcipher3 not installed. "
@@ -228,6 +236,8 @@ class SQLiteStore:
             # always start from a clean target (else iterdump's CREATE TABLE would
             # collide with the stale tables).
             tmp_path.unlink()
+        plain_conn = None
+        enc_conn = None
         try:
             plain_conn = sqlite3.connect(str(self._db_path))
             plain_conn.execute("PRAGMA busy_timeout = 5000")
@@ -248,7 +258,9 @@ class SQLiteStore:
             plain_counts = self._table_row_counts(plain_conn)
             enc_counts = self._table_row_counts(enc_conn)
             plain_conn.close()
+            plain_conn = None
             enc_conn.close()
+            enc_conn = None
             if plain_counts != enc_counts:
                 raise RuntimeError(
                     f"row-count mismatch after migration: {plain_counts} != {enc_counts}"
@@ -268,8 +280,36 @@ class SQLiteStore:
             logger.info("Migration complete and verified; plaintext backup removed.")
         except Exception as e:
             logger.error("SQLCipher migration failed: %s. Keeping plain DB.", e)
-            if tmp_path.exists():
+            # B248 #1: rollback. If we already renamed the plaintext live DB to
+            # .bak and the tmp->live swap then failed, the live path is absent and
+            # backup_path holds the ONLY copy. Restore it (plaintext rollback)
+            # before propagating so we never end up with no live DB. Only unlink
+            # the encrypted tmp once the live DB is safely back (it is no longer
+            # the sole copy then). Parity with text_store.py (B188 onada2).
+            backup_path = self._db_path.with_name(self._db_path.name + ".bak")
+            if not self._db_path.exists() and backup_path.exists():
+                backup_path.rename(self._db_path)
+                self._encrypted = False
+                logger.error(
+                    "Rolled back to plaintext live DB from %s after migration "
+                    "failure; PII is NOT encrypted.", backup_path.name,
+                )
+            if tmp_path.exists() and self._db_path.exists():
                 tmp_path.unlink()
+        finally:
+            # MC-010: always close both connections so handles (and the tmp WAL)
+            # are released on every path; a leaked handle can block tmp cleanup
+            # (notably on Windows). Parity with persistence_sqlite.py (MEM-004).
+            if plain_conn is not None:
+                try:
+                    plain_conn.close()
+                except Exception as close_err:
+                    logger.debug("plain_conn close failed: %s", close_err)
+            if enc_conn is not None:
+                try:
+                    enc_conn.close()
+                except Exception as close_err:
+                    logger.debug("enc_conn close failed: %s", close_err)
 
     def _quarantine_unreadable_encrypted_db(self) -> bool:
         """Archive an encrypted DB that won't open with the current key.
@@ -286,19 +326,22 @@ class SQLiteStore:
         db_error_cls = (
             sqlcipher.DatabaseError if SQLCIPHER_AVAILABLE else sqlite3.DatabaseError
         )
+        conn = None
         try:
             conn = sqlcipher.connect(str(self._db_path))
             dek = self._crypto.derive_key("sqlite")
             conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is an internal crypto key
             conn.execute("PRAGMA cipher_compatibility = 4")
-            try:
-                conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
-            finally:
-                conn.close()
+            conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
             return False
         except db_error_cls as e:
             if "file is not a database" not in str(e).lower():
                 raise
+            # MC-012: close the handle BEFORE renaming — Windows refuses to
+            # rename a file held open, and the fd must not leak on this path.
+            if conn is not None:
+                conn.close()
+                conn = None
             ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
             quarantine = self._db_path.with_name(
                 f"{self._db_path.name}.unrecoverable-{ts}"
@@ -315,6 +358,9 @@ class SQLiteStore:
                 if sidecar.exists():
                     sidecar.unlink()
             return True
+        finally:
+            if conn is not None:
+                conn.close()
 
     def _sweep_plaintext_leftovers(self) -> None:
         """Remove a stale plaintext .bak left by a crash mid-migration.
@@ -330,14 +376,52 @@ class SQLiteStore:
             return
         bak = self._db_path.with_name(self._db_path.name + ".bak")
         try:
-            if bak.exists() and self._is_plaintext_sqlite(bak):
-                bak.unlink()
+            if not (bak.exists() and self._is_plaintext_sqlite(bak)):
+                return
+            # B248 #2: only delete the plaintext .bak once the LIVE encrypted DB
+            # is proven readable with the current key. A SIGKILL between the two
+            # migration renames can leave {live absent, .bak = sole plaintext
+            # copy}; without this check the sweep would destroy the only copy.
+            # Parity with text_store.py (B188 onada2).
+            if not self._live_encrypted_db_verified():
                 logger.warning(
-                    "Removed orphan plaintext backup %s (crash-window leftover).",
+                    "Plaintext backup %s kept: no verified live encrypted DB "
+                    "(possible crash-window leftover — preserving for recovery).",
                     bak.name,
                 )
+                return
+            bak.unlink()
+            logger.warning(
+                "Removed orphan plaintext backup %s (crash-window leftover).",
+                bak.name,
+            )
         except OSError as e:  # nosec B110: best-effort cleanup
             logger.debug("Could not sweep plaintext leftover %s: %s", bak, e)
+
+    def _live_encrypted_db_verified(self) -> bool:
+        """True only if the live DB exists and opens with the current key.
+
+        Used to gate the destructive .bak sweep: we must never delete the
+        plaintext backup unless a usable encrypted live DB is confirmed. Mirrors
+        the probe in _quarantine_unreadable_encrypted_db (namespace "sqlite").
+        """
+        if not (self._encrypted and SQLCIPHER_AVAILABLE):
+            return False
+        if not self._db_path.exists() or self._db_path.stat().st_size == 0:
+            return False
+        conn = None
+        try:
+            conn = sqlcipher.connect(str(self._db_path))
+            dek = self._crypto.derive_key("sqlite")
+            conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is an internal crypto key
+            conn.execute("PRAGMA cipher_compatibility = 4")
+            conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+            return True
+        except Exception:  # nosec B110: verification probe, any failure = unverified
+            return False
+        finally:
+            if conn is not None:
+                conn.close()
 
     # ── Profile CRUD ──
 
@@ -505,6 +589,31 @@ class SQLiteStore:
                 (user_id, "active", limit),
             )
         return [dict(row) for row in cursor.fetchall()]
+
+    @_with_lock
+    def get_episodic_by_ids(
+        self,
+        user_id: str,
+        ids: List[str],
+    ) -> Dict[str, Dict[str, Any]]:
+        """Fetch active episodic rows for one user by id, keyed by id.
+
+        Used to hydrate real content for vector-search hits: the Qdrant payload
+        stores metadata only (no content), so a semantic hit must be resolved
+        back to SQLite — the source of truth — by its episodic id. Ids that are
+        absent (forgotten / tombstoned / GC'd) are simply missing from the
+        result dict; callers drop them rather than leak a removed memory.
+        """
+        if not ids:
+            return {}
+        conn = self._connect()
+        placeholders = ",".join("?" for _ in ids)
+        sql = (
+            f"SELECT * FROM episodic "  # nosec B608: dynamic '?' placeholder count for IN clause, all values bound as parameters
+            f"WHERE user_id = ? AND state = ? AND id IN ({placeholders})"
+        )
+        cursor = conn.execute(sql, (user_id, "active", *ids))  # nosemgrep: sqlalchemy-execute-raw-query — parameterized with '?' placeholders
+        return {row["id"]: dict(row) for row in cursor.fetchall()}
 
     # ── Staging CRUD ──
 

@@ -214,30 +214,6 @@ class TestModuleManagerAsync:
         assert isinstance(result, list)
 
 
-class TestSecurityValidationBranch:
-    """Test lines 37-38, 44: SECURITY_VALIDATION_AVAILABLE fallback."""
-
-    def test_security_validation_not_available_warning(self):
-        """Lines 37-38, 44: when import fails, warning is logged."""
-        import importlib
-        import sys
-
-        orig = sys.modules.get("plugins.security.core.validators")
-        sys.modules["plugins.security.core.validators"] = None  # force ImportError
-
-        try:
-            # We can't easily re-import the module, but we can verify
-            # the fallback class exists
-            from personality.module_manager.module_manager import SECURITY_VALIDATION_AVAILABLE
-            # Just check type
-            assert isinstance(SECURITY_VALIDATION_AVAILABLE, bool)
-        finally:
-            if orig is not None:
-                sys.modules["plugins.security.core.validators"] = orig
-            else:
-                sys.modules.pop("plugins.security.core.validators", None)
-
-
 class TestLoadModule:
     """Test lines 175-183: load_module for non-found module."""
 
@@ -599,3 +575,108 @@ class TestRegisterPluginInstance:
         mm._register_plugin_instance(app, "test_mod", manifest)
         # modules dict may or may not exist
         assert not hasattr(app.state, 'modules') or "test_mod" not in getattr(app.state, 'modules', {})
+
+
+class TestSecurityValidationBranch:
+    """T77 — SECURITY_VALIDATION_AVAILABLE=False + warning (module_manager.py:34-44).
+
+    The original test (T77) manipulated sys.modules AFTER the module was already
+    loaded, so the try/except at module scope never re-ran.  The only assert was
+    `isinstance(SECURITY_VALIDATION_AVAILABLE, bool)` — trivially True for any bool.
+
+    This version forces the import of `plugins.security.core.validators` to fail
+    BEFORE loading `personality.module_manager.module_manager`, triggering the real
+    except-ImportError branch (line 37-38) and the subsequent warning (line 44).
+
+    Mutation target: module_manager.py:38
+      SECURITY_VALIDATION_AVAILABLE = False   (inside except ImportError)
+    If the except branch were removed or set the flag to True, this test goes RED.
+    Mutation target: module_manager.py:44
+      logger.warning("Security validation not available...")
+    If the warning call were removed, the caplog assert goes RED.
+    """
+
+    _MM_MODULE = "personality.module_manager.module_manager"
+    _DEP_MODULE = "plugins.security.core.validators"
+
+    def _reload_without_dep(self):
+        """Re-import module_manager with the security dep blocked.
+
+        Returns the freshly-imported module object.  Caller is responsible for
+        restoring sys.modules via the returned snapshot dict.
+        """
+        import importlib
+
+        # Snapshot everything we will touch
+        snapshot = {
+            k: v for k, v in __import__("sys").modules.items()
+            if k == self._MM_MODULE or k == self._DEP_MODULE
+        }
+
+        # Block the dep (setting to None makes `from ... import ...` raise ImportError)
+        __import__("sys").modules[self._DEP_MODULE] = None
+        # Remove cached module so the import block re-executes
+        __import__("sys").modules.pop(self._MM_MODULE, None)
+
+        try:
+            mm_mod = importlib.import_module(self._MM_MODULE)
+            return mm_mod, snapshot
+        except Exception:
+            # Restore on unexpected error
+            self._restore_snapshot(snapshot)
+            raise
+
+    @staticmethod
+    def _restore_snapshot(snapshot):
+        sys_modules = __import__("sys").modules
+        for k, v in snapshot.items():
+            if v is None:
+                sys_modules.pop(k, None)
+            else:
+                sys_modules[k] = v
+        # Also evict the freshly-imported module so other tests see the real one
+        sys_modules.pop("personality.module_manager.module_manager", None)
+
+    def test_security_validation_not_available_warning(self, caplog):
+        """module_manager.py:34-44: when dep missing, flag=False and warning logged.
+
+        Exercises the ACTUAL try/except at module scope by re-importing with the
+        dep blocked — the only approach that really runs the production branch.
+
+        caplog captures the WARNING emitted at line 44 because the test forces
+        the module to reload inside the pytest log-capture context.
+
+        Mutation targets:
+        - module_manager.py:38 `SECURITY_VALIDATION_AVAILABLE = False`
+          → if changed to True, assert 1 goes RED
+        - module_manager.py:44 `logger.warning(...)`
+          → if removed, caplog assert goes RED
+        """
+        import logging
+
+        mm_mod, snapshot = self._reload_without_dep()
+        try:
+            # 1. Flag must be False when the dep import fails
+            assert mm_mod.SECURITY_VALIDATION_AVAILABLE is False, (
+                "SECURITY_VALIDATION_AVAILABLE must be False when dep import fails"
+            )
+
+            # 2. Warning must have been logged (captured by caplog because the
+            #    reload happens inside the pytest log-capture context)
+            warning_msgs = [
+                r.message for r in caplog.records
+                if r.levelno == logging.WARNING
+                and "security validation" in r.getMessage().lower()
+            ]
+            assert warning_msgs, (
+                "Expected a WARNING about missing security validation, "
+                f"got caplog records: {[r.getMessage() for r in caplog.records]}"
+            )
+
+            # 3. validate_safe_path must not be bound (import failed, so the
+            #    name was never assigned at module level)
+            assert not hasattr(mm_mod, "validate_safe_path"), (
+                "validate_safe_path must not be bound when its import fails"
+            )
+        finally:
+            self._restore_snapshot(snapshot)

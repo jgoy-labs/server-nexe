@@ -238,7 +238,7 @@ server-nexe te **tres mecanismes complementaris** per decidir quins plugins s'ac
 
 ### 1. `server.toml` — seccio `[plugins.modules]`
 
-Llista estatica declarativa al fitxer `personality/server.toml` (linia 203). Es la font primaria: indica al servidor quins plugins HA d'activar a l'arrencada.
+Llista estatica declarativa al fitxer `personality/server.toml` (linia 197). Es la font primaria: indica al servidor quins plugins HA d'activar a l'arrencada.
 
 ```toml
 [plugins.modules]
@@ -251,7 +251,7 @@ Per afegir un plugin nou cal incloure'l explicitament aqui.
 
 ### 2. `NEXE_APPROVED_MODULES` — env var (allowlist de seguretat)
 
-Validada per `get_module_allowlist()` a `core/config.py:355`. Es una capa de seguretat addicional sobre la llista de `server.toml`:
+Validada per `get_module_allowlist()` a `core/config.py:362`. Es una capa de seguretat addicional sobre la llista de `server.toml`:
 
 - **Mode desenvolupament** (`NEXE_ENV=development` o no definit): `NEXE_APPROVED_MODULES` es **opcional**. Si no s'ha definit, `get_module_allowlist()` retorna `None` i no filtra res.
 - **Mode produccio** (`NEXE_ENV=production` o `[core.environment].mode = "production"`): `NEXE_APPROVED_MODULES` es **OBLIGATORI**. Si falta, el servidor aborda amb `ValueError("SECURITY ERROR: NEXE_APPROVED_MODULES is required in production")`.
@@ -284,17 +284,17 @@ known_paths = [
 
 ## Arquitectura del ModuleManager
 
-El ModuleManager viu a `personality/module_manager/` — 13 fitxers, ~3279 linies. Es la facade central del sistema de plugins.
+El ModuleManager viu a `personality/module_manager/` — 15 fitxers, ~3485 linies. Es la facade central del sistema de plugins.
 
 ### Components principals
 
 | Fitxer | Responsabilitat |
 |--------|----------------|
-| `module_manager.py` | Facade central, cicle de vida, load/unload/health (642 linies) |
+| `module_manager.py` | Facade central, cicle de vida, load/unload/health (416 linies) |
 | `config_manager.py` | Carrega `server.toml`, config parsejada, secrets |
 | `config_validator.py` | Validacions i esquemes de configuracio |
 | `module_lifecycle.py` | Inicialitzacio, shutdown, gestio d'errors |
-| `path_discovery.py` | Escaneja paths (`plugins/`, `memory/modules/`, `core/tools/`...) |
+| `path_discovery.py` | Escaneja paths (`plugins/`, `memory/core/`, `core/tools/`...) |
 | `discovery.py` | Importa manifests, detecta capabilities |
 | `registry.py` | Registre de moduls carregats, cache |
 | `system_lifecycle.py` | Startup/shutdown global del sistema |
@@ -314,7 +314,7 @@ El ModuleManager viu a `personality/module_manager/` — 13 fitxers, ~3279 linie
 | **mlx_module** | local_llm_option | /mlx | Natiu Apple Silicon, prefix caching (trie), GPU Metal, is_model_loaded() |
 | **llama_cpp_module** | local_llm_option | /llama-cpp | GGUF universal, ModelPool LRU, CPU/GPU, is_model_loaded() |
 | **ollama_module** | local_llm_option | /ollama | Bridge HTTP a Ollama, auto-arrencada, neteja VRAM a l'aturada, streaming, is_model_loaded() via /api/ps |
-| **security** | core | /security | Auth dual-key, 6 detectors d'injeccio amb normalitzacio Unicode (NFKC), 47 patrons de jailbreak, rate limiting (tots els endpoints), logging d'auditoria RFC5424, permanent=true |
+| **security** | core | /security | Auth dual-key, 6 detectors d'injeccio amb normalitzacio Unicode (NFKC), 49 patrons de jailbreak, rate limiting (tots els endpoints), logging d'auditoria RFC5424, permanent=true |
 | **web_ui_module** | web_interface | /ui | Chat web UI, gestor de sessions, pujada de documents (aillament per sessio), memory helper (MEM_SAVE), validacio d'input (validate_string_input a totes les rutes), sanititzacio de context RAG, i18n (ca/es/en), 6 fitxers de rutes |
 
 ### Patrons comuns als plugins backend LLM
@@ -417,6 +417,6 @@ Ambdos metodes es poden cridar multiples vegades. Posa sempre guard `self._initi
 | Cicle de vida de moduls | `personality/module_manager/module_lifecycle.py` |
 | Gestor de configuracio | `personality/module_manager/config_manager.py` |
 | Registre de moduls | `personality/module_manager/registry.py` |
-| Allowlist de seguretat | `core/config.py:355` (`get_module_allowlist()`) |
+| Allowlist de seguretat | `core/config.py:362` (`get_module_allowlist()`) |
 | Registre de routers | `core/server/factory_modules.py` |
 | Plugin de referencia (el mes net) | `plugins/llama_cpp_module/` |

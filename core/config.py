@@ -16,6 +16,9 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from core.env_utils import parse_port
+from core.paths.constants import BASE_CONFIG_RELATIVE
+
 import tomllib
 import toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path (tomllib stdlib is read-only)
 
@@ -43,10 +46,12 @@ def _apply_env_overrides(merged: Dict[str, Any]) -> Dict[str, Any]:
     Priority: env var > server.toml > built-in default.
     Currently handles: NEXE_SERVER_PORT.
     """
-    raw_port = os.environ.get("NEXE_SERVER_PORT")
-    if raw_port:
-        merged['core']['server']['port'] = int(raw_port)  # ValueError if not int (fail-fast)
-        logger.debug("NEXE_SERVER_PORT override: port=%s", raw_port)
+    # MC-093: validate + range-check via the shared parser (fail-fast with a
+    # clear message instead of a raw int() that crashes later in uvicorn).
+    port = parse_port(os.environ.get("NEXE_SERVER_PORT"), var_name="NEXE_SERVER_PORT")
+    if port is not None:
+        merged['core']['server']['port'] = port
+        logger.debug("NEXE_SERVER_PORT override: port=%s", port)
     return merged
 
 
@@ -87,7 +92,10 @@ DEFAULT_CONFIG = {
     },
     'security': {
         'encryption': {
-            'enabled': False,
+            # MC-092: crypto is toggled ONLY by NEXE_ENCRYPTION_ENABLED — a config
+            # key here would be dead (nothing reads it) and would mislead users
+            # into thinking the TOML turns encryption on/off. Only warn_unencrypted
+            # is read (lifespan_crypto).
             'warn_unencrypted': True
         }
     }
@@ -96,12 +104,12 @@ DEFAULT_CONFIG = {
 # Standard search paths for config — kept for find_config_path() backward compat
 CONFIG_SEARCH_PATHS = [
     "server.toml",
-    "personality/server.toml",
+    BASE_CONFIG_RELATIVE,
     "config/server.toml"
 ]
 
 # Priority order: DEFAULT < personality/server.toml (BASE) < root/config server.toml (OVERRIDE) < ENV vars
-_BASE_CONFIG_FILES = ["personality/server.toml"]
+_BASE_CONFIG_FILES = [BASE_CONFIG_RELATIVE]
 _OVERRIDE_CONFIG_FILES = ["server.toml", "config/server.toml"]
 
 
@@ -371,7 +379,7 @@ def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[se
     # prefer SidecarConfig.is_production over reading NEXE_ENV directly,
     # fallback to os.getenv per backward-compat (tests/scripts sense singleton i
     # tests que muten NEXE_ENV runtime sense rebuild del singleton).
-    raw_env_is_prod = os.getenv("NEXE_ENV", "development").lower() == "production"
+    raw_env_is_prod = os.getenv("NEXE_ENV", "production").lower() == "production"
     sidecar_is_prod = False
     try:
         from core.sidecar_config import get_sidecar_config
@@ -399,7 +407,7 @@ def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[se
     return None
 
 
-# Localhost aliases — single source of truth (Gemini hardcode fix)
+# Localhost aliases — single source of truth (AI audit hardcode fix)
 # Default: 127.0.0.1, ::1, localhost. Override via NEXE_LOCALHOST_ALIASES env
 # (comma-separated). Used by bootstrap IP allowlist + middleware host checks.
 DEFAULT_LOCALHOST_ALIASES = ["127.0.0.1", "::1", "localhost"]  # nosemgrep
@@ -411,7 +419,7 @@ def get_localhost_aliases() -> list:
     Reads NEXE_LOCALHOST_ALIASES env var (comma-separated) if set,
     otherwise returns DEFAULT_LOCALHOST_ALIASES. Used to centralize
     the previously-hardcoded ['127.0.0.1', '::1', 'localhost'] lists  # nosemgrep
-    spread across bootstrap.py and middleware.py (Gemini finding).
+    spread across bootstrap.py and middleware.py (AI audit finding).
     """
     custom = os.getenv("NEXE_LOCALHOST_ALIASES", "").strip()
     if custom:
@@ -419,7 +427,7 @@ def get_localhost_aliases() -> list:
     return list(DEFAULT_LOCALHOST_ALIASES)
 
 
-# Network defaults — single source of truth (Gemini hardcode fix Q4)
+# Network defaults — single source of truth (AI audit hardcode fix Q4)
 # Used to centralize the previously-hardcoded "9119" / "127.0.0.1" lists  # nosemgrep
 # spread across runner.py, lifespan.py, middleware.py, cli/*, installer/tray.py
 # and plugins/web_ui_module/module.py.

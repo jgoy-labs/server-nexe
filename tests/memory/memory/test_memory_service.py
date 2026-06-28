@@ -72,8 +72,14 @@ class TestRecall:
         assert cards == []
 
     @pytest.mark.asyncio
-    async def test_recall_after_remember_returns_cards(self, svc):
+    async def test_recall_degraded_returns_recency(self, svc):
+        """Degraded mode (no embedder injected): recall returns profile +
+        most-recent episodic regardless of the query. This is the recency
+        fallback, NOT semantic search — semantic behavior is covered in
+        test_recall_semantic.py. Pin the mode so this can't silently masquerade
+        as semantic."""
         await svc.initialize()
+        assert svc._semantic_available() is False
         await svc.remember(user_id="u1", text="I live in Barcelona", force=True)
         cards = await svc.recall(user_id="u1", query="where do you live")
         assert len(cards) >= 1

@@ -1,0 +1,64 @@
+{
+  "_comment": "ADR B046b — provider-published weight pins (metadata-only, no model downloads). Generated/refreshed by installer/bootstrap_catalog_pins.py. mlx_file_hashes: per-LFS-file HF sha256 (the big .safetensors weights; small non-LFS config/tokenizer files are out of scope). These defend MITM/corruption, NOT a compromised provider repo — see ADR. Ollama is NOT pinned here (ADR B251): its content-addressed pull verifies layer integrity itself and its tags are mutable upstream.",
+  "mlx_file_hashes": {
+    "lmstudio-community/Mistral-Small-3.2-24B-Instruct-2506-MLX-4bit": {
+      "model-00001-of-00003.safetensors": "271b2009bf595520d9a020378b6b29a53d00733e16968856c59cbebd626b57c5",
+      "model-00002-of-00003.safetensors": "d0d74815f82887ed10cf702ff61b91b17dc42628e2008878d504672d4d2b47dc",
+      "model-00003-of-00003.safetensors": "56d9e23e0ef7ba7b7be871e60083fe50770737b288cf11503c85329777c93f31",
+      "tekken.json": "6e2501687ccd0e1f30f36319eaf2b46958b897811e246cd8eb5d385b9e3de7d1",
+      "tokenizer.json": "b76085f9923309d873994d444989f7eb6ec074b06f25b58f1e8d7b7741070949"
+    },
+    "mlx-community/Mistral-Nemo-Instruct-2407-4bit": {
+      "model-00001-of-00002.safetensors": "6a9bf783b123d07f46da6241f3a5d52fa72a63bde4fd750c2b0665e59a7605ec",
+      "model-00002-of-00002.safetensors": "664ac7ffe37e529cb8304dc55376c038ef9c3b9cc9b5f9de805af82490aa755b"
+    },
+    "mlx-community/Mixtral-8x7B-Instruct-v0.1": {
+      "model-00001-of-00018.safetensors": "e5f0461157e77c18c1e389c1893e7753372682c12da79c72338806e8afcab063",
+      "model-00002-of-00018.safetensors": "8fa6e71382203dded86e57c0db5ab39ac00d21fdcc99fa9180d3fd6764f0b950",
+      "model-00003-of-00018.safetensors": "90868868767c838a9bd25dcc59a2598f30487a0b3b76f72fa6361c594eac46d1",
+      "model-00004-of-00018.safetensors": "1ba581171b8dfdd9096888da9100e42308fc609ae7f52b3df04c8ce5a46ab129",
+      "model-00005-of-00018.safetensors": "186c8c5bbc644b6814be96bf8e6fbc8bdcbd309297b6367e011e5135206a6dc7",
+      "model-00006-of-00018.safetensors": "8c16fdf164fa449a23a350bb37ebcf18bb4c6e04c29a00904710107360d61e08",
+      "model-00007-of-00018.safetensors": "1e8163d3e4e56764a6d875f3f726f7d8968534738f9b20f14edb9059fe14ddcc",
+      "model-00008-of-00018.safetensors": "27230cf03d902bec4caf3a1d6375183100fbc71abe1573ff9467b48504d016ca",
+      "model-00009-of-00018.safetensors": "da59382be815bb6ff839d14632d6ec0f4b0243fd0c5ae36ac64d3ce0eb2eae96",
+      "model-00010-of-00018.safetensors": "a542edfd597eb7aa6602464f4d61745ab46c36a58bcf858adee72975d4a9b730",
+      "model-00011-of-00018.safetensors": "7818a3e90bd4f52b3a0f32843162b76b01584c8548fc61cadf6c8a4cb32c25d8",
+      "model-00012-of-00018.safetensors": "6704271054f1634946b2c4824e2d68aae204a30e1f5b2e1ea1f26435e01a824d",
+      "model-00013-of-00018.safetensors": "c33d2813d5df2bf3c2371f66b73e6449f601e4637d44a8e1f535d065eba54374",
+      "model-00014-of-00018.safetensors": "377f1e0385e3f718f453a01dc463007b64af794dd46ac32570d44e23581b3a11",
+      "model-00015-of-00018.safetensors": "8a45afe38b74c95e4767f9ba7d13f5fc683e2369e392a60b67a5ff0ac4768256",
+      "model-00016-of-00018.safetensors": "016e5230d5e22a05fe5624f06a3357212a020396087ac7933cf21a7366f7aea5",
+      "model-00017-of-00018.safetensors": "6d2db0d1658a8e85547c18437cc984e7ccd13d2252e1a12dc4b7057194abf43a",
+      "model-00018-of-00018.safetensors": "34e42ba714909d4ef4aa5a6f3626e0c3bd26c2070b9e457597d658e86730412b",
+      "tokenizer.model": "dadfd56d766715c61d2ef780a525ab43b8e6da4de6865bda3d95fdef5e134055"
+    },
+    "mlx-community/Qwen3.5-27B-4bit": {
+      "model-00001-of-00003.safetensors": "19cea4e4dba56318d52d7a32844df29c191c2c8861108f970322af55fc996e36",
+      "model-00002-of-00003.safetensors": "ba1d802762939303e82e6808ca90e81cc2d94a958a0dafdf9ee211e8b24e0a85",
+      "model-00003-of-00003.safetensors": "31bba7a7e18308d2c9bfd53fe53a277fc2f3a4bc8d39d0995d792986cf134be4",
+      "tokenizer.json": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4"
+    },
+    "mlx-community/Qwen3.5-35B-A3B-4bit": {
+      "model-00001-of-00004.safetensors": "0952c2fd5ec5f6163a045003eb0e60465290ac0ebedbe2cecde35dd95abed345",
+      "model-00002-of-00004.safetensors": "ddf163fcbaa7fc1ff2e93ee2e3306b1c31c4fe3c7dd46990cd2737d0cc30197f",
+      "model-00003-of-00004.safetensors": "5e7d8deca9240eec828c9a451fbd8a95389a7cc18494f400c330d0717c41f6e1",
+      "model-00004-of-00004.safetensors": "b540bac1ef081d7011e32428e0c2da77f00699db2f4f1508da73ee3b8de40551",
+      "tokenizer.json": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4"
+    },
+    "mlx-community/Qwen3.5-4B-MLX-4bit": {
+      "model.safetensors": "5fb9acd0246866381cf8c5c354c6db1019f6498eec4ccb4f5edcc71ffeacb2db",
+      "tokenizer.json": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4"
+    },
+    "mlx-community/Qwen3.5-4B-MLX-8bit": {
+      "model.safetensors": "87c362fdb36bdee8e32ff5961bdceca58d26c2d9b00738543cc0e17e985b46ce",
+      "tokenizer.json": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4"
+    },
+    "mlx-community/Qwen3.5-9B-MLX-4bit": {
+      "model-00001-of-00002.safetensors": "a68b87558c6ef43f74c2bd63ce7e9092ceddc3101f3def0030774bae5f42aadd",
+      "model-00002-of-00002.safetensors": "b0a770bf8469c7f3f18756a0e0283f1c1174344a83e059a4e483f6af4907352d",
+      "tokenizer.json": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4"
+    }
+  },
+  "schema_version": 1
+}

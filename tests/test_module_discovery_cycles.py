@@ -141,32 +141,3 @@ def test_get_cycle_warnings_returns_copy():
     disc.clear_cycle_warnings()
     assert disc.get_cycle_warnings() == []
 
-
-def test_lifespan_startup_summary_emits_warn_for_cycles(caplog):
-    """
-    Bug 20 — simulate the lifespan section that reads cycle_warnings and
-    emits [WARN] log.warning for each chain.
-    """
-    import logging as _logging
-    lifespan_logger = _logging.getLogger("core.lifespan")
-
-    class _FakeMM:
-        def get_cycle_warnings(self):
-            return ["A -> B -> A", "C -> D -> C"]
-
-    mm = _FakeMM()
-
-    with caplog.at_level(_logging.WARNING, logger="core.lifespan"):
-        # Replica of the new block added to core/lifespan.py
-        try:
-            cycle_warnings = mm.get_cycle_warnings()
-        except Exception:
-            cycle_warnings = []
-        for cycle_chain in cycle_warnings:
-            lifespan_logger.warning(
-                "[WARN] Module dependency cycle: %s", cycle_chain
-            )
-
-    text = " ".join(r.getMessage() for r in caplog.records)
-    assert "[WARN] Module dependency cycle: A -> B -> A" in text
-    assert "[WARN] Module dependency cycle: C -> D -> C" in text

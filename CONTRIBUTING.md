@@ -30,20 +30,19 @@ nexe go
 
 ## Running tests
 
-The test suite has **6776 passing tests with ~85% code coverage** (of 6991 total; 215 deselected by default markers).
+The test suite collects **7165 tests** (of 7400 total; 235 deselected by default markers).
 
 ```bash
-# Fast unit tests (no external services needed)
-pytest tests \
-  -m "not integration and not e2e and not slow" \
-  --tb=short -q
+# Fast unit tests (default gate — no external services needed)
+# This matches the default markers in pytest.ini:
+#   not integration and not gpu and not test_live
+pytest tests --tb=short -q
 
 # Integration tests (requires Ollama running locally)
 NEXE_AUTOSTART_OLLAMA=true pytest -m "integration" -q
 
 # With coverage report
 pytest tests \
-  -m "not integration and not e2e and not slow" \
   --cov=core --cov=memory --cov=personality --cov=plugins \
   --cov-report=term -q
 ```
@@ -151,7 +150,7 @@ author: "Your Name"
 
 Documents exist in three languages (`knowledge/en/`, `knowledge/ca/`, `knowledge/es/`). If you add or update documentation, keep all three language versions in sync.
 
-**Constraints:** Maximum 15 tags per document. Abstract should be under 500 characters.
+**Style guidance (not enforced):** Keep tags focused and the abstract concise — these are conventions, not validated limits, so use your judgment.
 
 ## Code conventions
 

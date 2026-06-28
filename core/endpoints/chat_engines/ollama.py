@@ -20,10 +20,12 @@ import httpx
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
+from core.ollama_utils import resolve_ollama_url
 from ..chat_memory import _pending_save_tasks, _save_conversation_to_memory
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
 from .ollama_helpers import auto_num_ctx
+from ._streaming import MAX_STREAM_BYTES
 
 logger = logging.getLogger(__name__)
 
@@ -144,16 +146,22 @@ async def _validate_ollama_model(host: str, model_name: str) -> tuple[str, list]
 
 def _build_ollama_payload(request, messages: List[Dict], model_name: str) -> dict:
     """Builds the payload for the Ollama API."""
+    options = {
+        "temperature": request.temperature,
+        "num_predict": request.max_tokens or int(os.getenv("NEXE_DEFAULT_MAX_TOKENS", "4096")),
+        "num_ctx": _OLLAMA_NUM_CTX
+    }
+    # top_p is opt-in (mirror of temperature): forward only when explicitly set so
+    # omitting it preserves Ollama's own default (byte-exact with prior behavior).
+    # `is not None` (never truthiness); schema enforces gt=0.0 so 0.0 never reaches here.
+    if request.top_p is not None:
+        options["top_p"] = request.top_p
     return {
         "model": model_name,
         "messages": messages,
         "stream": request.stream,
         "think": os.getenv("NEXE_OLLAMA_THINK", "false").lower() == "true",  # NEVER default true — 400 on non-thinking models
-        "options": {
-            "temperature": request.temperature,
-            "num_predict": request.max_tokens or int(os.getenv("NEXE_DEFAULT_MAX_TOKENS", "4096")),
-            "num_ctx": _OLLAMA_NUM_CTX
-        }
+        "options": options
     }
 
 
@@ -227,7 +235,9 @@ async def _forward_to_ollama(
     fallback_reason: Optional[str] = None,
 ):
     """Forward request to local Ollama instance."""
-    _ollama_host = os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    # MC-089: honour the full cascade (SidecarConfig → NEXE_OLLAMA_HOST →
+    # OLLAMA_HOST → default), same as warmup/health, not NEXE_OLLAMA_HOST-only.
+    _ollama_host = resolve_ollama_url()
     url = f"{_ollama_host}/api/chat"
     model_name = _resolve_ollama_model(request, app_state)
     model_name, _ = await _validate_ollama_model(_ollama_host, model_name)  # raises status_code=404 if not found, 503 if unavailable
@@ -239,6 +249,7 @@ async def _forward_to_ollama(
 async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user_msg: Optional[str] = None):
     """OpenAI-compatible streaming generator from Ollama with Auto-Save support."""
     response_parts = []
+    _response_bytes = 0
 
     try:
         async with httpx.AsyncClient(timeout=_OLLAMA_STREAM_TIMEOUT) as client:
@@ -259,6 +270,19 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                         done = data.get("done", False)
 
                         if content:
+                            # B104: hard byte cap, symmetric with TokenBridge._cap_triggered
+                            # (MLX/llama_cpp path). A runaway generation (model stuck in a loop) must
+                            # not accumulate GB into response_parts. We signal a cap error and stop.
+                            _response_bytes += len(content.encode("utf-8", errors="replace"))
+                            if _response_bytes > MAX_STREAM_BYTES:
+                                logger.warning(
+                                    "Ollama stream cap reached (%d bytes > %d). Terminating early.",
+                                    _response_bytes, MAX_STREAM_BYTES,
+                                )
+                                err_str = _sanitize_sse_token("stream_cap_exceeded")
+                                yield f"data: {json.dumps({'error': err_str})}\n\n"
+                                yield "data: [DONE]\n\n"
+                                return
                             response_parts.append(content)
                             # Wrap in OpenAI-like SSe format for our client convenience
                             chunk = {
@@ -280,7 +304,7 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                                             if attempt == 0:
                                                 await asyncio.sleep(1)
                                             else:
-                                                logger.error("Stream Auto-Save failed after retry: %s", e)
+                                                logger.error("Stream Auto-Save failed after retry: %s", e, exc_info=True)
                                 task = asyncio.create_task(_background_save_ollama())
                                 _pending_save_tasks.add(task)
                                 task.add_done_callback(_pending_save_tasks.discard)

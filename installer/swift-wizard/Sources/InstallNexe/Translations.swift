@@ -1,4 +1,4 @@
-// Translations.swift — Strings multiidioma (ca/es/en)
+// Translations.swift — Multi-language strings (ca/es/en)
 
 import Foundation
 
@@ -13,7 +13,7 @@ enum Lang: String, CaseIterable {
         }
     }
 
-    /// Detecta l'idioma del sistema (ca/es/en, default en)
+    /// Detects the system language (ca/es/en, default en)
     static func fromSystem() -> Lang {
         let preferred = Locale.preferredLanguages.first ?? "en"
         let code = String(preferred.prefix(2))
@@ -21,7 +21,7 @@ enum Lang: String, CaseIterable {
     }
 }
 
-// MARK: - Claus de traducció
+// MARK: - Translation keys
 
 struct T {
     static func get(_ key: String, lang: Lang) -> String {

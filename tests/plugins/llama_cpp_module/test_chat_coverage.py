@@ -80,14 +80,12 @@ class TestExecute:
             "timing": {"prefill_ms": 10, "generation_ms": 50},
         }
 
-        async def fake_to_thread(fn, *args, **kwargs):
-            return generate_result
-
+        # Generation now runs on the dedicated single-worker executor via the
+        # real running loop; mock the generator method, not asyncio.to_thread.
         with patch.object(LlamaCppChatNode, '_pool', mock_pool), \
              patch.object(LlamaCppChatNode, '_config', config), \
              patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="hash123"), \
-             patch("plugins.llama_cpp_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.llama_cpp_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
+             patch.object(node, "_generate", return_value=generate_result):
             result = await node.execute({
                 "system": "You are helpful",
                 "messages": [{"role": "user", "content": "hi"}],
@@ -116,14 +114,12 @@ class TestExecute:
             "timing": {"prefill_ms": 5, "generation_ms": 20},
         }
 
-        async def fake_to_thread(fn, *args, **kwargs):
-            return generate_result
-
+        # Streaming branch dispatches _generate_streaming on the dedicated
+        # executor via the real running loop.
         with patch.object(LlamaCppChatNode, '_pool', mock_pool), \
              patch.object(LlamaCppChatNode, '_config', config), \
              patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="h"), \
-             patch("plugins.llama_cpp_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.llama_cpp_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
+             patch.object(node, "_generate_streaming", return_value=generate_result):
             result = await node.execute({
                 "system": "sys",
                 "messages": [],
@@ -143,14 +139,10 @@ class TestExecute:
         mock_pool = MagicMock()
         mock_pool.get_or_create.return_value = (MagicMock(), False)
 
-        async def fake_to_thread(fn, *args, **kwargs):
-            raise RuntimeError("gen error")
-
         with patch.object(LlamaCppChatNode, '_pool', mock_pool), \
              patch.object(LlamaCppChatNode, '_config', config), \
              patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="h"), \
-             patch("plugins.llama_cpp_module.core.chat.asyncio.to_thread", side_effect=fake_to_thread), \
-             patch("plugins.llama_cpp_module.core.chat.asyncio.get_running_loop", return_value=MagicMock()):
+             patch.object(node, "_generate", side_effect=RuntimeError("gen error")):
             with pytest.raises(RuntimeError, match="gen error"):
                 await node.execute({"system": "", "messages": []})
 

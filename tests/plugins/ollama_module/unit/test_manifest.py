@@ -167,14 +167,19 @@ class TestGetModelInfo:
         data = r.json()
         assert data["model"] == "llama3"
 
-    def test_returns_404_on_error(self, auth):
+    def test_returns_500_on_internal_error(self, auth):
+        """MC-073: un error intern genèric (no semàntic) és 500, no 404.
+        Abans qualsevol excepció es xafava com a 404; ara un model inexistent
+        real llança ModelNotFoundError → 404 (vegeu test_mc073_074_error_sanitize),
+        mentre que un error inesperat és 500."""
         mock_module = MagicMock()
-        mock_module.get_model_info = AsyncMock(side_effect=Exception("Model not found"))
+        mock_module.get_model_info = AsyncMock(side_effect=Exception("boom"))
 
         c = TestClient(make_app_with_mock(mock_module), raise_server_exceptions=False)
         r = c.get("/ollama/api/models/nonexistent/info", headers=auth)
 
-        assert r.status_code == 404
+        assert r.status_code == 500
+        assert "boom" not in r.text  # MC-073: str(e) no s'ha de filtrar al cos
 
 
 class TestDeleteModel:

@@ -20,22 +20,16 @@ from .auth_models import KeyStatus
 from .auth_config import load_api_keys, is_dev_mode, get_admin_api_key
 from .messages import get_message
 
-try:
-  from plugins.observability.prometheus_metrics import (
-    record_auth_attempt,
-    record_auth_failure,
-    update_key_expiry_days,
-    update_key_status,
-    set_grace_period_active
-  )
-  METRICS_ENABLED = True
-except ImportError:
-  METRICS_ENABLED = False
-  def record_auth_attempt(*args, **kwargs): pass
-  def record_auth_failure(*args, **kwargs): pass
-  def update_key_expiry_days(*args, **kwargs): pass
-  def update_key_status(*args, **kwargs): pass
-  def set_grace_period_active(*args, **kwargs): pass
+# Auth metrics hooks. These are no-ops: server-nexe has no Prometheus auth
+# instrumentation module yet (the old `plugins.observability.prometheus_metrics`
+# import never resolved, so this was always a no-op masquerading behind a dead
+# `METRICS_ENABLED` toggle). They stay as module-level callables so call-sites
+# and tests can wire/patch them by name when a real metrics backend lands.
+def record_auth_attempt(*args, **kwargs): pass
+def record_auth_failure(*args, **kwargs): pass
+def update_key_expiry_days(*args, **kwargs): pass
+def update_key_status(*args, **kwargs): pass
+def set_grace_period_active(*args, **kwargs): pass
 
 def _is_loopback_ip(ip: str) -> bool:
   try:
@@ -270,9 +264,13 @@ async def optional_api_key(
     if secrets.compare_digest(x_api_key, keys_config.secondary.key):
       return x_api_key
 
-  # admin_key has no expiry by design: it is the bootstrap key set at first install.
-  # Primary/secondary keys use is_valid (expiry-aware); admin_key does not.
-  if admin_key and secrets.compare_digest(x_api_key, admin_key):
+  # admin_key is a bootstrap key with no expiry by design. BUT get_admin_api_key()
+  # returns the primary key by default, so honoring it here when it == primary would
+  # re-accept an EXPIRED primary and silently defeat its expiry (A-004). Only honor a
+  # DISTINCT bootstrap key (legacy single-field); never the (possibly expired) primary
+  # — a valid primary is already handled above via is_valid.
+  _primary_key = keys_config.primary.key if keys_config.primary else None
+  if admin_key and admin_key != _primary_key and secrets.compare_digest(x_api_key, admin_key):
     return x_api_key
 
   return None

@@ -84,7 +84,7 @@ def test_run_vlm_streaming_forwards_prompt_cache_state():
     Before the fix, ``_run_vlm_streaming`` called ``mlx_vlm.stream_generate``
     without any cache state, so mlx_vlm created a fresh cache every turn.
     """
-    # mlx-vlm només existeix a Apple Silicon (requirements-macos.txt); patch() força l'import.
+    # mlx-vlm only exists on Apple Silicon (requirements-macos.txt); patch() forces the import.
     pytest.importorskip("mlx_vlm", reason="mlx-vlm Apple-Silicon-only, absent al CI Linux")
     from plugins.mlx_module.core.chat import MLXChatNode
 

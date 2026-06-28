@@ -146,21 +146,11 @@ class MLXConfig:
         Use centralized get_models_dir() which honours
         NEXE_STORAGE_PATH (sidecar override) → NEXE_DATA_DIR/models → cwd → repo.
         """
-        try:
-            from core.paths.helpers import get_models_dir
-            models_dir = get_models_dir()
-            if models_dir.exists():
-                candidates = sorted(
-                    p for p in models_dir.iterdir()
-                    if p.is_dir() and (p / "config.json").exists()
-                )
-                if candidates:
-                    path = str(candidates[0].resolve())
-                    logger.info(f"MLXConfig: auto-discovered MLX model at {path}")
-                    return path
-        except Exception as e:
-            logger.debug(f"MLXConfig: auto-discover scan failed: {e}")
-        return ""
+        from core.paths.helpers import discover_first_model
+        return discover_first_model(
+            lambda p: p.is_dir() and (p / "config.json").exists(),
+            "MLX model",
+        )
 
     @classmethod
     def from_env(cls) -> "MLXConfig":

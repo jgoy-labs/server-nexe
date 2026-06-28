@@ -1,4 +1,4 @@
-// DestinationView.swift — Pantalla 2: Selecció de carpeta amb NSOpenPanel
+// DestinationView.swift — Screen 2: Folder selection with NSOpenPanel
 
 import SwiftUI
 import AppKit
@@ -30,7 +30,7 @@ struct DestinationView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 500)
 
-            // Path actual
+            // Current path
             HStack {
                 Image(systemName: "folder.fill")
                     .foregroundColor(.nexeRed)
@@ -51,7 +51,7 @@ struct DestinationView: View {
             .cornerRadius(10)
             .padding(.horizontal, 40)
 
-            // Info d'espai
+            // Space info
             VStack(spacing: 8) {
                 HStack {
                     Text(t("dest_free_space"))
@@ -61,11 +61,16 @@ struct DestinationView: View {
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(hasEnoughSpace ? .primary : .red)
                 }
+                // B200: this check is ONLY the 5 GB base minimum (without the model).
+                // The chosen model can require up to ~42 GB more and is NOT
+                // re-validated on the confirmation screen (legacy Swift installer;
+                // the real product is nexe-app/Tauri). The user must watch
+                // the space against the model size shown on the confirmation.
                 HStack {
                     Text(t("dest_required"))
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text("~5 GB")
+                    Text("≥5 GB (+ model)")
                         .font(.system(.body, design: .monospaced))
                 }
             }
@@ -81,7 +86,7 @@ struct DestinationView: View {
                 }
             }
 
-            // Opció Dock
+            // Dock option
             Toggle(isOn: $engine.addToDock) {
                 HStack(spacing: 8) {
                     Image(systemName: "dock.rectangle")
@@ -96,7 +101,7 @@ struct DestinationView: View {
 
             Spacer()
 
-            // Botons
+            // Buttons
             HStack {
                 Button(t("btn_back")) { onBack() }
                     .controlSize(.large)

@@ -1,4 +1,4 @@
-// InstallProgressView.swift — Pantalla 4: Progrés amb 7 passos, temps estimats i log visible
+// InstallProgressView.swift — Screen 4: Progress with 7 steps, estimated times and visible log
 
 import SwiftUI
 import AppKit
@@ -14,7 +14,7 @@ struct InstallProgressView: View {
                 .font(.system(size: 22, weight: .bold))
                 .padding(.top, 12)
 
-            // Barra de progrés global
+            // Global progress bar
             VStack(spacing: 4) {
                 ProgressView(value: engine.progress)
                     .progressViewStyle(.linear)
@@ -27,7 +27,7 @@ struct InstallProgressView: View {
             }
             .padding(.horizontal, 40)
 
-            // Llista de passos amb temps real
+            // List of steps with real time
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(engine.steps) { step in
                     StepRow(step: step, lang: engine.lang, tick: tick)
@@ -36,8 +36,8 @@ struct InstallProgressView: View {
             .padding(.horizontal, 40)
             .onReceive(timer) { _ in
                 tick.toggle()
-                // Recuperar focus periodicament durant l'install (subprocessos
-                // de tar/xattr/Python poden enviar la finestra al fons).
+                // Periodically regain focus during the install (tar/xattr/Python
+                // subprocesses can send the window to the background).
                 if !engine.installFinished {
                     NSApp.windows.first?.orderFrontRegardless()
                 }
@@ -56,7 +56,7 @@ struct InstallProgressView: View {
                 .padding(.horizontal, 40)
             }
 
-            // Log sempre visible
+            // Always-visible log
             VStack(alignment: .leading, spacing: 4) {
                 Text(t("progress_log"))
                     .font(.caption)
@@ -89,7 +89,7 @@ struct InstallProgressView: View {
             .padding(.bottom, 16)
         }
         .onAppear {
-            // Bring wizard window to front quan comença l'install.
+            // Bring wizard window to front when the install starts.
             NSApp.activate(ignoringOtherApps: true)
             NSApp.windows.first?.makeKeyAndOrderFront(nil)
         }
@@ -103,11 +103,11 @@ struct InstallProgressView: View {
 struct StepRow: View {
     let step: InstallStep
     let lang: Lang
-    let tick: Bool  // força re-render cada segon
+    let tick: Bool  // forces a re-render every second
 
     var body: some View {
         HStack(spacing: 10) {
-            // Icona d'estat
+            // Status icon
             Group {
                 switch step.status {
                 case .pending:
@@ -130,7 +130,7 @@ struct StepRow: View {
                 .font(.subheadline)
                 .foregroundColor(step.status == .pending ? .secondary : .primary)
 
-            // Temps real (running: comptador viu, done: temps final)
+            // Real time (running: live counter, done: final time)
             if let elapsed = step.elapsed {
                 Text(elapsed)
                     .font(.caption2)

@@ -5,6 +5,15 @@ Author: Jordi Goy
 Location: personality/module_manager/module_manager.py
 Description: Central facade of the server-nexe module management system.
 
+             LAYERING NOTE (MC-130): this is an INFRA KERNEL (module discovery /
+             loading / registry; core's lifespan depends on it), not a persona/
+             i18n concern. It lives under personality/ for historical reasons
+             (it predates the core/personality split). The physical move to a
+             low layer (core/kernel) is deferred post-1.0.7 as an atomic,
+             i18n-first epic — see ADR-001. Don't read the location as a domain
+             signal, and don't move it in isolation (it would inflate the
+             frozen layering baseline; see scripts/check_layering.py).
+
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """

@@ -56,7 +56,7 @@ expires: null
 |-------|-------|----------|
 | 401 Missing X-API-Key | Sin cabecera de autenticacion | Anadir `-H "X-API-Key: YOUR_KEY"` a la peticion |
 | 429 Rate Limited | Demasiadas peticiones | Esperar y reintentar. Comprobar limites de rate en `.env` |
-| 408 Timeout | Inferencia del modelo demasiado lenta | Aumentar timeout de NEXE_DEFAULT_MAX_TOKENS. Los modelos grandes necesitan 600s. |
+| 500 Timeout | Inferencia del modelo demasiado lenta (timeout de stream de Ollama, por defecto 300s; httpx.ReadTimeout no se captura y sale como 500) | Aumentar `NEXE_OLLAMA_STREAM_TIMEOUT` (en segundos). Los modelos grandes pueden necesitar 600s o mas. |
 | Empty error message | httpx.ReadTimeout tiene str() vacio | Corregido con repr(e). Comprobar logs del servidor. |
 
 ## Errores de modelo

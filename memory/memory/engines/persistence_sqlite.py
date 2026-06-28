@@ -121,7 +121,21 @@ class SqliteStorageMixin:
             logger.info("Migration complete; plaintext backup removed.")
         except Exception as e:
             logger.error("SQLCipher migration failed: %s. Keeping plain DB.", e)
-            if tmp_path.exists():
+            # B248 #1: rollback. If live->.bak succeeded but the tmp->live swap
+            # then failed, the live path is absent and backup_path holds the ONLY
+            # copy. Restore it (plaintext rollback) before propagating so we never
+            # end up with no live DB. Only unlink the encrypted tmp once the live
+            # DB is safely back. NOTE: persistence uses with_suffix(".db.bak"),
+            # NOT with_name(...+".bak"). Parity with sqlite_store.py (B248).
+            backup_path = self.db_path.with_suffix(".db.bak")
+            if not self.db_path.exists() and backup_path.exists():
+                backup_path.rename(self.db_path)
+                self._encrypted = False
+                logger.error(
+                    "Rolled back to plaintext live DB from %s after migration "
+                    "failure; PII is NOT encrypted.", backup_path.name,
+                )
+            if tmp_path.exists() and self.db_path.exists():
                 tmp_path.unlink()
         finally:
             # Always close both connections so handles (and the tmp WAL) are
@@ -167,19 +181,22 @@ class SqliteStorageMixin:
         # must reference the runtime exception class directly.
         db_error_cls = sqlcipher.DatabaseError if SQLCIPHER_AVAILABLE else sqlite3.DatabaseError
 
+        conn = None
         try:
             conn = sqlcipher.connect(str(self.db_path))
             dek = self._crypto.derive_key("sqlite")
             conn.execute(f"PRAGMA key = \"x'{dek.hex()}'\"")  # nosemgrep: formatted-sql-query,sqlalchemy-execute-raw-query — SQLCipher key directive; dek is internal crypto key
             conn.execute("PRAGMA cipher_compatibility = 4")
-            try:
-                conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
-            finally:
-                conn.close()
+            conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
             return False
         except db_error_cls as e:
             if "file is not a database" not in str(e).lower():
                 raise
+            # MC-012: close the handle BEFORE renaming — Windows refuses to
+            # rename a file held open, and the fd must not leak on this path.
+            if conn is not None:
+                conn.close()
+                conn = None
             ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
             quarantine = self.db_path.with_name(
                 f"{self.db_path.name}.unrecoverable-{ts}"
@@ -199,6 +216,9 @@ class SqliteStorageMixin:
                 if sidecar.exists():
                     sidecar.unlink()
             return True
+        finally:
+            if conn is not None:
+                conn.close()
 
     def _init_sqlite(self):
         """Initialize the SQLite DB with WAL mode."""
@@ -208,8 +228,21 @@ class SqliteStorageMixin:
 
         if self._crypto and SQLCIPHER_AVAILABLE:
             self._migrate_to_encrypted()
-            self._encrypted = True
-            self._quarantine_unreadable_encrypted_db()
+            # B248 #6: decide _encrypted from the REAL on-disk state instead of
+            # forcing it True unconditionally. A failed migration (or its #1
+            # rollback) leaves the file plaintext; forcing _encrypted=True would
+            # make _quarantine rename the cleartext PII to .unrecoverable-* (data
+            # loss + PII left in clear) and _connect_sqlite crash with "file is
+            # not a database". Parity with sqlite_store._init_db.
+            if self.db_path.exists() and self._is_plaintext_sqlite(self.db_path):
+                self._encrypted = False
+                logger.error(
+                    "DB remains plaintext after migration; opening in plaintext "
+                    "mode. PII is NOT encrypted — check sqlcipher3 and disk space."
+                )
+            else:
+                self._encrypted = True
+                self._quarantine_unreadable_encrypted_db()
         elif self._crypto and not SQLCIPHER_AVAILABLE:
             logger.warning(
                 "CryptoProvider provided but sqlcipher3 not installed. "

@@ -92,4 +92,4 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
             logger.debug("Autosave metrics update failed: %s", e)
 
     except Exception as e:
-        logger.error("Error saving conversation to memory: %s", e)
+        logger.error("Error saving conversation to memory: %s", e, exc_info=True)

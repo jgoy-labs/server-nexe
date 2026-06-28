@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .installer_display import (
     CYAN, BOLD, DIM, RESET,
-    print_step, print_success, print_error,
+    print_step, print_success, print_error, print_warn,
 )
 from .installer_i18n import t
 
@@ -330,6 +330,10 @@ def _install_requirements(pip_path, req_file, venv_path):
             if e.stderr:
                 for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-10:]:
                     print(f"     {line}")
+            print_warn(
+                "Supply-chain guarantee lost: no-index removed, installing "
+                "from PyPI without hash pins. Verify installed packages manually."
+            )
             pip_conf_path.unlink()
             subprocess.run([str(pip_path), "install", "-r", str(req_file)], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; req_file is project_root/requirements.txt (PyPI fallback)
             print("  ✅ Fallback to PyPI succeeded")
@@ -356,8 +360,36 @@ def _install_macos_deps(pip_path, project_root, venv_path):
             if e.stderr:
                 for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-5:]:
                     print(f"     {line}")
+            print_warn(
+                "Supply-chain guarantee lost: no-index removed for macOS deps, "
+                "installing from PyPI without hash pins."
+            )
             pip_conf_path.unlink(missing_ok=True)
             subprocess.run([str(pip_path), "install", "-r", str(req_macos)], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; req_macos is project_root/requirements-macos.txt (PyPI fallback)
+        else:
+            raise
+
+
+def _install_linux_deps(pip_path, project_root, venv_path):
+    """Install Linux-only deps (secretstorage keyring backend) with offline→PyPI fallback."""
+    req_linux = project_root / "requirements-linux.txt"
+    if not req_linux.exists():
+        return
+    pip_conf_path = venv_path / "pip.conf"
+    try:
+        subprocess.run([str(pip_path), "install", "-r", str(req_linux)], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; req_linux is project_root/requirements-linux.txt
+    except subprocess.CalledProcessError as e:
+        if pip_conf_path.exists():
+            print("  ⚠️ Offline install incomplete (Linux deps) — falling back to PyPI...")
+            if e.stderr:
+                for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-5:]:
+                    print(f"     {line}")
+            print_warn(
+                "Supply-chain guarantee lost: no-index removed for Linux deps, "
+                "installing from PyPI without hash pins."
+            )
+            pip_conf_path.unlink(missing_ok=True)
+            subprocess.run([str(pip_path), "install", "-r", str(req_linux)], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; req_linux is project_root/requirements-linux.txt (PyPI fallback)
         else:
             raise
 
@@ -366,13 +398,17 @@ def _install_mlx_engines(pip_path, venv_path):
     """Install pinned mlx-lm + mlx-vlm with offline→PyPI fallback per package."""
     print(f"   {t('detected_apple')} {CYAN}mlx-lm{RESET} + {CYAN}mlx-vlm{RESET}...")
     print(f"   {DIM}{t('mlx_dep_warning_title')} {t('mlx_dep_warning_body')}{RESET}")
-    for engine_spec in ("mlx-lm==0.31.2", "mlx-vlm==0.4.4"):
+    for engine_spec in ("mlx-lm==0.31.3", "mlx-vlm==0.4.4"):
         try:
             subprocess.run([str(pip_path), "install", engine_spec], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; engine_spec from local literal tuple (pinned versions)
         except subprocess.CalledProcessError:
             pip_conf_path = venv_path / "pip.conf"
             if pip_conf_path.exists():
                 print(f"  ⚠️ Offline install failed for {engine_spec} — fallback to PyPI...")
+                print_warn(
+                    f"Supply-chain guarantee lost: no-index removed for {engine_spec}, "
+                    "installing from PyPI without hash pins."
+                )
                 pip_conf_path.unlink(missing_ok=True)
                 subprocess.run([str(pip_path), "install", engine_spec], check=True, capture_output=True)  # nosec B603: pip_path absolute venv Path; engine_spec from local literal tuple (PyPI fallback)
             else:
@@ -396,6 +432,10 @@ def _install_llama_cpp(pip_path, venv_path):
         pip_conf_path = venv_path / "pip.conf"
         if pip_conf_path.exists():
             print("  ⚠️ Offline install failed for llama-cpp-python — fallback to PyPI...")
+            print_warn(
+                "Supply-chain guarantee lost: no-index removed for llama-cpp-python, "
+                "installing from PyPI without hash pins."
+            )
             pip_conf_path.unlink(missing_ok=True)
             subprocess.run(  # nosec B603: pip_path absolute venv Path; literal pinned llama-cpp-python version (PyPI fallback)
                 [str(pip_path), "install", "llama-cpp-python==0.3.19"],
@@ -435,10 +475,18 @@ def setup_environment(project_root, hw, engine="auto"):
     if platform.system() == "Darwin":
         _install_macos_deps(pip_path, project_root, venv_path)
 
+    # 2c. Install Linux-only deps (secretstorage keyring backend) on Linux
+    if platform.system() == "Linux":
+        _install_linux_deps(pip_path, project_root, venv_path)
+
     # 3. Hardware-Specific Inference Engines
     print_step(f"{BOLD}{t('installing_inference')}{RESET}")
     if hw['is_apple_silicon']:
         _install_mlx_engines(pip_path, venv_path)
-    _install_llama_cpp(pip_path, venv_path)
+    # B152: llama-cpp-python is macOS-only in the first release (Linux/Windows
+    # are Ollama-only — see requirements-linux.txt). Guard it like the sibling
+    # _install_macos_deps, instead of installing it unconditionally.
+    if platform.system() == "Darwin":
+        _install_llama_cpp(pip_path, venv_path)
 
     return python_path

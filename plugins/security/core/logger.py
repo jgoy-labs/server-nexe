@@ -20,14 +20,14 @@ SECURITY_LOG_PATH = get_repo_root() / "storage" / "system-logs" / "security"
 
 # Import-time IO refactor: mkdir moved to lazy init (first use of _ensure_log_dir()).
 # Previously this mkdir ran at import time — on read-only filesystem (sandbox,
-# mock test, contenidor restrictiu) trencava l'import. Ara és lazy i només es
-# crea quan realment cal escriure un log de seguretat.
+# mock test, restrictive container) broke the import. Now it's lazy and is only
+# created when a security log actually needs to be written.
 
 logger = logging.getLogger("security")
 
 
 def _ensure_log_dir() -> None:
-  """Lazy mkdir del directori de logs de seguretat. Idempotent."""
+  """Lazy mkdir of the security logs directory. Idempotent."""
   try:
     SECURITY_LOG_PATH.mkdir(parents=True, exist_ok=True)
   except OSError as exc:  # noqa: BLE001 — fallback explicit

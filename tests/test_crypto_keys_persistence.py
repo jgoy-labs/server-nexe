@@ -190,9 +190,13 @@ def test_file_set_failure_is_logged(tmp_path, monkeypatch, caplog):
     assert any("Failed to write key file" in r.getMessage() for r in caplog.records)
 
 
-def test_file_get_read_failure_returns_none(tmp_path, monkeypatch):
-    """If Path.read_bytes() fails for unexpected reasons, _try_file_get
-    returns None and the fallback continues."""
+def test_file_get_read_failure_raises(tmp_path, monkeypatch):
+    """B043: if the key file EXISTS but read_bytes() raises (I/O error, lock,
+    permission flip, NFS/iCloud stall), _try_file_get must FAIL-CLOSED (raise),
+    NOT return None. Returning None is read by get_or_create as 'key absent' →
+    a new key is generated → the existing encrypted DB is quarantined as
+    .unrecoverable-* (silent data loss). A present-but-unreadable key is a
+    transient fault, not an absent key."""
     key_path = tmp_path / "master.key"
     key_path.write_bytes(b"\x88" * crypto_keys.KEY_SIZE)
 
@@ -202,7 +206,25 @@ def test_file_get_read_failure_returns_none(tmp_path, monkeypatch):
     from pathlib import Path as _Path
     monkeypatch.setattr(_Path, "read_bytes", _raise)
 
-    assert crypto_keys._try_file_get(key_path) is None
+    with pytest.raises(RuntimeError):
+        crypto_keys._try_file_get(key_path)
+
+
+def test_present_but_unreadable_key_fails_closed(tmp_path, monkeypatch):
+    """B043 (end-to-end): a present-but-unreadable master.key must NOT be
+    treated as absent. get_or_create_master_key must fail-closed (raise)
+    instead of generating a new key that quarantines the existing encrypted DB."""
+    key_path = tmp_path / "master.key"
+    key_path.write_bytes(b"\x88" * crypto_keys.KEY_SIZE)
+
+    def _raise(_self):
+        raise OSError("EIO/lock/permission")
+
+    from pathlib import Path as _Path
+    monkeypatch.setattr(_Path, "read_bytes", _raise)
+
+    with pytest.raises(RuntimeError):
+        crypto_keys.get_or_create_master_key(key_path)
 
 
 def test_keyring_read_failure_returns_none(monkeypatch):

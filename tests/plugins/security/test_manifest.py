@@ -152,7 +152,11 @@ class TestSecurityReportEndpoint:
         if response.status_code == 200:
             data = response.json()
             assert data["status"] == "success"
-            assert "report" in data
+            # B075-C4: no persisted report exists, so the endpoint returns
+            # capabilities — it must NOT masquerade as a "report".
+            assert "report" not in data, "endpoint must not pretend to hold a report"
+            assert "capabilities" in data
+            assert data["capabilities"]["checks_available"]
 
 
 class TestSecurityAssetsEndpoint:

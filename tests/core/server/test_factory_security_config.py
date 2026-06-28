@@ -49,7 +49,12 @@ class TestValidateProductionSecurityConfig:
         validate_production_security(mock_i18n, config=config)
 
     def test_development_mode_no_allowlist_passes(self, clean_env, mock_i18n):
-        """Development mode is OK without allowlist."""
+        """Explicit development mode is OK without allowlist.
+
+        Fail-safe default flipped to 'production' (B077): absent NEXE_ENV now
+        means production, so development must be opted into explicitly.
+        """
+        clean_env.setenv("NEXE_ENV", "development")
         config = {"core": {"environment": {"mode": "development"}}}
         validate_production_security(mock_i18n, config=config)
 
@@ -59,6 +64,11 @@ class TestValidateProductionSecurityConfig:
         with pytest.raises(ValueError, match="NEXE_APPROVED_MODULES"):
             validate_production_security(mock_i18n, config=None)
 
-    def test_no_config_no_env_passes(self, clean_env, mock_i18n):
-        """No config + no env var → development mode → OK."""
-        validate_production_security(mock_i18n, config=None)
+    def test_no_config_no_env_defaults_production_raises(self, clean_env, mock_i18n):
+        """No config + no env var → fail-safe production default (B077) → raises.
+
+        Pre-B077 the absent NEXE_ENV defaulted to 'development' and this passed.
+        The SSOT default is now 'production', so a missing allowlist must raise.
+        """
+        with pytest.raises(ValueError, match="NEXE_APPROVED_MODULES"):
+            validate_production_security(mock_i18n, config=None)

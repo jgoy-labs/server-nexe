@@ -20,6 +20,51 @@ from memory.memory.engines.flash_memory import FlashMemory
 from memory.memory.engines.persistence import PersistenceManager
 from memory.memory.models.memory_entry import MemoryEntry
 from memory.memory.models.memory_types import MemoryType
+from memory.embeddings.paths import default_fastembed_cache_dir
+
+_FASTEMBED_BARE_MODEL = "paraphrase-multilingual-mpnet-base-v2"
+
+
+def _resolve_cached_fastembed_model(bare_name: str):
+    """Return a fastembed-supported model id equivalent to ``bare_name`` that is
+    already cached locally, or None when the real embedding path can't run offline.
+
+    fastembed 0.8+ only accepts fully-qualified ids, so the bare slug is resolved
+    against ``list_supported_models()``; the fastembed cache is then checked so the
+    test never triggers a network download. Used to gate the real (non-test)
+    embedding path with ``pytest.mark.skipif``.
+    """
+    try:
+        from fastembed import TextEmbedding
+    except ImportError:
+        return None
+    try:
+        supported = {m["model"] for m in TextEmbedding.list_supported_models()}
+    except Exception:
+        return None
+
+    slug = bare_name.rsplit("/", 1)[-1].lower()
+    if bare_name in supported:
+        resolved = bare_name
+    else:
+        resolved = next(
+            (c for c in supported if c.rsplit("/", 1)[-1].lower() == slug),
+            None,
+        )
+    if resolved is None:
+        return None
+
+    cache_dir = default_fastembed_cache_dir()
+    if not cache_dir.is_dir():
+        return None
+    has_cache = any(
+        p.is_dir() and p.name.lower().endswith(slug)
+        for p in cache_dir.iterdir()
+    )
+    return resolved if has_cache else None
+
+
+_RESOLVED_FASTEMBED_MODEL = _resolve_cached_fastembed_model(_FASTEMBED_BARE_MODEL)
 
 @pytest.fixture
 async def temp_pipeline():
@@ -343,4 +388,33 @@ class TestIngestionAdditional:
         result = await pipeline._generate_embedding("test text for executor")
         assert isinstance(result, list)
         assert len(result) == 768
+
+
+@pytest.mark.asyncio
+class TestIngestionRealFastembed:
+    """Real fastembed embedding path (no Ollama, no test-mode shortcut)."""
+
+    @pytest.mark.skipif(
+        _RESOLVED_FASTEMBED_MODEL is None,
+        reason="fastembed model not cached locally; real embedding path skipped",
+    )
+    async def test_generate_embedding_sync_real_model(self, temp_pipeline, monkeypatch):
+        """Lines 237-263: with the test-mode env vars removed (delenv),
+        _generate_embedding_sync must load the real fastembed ONNX model and
+        return a normalised 768-dim vector instead of the test shortcut."""
+        import math
+
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        monkeypatch.delenv("NEXE_ENV", raising=False)
+
+        pipeline = temp_pipeline
+        pipeline.embedding_model = _RESOLVED_FASTEMBED_MODEL
+
+        result = pipeline._generate_embedding_sync("Real fastembed embedding test")
+
+        assert isinstance(result, list)
+        assert len(result) == 768
+        assert all(isinstance(x, float) for x in result)
+        # The sync path L2-normalises the vector before returning it.
+        assert math.isclose(math.sqrt(sum(x * x for x in result)), 1.0, abs_tol=1e-3)
 

@@ -12,6 +12,8 @@ www.jgoy.net · https://server-nexe.org
 from pathlib import Path
 from typing import Tuple, Any
 
+from core.paths.constants import BASE_CONFIG_RELATIVE
+
 def setup_i18n_and_config(project_root: Path) -> Tuple[Any, Any, Any]:
   """
   Initialize i18n system, load configuration, and create ModuleManager.
@@ -28,7 +30,7 @@ def setup_i18n_and_config(project_root: Path) -> Tuple[Any, Any, Any]:
 
   config_path = project_root / "server.toml"
   if not config_path.exists():
-    config_path = project_root / "personality" / "server.toml"
+    config_path = project_root / BASE_CONFIG_RELATIVE
 
   i18n = ModularI18nManager(config_path, project_root)
 

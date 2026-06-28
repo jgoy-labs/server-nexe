@@ -9,12 +9,13 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import asyncio
 import logging
 import unicodedata
 from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, HTTPException, Request, Depends
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from core.dependencies import limiter
 from plugins.security.core.auth_dependencies import require_api_key
@@ -32,8 +33,19 @@ class MemoryStoreRequest(BaseModel):
       - content: max_length=100_000 (~100 KB; well above any legitimate single-doc store,
         rejects 1 GB DoS payloads at deserialization with HTTP 422)
       - collection: max_length=128 (mirrors ``validate_collection_name`` snake_case bound)
+
+    Back-compat (B066): older knowledge/docs taught a ``{"text": ...}`` body.
+    ``content`` therefore also accepts the legacy ``text`` key via AliasChoices,
+    so historical curl recipes keep working instead of 422-ing. The alias is
+    invisible: ``content`` stays the canonical field advertised in OpenAPI.
     """
-    content: str = Field(..., max_length=100_000)
+    model_config = ConfigDict(populate_by_name=True)
+
+    content: str = Field(
+        ...,
+        max_length=100_000,
+        validation_alias=AliasChoices("content", "text"),
+    )
     metadata: Optional[Dict[str, Any]] = None
     collection: str = Field(default="personal_memory", max_length=128)
     force: bool = False  # Bypass Gate heuristic (skip min-length check)
@@ -67,52 +79,61 @@ class MemorySearchResponse(BaseModel):
     """Response for search operation."""
     results: List[MemorySearchResult]
     total: int
+    # MC-125: surface partial RAG degradation. True when some (but not all)
+    # collections failed, so callers know the recall is incomplete instead of
+    # treating a silently-degraded HTTP 200 as a full result set.
+    partial: bool = False
+    failed_collections: List[str] = Field(default_factory=list)
 
 # Global memory API instance (initialized on first use)
 _memory_api = None
+_memory_api_lock = asyncio.Lock()  # MC-121: serialitza el cold-start
 
 async def get_memory_api():
     """Get or create MemoryAPI instance."""
     global _memory_api
     if _memory_api is None:
-        from . import MemoryAPI
-        # Bug fix: create the API object in a local variable and only assign to
-        # the global AFTER initialize() succeeds. Previously _memory_api was set
-        # before initialize(), so a failed initialize() left the global pointing
-        # to an uninitialized object. Subsequent callers received this broken
-        # object without any exception, leading to a silent init-failed state in
-        # memory_helper and permanently disabled RAG recalls.
-        _new_api = MemoryAPI()
-        await _new_api.initialize()
-        # The 3 canonical collections ("RAG library corridors"):
-        # - nexe_documentation: nexe's own knowhow (knowledge/ folder auto-ingest)
-        # - user_knowledge: ad-hoc documents uploaded by the user via chat
-        # - personal_memory: facts the chat remembers about the user (MEM_SAVE/RECALL)
-        #
-        # Note: the personal memory collection was called "nexe_web_ui" until
-        # the 2026-04-08 refactor (technical origin of the web_ui_module plugin).
-        # Renamed to "personal_memory" to align the name with the function.
-        #
-        # Ensure canonical collections exist (F5 fix). Previously only
-        # the personal memory collection was created and nexe_documentation
-        # was a silent skip in recall_from_memory(), making the "Base de
-        # coneixement" sidebar permanently empty.
-        canonical_collections = (
-            "nexe_documentation", # corporate know-how from knowledge/ folder
-            "user_knowledge",     # ad-hoc docs uploaded via chat UI
-            "personal_memory",    # personal memory MEM_SAVE (was nexe_web_ui pre-2026-04-08)
-        )
-        for col in canonical_collections:
-            try:
-                if not await _new_api.collection_exists(col):
-                    await _new_api.create_collection(col, vector_size=DEFAULT_VECTOR_SIZE)
-                    logger.info("Created canonical collection: %s", col)
-            except Exception as e:
-                logger.warning("Could not create canonical collection %s: %s", col, e)
-        _memory_api = _new_api  # only assigned after successful initialization
+        async with _memory_api_lock:  # MC-121: double-checked locking
+            if _memory_api is None:
+                from . import MemoryAPI
+                # Bug fix: create the API object in a local variable and only assign to
+                # the global AFTER initialize() succeeds. Previously _memory_api was set
+                # before initialize(), so a failed initialize() left the global pointing
+                # to an uninitialized object. Subsequent callers received this broken
+                # object without any exception, leading to a silent init-failed state in
+                # memory_helper and permanently disabled RAG recalls.
+                _new_api = MemoryAPI()
+                await _new_api.initialize()
+                # The 3 canonical collections ("RAG library corridors"):
+                # - nexe_documentation: nexe's own knowhow (knowledge/ folder auto-ingest)
+                # - user_knowledge: ad-hoc documents uploaded by the user via chat
+                # - personal_memory: facts the chat remembers about the user (MEM_SAVE/RECALL)
+                #
+                # Note: the personal memory collection was called "nexe_web_ui" until
+                # the 2026-04-08 refactor (technical origin of the web_ui_module plugin).
+                # Renamed to "personal_memory" to align the name with the function.
+                #
+                # Ensure canonical collections exist (F5 fix). Previously only
+                # the personal memory collection was created and nexe_documentation
+                # was a silent skip in recall_from_memory(), making the "Base de
+                # coneixement" sidebar permanently empty.
+                canonical_collections = (
+                    "nexe_documentation", # corporate know-how from knowledge/ folder
+                    "user_knowledge",     # ad-hoc docs uploaded via chat UI
+                    "personal_memory",    # personal memory MEM_SAVE (was nexe_web_ui pre-2026-04-08)
+                )
+                for col in canonical_collections:
+                    try:
+                        if not await _new_api.collection_exists(col):
+                            await _new_api.create_collection(col, vector_size=DEFAULT_VECTOR_SIZE)
+                            logger.info("Created canonical collection: %s", col)
+                    except Exception as e:
+                        logger.warning("Could not create canonical collection %s: %s", col, e)
+                _memory_api = _new_api  # only assigned after successful initialization
     return _memory_api
 
 @router.post("/store", response_model=MemoryStoreResponse, dependencies=[Depends(require_api_key)], summary="Store content in semantic memory (API key required)", operation_id="memory_store")
+@limiter.limit("30/minute")
 async def memory_store(request: Request, body: MemoryStoreRequest):
     """
     Store content in semantic memory (RAG).
@@ -191,7 +212,7 @@ def _validate_search_collections(body: "MemorySearchRequest") -> None:
 
 def _resolve_search_collections(body: "MemorySearchRequest") -> list:
     """Determine the ordered list of collections to search."""
-    if body.collections:
+    if body.collections is not None:
         return body.collections
     if body.collection:
         return [body.collection]
@@ -231,7 +252,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         # Documents are NFKC-normalized at ingest, so a fullwidth or compat
         # variant in body.query would otherwise miss the canonical indexed
         # form. Pydantic v1/v2 BaseModel fields are mutable; assigning back
-        # also keeps the truncated debug log (line below) in sync.
+        # propagates the normalized form to the downstream memory.search() calls.
         body.query = unicodedata.normalize("NFKC", body.query)
         cols = _resolve_search_collections(body)
 
@@ -239,6 +260,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         search_errors = 0
         cols_searched = 0
         last_error = None
+        failed_cols: List[str] = []  # MC-125
         for col in cols:
             try:
                 if not await memory.collection_exists(col):
@@ -255,6 +277,7 @@ async def memory_search(request: Request, body: MemorySearchRequest):
             except Exception as e:
                 search_errors += 1
                 last_error = e
+                failed_cols.append(col)  # MC-125
                 logger.warning("Search failed for collection %s: %s", col, e)
                 continue
 
@@ -265,9 +288,19 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         formatted_results.sort(key=lambda x: x.score, reverse=True)
         formatted_results = formatted_results[:body.limit]
 
-        logger.debug("Memory search for '%s' returned %d results from %d collections", body.query[:50], len(formatted_results), len(cols))
+        # MC-113: never log the query text (sensitive); counts only.
+        logger.debug("Memory search returned %d results from %d collections", len(formatted_results), len(cols))
 
-        return MemorySearchResponse(results=formatted_results, total=len(formatted_results))
+        # MC-125: some collections failed but not all → partial recall. Make it
+        # visible (error-level log + response flags) instead of a silent 200.
+        _partial = search_errors > 0 and not (cols_searched > 0 and search_errors == cols_searched)
+        if _partial:
+            logger.error("Memory search partially degraded: %d collection(s) failed (%s)",
+                         search_errors, ", ".join(failed_cols))
+        return MemorySearchResponse(
+            results=formatted_results, total=len(formatted_results),
+            partial=_partial, failed_collections=failed_cols,
+        )
 
     except InvalidCollectionNameError:
         raise HTTPException(status_code=400, detail="Invalid collection name. Must follow pattern 'module_type' with only lowercase, numbers and underscores.")

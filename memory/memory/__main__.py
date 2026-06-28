@@ -9,7 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from .cli import main  # type: ignore[attr-defined]  # FP: main() defined in cli.py:396, mypy does not detect it due to import cycle
+from .memory_cli import main
 
 if __name__ == "__main__":
   main()

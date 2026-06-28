@@ -66,6 +66,40 @@ class TestI18nHelper:
         result = helper.t("my.key", "")
         assert result == "my.key"
 
+    # ── Manager returns the raw key on a miss (its real behaviour: I18nManager.t
+    #    returns `key` without raising). The documented fallback must trigger here
+    #    too, otherwise raw i18n keys leak into logs (e.g. the security audit log).
+    def test_t_uses_fallback_when_manager_returns_raw_key(self):
+        mock_manager = MagicMock()
+        mock_manager.t.side_effect = lambda key, **kw: key  # real miss behaviour
+        helper = I18nHelper(mock_manager)
+        result = helper.t(
+            "security_logger.auth.failure",
+            "Authentication failed: {reason}",
+            reason="bad token",
+        )
+        assert result == "Authentication failed: bad token"  # fail-before: the raw key
+
+    def test_t_uses_fallback_without_kwargs_on_raw_key(self):
+        mock_manager = MagicMock()
+        mock_manager.t.side_effect = lambda key, **kw: key
+        helper = I18nHelper(mock_manager)
+        assert helper.t("some.missing.key", "Static fallback") == "Static fallback"
+
+    def test_t_returns_key_on_raw_key_when_no_fallback(self):
+        # No fallback provided → preserve existing behaviour (return the key).
+        mock_manager = MagicMock()
+        mock_manager.t.side_effect = lambda key, **kw: key
+        helper = I18nHelper(mock_manager)
+        assert helper.t("some.missing.key") == "some.missing.key"
+
+    def test_t_returns_translation_when_resolved_not_fallback(self):
+        # Guard: a resolved translation (differs from key) is returned untouched.
+        mock_manager = MagicMock()
+        mock_manager.t.return_value = "Resolved text"
+        helper = I18nHelper(mock_manager)
+        assert helper.t("some.key", "ignored fallback") == "Resolved text"
+
 
 class TestGetI18n:
     def test_get_i18n_returns_helper(self):

@@ -5,6 +5,8 @@
  * Fetch /security/info and /security/health to display status.
  */
 
+const esc = (s) => { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; };
+
 (function() {
   const BASE = window.location.origin;
 
@@ -25,15 +27,15 @@
       const data = await fetchJSON(`${BASE}/security/info`);
       const grid = document.getElementById('info-grid');
       grid.innerHTML = `
-        <dt>Name</dt><dd>${data.name || '-'}</dd>
-        <dt>Version</dt><dd>${data.version || '-'}</dd>
-        <dt>Type</dt><dd>${data.type || '-'}</dd>
+        <dt>Name</dt><dd>${esc(data.name) || '-'}</dd>
+        <dt>Version</dt><dd>${esc(data.version) || '-'}</dd>
+        <dt>Type</dt><dd>${esc(data.type) || '-'}</dd>
         <dt>Initialized</dt><dd>${data.initialized ? 'Yes' : 'No'}</dd>
-        <dt>Description</dt><dd>${data.description || '-'}</dd>
+        <dt>Description</dt><dd>${esc(data.description) || '-'}</dd>
       `;
       const list = document.getElementById('endpoints-list');
       list.innerHTML = (data.endpoints || [])
-        .map(e => `<li><code>${e}</code></li>`)
+        .map(e => `<li><code>${esc(e)}</code></li>`)
         .join('');
     } catch(e) {
       setError('Failed to load info: ' + e.message);
@@ -45,15 +47,15 @@
       const data = await fetchJSON(`${BASE}/security/health`);
       const status = data.status || 'unknown';
       document.getElementById('health-status').innerHTML =
-        `<span class="status ${status}">${status}</span>`;
+        `<span class="status ${esc(status)}">${esc(status)}</span>`;
       document.getElementById('health-message').textContent = data.message || '';
 
       const checksEl = document.getElementById('health-checks');
       if (data.checks && data.checks.length) {
         checksEl.innerHTML = data.checks.map(c =>
           `<div class="check-item">
-            <span class="check-dot ${c.status}"></span>
-            <span>${c.name}: ${c.message}</span>
+            <span class="check-dot ${esc(c.status)}"></span>
+            <span>${esc(c.name)}: ${esc(c.message)}</span>
           </div>`
         ).join('');
       }

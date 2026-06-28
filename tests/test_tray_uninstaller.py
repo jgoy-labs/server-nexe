@@ -60,3 +60,18 @@ def test_perform_uninstall_aborts_if_backup_fails(tmp_path, monkeypatch):
     assert removed == []
     assert "uninstall_backup_failed" in failed
     assert install_dir.exists()
+
+
+def test_install_dir_reported_as_scheduled_not_removed(monkeypatch, tmp_path):
+    """B151: install_dir is removed by a DETACHED script after the app exits, so
+    a successful Popen only means the script launched — report it as 'scheduled',
+    never as confirmed-removed. Mutation 'removed.append(str(install_dir))' → red."""
+    calls = {"popen": 0}
+    monkeypatch.setattr(tu.subprocess, "Popen",
+                        lambda *a, **k: calls.__setitem__("popen", calls["popen"] + 1))
+    removed, failed = [], []
+    tu._uninstall_remove_install_dir(tmp_path / "nexe-install", removed, failed)
+    assert calls["popen"] == 1          # the detached cleanup script is still launched
+    assert failed == []
+    assert len(removed) == 1
+    assert "scheduled" in removed[0].lower()   # honest: not a bare confirmed path

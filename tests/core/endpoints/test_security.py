@@ -244,22 +244,22 @@ class TestHealthEndpointSecurity:
 # Bug #3 (2026-05-21) — readiness aggregation contract sentinel
 # ═══════════════════════════════════════════════════════════════════════════
 
-# The 7 sub-checks declared by memory/rag/health.py::check_health (line 261-268).
+# The 5 sub-checks declared by memory/rag/health.py::check_health.
 # Parametrising over each one guards against a future change that would loosen
 # the "any fail → unhealthy" aggregation rule for a specific sub-check.
+# (transaction_ledger / write_coordinator were removed in B064 — they were
+# phantom checks reporting 'pass' for non-existent components.)
 _RAG_SUBCHECK_NAMES = (
     "module_initialized",
     "rag_sources",
     "qdrant_available",
     "storage_paths",
-    "transaction_ledger",
-    "write_coordinator",
     "disk_space",
 )
 
 
 def _make_rag_health(failing_subcheck: str) -> dict:
-    """Build a realistic get_health() payload with 6 pass + 1 fail sub-checks."""
+    """Build a realistic get_health() payload with 4 pass + 1 fail sub-checks."""
     checks = [
         {
             "name": name,
@@ -280,9 +280,9 @@ def _make_rag_health(failing_subcheck: str) -> dict:
 
 
 class TestReadinessAggregationContract:
-    """Anti-regression sentinel for Bug #3 (RAG health 1/7 sub-check fail).
+    """Anti-regression sentinel for Bug #3 (RAG health 1/5 sub-check fail).
 
-    Logs from the real sidecar on 2026-05-21 showed RAG healthy 7/7 (the bug
+    Logs from the real sidecar on 2026-05-21 showed RAG healthy (the bug
     is not currently reproducible — likely a startup race condition resolved
     indirectly). These tests guard the *contract* so that if anyone in the
     future loosens the aggregation rule, the failure is caught immediately.
@@ -299,7 +299,7 @@ class TestReadinessAggregationContract:
         self, failing_subcheck
     ):
         """Unit-level: aggregate_health_checks must return unhealthy when ANY
-        single sub-check is 'fail', regardless of which one (7 parametric cases)."""
+        single sub-check is 'fail', regardless of which one (5 parametric cases)."""
         from memory.shared.health_helpers import aggregate_health_checks
 
         payload = _make_rag_health(failing_subcheck)

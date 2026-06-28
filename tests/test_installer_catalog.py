@@ -64,6 +64,58 @@ def test_catalog_still_has_small_models():
 
 
 # ════════════════════════════════════════════════════════════════════════
+# B158: dedupe gemma4_31b — cap clau duplicada al catàleg + validador la caça
+# ════════════════════════════════════════════════════════════════════════
+
+
+def test_no_duplicate_keys_in_python_catalog():
+    """B158: cada clau viu en un sol tier (gemma4_31b duplicava large+xlarge)."""
+    keys = _all_keys()
+    dupes = sorted({k for k in keys if keys.count(k) > 1})
+    assert not dupes, f"claus duplicades a installer_catalog_data.py: {dupes}"
+
+
+def test_no_duplicate_keys_in_swift_wizard_models_json():
+    """B158: el mirall del wizard tampoc pot repetir cap clau."""
+    json_path = (
+        Path(__file__).resolve().parent.parent
+        / "installer" / "swift-wizard" / "Resources" / "models.json"
+    )
+    if not json_path.exists():
+        return
+    data = json.loads(json_path.read_text())
+    keys = [m.get("key") for models in data.values() for m in models]
+    dupes = sorted({k for k in keys if keys.count(k) > 1})
+    assert not dupes, f"claus duplicades a models.json: {dupes}"
+
+
+def test_gemma4_31b_only_in_xlarge_with_honest_ram():
+    """B158: Gemma 4 31B (8-bit) viu només a xlarge amb ram_gb honest (~22), no a large amb 10."""
+    occ = [
+        (tier, m)
+        for tier, models in MODEL_CATALOG.items()
+        for m in models
+        if m["key"] == "gemma4_31b"
+    ]
+    assert len(occ) == 1, f"gemma4_31b ha d'aparèixer 1 cop: {[t for t, _ in occ]}"
+    tier, model = occ[0]
+    assert tier == "xlarge"
+    assert model["ram_gb"] >= 20  # un 31B 8-bit vol ~22 GB, mai 10
+
+
+def test_validator_detects_duplicate_keys_with_divergent_metadata():
+    """Regressió B158: el validador estès caça claus duplicades amb ram_gb divergent."""
+    from installer.export_catalog_json import _duplicate_key_errors
+
+    poisoned = {
+        "large": [{"key": "dup", "ram_gb": 10.0, "disk_gb": 18.5}],
+        "xlarge": [{"key": "dup", "ram_gb": 22.0, "disk_gb": 18.5}],
+    }
+    errors = _duplicate_key_errors("test", poisoned)
+    assert any("dup" in e and "divergent" in e for e in errors)
+
+
+# ════════════════════════════════════════════════════════════════════════
 # Tests helpers de select_model (refactor CCN 36→≤10, façana facade)
 # ════════════════════════════════════════════════════════════════════════
 

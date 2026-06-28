@@ -69,35 +69,30 @@ class RAGCLI:
     try:
       info = self._require_module().get_info()
 
-      logger.info("")
-      logger.info("RAG Module Info")
+      logger.info("\nRAG Module Info")
       logger.info("=" * 60)
       logger.info("ID:     %s", info.get("module_id", "N/A"))
       logger.info("Name:    %s", info.get("name", "N/A"))
       logger.info("Version:   %s", info.get("version", "N/A"))
       logger.info("Description: %s", info.get("description", "N/A"))
       logger.info("Initialized: %s", info.get("initialized", False))
-      logger.info("")
-      logger.info("Sources:")
+      logger.info("\nSources:")
       sources = info.get("sources", [])
       if sources:
         for source in sources:
           logger.info(" - %s", source)
       else:
         logger.info(" (no sources loaded)")
-      logger.info("")
-      logger.info("Capabilities:")
+      logger.info("\nCapabilities:")
       for cap in info.get("capabilities", []):
         logger.info(" - %s", cap)
-      logger.info("")
-      logger.info("Stats:")
+      logger.info("\nStats:")
       stats = info.get("stats", {})
       logger.info(" Documents added:   %s", stats.get("documents_added", 0))
       logger.info(" Searches performed: %s", stats.get("searches_performed", 0))
       logger.info(" Total chunks:    %s", stats.get("total_chunks", 0))
       logger.info(" Cache hit rate:   %.1f%%", stats.get("cache_hit_rate", 0) * 100)
-      logger.info("")
-      logger.info("Config:")
+      logger.info("\nConfig:")
       config = info.get("config", {})
       for key, value in config.items():
         logger.info(" %s: %s", key, value)
@@ -125,12 +120,10 @@ class RAGCLI:
         "unhealthy": "[FAIL]"
       }.get(status, "[??]")
 
-      logger.info("")
-      logger.info("RAG Module Health")
+      logger.info("\nRAG Module Health")
       logger.info("=" * 60)
       logger.info("Status: %s %s", status_icon, status.upper())
-      logger.info("")
-      logger.info("Checks:")
+      logger.info("\nChecks:")
 
       checks = health.get("checks", [])
       for check in checks:
@@ -144,8 +137,7 @@ class RAGCLI:
 
       sources_check = next((c for c in checks if c.get("name") == "rag_sources"), None)
       if sources_check and "sources" in sources_check:
-        logger.info("")
-        logger.info("Sources Health:")
+        logger.info("\nSources Health:")
         for source_name, source_health in sources_check["sources"].items():
           s_status = source_health.get("status", "unknown")
           s_icon = {
@@ -160,8 +152,7 @@ class RAGCLI:
             logger.info("   Documents: %s", source_health["num_documents"])
 
       if args.json:
-        logger.info("")
-        logger.info("JSON Output:")
+        logger.info("\nJSON Output:")
         logger.info(json.dumps(health, indent=2, default=str))
 
       return 0 if status == "healthy" else 1
@@ -184,13 +175,11 @@ class RAGCLI:
       top_k = args.top_k
       source = args.source
 
-      logger.info("")
-      logger.info("RAG Search")
+      logger.info("\nRAG Search")
       logger.info("=" * 60)
       logger.info("Query: %s", query)
       logger.info("Top K: %s", top_k)
-      logger.info("Source: %s", source)
-      logger.info("")
+      logger.info("Source: %s\n", source)
 
       request = SearchRequest(query=query, top_k=top_k)
       results = await self._require_module().search(request, source=source)
@@ -228,8 +217,7 @@ class RAGCLI:
       module = self._require_module()
       sources = module.list_sources()
 
-      logger.info("")
-      logger.info("RAG Sources")
+      logger.info("\nRAG Sources")
       logger.info("=" * 60)
 
       if not sources:

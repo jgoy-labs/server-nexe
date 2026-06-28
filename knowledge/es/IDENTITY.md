@@ -21,7 +21,7 @@ expires: null
 
 ## En 30 segundos
 
-- **Servidor de IA 100% local** (cero cloud)
+- **Servidor de IA 100% local** (cero cloud en runtime; descarga inicial de modelos desde Hugging Face / Ollama)
 - **Con memoria persistente** (RAG + MEM_SAVE)
 - **macOS 14+ Apple Silicon**, version 1.0.6
 - **Multi-backend:** MLX, llama.cpp, Ollama
@@ -74,7 +74,7 @@ server-nexe combina cinco capacidades:
 - **Linux x86_64:** Soportado (backend Ollama, CPU). Tests unitarios pasan, instalacion CLI validada.
 - **Windows:** En desarrollo (sin ETA pública)
 - **Puerto por defecto:** 9119
-- **Tests:** 6776 funciones de test recopiladas (6991 totales — 215 deselected por marcadores), 0 fallos en la ultima ejecucion
+- **Tests:** 7165 funciones de test recopiladas (7400 totales — 235 deselected por marcadores), 0 fallos en la ultima ejecucion
 
 ## Documentacion AI-Ready
 

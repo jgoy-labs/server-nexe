@@ -109,17 +109,13 @@ class TestLlamaCppChatNodeImages:
         mock_model.create_chat_completion.return_value = mock_result
         node._get_model = MagicMock(return_value=(mock_model, False))
 
+        gen_result = {
+            "text": "Resposta", "tokens": 5, "prompt_tokens": 10,
+            "timing": {"prefill_ms": 0, "generation_ms": 100},
+        }
         with caplog.at_level(logging.WARNING, logger="llama_cpp_module.core.chat"):
             with patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="hash123"):
-                with patch("asyncio.to_thread") as mock_thread:
-                    mock_thread.return_value = {
-                        "text": "Resposta",
-                        "tokens": 5,
-                        "prompt_tokens": 10,
-                        "prefill_ms": 0,
-                        "generation_ms": 100,
-                        "finish_reason": "stop",
-                    }
+                with patch.object(node, "_generate", return_value=gen_result):
                     await node.execute({
                         "system": "Ets un assistent",
                         "messages": [{"role": "user", "content": "Hola"}],
@@ -135,16 +131,12 @@ class TestLlamaCppChatNodeImages:
         mock_model = MagicMock()
         node._get_model = MagicMock(return_value=(mock_model, False))
 
+        gen_result = {
+            "text": "Hola!", "tokens": 3, "prompt_tokens": 8,
+            "timing": {"prefill_ms": 0, "generation_ms": 50},
+        }
         with patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="hash123"):
-            with patch("asyncio.to_thread") as mock_thread:
-                mock_thread.return_value = {
-                    "text": "Hola!",
-                    "tokens": 3,
-                    "prompt_tokens": 8,
-                    "prefill_ms": 0,
-                    "generation_ms": 50,
-                    "finish_reason": "stop",
-                }
+            with patch.object(node, "_generate", return_value=gen_result):
                 result = await node.execute({
                     "system": "Ets un assistent",
                     "messages": [{"role": "user", "content": "Hola"}],
@@ -166,17 +158,18 @@ class TestLlamaCppChatNodeImages:
             "timing": {"prefill_ms": 50, "generation_ms": 100, "overhead_ms": 0, "prefill_available": False},
         }
 
-        with patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="hash123"):
-            with patch("asyncio.to_thread", return_value=vlm_result) as mock_thread:
-                result = await node.execute({
-                    "system": "Ets un assistent visual",
-                    "messages": [{"role": "user", "content": "Què veus?"}],
-                    "images": [b"fake_image_bytes"],
-                })
+        with patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="hash123"), \
+             patch.object(node, "_generate_vlm", return_value=vlm_result) as mock_vlm, \
+             patch.object(node, "_generate") as mock_text:
+            result = await node.execute({
+                "system": "Ets un assistent visual",
+                "messages": [{"role": "user", "content": "Què veus?"}],
+                "images": [b"fake_image_bytes"],
+            })
 
         # Verify _generate_vlm was called (not _generate)
-        called_fn = mock_thread.call_args[0][0]
-        assert called_fn.__name__ == "_generate_vlm"
+        assert mock_vlm.called
+        assert not mock_text.called
         assert result["response"] == "Veig un gat"
 
     @pytest.mark.asyncio
@@ -195,17 +188,16 @@ class TestLlamaCppChatNodeImages:
 
         callback = MagicMock()
 
-        with patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="hash123"):
-            with patch("asyncio.to_thread", return_value=vlm_result) as mock_thread:
-                result = await node.execute({
-                    "system": "Ets un assistent visual",
-                    "messages": [{"role": "user", "content": "Descriu"}],
-                    "images": [b"fake_image_bytes"],
-                    "stream_callback": callback,
-                })
+        with patch("plugins.llama_cpp_module.core.chat.compute_system_hash", return_value="hash123"), \
+             patch.object(node, "_generate_vlm_streaming", return_value=vlm_result) as mock_vlm_stream:
+            result = await node.execute({
+                "system": "Ets un assistent visual",
+                "messages": [{"role": "user", "content": "Descriu"}],
+                "images": [b"fake_image_bytes"],
+                "stream_callback": callback,
+            })
 
-        called_fn = mock_thread.call_args[0][0]
-        assert called_fn.__name__ == "_generate_vlm_streaming"
+        assert mock_vlm_stream.called
         assert result["response"] == "Un paisatge"
 
     @pytest.mark.asyncio

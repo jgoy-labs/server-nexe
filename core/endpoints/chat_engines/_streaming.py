@@ -87,6 +87,10 @@ class TokenBridge:
         # running byte counter for the cap below.
         self._response_bytes: int = 0
         self._cap_triggered: bool = False
+        # B216: set when at least one token was dropped because the queue was
+        # full. We keep dropping (drop > OOM, decision CS2) but the loss is no
+        # longer silent: it is logged once and surfaced to the client.
+        self._truncated: bool = False
 
     def on_token(self, token: str):
         """Called from the engine thread for each generated token.
@@ -111,10 +115,28 @@ class TokenBridge:
             return
         self._response_bytes += token_bytes
         self._response_parts.append(token)
+
+        def _enqueue() -> None:
+            # Runs on the event loop. The real put_nowait lives HERE, so the
+            # QueueFull it can raise must be caught HERE — not around the
+            # call_soon_threadsafe scheduling above (B216). On overflow we drop
+            # the token (drop > OOM, CS2) but mark _truncated and warn once.
+            try:
+                self.queue.put_nowait(token)
+            except asyncio.QueueFull:
+                if not self._truncated:
+                    self._truncated = True
+                    logger.warning(
+                        "Stream queue full (maxsize=%d): dropping token, response "
+                        "will be truncated (drop>OOM policy, CS2).",
+                        self.queue.maxsize,
+                    )
+
         try:
-            self._loop.call_soon_threadsafe(self.queue.put_nowait, token)
-        except Exception as e:
-            logger.warning("Stream token enqueue failed (queue full/closed): %s", e)  # nosemgrep: python-logger-credential-disclosure
+            self._loop.call_soon_threadsafe(_enqueue)
+        except RuntimeError as e:
+            # the loop is closed/closing — nothing more we can do with this token
+            logger.warning("Stream token enqueue scheduling failed (loop closed): %s", e)  # nosemgrep: python-logger-credential-disclosure
 
     def set_done(self, result=None, error=None):
         """Signal that generation is complete."""
@@ -141,10 +163,11 @@ class TokenBridge:
 
 def format_sse_chunk(token: str, model_name: str, engine_prefix: str) -> str:
     """Format a single token as an OpenAI-compatible SSE chunk."""
+    now = int(time.time())
     chunk = {
-        "id": f"{engine_prefix}-stream-{int(time.time())}",
+        "id": f"{engine_prefix}-stream-{now}",
         "object": "chat.completion.chunk",
-        "created": int(time.time()),
+        "created": now,
         "model": model_name,
         "choices": [{
             "index": 0,
@@ -155,17 +178,24 @@ def format_sse_chunk(token: str, model_name: str, engine_prefix: str) -> str:
     return f"data: {json.dumps(chunk)}\n\n"
 
 
-def format_sse_done(model_name: str, engine_prefix: str) -> str:
-    """Format the final SSE chunk with finish_reason=stop."""
+def format_sse_done(model_name: str, engine_prefix: str, truncated: bool = False) -> str:
+    """Format the final SSE chunk.
+
+    ``finish_reason`` is ``"stop"`` for a clean completion, or ``"length"``
+    (the OpenAI-canonical value for a cut-off response) when the stream was
+    truncated because the bridge queue overflowed (B216). This makes the
+    silent token drop visible to the client.
+    """
+    now = int(time.time())
     final_chunk = {
-        "id": f"{engine_prefix}-stream-{int(time.time())}",
+        "id": f"{engine_prefix}-stream-{now}",
         "object": "chat.completion.chunk",
-        "created": int(time.time()),
+        "created": now,
         "model": model_name,
         "choices": [{
             "index": 0,
             "delta": {},
-            "finish_reason": "stop",
+            "finish_reason": "length" if truncated else "stop",
         }],
     }
     return f"data: {json.dumps(final_chunk)}\n\n"
@@ -183,4 +213,4 @@ async def background_memory_save(app_state, user_msg: str, response_text: str):
             if attempt == 0:
                 await asyncio.sleep(1)
             else:
-                logger.error("Stream Auto-Save failed after retry: %s", e)
+                logger.error("Stream Auto-Save failed after retry: %s", e, exc_info=True)

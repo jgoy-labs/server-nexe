@@ -5,7 +5,7 @@ id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe es un servidor d'IA local amb memoria RAG persistent creat per Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalitats: MEM_SAVE, i18n (ca/es/en), aillament de sessions, encriptacio at-rest, thinking toggle. Models per tiers (8GB a 32GB, 14 models 4 tiers), 2 metodes d'instal-lacio (DMG offline 1.2GB, CLI). macOS 14+ Apple Silicon only, Linux suportat (Ollama, CPU)."
+abstract: "server-nexe es un servidor d'IA local amb memoria RAG persistent creat per Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalitats: MEM_SAVE, i18n (ca/es/en), aillament de sessions, encriptacio at-rest, thinking toggle. Models per tiers (8GB a 32GB, 14 models 4 tiers), 3 metodes d'instal-lacio (nexe-app Tauri desktop recomanat, CLI, DMG SwiftUI legacy). macOS 14+ Apple Silicon only, Linux suportat (Ollama, CPU)."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -46,14 +46,14 @@ NO es npm nexe (un compilador de Node.js). NO es un producte de servidor Windows
 6. **Multilingue (ca/es/en)** — i18n complet: UI, prompts del sistema, etiquetes de context RAG, missatges d'error, instal·lador. El servidor es la font de veritat per a la seleccio d'idioma.
 7. **Pujada de documents amb aillament de sessio** — Puja documents via la Web UI. Indexats a user_knowledge amb metadades de session_id. Els documents nomes son visibles dins la sessio on s'han pujat.
 8. **Encriptacio at-rest (default `auto`)** — Encriptacio AES-256-GCM per a SQLite (via SQLCipher), sessions de xat (.enc) i text de documents RAG (TextStore). S'activa automaticament si sqlcipher3 esta disponible. Gestio de claus via OS Keyring, variable d'entorn o fitxer. Recentment afegida — encara no provada en batalla en produccio.
-9. **Validacio d'input completa** — Tots els endpoints (API i Web UI) tenen rate limiting, validacio d'input (`validate_string_input`) i sanititzacio de context RAG. 6 detectors d'injeccio amb normalitzacio Unicode. 47 patrons de jailbreak.
+9. **Validacio d'input completa** — Tots els endpoints (API i Web UI) tenen rate limiting, validacio d'input (`validate_string_input`) i sanititzacio de context RAG. 6 detectors d'injeccio amb normalitzacio Unicode. 49 patrons de jailbreak.
 
 ## Stack tecnologic
 
 | Component | Tecnologia |
 |-----------|-----------|
 | Llenguatge | Python 3.11+ (3.12 inclos a l'instal·lador) |
-| Framework web | FastAPI 0.115+ |
+| Framework web | FastAPI 0.136.3 (pinned) |
 | Base de dades vectorial | Qdrant (binari embegut) |
 | Backends LLM | MLX, llama.cpp (llama-cpp-python 0.3.19 pinned), Ollama |
 | Embeddings | **fastembed ONNX (paraphrase-multilingual-mpnet-base-v2, 768D) — principal offline** / nomic-embed-text via Ollama (opcional) |
@@ -62,7 +62,7 @@ NO es npm nexe (un compilador de Node.js). NO es un producte de servidor Windows
 | CLI | Click + Rich |
 | API | Compatible amb OpenAI (/v1/chat/completions) |
 | Autenticacio | X-API-Key (dual-key amb rotacio) |
-| Seguretat | 6 detectors d'injeccio + normalitzacio Unicode, 47 patrons de jailbreak, rate limiting, capcaleres CSP |
+| Seguretat | 6 detectors d'injeccio + normalitzacio Unicode, 49 patrons de jailbreak, rate limiting, capcaleres CSP |
 
 ## Arquitectura
 
@@ -86,7 +86,7 @@ server-nexe/
 ├── personality/           # Prompts del sistema, module manager, i18n, server.toml
 ├── installer/             # Wizard SwiftUI, constructor de DMG, app de safata, instal·lador headless
 ├── storage/               # Dades en temps d'execucio (models, logs, vectors Qdrant)
-├── tests/                 # Suite de tests (6776 col·lectades / 6991 totals)
+├── tests/                 # Suite de tests (7165 col·lectades / 7400 totals)
 └── nexe                   # Executable CLI principal
 ```
 
@@ -117,13 +117,13 @@ La base de coneixement (`knowledge/`) esta dissenyada tant per a consum huma com
 
 ### tier_16 (16 GB RAM)
 - 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama + MLX.
+- 👁 🧠 Qwen3.5 4B (8-bit) — Alibaba, 2026. Ollama + MLX. Precisio 8-bit (mes fidel que el 4B base).
 - 👁 🧠 Gemma 4 E4B — Google, 2026. Ollama + MLX.
 - 🧠 Mistral Nemo 12B — Mistral AI, 2024. Ollama + MLX.
 - Salamandra 7B — BSC/AINA, 2025. Ollama + llama.cpp (GGUF). El millor per catala.
 
 ### tier_24 (24 GB RAM)
 - 👁 🧠 Qwen3.5 27B — Alibaba, 2026. Ollama + MLX.
-- 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
 - 👁 🧠 Mistral Small 3.2 24B — Mistral AI, 2025. Ollama + MLX.
 - 🧠 GPT-OSS 20B — OpenAI, 2025. Ollama + MLX. Apache 2.0.
 
@@ -145,8 +145,8 @@ Tambe es suporten models personalitzats via Ollama (per nom) o Hugging Face (rep
 
 ## Metodes d'instal·lacio
 
-### 1. Instal·lador DMG per a macOS (recomanat)
-Wizard natiu SwiftUI amb 6 pantalles: benvinguda, carpeta de desti, seleccio de model (deteccio de maquinari per tiers), confirmacio, progres, finalitzacio. Inclou Python 3.12.
+### 1. Aplicacio d'escriptori — nexe-app (Tauri v2, recomanat)
+Aplicacio d'escriptori que integra server-nexe com a sidecar Python dins un shell Tauri v2. Descarrega el `nexe-app_*_aarch64.dmg` (macOS) o `.AppImage` (Linux ARM64) des de la pagina de [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest). Inclou wizard d'onboarding, system tray i gestio automatica del sidecar.
 
 ### 2. CLI headless
 ```bash
@@ -155,6 +155,11 @@ cd server-nexe
 ./setup.sh
 ./nexe go
 ```
+
+### 3. Instal·lador DMG SwiftUI (legacy)
+> **Estat:** substituït per l'aplicacio d'escriptori (Metode 1). Documentat per a instal·lacions existents.
+
+Wizard natiu SwiftUI amb 6 pantalles, Python 3.12 inclos, instal·lacio 100% offline (~1.2 GB). Nomes Apple Silicon macOS.
 
 ## Inici rapid
 
@@ -201,6 +206,8 @@ Altres documents de coneixement en aquesta carpeta:
 - IDENTITY.md — Que es server-nexe i que NO es (desambiguacio)
 - INSTALLATION.md — Guia d'instal·lacio detallada
 - USAGE.md — Exemples d'us i casos practics
+- USE_CASES.md — Casos d'us i quan server-nexe te (o no) sentit
+- LANGUAGES.md — Deteccio d'idioma per missatge i directiva de resposta
 - ARCHITECTURE.md — Arquitectura tecnica en detall
 - RAG.md — Com funciona el sistema de memoria
 - PLUGINS.md — Sistema de plugins

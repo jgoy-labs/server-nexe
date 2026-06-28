@@ -5,7 +5,7 @@ id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Testing strategy and coverage for server-nexe 1.0.6. 6776 test functions collected (6991 total, 215 deselected), 0 failures in latest run. Tests collocated with modules. Covers test structure, running tests, honest actual coverage ~85% global, AI audit test fixes, crypto tests (68), MEM_DELETE e2e tests (8), automated mass test run results (AI-run), and honest assessment of testing limitations."
+abstract: "Testing strategy and coverage for server-nexe 1.0.6. 7165 test functions collected (7400 total, 235 deselected), 0 failures in latest run. Tests centralized in a single tests/ directory at the root that mirrors the module structure. Covers test structure, running tests, honest actual coverage ~85% global, AI audit test fixes, crypto tests (72), MEM_DELETE e2e tests (8), automated mass test run results (AI-run), and honest assessment of testing limitations."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mass-tests]
 chunk_size: 800
 priority: P2
@@ -23,15 +23,15 @@ expires: null
 
 | Metric | Value |
 |--------|-------|
-| Total test functions collected | **6776** |
-| Total test functions (incl. deselected) | **6991** (215 deselected by markers) |
-| Latest full run passed | 6776 |
+| Total test functions collected | **7165** |
+| Total test functions (incl. deselected) | **7400** (235 deselected by markers) |
+| Latest full run passed | 7165 |
 | Failed | 0 |
 | Skipped | 6 |
 | XFailed | 1 |
 | **Actual global coverage** | **~85%** (honest baseline, not inflated) |
 
-Note: 6776 functions collected in the standard run (excluding integration/e2e/slow markers). The raw total including deselected tests is 6991.
+Note: 7165 functions collected in the standard run (excluding integration/e2e/slow markers). The raw total including deselected tests is 7400.
 
 > **Honesty note on coverage:** Historical badges have reported 97.4%, 91.1% or 93% in specific mass-test phases. Those numbers correspond to specific subsets (a phase baseline, functional against a live server) and not to the project global. The **actual global code coverage**, measured with `pytest --cov` over the whole codebase, is **~85%**. That is the value we use as reference.
 >
@@ -39,20 +39,20 @@ Note: 6776 functions collected in the standard run (excluding integration/e2e/sl
 
 ## Test Structure
 
-Tests are collocated with their modules (not in a separate `tests/` root):
+All tests live in a single centralized `tests/` directory at the root that mirrors the module structure (they are not co-located inside `core/`, `plugins/`, `memory/` or `personality/`):
 
 ```
-core/endpoints/tests/       # Endpoint tests
-core/server/tests/          # Factory tests
-core/tests/                 # Core tests (crypto, lifespan)
-plugins/security/tests/     # Security plugin tests
-plugins/web_ui_module/tests/ # Web UI tests
-plugins/ollama_module/tests/ # Ollama tests
-memory/memory/tests/        # Memory module tests
-memory/rag/tests/           # RAG tests
-memory/embeddings/tests/    # Embeddings tests
-personality/module_manager/tests/ # Module manager tests
-tests/                      # Root integration tests
+tests/core/endpoints/       # Endpoint tests
+tests/core/server/          # Factory tests
+tests/core/                 # Core tests (crypto, lifespan)
+tests/plugins/security/     # Security plugin tests
+tests/plugins/web_ui_module/ # Web UI tests
+tests/plugins/ollama_module/ # Ollama tests
+tests/memory/memory/        # Memory module tests
+tests/memory/rag/           # RAG tests
+tests/memory/embeddings/    # Embeddings tests
+tests/personality/module_manager/ # Module manager tests
+tests/integration/          # Integration tests
 ```
 
 ## Running Tests
@@ -68,11 +68,11 @@ pytest --cov
 pytest -c pytest-full.ini
 
 # Specific module
-pytest plugins/security/tests/
+pytest tests/plugins/security/
 
 # CI-equivalent command
-pytest core memory personality plugins \
-  -m "not integration and not e2e and not slow" \
+pytest tests \
+  -m "not integration and not e2e and not slow and not gpu and not test_live" \
   --cov=core --cov=memory --cov=personality --cov=plugins \
   --cov-report=term --cov-report=xml:coverage.xml --tb=short -q
 ```
@@ -81,19 +81,19 @@ Root `conftest.py` provides shared fixtures. Each module can have its own `conft
 
 ## Crypto Tests (new in v0.9.0)
 
-68 tests added for the encryption at-rest system:
+72 tests added for the encryption at-rest system:
 
 | Test file | Tests | Covers |
 |-----------|-------|--------|
-| `core/tests/test_crypto.py` | 30 | CryptoProvider AES-256-GCM, key management, HKDF |
-| `core/tests/test_crypto_cli.py` | 8 | CLI commands (encrypt-all, export-key, status) |
-| `memory/memory/tests/test_persistence.py` (+9) | 9 | SQLCipher migration, encrypted persistence |
-| `plugins/web_ui_module/tests/test_session_manager.py` (+7) | 7 | Encrypted sessions (.json → .enc) |
+| `tests/core/test_crypto.py` | 34 | CryptoProvider AES-256-GCM, key management, HKDF |
+| `tests/core/test_crypto_cli.py` | 8 | CLI commands (encrypt-all, export-key, status) |
+| `tests/memory/memory/test_persistence.py` (+9) | 9 | SQLCipher migration, encrypted persistence |
+| `tests/plugins/web_ui_module/test_session_manager.py` (+7) | 7 | Encrypted sessions (.json → .enc) |
 | Lifespan integration tests | 14 | CryptoProvider end-to-end integration |
 
 ## MEM_DELETE e2e tests (v0.9.9)
 
-In v0.9.9, the MEM_DELETE fix (DELETE_THRESHOLD 0.70 → 0.20) brought an associated battery of **8 end-to-end tests** in `tests/integration/test_mem_delete_e2e.py`:
+In v0.9.9, the MEM_DELETE fix (DELETE_THRESHOLD 0.82 → 0.70 → 0.55 → 0.20, final value 0.20) brought an associated battery of **8 end-to-end tests** in `tests/integration/test_mem_delete_e2e.py`:
 
 - Real embedded Qdrant (not mocked)
 - Real fastembed ONNX (not mocked)
@@ -140,7 +140,7 @@ During the monolith split (chat.py, routes.py, tray.py, lifespan.py), closures w
 
 ### Test philosophy
 
-- Tests inside modules (collocated, not centralized)
+- Tests centralized in a `tests/` directory at the root that mirrors the module structure (not co-located)
 - Mocks for external services (Ollama) and embedded services (Qdrant embedded)
 - Real code paths for internal logic
 - CI-ready: all tests run in GitHub Actions
@@ -149,7 +149,7 @@ During the monolith split (chat.py, routes.py, tray.py, lifespan.py), closures w
 ## CI/CD
 
 GitHub Actions workflow (`.github/workflows/ci.yml`):
-- Python 3.12
+- Python 3.11
 - Install dependencies (requirements.txt only, no macOS-specific)
 - Run full test suite
 - Coverage badge generation
@@ -161,6 +161,6 @@ Linux CI works because `rumps` (macOS tray) is in `requirements-macos.txt` (not 
 - **Tested by the developer + autonomous AI audit sessions.** No third-party users yet. No external security audit.
 - **One real user** — server-nexe has only been used by the developer so far. There is no feedback from third-party users or battle-testing in production multi-user environments.
 - **AI audits are thorough but not exhaustive** — they find many issues but certainly miss others. **Actual global coverage is ~85%** (not 97%/91%/93% as shown in old badges: those numbers corresponded to phase subsets).
-- **Encryption tests are new** — 68 tests for the crypto system, but the system has not been through real production use yet.
+- **Encryption tests are new** — 72 tests for the crypto system, but the system has not been through real production use yet.
 - **Integration tests require local services** — Ollama must be running (Qdrant is embedded, no separate process needed). These are tested in development but not in CI.
 - **AI-generated tests 🎭 — read coverage with this caveat.** Tests are also written by AI under human direction (multi-model). Sample audits have been performed but **we cannot guarantee 100% there is no "test theatre"** (tests that pass without proving anything meaningful — trivial checks, mocks that always return the expected value, tautological assertions). 85% coverage with potential test theatre is worth less than 70% with robust tests. Future reviews (human or independent AI) may identify and rewrite them. In the meantime: treat tests as a **useful signal, not definitive proof** — a production bug may manifest even if tests pass.

@@ -79,19 +79,6 @@ class TestInterventionNode:
         }))
         assert result["threat_type"] == "jailbreak"
 
-    def test_execute_critical_severity(self):
-        result = asyncio.run(self.node.execute({
-            "threats": ["critical_threat"],
-            "severity": "critical"
-        }))
-        assert result["activated"] is True
-
-    def test_execute_low_severity(self):
-        result = asyncio.run(self.node.execute({
-            "threats": ["minor_threat"],
-            "severity": "low"
-        }))
-        assert result["activated"] is True
 
 
 class TestSanitizerNode:
@@ -132,6 +119,16 @@ class TestSanitizerNode:
         assert "severity" in output_names
         assert "threats" in output_names
         assert "clean_text" in output_names
+
+    def test_execute_keys_all_declared_in_metadata(self):
+        """B178: every key execute() returns must be declared as a NodeOutput in
+        the metadata (so introspection/UI sees the real contract). Mutation
+        'drop patterns_matched/text/user_message from outputs' → red."""
+        meta = self.node.get_metadata()
+        declared = {out.name for out in meta.outputs}
+        result = asyncio.run(self.node.execute({"text": "hi"}))
+        undeclared = set(result) - declared
+        assert not undeclared, f"execute() emits undeclared outputs: {undeclared}"
 
     def test_execute_safe_text(self):
         result = asyncio.run(self.node.execute({"text": "Hello, how are you?"}))

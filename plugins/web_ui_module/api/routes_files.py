@@ -189,7 +189,13 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         # SessionManager blocks them anyway, but via ValueError → 500.
         if session_id is not None and not session_mgr.is_valid_session_id(session_id):
             raise HTTPException(status_code=400, detail="Invalid session_id")
-        content = await file.read()
+        # MC-078: límit pre-read — no carregar tot el cos a memòria abans de
+        # validar la mida. read(MAX+1) atura la lectura; si excedeix → 413.
+        # (Mitiga el DoS de memòria; el límit de recepció total seria a uvicorn.)
+        from plugins.web_ui_module.core import file_handler as _fh
+        content = await file.read(_fh.MAX_FILE_SIZE + 1)
+        if len(content) > _fh.MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File too large")
 
         # Security (P1-4): speed-bump denylist for sensitive content patterns.
         # See _detect_sensitive_upload docstring for the design tradeoff.
@@ -288,8 +294,8 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
     @limiter.limit("5/minute")
     async def cleanup_files(request: Request, max_age_hours: int = 24, _auth=Depends(require_ui_auth)):
         """Clean up old files (default > 24h)"""
-        # MC-072 (confirmat reachable al red team RT-06): sense cota mínima,
-        # max_age_hours=0 o negatiu esborraria TOTS els uploads de l'usuari.
+        # MC-072 (confirmed reachable in red team RT-06): without a minimum bound,
+        # max_age_hours=0 or negative would delete ALL the user's uploads.
         if max_age_hours < 1:
             raise HTTPException(status_code=422, detail="max_age_hours must be >= 1")
         deleted = file_handler.cleanup_old_files(max_age_hours)

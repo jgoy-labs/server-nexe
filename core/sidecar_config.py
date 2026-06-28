@@ -72,6 +72,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from core.env_utils import parse_truthy as _parse_truthy
+
 
 # Required env vars when running as sidecar (NEXE_SIDECAR=1).
 # Tauri's spawn_sidecar_process injecta més (NEXE_HOME, NEXE_DATA_DIR, etc.)
@@ -122,11 +124,6 @@ _DEFAULT_PORT = 9119  # nosemgrep — server-nexe canonical port
 # TCP max are not valid network ports.
 _MIN_PORT = 1024   # nosemgrep — RFC IANA registered ports cutoff
 _MAX_PORT = 65535  # nosemgrep — RFC TCP/IP max port number
-
-# Truthy values for NEXE_SIDECAR (matches NexeSettings ENV bool parsing).
-# Case-insensitive, whitespace-stripped.
-_TRUTHY_VALUES = frozenset({"1", "true", "yes", "on", "y", "t"})
-
 
 class SidecarConfigError(RuntimeError):
     """Raised when SidecarConfig.from_env() detects an invalid environment.
@@ -206,16 +203,6 @@ def _resolve_port() -> int:
             f"[{_MIN_PORT}, {_MAX_PORT}]: {port}"
         )
     return port
-
-
-def _parse_truthy(value: Optional[str]) -> bool:
-    """Parse a string as truthy (1/true/yes/on/y/t, case-insensitive, stripped).
-
-    None → False. Empty → False. Anything else → False.
-    """
-    if value is None:
-        return False
-    return value.strip().lower() in _TRUTHY_VALUES
 
 
 def _resolve_cors_origins(is_sidecar: bool, port: int) -> tuple[str, ...]:

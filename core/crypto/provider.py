@@ -136,7 +136,3 @@ class CryptoProvider:
         ciphertext = data[NONCE_SIZE:]
         aesgcm = AESGCM(key)
         return aesgcm.decrypt(nonce, ciphertext, aad)
-
-    def derive_key_hex(self, purpose: str) -> str:
-        """Derive key and return as hex string (useful for SQLCipher PRAGMA key)."""
-        return self.derive_key(purpose).hex()

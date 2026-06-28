@@ -13,39 +13,11 @@ def client():
     return TestClient(app)
 
 
-class TestServeModulesUI:
-    def test_ui_not_found(self, client):
-        with patch("personality.module_manager.manifest.UI_PATH") as mock_path:
-            mock_index = MagicMock()
-            mock_index.exists.return_value = False
-            mock_path.__truediv__ = MagicMock(return_value=mock_index)
-            response = client.get("/modules/ui")
-        assert response.status_code == 200 or response.status_code == 404
-
-
 class TestModuleManagerHealth:
-    def test_health_healthy(self, client):
-        response = client.get("/modules/health")
-        assert response.status_code in (200, 500)
-
     def test_health_response_has_name(self, client):
         response = client.get("/modules/health")
         data = response.json()
         assert data["name"] == "module_manager"
-
-
-class TestModuleManagerInfo:
-    def test_info_returns_data(self, client):
-        response = client.get("/modules/info")
-        assert response.status_code in (200, 500)
-
-
-class TestListRegisteredModules:
-    def test_list_returns_modules(self, client):
-        response = client.get("/modules/list")
-        assert response.status_code in (200, 500)
-        data = response.json()
-        assert "modules" in data or "error" in data
 
 
 class TestGetRouterAndMetadata:

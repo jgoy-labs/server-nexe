@@ -26,23 +26,6 @@ from typing import Any, Optional, AsyncGenerator
 logger = logging.getLogger(__name__)
 
 # Helpers for engine detection
-def get_default_system_prompt():
-    """Read the system prompt from personality/server.toml if it exists."""
-    try:
-        import tomllib
-    except ImportError:
-        import tomli as tomllib  # type: ignore[no-redef]
-    
-    config_path = Path(__file__).parent.parent.parent / "personality" / "server.toml"
-    if config_path.exists():
-        try:
-            with open(config_path, "rb") as f:
-                data = tomllib.load(f)
-                return data.get("personality", {}).get("prompt", {}).get("system_prompt")
-        except Exception as e:
-            logger.debug("Failed to load system prompt: %s", e)
-    return "You are Nexe, a local AI assistant, precise and secure."
-
 def detect_engine() -> str:
     """
     Detect which engine is configured/available.
@@ -392,8 +375,13 @@ async def _chat_resolve_actual_engine(nexe_url: str, engine: str) -> str:
     """Best-effort query of /status to detect actual engine (e.g. fallback). Returns updated engine string."""
     try:
         import httpx
+        api_key = os.environ.get("NEXE_PRIMARY_API_KEY") or os.environ.get("NEXE_ADMIN_API_KEY")
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            headers["x-api-key"] = api_key
         async with httpx.AsyncClient() as http_client:
-            response = await http_client.get(f"{nexe_url}/status", timeout=5.0)
+            response = await http_client.get(f"{nexe_url}/status", timeout=5.0, headers=headers)
             if response.status_code == 200:
                 status = response.json()
                 actual_engine = status.get("engine", engine)

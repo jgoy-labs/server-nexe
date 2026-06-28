@@ -302,6 +302,7 @@ async def search_documents(
   filter_metadata: Optional[Dict[str, Any]] = None,
   include_expired: bool = False,
   text_store=None,
+  query_embedding: Optional[List[float]] = None,
 ) -> List[SearchResult]:
   """
   Search by semantic similarity.
@@ -316,11 +317,15 @@ async def search_documents(
     threshold: Minimum score (0-1)
     filter_metadata: Filter by metadata
     include_expired: Include expired documents
+    query_embedding: Precomputed query embedding; when provided the embedding
+      step is skipped (MC-001: callers fanning out over several collections
+      embed the shared query once).
 
   Returns:
     List[SearchResult]: Results sorted by similarity
   """
-  query_embedding = await generate_embedding(query)
+  if query_embedding is None:
+    query_embedding = await generate_embedding(query)
   loop = asyncio.get_running_loop()
   now_iso = datetime.now(timezone.utc).isoformat()
 

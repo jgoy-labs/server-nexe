@@ -43,6 +43,7 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = False
     use_rag: bool = True  # RAG enabled by default - searches nexe_documentation + personal_memory
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)  # Validated range
+    top_p: Optional[float] = Field(default=None, gt=0.0, le=1.0)  # Nucleus sampling (OpenAI-compat; gt=0 excludes the degenerate empty-nucleus value that engines treat divergently)
     max_tokens: Optional[int] = Field(default=None, ge=1, le=32000)  # Prevent DoS via huge values
 
     model_config = ConfigDict(protected_namespaces=())

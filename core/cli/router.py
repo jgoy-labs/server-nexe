@@ -74,9 +74,9 @@ DEFAULT_CLIS: Dict[str, CLIInfo] = {
   "memory": CLIInfo(
     alias="memory",
     module_name="memory",
-    entry_point="memory.memory.cli",
+    entry_point="memory.memory.memory_cli",
     description="Flat memory management and data ingestion",
-    commands=["store", "recall", "stats", "cleanup"],
+    commands=["store", "recall", "stats", "cleanup", "inspect", "search", "mirror", "gc"],
     framework="argparse",
     offline=True,
     quadrant="memory",

@@ -9,7 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from typing import Any, Optional
+import os
 
 from fastapi import Request
 from slowapi import Limiter
@@ -27,35 +27,26 @@ def get_i18n(request: Request):
     """
     return getattr(request.app.state, "i18n", None)
 
-try:
-  from plugins.security.core.rate_limiting import (
-    limiter_global,
-    limiter_by_key,
-    limiter_composite,
-    limiter_by_endpoint,
-    rate_limit_tracker,
-    start_rate_limit_cleanup_task,
-  )
-  ADVANCED_RATE_LIMITING = True
-except ImportError:
-  limiter_global = Limiter(key_func=get_remote_address)
-  limiter_by_key = None
-  limiter_composite = None
-  limiter_by_endpoint = None
-  rate_limit_tracker: Optional[Any] = None  # type: ignore[no-redef]  # ImportError fallback for the optional advanced rate limiter
-  start_rate_limit_cleanup_task: Optional[Any] = None  # type: ignore[no-redef]  # ImportError fallback for the optional advanced rate limiter
-  ADVANCED_RATE_LIMITING = False
-
-limiter = limiter_global
+# MC-103: the per-IP limiter is defined HERE, in core, with no import from
+# plugins. Previously core imported limiter_global from
+# plugins.security.core.rate_limiting (core→plugins, the wrong direction) and
+# plugins.security re-imported `limiter` back from core — a latent import cycle
+# hidden behind a try/except. The advanced limiters it pulled (by_key/composite/
+# by_endpoint) were dead wiring already removed in MC-123/124. This definition is
+# byte-equivalent to the old plugins one (same key_func/limits/storage/strategy),
+# so rate-limiting behaviour is unchanged; the dependency now flows plugins→core.
+limiter = Limiter(
+  key_func=get_remote_address,
+  default_limits=[os.getenv("NEXE_RATE_LIMIT_GLOBAL", "100/minute")],
+  storage_uri="memory://",
+  strategy="fixed-window",
+)
+# Only the per-IP limiter is enforced (via SlowAPIMiddleware). Kept as a named
+# constant because core/middleware.py imports it.
+ADVANCED_RATE_LIMITING = False
 
 __all__ = [
   'get_i18n',
   'limiter',
-  'limiter_global',
-  'limiter_by_key',
-  'limiter_composite',
-  'limiter_by_endpoint',
-  'rate_limit_tracker',
-  'start_rate_limit_cleanup_task',
   'ADVANCED_RATE_LIMITING',
 ]

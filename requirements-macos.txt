@@ -4,6 +4,9 @@
 # ─────────────────────────────────────────────────────────────
 
 # MLX Inference Engine (Apple Silicon only)
+# These pins MUST stay identical in installer_setup_env.py (runtime install),
+# build-wheels-bundle.sh (offline bundle) and check_cves_osv.py (CVE audit).
+# Cross-checked by tests/test_installer_mlx_pin_consistency.py (B069).
 mlx-lm==0.31.3
 mlx-vlm==0.4.4
 

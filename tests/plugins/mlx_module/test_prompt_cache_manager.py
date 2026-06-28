@@ -104,6 +104,25 @@ class TestMLXPromptCacheManager:
         assert prompt_cache is not None
         assert remaining == []
 
+    def test_insert_cache_snapshots_against_caller_mutation(self):
+        """B120: insert_cache must store an immutable snapshot. The post-prefill
+        save inserts cached_kv and then generation keeps mutating that SAME object
+        in place, so storing by reference left the prompt-only entry holding a
+        prompt+response cache (offset desync). Mutation 'CacheEntry(prompt_cache,
+        1)' (store by reference) → fetched sees the mutated 7 → red."""
+        mgr = MLXPromptCacheManager(max_size=4)
+
+        class _KV:
+            def __init__(self, offset):
+                self.offset = offset
+
+        cache = [_KV(3)]                      # prefill state: 3 tokens
+        mgr.insert_cache("m", [1, 2, 3], cache)
+        cache[0].offset = 7                   # generation extends the SAME object in place
+        fetched, remaining = mgr.fetch_nearest_cache("m", [1, 2, 3])
+        assert remaining == []
+        assert fetched[0].offset == 3         # snapshot at insert time, not the mutated 7
+
     def test_fetch_nearest_cache_shorter(self):
         """Test fetch with shorter prefix match."""
         mgr = MLXPromptCacheManager()

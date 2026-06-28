@@ -248,3 +248,54 @@ def test_fallback_path_when_data_dir_unset(
             / "onboarding.json"
         )
     assert OnboardingState._state_file() == expected
+
+
+# ── MC-022 / MC-043: persistable-engine consistency (latent KeyError mine) ──
+# `embedder` is a download-only auxiliary engine (fastembed); it must NEVER
+# become a persisted engine field. Before the fix, save() validated against
+# ONBOARDING_ENGINES (which includes 'embedder'), so an internal caller or a
+# hand-edited onboarding.json could plant engine='embedder' that load()
+# returned intact and apply_to_env() crashed on (KeyError -> uncaught at
+# lifespan startup). The persistable set must equal the resolver's domain.
+
+def test_save_rejects_embedder(tmp_data_dir: Path) -> None:
+    """save() rejects 'embedder' — it is download-only, never a persisted engine."""
+    with pytest.raises(ValueError, match="embedder"):
+        OnboardingState.save(
+            engine="embedder", model_id="x", model_path=str(tmp_data_dir / "x")
+        )
+
+
+def test_load_returns_none_for_non_persistable_engine(tmp_data_dir: Path) -> None:
+    """A hand-edited onboarding.json with a non-persistable engine loads as None
+    (graceful 'not onboarded'), never a poisoned state that crashes startup."""
+    path = tmp_data_dir / "onboarding.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": SCHEMA_VERSION,
+                "engine": "embedder",
+                "model_id": "x",
+                "model_path": "/tmp/x",
+                "completed_at": "2026-06-22T00:00:00+00:00",
+                "has_token": False,
+                "lang": "en",
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert OnboardingState.load() is None
+
+
+def test_apply_to_env_unknown_engine_raises_valueerror() -> None:
+    """Defense-in-depth: a state constructed directly with an unresolvable
+    engine raises a CLEAR ValueError, never an opaque KeyError (the mine)."""
+    state = OnboardingState(
+        version=SCHEMA_VERSION,
+        engine="embedder",
+        model_id="x",
+        model_path="/tmp/x",
+        completed_at="2026-06-22T00:00:00+00:00",
+    )
+    with pytest.raises(ValueError, match="embedder"):
+        state.apply_to_env()

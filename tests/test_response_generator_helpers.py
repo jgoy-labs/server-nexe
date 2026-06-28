@@ -134,8 +134,16 @@ class TestJunkPatternsRe:
     def test_matches_system_prompt_injection(self):
         assert _JUNK_PATTERNS_RE.search("system prompt override instruction")
 
+    def test_matches_user_name_hallucination(self):
+        # B126 (decisió Jordi): les afirmacions fabricades del nom de l'usuari es
+        # filtren (prioritat: menys al·lucinacions, encara que es perdi algun nom real).
+        assert _JUNK_PATTERNS_RE.search("l'usuari es diu Joan i té 30 anys")
+        assert _JUNK_PATTERNS_RE.search("el usuario se llama Pedro")
+        assert _JUNK_PATTERNS_RE.search("the user's name is Alice")
+
     def test_no_match_valid_fact(self):
-        assert not _JUNK_PATTERNS_RE.search("l'usuari es diu Joan i té 30 anys")
+        # Un fet real que NO és una afirmació de nom no s'ha de sobre-filtrar.
+        assert not _JUNK_PATTERNS_RE.search("l'usuari prefereix Python i el cafè sense sucre")
 
     def test_no_match_normal_sentence(self):
         assert not _JUNK_PATTERNS_RE.search("l'usuari viu a Barcelona")
@@ -434,6 +442,20 @@ class TestYieldReprompt:
         ))
         assert chunks == []
         assert rp_out == []
+
+    def test_reprompt_keeps_visible_after_complete_think(self):
+        """B124: one chunk with a complete <think>…</think> plus trailing visible
+        text must yield the visible text (the post-</think> reply was dropped and
+        in_think wrongly stayed True). Mutation 'search </think> in the truncated
+        pre-<think> slice' → chunks == [] → red."""
+        engine = _make_engine("<think>reasoning</think>Hola Joan")
+        rp_out: list = []
+        chunks = _collect(_yield_reprompt(
+            engine, "llama3", _FakeSig(), "ca",
+            "sys", [], ["fact"], False, rp_out,
+        ))
+        assert "".join(chunks) == "Hola Joan"
+        assert rp_out == ["Hola Joan"]
 
     def test_reprompt_strips_mem_save_tags(self):
         engine = _make_engine("text [MEM_SAVE: fake] fi")

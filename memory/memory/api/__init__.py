@@ -438,6 +438,7 @@ class MemoryAPI:
     threshold: float = 0.0,
     filter_metadata: Optional[Dict[str, Any]] = None,
     include_expired: bool = False,
+    query_embedding: Optional[List[float]] = None,
   ) -> List[SearchResult]:
     """
     Search by semantic similarity.
@@ -449,6 +450,9 @@ class MemoryAPI:
       threshold: Minimum score (0-1)
       filter_metadata: Filter by metadata
       include_expired: Include expired documents
+      query_embedding: Precomputed query embedding; when provided the
+        embedding step is skipped (MC-001: embed a shared query once when
+        fanning out over several collections).
 
     Returns:
       List[SearchResult]: Results sorted by similarity
@@ -477,7 +481,18 @@ class MemoryAPI:
       filter_metadata,
       include_expired,
       text_store=self._text_store,
+      query_embedding=query_embedding,
     )
+
+  async def embed_query(self, text: str) -> List[float]:
+    """Generate the (L2-normalized) embedding for a search query.
+
+    Public entry point so callers that fan out several searches for the same
+    query can embed it once and pass it back via search(query_embedding=...)
+    instead of recomputing it per collection (MC-001).
+    """
+    self._ensure_initialized()
+    return await self._generate_embedding(text)
 
   async def get(self, doc_id: str, collection: str) -> Optional[Document]:
     """Get a document by ID."""

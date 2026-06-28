@@ -15,6 +15,8 @@ import stat
 import tempfile
 from pathlib import Path
 
+from core.env_utils import parse_truthy
+
 logger = logging.getLogger(__name__)
 
 KEYRING_SERVICE = "server-nexe"
@@ -40,14 +42,6 @@ def _resolve_key_file_path() -> Path:
     return _resolve_key_file_dir() / "master.key"
 
 
-# Backward-compat constants (evaluated at import-time). The
-# nous defaults dels paràmetres `path`/`key_file_path` resolen dinàmicament
-# via _resolve_key_file_path() per respectar canvis runtime de NEXE_SIDECAR_DIR
-# (cas tests + cas multi-instància).
-KEY_FILE_DIR = _resolve_key_file_dir()
-KEY_FILE_PATH = KEY_FILE_DIR / "master.key"
-
-
 def _is_sidecar() -> bool:
     """True when running as the bundled Tauri sidecar (NEXE_SIDECAR=1).
 
@@ -58,7 +52,9 @@ def _is_sidecar() -> bool:
     The `master.key` file is the durable anchor; the keyring is only a mirror,
     so dropping it in sidecar mode loses no durability.
     """
-    return os.environ.get("NEXE_SIDECAR") == "1"
+    # MC-087: same truthy parsing as SidecarConfig.is_sidecar (1/true/yes/...),
+    # so a non-"1" spelling can't half-enable sidecar mode (CRY-01 vs CSP skew).
+    return parse_truthy(os.environ.get("NEXE_SIDECAR"))
 
 
 def _try_keyring_get() -> bytes | None:
@@ -104,18 +100,39 @@ def _try_env_get() -> bytes | None:
 
 
 def _try_file_get(path: Path | None = None) -> bytes | None:
-    """Try to retrieve master key from file. Default path resolved dynamically."""
+    """Try to retrieve master key from file. Default path resolved dynamically.
+
+    Fail-closed on present-but-unreadable (B043): if the file EXISTS but
+    read_bytes() raises (I/O error, permission flip, fcntl lock, NFS/iCloud
+    stall), we MUST NOT swallow it and return None. The caller treats None as
+    "key absent" and generates a brand-new key, which derives a different
+    SQLCipher DEK and quarantines the existing encrypted DB as .unrecoverable-*
+    (silent data loss). A present-but-unreadable key is a transient/permission
+    fault, not an absent key, so re-raise and refuse to continue. This mirrors
+    the write path, which already fails closed (see get_or_create_master_key).
+
+    Distinct cases:
+    - absent (not path.exists())               → return None (legit first boot)
+    - present but read_bytes() raises (OSError) → raise (fail-closed)  [B043]
+    - present, readable, wrong length          → warn + None (corrupt content,
+                                                  separate decision; kept as-is)
+    """
     if path is None:
         path = _resolve_key_file_path()
     if not path.exists():
         return None
     try:
         key = path.read_bytes()
-        if len(key) == KEY_SIZE:
-            return key
-        logger.warning("Key file %s has wrong length (%d bytes)", path, len(key))
-    except Exception as e:
-        logger.debug("Key file read failed: %s", e)
+    except OSError as e:
+        raise RuntimeError(
+            f"Master key file {path} exists but is unreadable ({e}). Refusing "
+            "to continue: treating it as absent would generate a new key and "
+            "quarantine the existing encrypted database. Fix the file "
+            "permissions / release the lock / let the sync settle, then restart."
+        ) from e
+    if len(key) == KEY_SIZE:
+        return key
+    logger.warning("Key file %s has wrong length (%d bytes)", path, len(key))
     return None
 
 

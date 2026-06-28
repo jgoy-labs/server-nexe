@@ -1,4 +1,4 @@
-// InstallerWizardView.swift — Navegació entre pantalles del wizard
+// InstallerWizardView.swift — Navigation between wizard screens
 
 import SwiftUI
 import Combine
@@ -20,7 +20,7 @@ struct InstallerWizardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Barra de progrés del wizard + botó cancel
+            // Wizard progress bar + cancel button
             HStack {
                 WizardProgressBar(currentStep: currentStep)
 
@@ -41,7 +41,7 @@ struct InstallerWizardView: View {
             Divider()
                 .padding(.top, 12)
 
-            // Contingut de la pantalla actual
+            // Content of the current screen
             Group {
                 switch currentStep {
                 case .welcome:
@@ -80,7 +80,7 @@ struct InstallerWizardView: View {
         }
         .alert(t("btn_cancel"), isPresented: $showCancelAlert) {
             Button(t("btn_cancel"), role: .destructive) {
-                // B172: atura el subprocés d'instal·lació abans de tancar, perquè no quedi orfe.
+                // B172: stop the install subprocess before closing, so it doesn't become an orphan.
                 engine.cancelInstall()
                 NSApplication.shared.terminate(nil)
             }
@@ -120,7 +120,7 @@ struct InstallerWizardView: View {
     }
 }
 
-// MARK: - Pantalla de confirmació (resum descàrregues + avís quarantena)
+// MARK: - Confirmation screen (download summary + quarantine notice)
 
 struct ConfirmView: View {
     @EnvironmentObject var engine: InstallerEngine
@@ -146,7 +146,7 @@ struct ConfirmView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 500)
 
-            // Resum del que es descarregarà
+            // Summary of what will be downloaded
             VStack(alignment: .leading, spacing: 10) {
                 if let model = engine.selectedModel {
                     DownloadItem(
@@ -180,7 +180,7 @@ struct ConfirmView: View {
             .cornerRadius(10)
             .padding(.horizontal, 40)
 
-            // Avís quarantena
+            // Quarantine notice
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "shield.lefthalf.filled")
                     .foregroundColor(.orange)
@@ -193,7 +193,7 @@ struct ConfirmView: View {
 
             Spacer()
 
-            // Botons
+            // Buttons
             HStack {
                 Button(t("btn_back")) { onBack() }
                     .controlSize(.large)
@@ -240,7 +240,7 @@ struct DownloadItem: View {
     }
 }
 
-// MARK: - Barra de progrés visual
+// MARK: - Visual progress bar
 
 struct WizardProgressBar: View {
     let currentStep: WizardStep

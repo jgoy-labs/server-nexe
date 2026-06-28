@@ -515,20 +515,3 @@ class TestCleanupExpired:
 
 # ─── TestGetMetrics ───────────────────────────────────────────────────────────
 
-class TestGetMetrics:
-
-    def test_returns_none_when_import_fails(self):
-        import memory.memory.api.documents as docs_module
-        # Reset cached metrics
-        docs_module._metrics_imported = False
-        docs_module._MEMORY_OPERATIONS = None
-        docs_module._MEMORY_STORE_SIZE = None
-
-        with patch("memory.memory.api.documents._metrics_imported", False):
-            with patch.dict("sys.modules", {"core.metrics.registry": None}):
-                # Reset again
-                docs_module._metrics_imported = False
-                ops, size = docs_module._get_metrics()
-                # Either None or valid depending on import
-                # Just check it doesn't crash
-                assert ops is None or ops is not None

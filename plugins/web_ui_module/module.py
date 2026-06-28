@@ -79,9 +79,9 @@ class WebUIModule:
             if self._initialized:
                 return True
 
-            # Short-circuit declaratiu — si manifest té
-            # `disabled_in_sidecar=true` i `SidecarConfig.is_sidecar=True`,
-            # NO carreguem el mòdul (la UI la serveix Tauri host).
+            # Declarative short-circuit — if the manifest has
+            # `disabled_in_sidecar=true` and `SidecarConfig.is_sidecar=True`,
+            # we do NOT load the module (the UI is served by the Tauri host).
             if self._is_disabled_in_sidecar():
                 logger.info(
                     "WebUIModule: disabled_in_sidecar=true and is_sidecar=True; "

@@ -37,10 +37,10 @@ from pathlib import Path
 BUNDLE_PINS: list[tuple[str, str]] = [
     ("torch", "2.11.0"),
     ("torchvision", "0.26.0"),
-    ("mlx-lm", "0.31.2"),
+    ("mlx-lm", "0.31.3"),
     ("mlx-vlm", "0.4.4"),
     ("llama-cpp-python", "0.3.19"),
-    # transformers is transitive; we audit the version mlx-lm 0.31.2 resolves.
+    # transformers is transitive; we audit the version mlx-lm 0.31.3 resolves.
     # Pinned manually after empirical check (pip show transformers).
     ("transformers", "5.8.1"),
 ]

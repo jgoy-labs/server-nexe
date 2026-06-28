@@ -100,12 +100,6 @@ class TestCryptoProvider:
         key2 = crypto.derive_key("sqlite")
         assert key1 is key2  # same object from cache
 
-    def test_derive_key_hex(self):
-        crypto = CryptoProvider(master_key=os.urandom(32))
-        hex_key = crypto.derive_key_hex("sqlite")
-        assert len(hex_key) == 64  # 32 bytes = 64 hex chars
-        bytes.fromhex(hex_key)  # should not raise
-
     def test_encrypt_with_purpose(self):
         crypto = CryptoProvider(master_key=os.urandom(32))
         plaintext = b"cross-purpose test"

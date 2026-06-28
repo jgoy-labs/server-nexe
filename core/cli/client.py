@@ -138,7 +138,11 @@ class NexeClient:
       }
 
     modules_data = self._request("GET", "/modules")
-    modules = modules_data.get("modules", []) if not modules_data.get("error") else []
+    if not modules_data.get("error"):
+      data = modules_data.get("data", {})
+      modules = [{"name": m, "state": "LOADED"} for m in data.get("modules_loaded", [])]
+    else:
+      modules = []
 
     return {
       "url": self.config.server_url,
@@ -159,15 +163,6 @@ class NexeClient:
     """
     return self._request("GET", "/health")
 
-  def get_modules(self) -> Dict[str, Any]:
-    """
-    Get list of modules from server.
-
-    Returns:
-      Modules data dict
-    """
-    return self._request("GET", "/ui-control/api/modules")
-
   def chat(self, message: str) -> Dict[str, Any]:
     """
     Send chat message to server.
@@ -179,12 +174,3 @@ class NexeClient:
       Chat response dict
     """
     return self._request("POST", "/api/chat", {"message": message})
-
-_client_instance: Optional[NexeClient] = None
-
-def get_client() -> NexeClient:
-  """Get singleton client instance."""
-  global _client_instance
-  if _client_instance is None:
-    _client_instance = NexeClient()
-  return _client_instance

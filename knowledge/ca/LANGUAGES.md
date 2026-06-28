@@ -5,7 +5,7 @@ id: nexe-languages
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Com server-nexe gestiona els idiomes: detecta l'idioma de cada missatge de l'usuari (uns 75 idiomes, deteccio offline amb lingua) i respon en aquest mateix idioma, no en l'idioma d'instal-lacio (NEXE_LANG). Explica el pipeline de deteccio i la directiva de resposta, el paper de NEXE_LANG com a reserva, i el comportament en missatges curts o canvis d'idioma. Documenta la correccio del bug pel qual fins a la 1.0.5 responia sempre en l'idioma fix d'instal-lacio (per defecte catala)."
+abstract: "Com server-nexe gestiona els idiomes: detecta l'idioma de cada missatge de l'usuari (uns 75 idiomes, deteccio offline amb lingua) i respon en aquest mateix idioma, no en l'idioma d'instal-lacio (NEXE_LANG). Explica el pipeline de deteccio i la directiva de resposta, el paper de NEXE_LANG com a reserva, i el comportament en missatges curts o canvis d'idioma. Documenta la correccio del bug pel qual fins a la 1.0.4 responia sempre en l'idioma fix d'instal-lacio (per defecte catala); la deteccio automatica es va afegir a la 1.0.5."
 tags: [idiomes, llengua, language, i18n, multilingue, deteccio, lingua, nexe-lang, multi-idioma]
 chunk_size: 600
 priority: P2
@@ -43,4 +43,4 @@ Si el missatge és massa curt o ambigu (per exemple "ok", "gràcies") o és nom�
 ## Notes
 
 - **Canvi d'idioma a mig diàleg:** pots canviar d'idioma quan vulguis i Nexe s'adapta. Dins d'una conversa ja iniciada en un idioma, el canvi pot costar una mica més (l'historial de la conversa influeix); si vols un canvi net, obre una conversa nova.
-- **Correcció (1.0.5):** fins a la versió 1.0.5, Nexe responia sempre en l'idioma fix d'instal·lació (per defecte català) encara que l'usuari escrivís en un altre idioma. Aquest comportament es va **corregir a la 1.0.5** amb la detecció automàtica de l'idioma del missatge.
+- **Correcció (1.0.5):** fins a la versió 1.0.4, Nexe responia sempre en l'idioma fix d'instal·lació (per defecte català) encara que l'usuari escrivís en un altre idioma. Aquest comportament es va **corregir a la 1.0.5** amb la detecció automàtica de l'idioma del missatge.

@@ -14,7 +14,6 @@ Description: Unit tests for installer.download_verify — post-download SHA256
 
 from __future__ import annotations
 
-import json
 import logging
 import subprocess
 from pathlib import Path
@@ -25,135 +24,12 @@ import pytest
 
 from installer.download_verify import (
     DownloadIntegrityError,
-    get_ollama_digest,
     verify_download_integrity,
 )
 
 
 _VALID_HEX = "0" * 64
 _OTHER_HEX = "f" * 64
-
-
-# ════════════════════════════════════════════════════════════════════════
-# get_ollama_digest
-# ════════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture
-def fake_ollama_bin(tmp_path: Path) -> Path:
-    """Drop a dummy executable so shutil.which / Path.is_file both match."""
-    bin_ = tmp_path / "ollama"
-    bin_.write_text("#!/bin/sh\nexit 0\n")
-    bin_.chmod(0o755)
-    return bin_
-
-
-def _run(stdout: str = "", returncode: int = 0, stderr: str = "") -> subprocess.CompletedProcess:
-    return subprocess.CompletedProcess(
-        args=["ollama", "show", "--json", "m"],
-        returncode=returncode,
-        stdout=stdout,
-        stderr=stderr,
-    )
-
-
-def test_get_ollama_digest_reads_details_digest(fake_ollama_bin: Path) -> None:
-    payload = {"details": {"digest": _VALID_HEX, "family": "gemma"}}
-    with patch("installer.download_verify.subprocess.run") as run:
-        run.return_value = _run(stdout=json.dumps(payload))
-        digest = get_ollama_digest("gemma3:4b", ollama_bin=str(fake_ollama_bin))
-    assert digest == _VALID_HEX
-
-
-def test_get_ollama_digest_strips_sha256_prefix(fake_ollama_bin: Path) -> None:
-    payload = {"details": {"digest": f"sha256:{_VALID_HEX}"}}
-    with patch("installer.download_verify.subprocess.run") as run:
-        run.return_value = _run(stdout=json.dumps(payload))
-        digest = get_ollama_digest("gemma3:4b", ollama_bin=str(fake_ollama_bin))
-    assert digest == _VALID_HEX
-
-
-def test_get_ollama_digest_legacy_schema(fake_ollama_bin: Path) -> None:
-    # Older Ollama emits {"digest": "..."} at the top level.
-    payload = {"digest": _VALID_HEX}
-    with patch("installer.download_verify.subprocess.run") as run:
-        run.return_value = _run(stdout=json.dumps(payload))
-        digest = get_ollama_digest("m", ollama_bin=str(fake_ollama_bin))
-    assert digest == _VALID_HEX
-
-
-def test_get_ollama_digest_missing_binary(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    caplog.set_level(logging.WARNING, logger="installer.download_verify")
-    # Path pointing to a file that does not exist.
-    missing = tmp_path / "ollama-missing"
-    digest = get_ollama_digest("gemma3:4b", ollama_bin=str(missing))
-    assert digest is None
-    assert any("ollama binary not found" in rec.getMessage() for rec in caplog.records)
-
-
-def test_get_ollama_digest_nonzero_returncode(
-    fake_ollama_bin: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    caplog.set_level(logging.WARNING, logger="installer.download_verify")
-    with patch("installer.download_verify.subprocess.run") as run:
-        run.return_value = _run(stdout="", returncode=1, stderr="model not found")
-        digest = get_ollama_digest("unknown", ollama_bin=str(fake_ollama_bin))
-    assert digest is None
-    assert any("returned" in rec.getMessage() for rec in caplog.records)
-
-
-def test_get_ollama_digest_invalid_json(
-    fake_ollama_bin: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    caplog.set_level(logging.WARNING, logger="installer.download_verify")
-    with patch("installer.download_verify.subprocess.run") as run:
-        run.return_value = _run(stdout="not json")
-        digest = get_ollama_digest("m", ollama_bin=str(fake_ollama_bin))
-    assert digest is None
-
-
-def test_get_ollama_digest_timeout(
-    fake_ollama_bin: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    caplog.set_level(logging.WARNING, logger="installer.download_verify")
-    with patch("installer.download_verify.subprocess.run") as run:
-        run.side_effect = subprocess.TimeoutExpired(cmd="ollama", timeout=10)
-        digest = get_ollama_digest("m", ollama_bin=str(fake_ollama_bin))
-    assert digest is None
-
-
-def test_get_ollama_digest_no_digest_field(
-    fake_ollama_bin: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    caplog.set_level(logging.WARNING, logger="installer.download_verify")
-    payload = {"details": {"family": "gemma"}}  # no digest
-    with patch("installer.download_verify.subprocess.run") as run:
-        run.return_value = _run(stdout=json.dumps(payload))
-        digest = get_ollama_digest("m", ollama_bin=str(fake_ollama_bin))
-    assert digest is None
-    assert any("no details.digest" in rec.getMessage() for rec in caplog.records)
-
-
-def test_get_ollama_digest_non_string_digest_legacy(
-    fake_ollama_bin: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    """Some Ollama builds historically emitted ``digest`` as a structured
-    object (dict/list) — treat any non-string as legacy, never crash."""
-    caplog.set_level(logging.WARNING, logger="installer.download_verify")
-    for bogus in (
-        {"details": {"digest": {"algo": "sha256", "hex": _VALID_HEX}}},
-        {"details": {"digest": ["sha256", _VALID_HEX]}},
-        {"details": {"digest": 42}},
-    ):
-        with patch("installer.download_verify.subprocess.run") as run:
-            run.return_value = _run(stdout=json.dumps(bogus))
-            digest = get_ollama_digest("m", ollama_bin=str(fake_ollama_bin))
-        assert digest is None
-    assert any(
-        "non-string digest" in rec.getMessage() for rec in caplog.records
-    )
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -312,58 +188,56 @@ def test_verify_mlx_mismatch_includes_mlx_retry(
 
 
 # ════════════════════════════════════════════════════════════════════════
-# verify_download_integrity — Ollama (subprocess)
+# verify_download_integrity — Ollama (content-addressed, ADR B251)
 # ════════════════════════════════════════════════════════════════════════
 
 
-def test_verify_ollama_legacy_when_daemon_missing(
+def test_verify_ollama_short_circuits_to_true(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    caplog.set_level(logging.WARNING)
-    bin_ = tmp_path / "ollama-missing"
-    # Ollama binary absent → digest is None → legacy behaviour, not a raise.
-    result = verify_download_integrity(
-        "ollama", "gemma3:4b", tmp_path, ollama_bin=str(bin_)
-    )
-    assert result is False
-
-
-def test_verify_ollama_pinned_matches(
-    tmp_path: Path, fake_ollama_bin: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    digest_hex = _VALID_HEX
-    payload = {"details": {"digest": digest_hex}}
-    monkeypatch.setitem(
-        __import__("installer.installer_catalog_data", fromlist=["MODEL_WEIGHT_SHA256"]).MODEL_WEIGHT_SHA256,
-        ("ollama", "gemma3:4b"),
-        digest_hex,
-    )
-    with patch("installer.download_verify.subprocess.run") as run:
-        run.return_value = _run(stdout=json.dumps(payload))
-        result = verify_download_integrity(
-            "ollama", "gemma3:4b", tmp_path, ollama_bin=str(fake_ollama_bin)
-        )
+    """Ollama integrity is delegated to its content-addressed pull (ADR B251):
+    verify_download_integrity short-circuits to True with an info log, never
+    raises, and ignores any catalog pin (tags are mutable upstream)."""
+    caplog.set_level(logging.INFO, logger="installer.download_verify")
+    result = verify_download_integrity("ollama", "gemma3:4b", tmp_path)
     assert result is True
+    assert any(
+        "content-addressed pull" in rec.getMessage() for rec in caplog.records
+    )
 
 
-def test_verify_ollama_pinned_mismatch_raises(
-    tmp_path: Path, fake_ollama_bin: Path, monkeypatch: pytest.MonkeyPatch
+def test_verify_ollama_ignores_any_catalog_pin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    observed = _VALID_HEX
+    """Even if a stale digest lingers in MODEL_WEIGHT_SHA256, Ollama is never
+    compared against it — no false DownloadIntegrityError on a mutable tag."""
     monkeypatch.setitem(
         __import__("installer.installer_catalog_data", fromlist=["MODEL_WEIGHT_SHA256"]).MODEL_WEIGHT_SHA256,
         ("ollama", "gemma3:4b"),
-        _OTHER_HEX,
+        _OTHER_HEX,  # a digest that would mismatch reality, were it ever read
     )
-    with patch("installer.download_verify.subprocess.run") as run:
-        run.return_value = _run(stdout=json.dumps({"details": {"digest": observed}}))
-        with pytest.raises(DownloadIntegrityError) as excinfo:
-            verify_download_integrity(
-                "ollama", "gemma3:4b", tmp_path, ollama_bin=str(fake_ollama_bin)
-            )
-    msg = str(excinfo.value)
-    assert "ollama rm gemma3:4b" in msg
-    assert "ollama pull gemma3:4b" in msg
+    # Must not raise; short-circuits to True regardless of the pin.
+    assert verify_download_integrity("ollama", "gemma3:4b", tmp_path) is True
+
+
+def test_verify_ollama_never_runs_subprocess(tmp_path: Path) -> None:
+    """The dead `ollama show --json` path is gone — verify must not shell out."""
+    with patch("subprocess.run") as run:
+        result = verify_download_integrity("ollama", "gemma3:4b", tmp_path)
+    assert result is True
+    run.assert_not_called()
+
+
+def test_download_verify_has_no_ollama_show_machinery() -> None:
+    """Import-level guard: the dead `ollama show --json` code is fully removed
+    (B251). A future re-introduction of get_ollama_digest / subprocess / shutil
+    in this module must fail this test, not silently revive the no-op verify."""
+    import installer.download_verify as dv
+    assert not hasattr(dv, "get_ollama_digest")
+    assert not hasattr(dv, "_run_ollama_show")
+    assert not hasattr(dv, "_parse_ollama_digest")
+    assert "subprocess" not in vars(dv)
+    assert "shutil" not in vars(dv)
 
 
 # ════════════════════════════════════════════════════════════════════════
@@ -398,7 +272,8 @@ def test_verify_download_integrity_accepts_every_catalog_pair(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Every (engine, model_id) from the catalog is dispatched without raising.
-    Pins are forced to None so only the dispatch path is exercised with stub files."""
+    Pins are forced to None so only the dispatch path is exercised with stub
+    files: MLX/GGUF → unpinned False; Ollama → content-addressed True (B251)."""
     from installer.installer_catalog_data import iter_catalog_model_ids
     from installer import installer_catalog_data
     # Force all pins to None so stub files don't trigger hash mismatch
@@ -406,13 +281,17 @@ def test_verify_download_integrity_accepts_every_catalog_pair(
         installer_catalog_data, "MODEL_WEIGHT_SHA256",
         {k: None for k in installer_catalog_data.MODEL_WEIGHT_SHA256},
     )
+    # Also clear tier-2 provider pins (ADR B046b) so the MLX dispatch path stays
+    # "unpinned → False" rather than entering MLX per-file verification.
+    monkeypatch.setattr(
+        installer_catalog_data, "_load_provider_pins",
+        lambda: {"mlx_file_hashes": {}},
+    )
     file_target = tmp_path / "f.gguf"
     file_target.write_bytes(b"x")
     dir_target = tmp_path / "snap"
     dir_target.mkdir()
     (dir_target / "config.json").write_bytes(b"{}")
-
-    bin_missing = tmp_path / "ollama-none"  # ensures Ollama path short-circuits
 
     for engine, model_id in iter_catalog_model_ids():
         target: Any
@@ -422,7 +301,7 @@ def test_verify_download_integrity_accepts_every_catalog_pair(
             target = dir_target
         else:
             target = tmp_path
-        result = verify_download_integrity(
-            engine, model_id, target, ollama_bin=str(bin_missing)
-        )
-        assert result is False, (engine, model_id)
+        result = verify_download_integrity(engine, model_id, target)
+        # ADR B251: Ollama is content-addressed → True; MLX/GGUF unpinned → False.
+        expected = engine == "ollama"
+        assert result is expected, (engine, model_id)

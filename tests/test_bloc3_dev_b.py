@@ -16,18 +16,36 @@ _ROOT = Path(__file__).parent.parent
 # Bug 12 — Double module discovery at startup
 # ═══════════════════════════════════════════════════════════════════════════
 
-def test_bug12_discover_has_early_return_for_known_modules():
-    """The source of discover() must contain the early return for Bug 12."""
-    import inspect
-    from personality.module_manager.discovery import ModuleDiscovery
+def test_bug12_resolve_force_flag_returns_none_for_known_modules(monkeypatch):
+    """Outside the pytest/test runtime, _resolve_force_flag(force=False) with a
+    non-empty modules dict must return the early-return sentinel None, so the
+    caller skips a second discovery pass (Bug 12)."""
+    from unittest.mock import MagicMock
 
-    source = inspect.getsource(ModuleDiscovery.discover)
-    assert "Module discovery skipped" in source, (
-        "Bug 12: early return sense implementar"
-    )
-    assert "_resolve_force_flag" in source, (
-        "Bug 12: early return delegat a _resolve_force_flag"
-    )
+    from personality.data.models import ModuleInfo, ModuleState
+    from personality.module_manager.discovery import ModuleDiscovery
+    from personality.module_manager.types import DiscoveryConfig
+
+    # Remove the test-mode env shortcuts so the production branch is exercised.
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("NEXE_ENV", raising=False)
+
+    discovery = ModuleDiscovery(DiscoveryConfig(
+        path_discovery=MagicMock(),
+        config_manager=MagicMock(),
+        events=MagicMock(),
+    ))
+
+    modules = {
+        "known": ModuleInfo(
+            name="known",
+            path="/fake/known",
+            manifest_path="known.toml",
+            state=ModuleState.DISCOVERED,
+        ),
+    }
+
+    assert discovery._resolve_force_flag(False, modules) is None
 
 
 # ═══════════════════════════════════════════════════════════════════════════

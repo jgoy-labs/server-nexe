@@ -239,14 +239,16 @@ class RAGSearchNode(Node):
         top_k=top_k
       )
       results = await rag_source.search(request)
-      # Apply score threshold filtering
-      results = [r for r in results if r.get("score", 1.0) >= score_threshold]
+      # Apply score threshold filtering. search() returns List[SearchHit]
+      # (a Pydantic model, B115) — access by attribute, never dict.get().
+      results = [r for r in results if r.score >= score_threshold]
 
       context_chunks = []
       for i, result in enumerate(results, 1):
-        text = result.get("text", "")
-        score = result.get("score", 0.0)
-        file_path = result.get("metadata", {}).get("file_path", "unknown")
+        text = result.text
+        score = result.score
+        # metadata is a plain dict on SearchHit, so .get() is correct here.
+        file_path = result.metadata.get("file_path", "unknown")
 
         context_chunks.append(
           f"[{i}] (score: {score:.2f}, file: {file_path})\n{text}"

@@ -128,70 +128,18 @@ class OllamaClient:
             return False
 
     async def ensure_ollama_running(self):
-        """Start Ollama if it is installed but not running. macOS + Linux."""
-        import shutil
-        import subprocess
-        import platform
+        """Start Ollama if it is installed but not running. macOS + Linux.
 
-        httpx = _parent().httpx
-        if httpx is None:
-            return
+        MC-028: delegates to the centralised :mod:`ollama_runtime` (single read
+        point for NEXE_OLLAMA_BIN + the headless bundle binary); we still keep a
+        reference to the spawned process so :meth:`reap_process` can reap it at
+        shutdown. ``wait=True`` preserves this call site's readiness wait.
+        """
+        from plugins.ollama_module.core.ollama_runtime import ensure_ollama_running
 
-        # Check if already running
-        try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(f"{self.base_url}/api/tags")
-                if resp.status_code == 200:
-                    logger.info("Ollama already running at %s", self.base_url)
-                    return
-        except Exception:  # nosec B110: best-effort connection probe; on failure fall through to start-Ollama path
-            pass
-
-        # Not running — attempt to start
-        is_macos = platform.system() == "Darwin"
-
-        # Bug Ollama GUI (2026-04-06) — we always prefer headless `ollama serve`.
-        # Previously we used `open -a Ollama` which launches the full GUI (Dock + window)
-        # and constantly bothers the user. The serve binary lives inside the
-        # Ollama.app bundle and can be invoked directly without raising the GUI.
-        macos_ollama_bin = os.getenv("NEXE_OLLAMA_BIN") or "/Applications/Ollama.app/Contents/Resources/ollama"
-        if is_macos and os.path.exists(macos_ollama_bin):
-            try:
-                self._ollama_process = subprocess.Popen(  # nosec B603: macos_ollama_bin is hardcoded absolute path "/Applications/Ollama.app/Contents/Resources/ollama"; literal `serve`
-                    [macos_ollama_bin, "serve"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    start_new_session=True,  # Don't die with the parent process
-                )
-                logger.info("ollama serve started headless from Ollama.app bundle (macOS)")
-            except Exception as e:
-                logger.warning("Could not start ollama serve from bundle: %s", e)
-        elif shutil.which("ollama"):
-            try:
-                self._ollama_process = subprocess.Popen(  # nosec B603 B607: literal `ollama serve` argv; ollama via PATH (mono-user local — equivalent to running it manually)
-                    ["ollama", "serve"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    start_new_session=True  # Don't die with the parent process
-                )
-                logger.info("ollama serve started automatically")
-            except Exception as e:
-                logger.warning("Could not start ollama serve: %s", e)
-        else:
-            logger.info("Ollama not installed — skipping auto-start")
-            return
-
-        # Wait until ready (max 15s)
-        import asyncio
-        for i in range(15):
-            await asyncio.sleep(1)
-            try:
-                async with httpx.AsyncClient(timeout=2.0) as client:
-                    resp = await client.get(f"{self.base_url}/api/tags")
-                    if resp.status_code == 200:
-                        logger.info("Ollama ready after %ds", i + 1)
-                        return
-            except Exception:  # nosec B110: best-effort readiness retry loop; loop exit logs the warning below
-                pass
-        logger.warning("Ollama started but not responding after 15s")
+        process = await ensure_ollama_running(self.base_url, wait=True)
+        if process is not None:
+            self._ollama_process = process
 
     def reap_process(self) -> None:
         """Non-blocking reap of the Ollama process started by us.

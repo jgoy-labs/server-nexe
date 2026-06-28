@@ -22,8 +22,15 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_BASE_URL = os.getenv("NEXE_OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 OLLAMA_HEALTH_TIMEOUT = float(os.getenv('NEXE_OLLAMA_HEALTH_TIMEOUT', '5.0'))
+
+
+def _ollama_base_url() -> str:
+    # MC-089: resolve at call time via the shared cascade (SidecarConfig →
+    # NEXE_OLLAMA_HOST → OLLAMA_HOST → default), not NEXE_OLLAMA_HOST-only at
+    # import time. Function-level import keeps core off the layering graph.
+    from core.ollama_utils import resolve_ollama_url
+    return resolve_ollama_url()
 
 
 async def get_health_async() -> Dict[str, Any]:
@@ -39,9 +46,10 @@ async def get_health_async() -> Dict[str, Any]:
             "error": "httpx not installed (pip install httpx)"
         }
 
+    base_url = _ollama_base_url()
     try:
         async with httpx.AsyncClient(timeout=min(OLLAMA_HEALTH_TIMEOUT, 3.0)) as client:
-            response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+            response = await client.get(f"{base_url}/api/tags")
             response.raise_for_status()
             data = response.json()
             models = data.get("models", [])
@@ -50,16 +58,16 @@ async def get_health_async() -> Dict[str, Any]:
                 "status": "HEALTHY",
                 "connected": True,
                 "models_count": len(models),
-                "base_url": OLLAMA_BASE_URL
+                "base_url": base_url
             }
     except httpx.ConnectError:
-        logger.warning("Ollama not reachable at %s", OLLAMA_BASE_URL)
+        logger.warning("Ollama not reachable at %s", base_url)
         return {
             "name": "ollama_module",
             "status": "UNHEALTHY",
             "connected": False,
             "error": "Cannot connect to Ollama (not running?)",
-            "base_url": OLLAMA_BASE_URL
+            "base_url": base_url
         }
     except Exception as e:
         logger.error("Ollama health check failed: %s", e)
@@ -68,7 +76,7 @@ async def get_health_async() -> Dict[str, Any]:
             "status": "ERROR",
             "connected": False,
             "error": str(e),
-            "base_url": OLLAMA_BASE_URL
+            "base_url": base_url
         }
 
 

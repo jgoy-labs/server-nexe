@@ -25,9 +25,9 @@ ENABLED_MSG = "Encryption at rest: ENABLED"
 
 
 def test_crypto_enabled_logs_encryption_at_rest(caplog):
-    """Amb encriptació activa: es fixa el provider i es loga el missatge ENABLED."""
+    """With encryption active: the provider is set and the ENABLED message is logged."""
     server_state = SimpleNamespace(crypto_provider=None)
-    # CryptoProvider és un import LOCAL dins _apply_crypto_provider → patch al mòdul origen.
+    # CryptoProvider is a LOCAL import inside _apply_crypto_provider → patch at the source module.
     with patch("core.crypto.CryptoProvider", return_value=MagicMock()) as mock_cp:
         with caplog.at_level(logging.INFO, logger="core.lifespan_crypto"):
             _apply_crypto_provider(
@@ -42,9 +42,9 @@ def test_crypto_enabled_logs_encryption_at_rest(caplog):
 
 
 def test_no_sqlcipher_does_not_log_enabled(caplog):
-    """Sense SQLCipher (auto): banner plaintext, MAI el missatge ENABLED."""
+    """Without SQLCipher (auto): plaintext banner, NEVER the ENABLED message."""
     server_state = SimpleNamespace(crypto_provider=None)
-    # format_plaintext_startup_banner també és import LOCAL → patch al mòdul origen.
+    # format_plaintext_startup_banner is also a LOCAL import → patch at the source module.
     with patch(
         "core.crypto.format_plaintext_startup_banner",
         return_value="PLAINTEXT-WARNING-BANNER",

@@ -11,6 +11,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from .tray_alerts import _ForegroundContext, _front_alert
+
 
 def _format_bytes(b):
     """Format bytes as human-readable string."""
@@ -91,101 +93,6 @@ def remove_login_items() -> bool:
         return True
     except Exception:
         return False
-
-
-NS_STATUS_WINDOW_LEVEL = 25  # above any normal app window
-
-
-class _ForegroundContext:
-    """Context manager that promotes the tray to .regular for an entire alert
-    flow and returns it to .accessory (menubar only) on exit. Done ONCE to
-    avoid interfering with the modal event loop between alerts (the cause of
-    alerts being 'skipped' — activation policy flip-flop).
-    """
-    def __init__(self):
-        self.old_policy = None
-
-    def __enter__(self):
-        try:
-            from AppKit import NSApp, NSApplicationActivationPolicyRegular
-            self.old_policy = NSApp.activationPolicy()
-            NSApp.setActivationPolicy_(NSApplicationActivationPolicyRegular)
-            NSApp.activateIgnoringOtherApps_(True)
-        except Exception:  # nosec B110: best-effort AppKit activation policy promotion; non-fatal if AppKit unavailable
-            pass
-        return self
-
-    def __exit__(self, *exc):
-        if self.old_policy is not None:
-            try:
-                from AppKit import NSApp
-                NSApp.setActivationPolicy_(self.old_policy)
-            except Exception:  # nosec B110: best-effort AppKit activation policy restore on context exit; non-fatal
-                pass
-
-
-def _front_alert_rumps_fallback(title, message, ok, cancel, other):
-    """Fallback path when AppKit is unavailable: delegate to rumps.alert."""
-    import rumps
-    kwargs = {}
-    if title is not None:
-        kwargs["title"] = title
-    if message is not None:
-        kwargs["message"] = message
-    if ok is not None:
-        kwargs["ok"] = ok
-    if cancel is not None:
-        kwargs["cancel"] = cancel
-    if other is not None:
-        kwargs["other"] = other
-    return rumps.alert(**kwargs)
-
-
-def _build_nsalert(title, message, ok, cancel, other):
-    """Construct and configure an NSAlert with buttons."""
-    from AppKit import NSAlert, NSAlertStyleWarning
-    alert = NSAlert.alloc().init()
-    if title is not None:
-        alert.setMessageText_(str(title))
-    if message is not None:
-        alert.setInformativeText_(str(message))
-    alert.setAlertStyle_(NSAlertStyleWarning)
-    alert.addButtonWithTitle_(str(ok) if ok is not None else "OK")
-    if cancel is not None:
-        alert.addButtonWithTitle_(str(cancel))
-    if other is not None:
-        alert.addButtonWithTitle_(str(other))
-    return alert
-
-
-def _nsalert_response_to_int(response):
-    """Convert NSAlertFirstButtonReturn=1000, Second=1001, Third=1002 to ints."""
-    if response == 1000:
-        return 1
-    elif response == 1001:
-        return 0
-    elif response == 1002:
-        return -1
-    return response
-
-
-def _front_alert(title=None, message=None, ok=None, cancel=None, other=None, **_):
-    """Show an always-on-top NSAlert.
-
-    Assumes activation policy is ALREADY promoted to .regular (via
-    _ForegroundContext in the caller). Only raises window level and calls
-    runModal. Return compat with rumps: 1 (OK) / 0 (Cancel) / -1 (Other).
-    """
-    try:
-        alert = _build_nsalert(title, message, ok, cancel, other)
-    except Exception:
-        return _front_alert_rumps_fallback(title, message, ok, cancel, other)
-
-    window = alert.window()
-    window.setLevel_(NS_STATUS_WINDOW_LEVEL)
-    window.makeKeyAndOrderFront_(None)
-
-    return _nsalert_response_to_int(alert.runModal())
 
 
 def _uninstall_confirm_dialogs(install_dir: Path, t_func) -> tuple:
@@ -300,7 +207,15 @@ def _uninstall_remove_system_entries(removed, failed):
 
 
 def _uninstall_remove_install_dir(install_dir: Path, removed, failed):
-    """Schedule removal of install_dir via a detached shell script."""
+    """Schedule removal of install_dir via a detached shell script.
+
+    B151: install_dir holds the running tray app + venv, so it cannot be removed
+    synchronously here — a detached script waits for the app to exit, then
+    rm -rf. The actual rm therefore happens AFTER this returns; a successful
+    Popen only means the script was launched, not that the directory is gone.
+    Report it as *scheduled* (not confirmed-removed): claiming removal would be a
+    lie if the detached rm later fails (it writes /tmp/nexe_uninstall_{ok,failed}).
+    """
     cleanup_script = f"""#!/bin/bash
 sleep 2
 rm -rf "{install_dir}" && touch /tmp/nexe_uninstall_ok || touch /tmp/nexe_uninstall_failed
@@ -312,7 +227,7 @@ rm -rf "{install_dir}" && touch /tmp/nexe_uninstall_ok || touch /tmp/nexe_uninst
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        removed.append(str(install_dir))
+        removed.append(f"{install_dir} (scheduled for removal on exit)")
     except Exception:
         failed.append(str(install_dir))
 

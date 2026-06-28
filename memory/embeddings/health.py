@@ -16,7 +16,8 @@ import structlog
 from personality.i18n import get_i18n
 from memory.shared.health_helpers import (
   check_module_initialized as _shared_check_module_initialized,
-  aggregate_health_checks
+  aggregate_health_checks,
+  check_paths_writable
 )
 
 logger = structlog.get_logger()
@@ -143,36 +144,15 @@ def check_cache_directories() -> Dict[str, Any]:
     from core.paths import get_repo_root
     cache_dir = get_repo_root() / "storage" / "vectors" / "embeddings" / "cache" / "l2"
 
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
-    test_file = cache_dir / ".write_test"
-    try:
-      test_file.write_text("test")
-      test_file.unlink()
-      writable = True
-    except Exception:
-      writable = False
-
-    if writable:
-      return {
-        "name": "cache_directories",
-        "status": "pass",
-        "message": get_i18n().t(
-          "embeddings.health.cache_writable",
-          "Cache directory writable: {path}",
-          path=str(cache_dir)
-        )
-      }
-    else:
-      return {
-        "name": "cache_directories",
-        "status": "fail",
-        "message": get_i18n().t(
-          "embeddings.health.cache_not_writable",
-          "Cache directory not writable: {path}",
-          path=str(cache_dir)
-        )
-      }
+    return check_paths_writable(
+      check_name="cache_directories",
+      paths=[cache_dir],
+      i18n_prefix="embeddings.health",
+      writable_key="cache_writable",
+      writable_text="Cache directory writable: {path}",
+      not_writable_key="cache_not_writable",
+      not_writable_text="Cache directory not writable: {path}"
+    )
 
   except Exception as e:
     return {

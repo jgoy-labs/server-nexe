@@ -16,6 +16,8 @@ import logging
 import os
 from pathlib import Path
 
+from core.env_utils import parse_truthy
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,6 +72,7 @@ async def load_memory_modules(app, server_state, _translate):
         msg = _translate(server_state.i18n, "core.server.memory_error",
             "Error loading Memory modules: {error}", error=str(e))
         logger.error(msg, exc_info=True)
+        server_state.degraded_modules.append("memory")  # MC-122: surface fail-open in banner
 
 
 async def initialize_plugin_modules(app, server_state):
@@ -99,10 +102,13 @@ async def initialize_plugin_modules(app, server_state):
                         plugin_modules.pop(module_name, None)
                         # Note: plugin_modules is a reference to app.state.modules,
                         # so this also cleans up app.state.modules automatically
+                        server_state.degraded_modules.append(module_name)  # MC-122
                 except Exception as e:
                     logger.error(f"Failed to initialize {module_name}: {e}", exc_info=True)
+                    server_state.degraded_modules.append(module_name)  # MC-122
     except Exception as e:
         logger.error(f"Error during plugin initialization: {e}", exc_info=True)
+        server_state.degraded_modules.append("plugins")  # MC-122
 
 
 def _auto_ingest_is_disabled(nexe_env: str, auto_ingest_enabled: bool) -> bool:
@@ -160,7 +166,17 @@ async def auto_ingest_knowledge(server_state):
         # fallback a os.getenv per backward-compat. Reconstruim la string `nexe_env`
         # només per al log (vegeu _auto_ingest_is_disabled).
         # in sidecar mode use SidecarConfig.auto_ingest_knowledge
-        auto_ingest_enabled = os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE", "true").lower() == "true"
+        #
+        # MC-086: el default DIVERGENT per mode és INTENCIONAL, NO un descuit —
+        # NO l'unifiquis flipejant aquesta línia a "false":
+        #   · standalone (aquesta línia)        → default ON  (l'usuari corre el
+        #     seu propi server amb la seva knowledge/ → auto-ingest és comoditat)
+        #   · sidecar (l'app Tauri, línia 172-173) → default OFF (l'onboarding de
+        #     l'app controla la ingesta explícitament)
+        # Aquí només s'unifica el PARSEIG (parse_truthy, MC-088), no el default.
+        # FOLLOW-UP: quan arribi el plugin multiusuari, replantejar l'auto-ingest
+        # com a consentiment per-usuari (opt-in explícit), com el patró de B247.
+        auto_ingest_enabled = parse_truthy(os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE", "true"))
         try:
             from core.sidecar_config import get_sidecar_config
             cfg = get_sidecar_config()
@@ -394,6 +410,20 @@ async def start_memory_service_v1(app, server_state) -> None:
                         "DreamingCycle and vector sync."
                     )
                 else:
+                    # B112: give recall() the SAME embedder singleton so
+                    # MemoryService.recall() runs semantic vector search (not
+                    # just recency). Best-effort — never block startup.
+                    try:
+                        ms.set_embedder(embedder)
+                        logger.info(
+                            "MemoryService.recall() semantic search enabled "
+                            "(embedder injected)"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "set_embedder failed (recall stays recency-only): %s",
+                            e,
+                        )
                     dreaming = DreamingCycle(
                         store=ms._store,
                         vector_index=ms._vector_index,

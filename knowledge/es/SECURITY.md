@@ -5,7 +5,7 @@ id: nexe-security-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Seguridad de server-nexe 1.0.6: autenticacion dual-key, rate limiting (incl. PATCH thinking 10/min y NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectores de inyeccion, 47 patrones jailbreak, cabeceras OWASP, logging RFC5424, encriptacion AES-256-GCM en reposo (SQLCipher, sesiones .enc), MEK fallback order (file->keyring->env->generate), sanitizacion RAG injection (_filter_rag_injection). Todo local, cero llamadas externas."
+abstract: "Seguridad de server-nexe 1.0.6: autenticacion dual-key, rate limiting (incl. PATCH thinking 10/min y NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectores de inyeccion, 49 patrones jailbreak, cabeceras OWASP, logging RFC5424, encriptacion AES-256-GCM en reposo (SQLCipher, sesiones .enc), MEK fallback order (file->keyring->env->generate), sanitizacion RAG injection (_filter_rag_injection). Todo local, cero llamadas externas."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
 chunk_size: 600
 priority: P1
@@ -23,7 +23,7 @@ expires: null
 
 - [Autenticacion](#autenticacion)
 - [Rate Limiting](#rate-limiting)
-  - [Endpoints API (configurables via `.env`)](#endpoints-api-configurables-via-env)
+  - [Endpoints API (límites fijados en el código)](#endpoints-api-limites-fijados-en-el-codigo)
   - [Endpoints Web UI (fijos por endpoint)](#endpoints-web-ui-fijos-por-endpoint)
 - [Cabeceras de seguridad (OWASP)](#cabeceras-de-seguridad-owasp)
 - [Validacion de entrada](#validacion-de-entrada)
@@ -60,24 +60,23 @@ server-nexe 1.0.6 esta disenado para entornos locales de confianza. Todos los da
 - Validacion: `secrets.compare_digest()` (comparacion segura contra timing attacks)
 - Cabecera: `X-API-Key`
 
-**Token bootstrap:** Token de configuracion inicial generado al arrancar. Entropia de 256 bits, persistente en SQLite, TTL de 30 minutos. Regeneracion solo desde localhost.
+**Token bootstrap:** Token de configuracion inicial generado al arrancar. Entropia de 128 bits, persistente en SQLite, TTL de 30 minutos. Regeneracion solo desde localhost.
 
 ## Rate Limiting
 
 El rate limiting se aplica a **todos los endpoints** — tanto la API (`/v1/*`) como la Web UI (`/ui/*`).
 
-### Endpoints API (configurables via `.env`)
+### Endpoints API (límites fijados en el código)
 
-| Variable | Por defecto | Endpoints |
-|----------|-------------|-----------|
-| NEXE_RATE_LIMIT_CHAT | 20/min | /v1/chat/completions |
-| NEXE_RATE_LIMIT_MEMORY | 30/min | /v1/memory/* (nota: `/v1/memory/search` esta hardcoded a **60/min** en `memory/memory/api/v1.py`) |
-| NEXE_RATE_LIMIT_RAG | 30/min | /v1/rag/* (stubs, devuelven 501) |
-| NEXE_RATE_LIMIT_UPLOAD | 5/min | /ui/upload |
-| NEXE_RATE_LIMIT_DEFAULT | 120/min | Resto de endpoints |
-| NEXE_RATE_LIMIT_GLOBAL | 100/min | Limite global |
+| Endpoint | Límite | Dónde |
+|----------|--------|-------|
+| /v1/chat/completions | 20/min | hardcoded en `core/endpoints/chat.py` |
+| /v1/memory/store | 30/min | hardcoded en `memory/memory/api/v1.py` |
+| /v1/memory/search | 60/min | hardcoded en `memory/memory/api/v1.py` |
+| /v1/rag/* | — | stubs, devuelven 501 |
+| /ui/upload | 5/min | hardcoded en `plugins/web_ui_module/api/routes_files.py` |
 
-**Nota:** Estas variables estan reservadas para implementacion futura. Los limites actuales estan configurados en el codigo fuente.
+**Nota:** Los límites por endpoint de arriba están fijados en el código fuente (decorador `@limiter.limit()`), **no** son configurables via `.env`. Las únicas variables de entorno que se leen realmente son `NEXE_RATE_LIMIT_GLOBAL` (por defecto 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) y `NEXE_RATE_LIMIT_HEALTH` (1000/min) — ver `plugins/security/core/rate_limiting.py` y `core/dependencies.py`. Las variables `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` solo aparecen comentadas en `.env.example` y el código no las lee (reservadas para implementación futura).
 
 ### Endpoints Web UI (fijos por endpoint)
 
@@ -145,7 +144,7 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 
 **Normalizacion Unicode:** Los 6 detectores aplican `unicodedata.normalize('NFKC', text)` antes del pattern matching. Esto previene bypasses mediante homoglifos Unicode o variaciones de codificacion (p. ej., caracteres fullwidth, formas compuestas vs descompuestas).
 
-**47 patrones de jailbreak** en `plugins/security/sanitizer/`: Pattern matching multilingue para intentos de inyeccion de prompt.
+**49 patrones de jailbreak** en `plugins/security/sanitizer/`: Pattern matching multilingue para intentos de inyeccion de prompt.
 
 **Neutralizacion de tags RAG injection** (`_filter_rag_injection`, v0.9.9): en ingest y retrieval, el sistema **neutraliza tags de control** que podrian manipular la memoria por rebote:
 
@@ -172,7 +171,7 @@ Esto forma parte de la correccion de MEM_DELETE de v0.9.9 (ver RAG.md). Se aplic
 
 ## Encriptacion en reposo (default `auto`)
 
-**Anadida en v0.9.0, default `auto` desde v0.9.2.** La encriptacion en reposo se activa automaticamente si `sqlcipher3` esta disponible (modo `auto`). Ha sido probada (68 tests) pero aun no ha pasado por uso en produccion con usuarios reales fuera del desarrollo.
+**Anadida en v0.9.0, default `auto` desde v0.9.2.** La encriptacion en reposo se activa automaticamente si `sqlcipher3` esta disponible (modo `auto`). Ha sido probada (72 tests) pero aun no ha pasado por uso en produccion con usuarios reales fuera del desarrollo.
 
 ### CryptoProvider
 

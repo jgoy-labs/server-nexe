@@ -109,10 +109,14 @@ class CodeChunker(BaseChunker):
       raw_chunks = self._chunk_by_indentation(text)
 
     chunks: List[Chunk] = []
+    search_from = 0
     for idx, (chunk_text, chunk_meta) in enumerate(raw_chunks):
-      start = text.find(chunk_text)
+      # B116: keep a cursor (like TextChunker) so chunks with identical text
+      # (homonymous helpers) don't all get the char_start of the first occurrence.
+      start = text.find(chunk_text, search_from)
       if start == -1:
-        start = 0
+        start = search_from
+      search_from = start + len(chunk_text)
 
       chunk = Chunk.create(
         text=chunk_text,

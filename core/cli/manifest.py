@@ -68,13 +68,11 @@ async def cli_info():
         "Dynamic CLI discovery via manifest.toml",
         "Subprocess execution for isolation",
         "Offline mode support",
-        "Web UI at /ui-control/clis",
         "API at /ui-control/api/clis"
       ],
       "path": str(MODULE_PATH),
       "clis_available": len(clis),
       "cli_list": [c.alias for c in clis],
-      "ui_path": "/ui-control/clis",
       "api_path": "/ui-control/api/clis"
     })
   except Exception as e:
@@ -107,8 +105,7 @@ MODULE_METADATA = {
   "router": router_public,
   "prefix": "/cli",
   "tags": ["cli", "terminal", "commands"],
-  "ui_available": True,
-  "ui_path": "/ui-control/clis",
+  "ui_available": False,
   "quadrant": "core",
   "type": "core"
 }

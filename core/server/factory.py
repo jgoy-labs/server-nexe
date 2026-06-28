@@ -16,6 +16,8 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from core.env_utils import parse_truthy
+
 from fastapi import FastAPI
 
 from .helpers import translate
@@ -80,11 +82,11 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
       _cache_project_root = None
 
     # fail-fast validation in sidecar mode (NEXE_SIDECAR=1)
-    # SidecarConfig.from_env() valida SIDECAR_REQUIRED_ENV_VARS i llança
-    # SidecarConfigError si manca alguna crítica. Capturar aquí evita un
-    # error críptic més tard al lifespan (p.ex. CORS preflight fallant
-    # sense saber per què).
-    if os.environ.get("NEXE_SIDECAR") == "1":
+    # SidecarConfig.from_env() validates SIDECAR_REQUIRED_ENV_VARS and raises
+    # SidecarConfigError if a critical one is missing. Catching here avoids a
+    # cryptic error later in the lifespan (e.g. CORS preflight failing
+    # without knowing why).
+    if parse_truthy(os.environ.get("NEXE_SIDECAR")):  # MC-087: unified truthy parsing
       try:
         from core.sidecar_config import get_sidecar_config
         _sidecar_cfg = get_sidecar_config()

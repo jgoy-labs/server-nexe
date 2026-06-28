@@ -38,7 +38,7 @@ class HealthResponse(BaseModel):
   status: str = Field(..., description="Health status")
   message: str = Field(..., description="Health message")
   version: str = Field(..., description="System version")
-  uptime: str = Field(..., description="System uptime")
+  uptime: str = Field(..., description="Whole seconds since server startup")
 
   model_config = ConfigDict(
     json_schema_extra={
@@ -46,7 +46,7 @@ class HealthResponse(BaseModel):
         "status": "operational",
         "message": "Basic server operational",
         "version": "1.0.6",
-        "uptime": "operational"
+        "uptime": "3600"
       }
     }
   )
@@ -62,7 +62,7 @@ class ApiInfoResponse(BaseModel):
   name: str = Field(..., description="API name")
   version: str = Field(..., description="API version")
   description: str = Field(..., description="API description")
-  endpoints: List[EndpointInfo] = Field(..., description="Available endpoints")
+  endpoints: List[EndpointInfo] = Field(..., description="A representative subset of public endpoints (not exhaustive; full schema is gated)")
 
   model_config = ConfigDict(
     json_schema_extra={
