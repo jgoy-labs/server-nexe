@@ -42,9 +42,11 @@
 
 ---
 
-> **v1.0.6 — Security hardening.** Server Nexe now ships as a Tauri v2 desktop application with onboarding wizard, system tray, and automatic sidecar management. Available as **macOS DMG** (Apple Silicon) and **Linux AppImage** (ARM64). See [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
+> **v1.0.7 — Memory & collections fixes, Windows ARM64 support.** Server Nexe now ships as a Tauri v2 desktop application with onboarding wizard, system tray, and automatic sidecar management. Available as **macOS DMG** (Apple Silicon), **Linux AppImage** (ARM64), and **Windows ARM64 installer** (unsigned — SmartScreen warns). See [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
 >
 > **Linux note:** tested on Ubuntu 24.04 ARM64 virtual machines (UTM). CPU inference (Ollama) verified. If you test on native hardware or with GPU acceleration, please [open an issue](https://github.com/jgoy-labs/server-nexe/issues) with your results.
+>
+> **Windows note:** Windows ARM64 is supported since v1.0.7. The NSIS installer is unsigned — SmartScreen will warn: choose "More info" → "Run anyway". The installer handles WebView2; the app then installs Ollama (the inference engine on Windows) automatically on first run, from the onboarding wizard.
 
 ---
 
@@ -54,7 +56,7 @@
 - [Screenshots](#screenshots)
 - [Why Server Nexe?](#why-server-nexe)
 - [Quick Start](#quick-start)
-  - [Option A: Desktop App (macOS / Linux)](#option-a-desktop-app-macos--linux)
+  - [Option A: Desktop App (macOS / Linux / Windows)](#option-a-desktop-app-macos--linux--windows)
   - [Option B: Command Line](#option-b-command-line)
   - [Option C: Headless (servers, scripts, CI)](#option-c-headless-servers-scripts-ci)
 - [Backends](#backends)
@@ -79,7 +81,7 @@ Server Nexe started as a learning-by-doing experiment: *"What would it take to h
 
 **This entire project — code, tests, audits, documentation — has been built by one person orchestrating different AI models**, both local (MLX, Ollama) and cloud (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), as collaborators. The human decides what to build, designs the architecture, reviews lines and runs tests. The AIs write, audit, and stress-test under human direction.
 
-What began as a prototype has turned into a genuinely useful product: 7165 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
+What began as a prototype has turned into a genuinely useful product: 7694 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
 
 This is not trying to compete with ChatGPT or Claude. But it can be complementary for less demanding tasks. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with AI as co-pilot, music, and stubbornness.
 
@@ -143,7 +145,7 @@ Auto-discovered plugins with independent manifests. Security, web UI, RAG, backe
 <td width="50%">
 
 ### Desktop App
-Tauri v2 desktop application for macOS (DMG) and Linux (AppImage). Onboarding wizard detects your hardware, picks the right backend, recommends models for your RAM, and gets you running in minutes. System tray, native menus, and automatic sidecar management.
+Tauri v2 desktop application for macOS (DMG), Linux (AppImage), and Windows ARM64 (installer, since v1.0.7). Onboarding wizard detects your hardware, picks the right backend, recommends models for your RAM, and gets you running in minutes. System tray, native menus, and automatic sidecar management.
 
 </td>
 </tr>
@@ -157,7 +159,7 @@ Upload `.txt`, `.md` or `.pdf` and they're automatically indexed for RAG. Each d
 <td width="50%">
 
 ### Built to Grow
-7165 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
+7694 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
 
 </td>
 </tr>
@@ -165,14 +167,15 @@ Upload `.txt`, `.md` or `.pdf` and they're automatically indexed for RAG. Each d
 
 ## Quick Start
 
-### Option A: Desktop App (macOS / Linux)
+### Option A: Desktop App (macOS / Linux / Windows)
 
 Download the latest package from **[Releases](https://github.com/jgoy-labs/server-nexe/releases/latest)**:
 
 | Platform | Package | Size |
 |----------|---------|------|
-| macOS (Apple Silicon) | `nexe-app_1.0.6_aarch64.dmg` | ~1.3 GB |
-| Linux (ARM64) | `nexe-app_1.0.6_aarch64.AppImage` | ~1.2 GB |
+| macOS (Apple Silicon) | `nexe-app_1.0.7_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.7_aarch64.AppImage` | ~1.2 GB |
+| Windows (ARM64) | `nexe-app_1.0.7_arm64-setup.exe` (unsigned — SmartScreen warns) | ~1.3 GB |
 
 The onboarding wizard handles everything: hardware detection, backend selection, model download, and configuration. The app runs server-nexe as a sidecar process with system tray integration.
 
@@ -197,7 +200,8 @@ nexe status             # system status
 ### Option C: Headless (servers, scripts, CI)
 
 ```bash
-python -m installer.install_headless --backend ollama --model qwen3.5:latest
+# Config is passed as JSON on stdin — keys: model_key (a catalog key) and engine
+echo '{"model_key": "qwen35_4b", "engine": "ollama"}' | python -m installer.install_headless
 nexe go
 ```
 
@@ -218,19 +222,19 @@ nexe go
 |---------|----------|----------|
 | **MLX** | macOS (Apple Silicon) | Recommended for Mac — native Metal GPU acceleration, fastest on M-series |
 | **llama.cpp** | macOS / Linux | Universal — GGUF format, Metal on Mac, CPU/CUDA on Linux |
-| **Ollama** | macOS / Linux | Bridge to existing Ollama installations, easiest model management |
+| **Ollama** | macOS / Linux / Windows | Bridge to existing Ollama installations, easiest model management — the engine on Windows (installed automatically) |
 
 The installer auto-detects your hardware and recommends the best backend. You can switch anytime in `personality/server.toml`.
 
 ## Available Models by RAM Tier
 
-The installer organizes the 15 catalog models by the RAM available on your machine (4 tiers):
+The installer organizes the 14 catalog models by the RAM available on your machine (4 tiers):
 
 | Tier | Models | Origin |
 |------|--------|--------|
 | **8 GB** | Qwen3.5 4B | Alibaba |
 | **16 GB** | Qwen3.5 9B, Qwen3.5 4B (8-bit), Gemma 4 E4B, Mistral Nemo 12B, Salamandra 7B | Alibaba, Alibaba, Google, Mistral AI, BSC/AINA |
-| **24 GB** | Qwen3.5 27B, Gemma 4 31B, Mistral Small 3.2 24B, GPT-OSS 20B | Alibaba, Google, Mistral AI, OpenAI |
+| **24 GB** | Qwen3.5 27B, Mistral Small 3.2 24B, GPT-OSS 20B | Alibaba, Mistral AI, OpenAI |
 | **32 GB** | Qwen3.5 35B-A3B, Gemma 4 31B, Mixtral 8x7B, DeepSeek R1 32B, ALIA-40B | Alibaba, Google, Mistral AI, DeepSeek, BSC (Barcelona Supercomputing Center) |
 
 In addition, you can use any Ollama model by name or any GGUF model from Hugging Face.
@@ -332,30 +336,37 @@ Server Nexe includes a security module enabled by default:
 | macOS 13 Ventura or earlier | **Not supported** since v0.9.9 (requires macOS 14 Sonoma+) | — |
 | Linux ARM64 | **Supported** — AppImage + Ollama, tested on VM | Ollama |
 | Linux x86_64 | **Supported** (Ollama, CPU) — unit tests pass | Ollama, llama.cpp |
-| Windows | In development (no public ETA) | — |
+| Windows ARM64 | **Supported** (v1.0.7) — unsigned installer, SmartScreen warns | Ollama |
 
-> Since v0.9.9, server-nexe requires **macOS 14 Sonoma+ with Apple Silicon (M1 or later)**. The pre-built wheels in the DMG are `arm64` exclusive. Linux is supported with the Ollama backend (CPU). Tested on Ubuntu 24.04 ARM64 VM. Native hardware validation on the roadmap.
+> Since v0.9.9, server-nexe requires **macOS 14 Sonoma+ with Apple Silicon (M1 or later)**. The pre-built wheels in the DMG are `arm64` exclusive. Linux is supported with the Ollama backend (CPU). Tested on Ubuntu 24.04 ARM64 VM. Native hardware validation on the roadmap. Windows ARM64 is supported since v1.0.7: the installer is unsigned (SmartScreen warns — "More info" → "Run anyway") and sets up WebView2; the app then installs Ollama automatically on first run.
 
 ## Requirements
 
-| | Minimum | Recommended |
+RAM and disk are the same across platforms (they depend on the model you pick, not the OS). OS, CPU/arch and the available inference backend differ:
+
+| | macOS | Linux | Windows |
+|---|---|---|---|
+| **OS** | 14 Sonoma+ | Ubuntu 24.04+ (tested on VM) | 11 ARM64 (since v1.0.7) |
+| **CPU / arch** | Apple Silicon (M1+) | x86_64 or ARM64 | ARM64 |
+| **Inference backend** | MLX + llama.cpp + Ollama | Ollama (+ llama.cpp on x86_64) | Ollama only |
+| **Extra native deps** | — (bundled) | WebKitGTK 4.1 | WebView2 (installer handles it) |
+
+| Common (all platforms) | Minimum | Recommended |
 |---|---------|-------------|
-| **OS** | macOS 14 Sonoma (Apple Silicon only) | macOS 14+ (Apple Silicon) |
-| **CPU** | Apple Silicon M1 | Apple Silicon M2 / M3 / M4 |
-| **Python** | 3.11+ | 3.12+ |
 | **RAM** | 8 GB | 16 GB+ (for larger models) |
 | **Disk** | 10 GB free | 20 GB+ free |
+| **Python** | 3.11+ (only needed when installing from source; the installer bundles it) | 3.12+ |
 
-> **Intel Macs and macOS 13 Ventura are no longer supported.** Apple Silicon only (arm64).
-> **Linux**: Supported with the Ollama backend (CPU). Tested on Ubuntu 24.04 ARM64 VM. Native hardware validation on the roadmap.
+> **macOS**: Apple Silicon only (arm64). Intel Macs and macOS 13 Ventura are no longer supported since v0.9.9.
+> **Backends caveat**: models marked *"MLX Apple Silicon"* in the [model catalog](#available-models-by-ram-tier) run **only on macOS**. On Windows and Linux ARM64 (Ollama-only) those models are unavailable — pick an Ollama-backed model.
 
 ## Testing
 
-7165 tests collected (of 7400 total, 235 deselected by default markers) with ~85% code coverage. CI runs the full suite on every push.
+7694 tests collected with ~85% code coverage. CI runs the full suite on every push.
 
 ```bash
-# Unit tests
-pytest core memory personality plugins -m "not integration and not e2e and not slow" \
+# Unit tests (the suite lives under tests/)
+pytest tests -m "not integration and not e2e and not slow" \
   --cov=core --cov=memory --cov=personality --cov=plugins \
   --cov-report=term --tb=short -q
 
@@ -378,7 +389,7 @@ Server Nexe is actively developed. Here's what's coming:
 - [x] RAG injection sanitization (MEM tags neutralized at ingest and retrieval) (v0.9.9)
 - [x] Offline install bundle — all wheels + embedding model in DMG (~1.2 GB, post-v0.9.9)
 - [x] Thinking toggle endpoint — `PATCH /session/{id}/thinking` (post-v0.9.9)
-- [x] Desktop app (Tauri v2) — macOS DMG + Linux AppImage, onboarding wizard, system tray (v1.0.6)
+- [x] Desktop app (Tauri v2) — macOS DMG + Linux AppImage + Windows ARM64 installer, onboarding wizard, system tray (v1.0.7)
 - [ ] Configurable inference parameters via UI
 - [ ] Community forum
 
@@ -448,5 +459,5 @@ See [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Version 1.0.6</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
+  <strong>Version 1.0.7</strong> · Apache 2.0 · Made by <a href="https://www.jgoy.net">Jordi Goy</a> in Barcelona
 </p>

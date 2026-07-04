@@ -1,24 +1,24 @@
 # server-nexe — Threat Model (STRIDE)
 
-**Version:** 1.0 (initial formalization)
-**Date:** 2026-04-24
+**Version:** 1.1
+**Date:** 2026-07-04
 **Status:** Active, reviewed at each minor release.
 **Supersedes:** `SECURITY.md` §"Scope and threat model" (informal, lines 3–15 and 80–90). That section remains as a one-paragraph summary and points here for the detail.
 
-This document formalizes the threat model that until v1.0.2-beta was implicit in the code. It is the artefact referenced by the internal AI-assisted security review `AUD-INT-001` §2.11. It is not a pen-test report: it describes **what server-nexe defends against, what it does not, and which controls back each claim**, with every control citing the source file and line where it is implemented.
+This document formalizes the threat model that until v1.0.2-beta was implicit in the code. It is the artefact referenced by the internal AI-assisted security review `AUD-INT-001` §2.11. It is not a pen-test report: it describes **what server-nexe defends against, what it does not, and which controls back each claim**, with every control citing the source file and function where it is implemented.
 
 ---
 
 ## 1. Purpose and scope
 
-server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.6 release (security hardening and the STRIDE threat model included).
+server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.7 release (security hardening and the STRIDE threat model included).
 
 In scope:
 
 - The HTTP surface exposed by the FastAPI server (`/ui/*`, `/v1/*`, `/rag/*`, `/health`, `/metrics`, `/api/bootstrap`).
 - The inference subprocesses (MLX, llama.cpp, Ollama bridge) and the supply chain that puts model weights on disk.
 - The data at rest on the user's machine (SQLite memories, `.enc` chat sessions, RAG TextStore, logs).
-- The key material stored in `~/.nexe/master.key`, the macOS Keyring, and environment variables.
+- The key material stored in `~/.nexe/master.key`, the OS keyring (macOS Keychain; Windows Credential Manager on Windows ARM64), and environment variables.
 
 Explicitly **not** in scope — see §7.
 
@@ -36,7 +36,7 @@ You evaluate server-nexe against an internal policy (ISO 27001 or similar). You 
 
 ## 3. Assumptions
 
-- The operating system (macOS 14+, Linux partial) is not compromised. server-nexe cannot protect against a kernel-level adversary or a malicious macOS update.
+- The operating system (macOS 14+, Linux ARM64, or Windows 11 ARM64 — the latter supported since v1.0.7) is not compromised. server-nexe cannot protect against a kernel-level adversary or a malicious OS update.
 - The user has a minimum trust in themselves: they do not paste their API key into a shared document, do not copy `~/.nexe/` to a USB drive and forget it, do not run server-nexe as root on a multi-user server.
 - The local network is untrusted by default, but **not** hostile at the LAN level. server-nexe binds to loopback; LAN exposure requires an explicit opt-in (VPN allow-list, SSH tunnel, reverse proxy the user sets up).
 - Python dependencies listed in `requirements.txt` are considered trusted after install. Their own supply chain (PyPI, Hugging Face Hub) is audited offline before building a release, but not at every boot.
@@ -133,12 +133,12 @@ Numbered for the STRIDE matrix:
 4. **Server ↔ Ollama daemon.** HTTP loopback, port 11434, no auth on the Ollama side (see §6.1 Spoofing).
 5. **Server ↔ Hugging Face / Ollama registry / GGUF URL.** HTTPS; only crossed at install time and on explicit model download.
 6. **Server ↔ Filesystem.** `~/.nexe/master.key` (`0o600`), SQLCipher DBs, `.enc` session files.
-7. **Server ↔ macOS Keyring.** `Security.framework` via `keyring` (Python). Mirrors the MEK.
+7. **Server ↔ OS keyring.** On macOS, `Security.framework` via `keyring` (Python); on Windows ARM64 (v1.0.7+), the `keyring` backend is Windows Credential Manager — there is no macOS Keychain, so the MEK fallback chain (file → keyring → env → generate) leans on the `~/.nexe/master.key` file and the Credential Manager slot. Mirrors the MEK.
 8. **LAN ↔ `/api/bootstrap`.** Gated by `NEXE_ENV` (`core/endpoints/bootstrap.py:_validate_bootstrap_env`, lines 97-106): production → HTTP 503; development → loopback + RFC1918 + VPN allow-list (`core/endpoints/bootstrap.py:_validate_bootstrap_ip`, lines 109-119).
 
 ## 6. STRIDE analysis
 
-The matrix summarizes which threats we accept against each boundary. Cells marked *n/a* mean the boundary cannot physically produce that class of threat (e.g. repudiation between two processes of the same user). Controls are detailed after the table, each citing `file:line`.
+The matrix summarizes which threats we accept against each boundary. Cells marked *n/a* mean the boundary cannot physically produce that class of threat (e.g. repudiation between two processes of the same user). Controls are detailed after the table, each citing `file` and the implementing function (line numbers are avoided — they drift on every refactor).
 
 | Boundary | S Spoofing | T Tampering | R Repudiation | I Info Disc. | D DoS | E Elev.Priv. |
 |----------|:---------:|:-----------:|:-------------:|:------------:|:-----:|:------------:|
@@ -155,7 +155,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 ### 6.1 Spoofing
 
-**Browser pretends to be an authenticated user (boundary 1).** Mitigated by dual-key `X-API-Key` validation with `secrets.compare_digest` in `plugins/security/core/auth_dependencies.py:require_api_key` (line 167; `secrets.compare_digest` at lines 102 and 125). Failure is logged with client IP. Dev-mode bypass is gated to loopback only (the `if dev_mode:` branch in `_check_dev_mode` at line 71 enforces `_is_loopback_ip` at lines 40-45 and raises 403 unless `NEXE_DEV_MODE_ALLOW_REMOTE=true`).
+**Browser pretends to be an authenticated user (boundary 1).** Mitigated by dual-key `X-API-Key` validation with `secrets.compare_digest` in `plugins/security/core/auth_dependencies.py` (`require_api_key`, comparing the primary and secondary keys). Failure is logged with client IP. Dev-mode bypass is gated to loopback only (the `if dev_mode:` branch in `_check_dev_mode` enforces `_is_loopback_ip` and raises 403 unless `NEXE_DEV_MODE_ALLOW_REMOTE=true`).
 
 **Another process on the same machine sends requests as the Ollama daemon (boundary 4).** Partial: Ollama listens on loopback without authentication. Any local process running as the same user can call it. Accepted — the same local user can read `~/.ollama/` directly. Server-nexe's defense is that the chat pipeline always flows through `/ui/chat` or `/v1/chat/completions` (both authenticated); direct per-backend chat endpoints (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) are blocked by the `RemovedDirectRoutesGuard` middleware (`core/middleware.py`) — a direct call returns HTTP 403 with error code `direct_plugin_endpoint_disabled` before reaching any handler. The routes are declared as `removed_direct_routes` in each plugin's `manifest.toml` and enforced both at request time and at plugin load time (see §6.6).
 
@@ -169,7 +169,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 **Injected markdown or HTML rendered back in chat (boundary 1).** XSS detector runs unconditionally (`plugins/security/core/input_sanitizers.py:validate_string_input`, `check_xss=True` in all contexts). `sanitize_html` escapes HTML on all UI-rendered output.
 
-**Memory / RAG injection (boundary 1 and 6).** User input is scrubbed of memory-role tags (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]` …) by `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:85-102`). RAG-ingested documents and retrieval results pass through `_filter_rag_injection` and `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:64` and line 91). A malicious document cannot embed a `[MEM_DELETE:]` tag that the LLM would copy verbatim.
+**Memory / RAG injection (boundary 1 and 6).** User input is scrubbed of memory-role tags (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]` …) by `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:85-102`). RAG-ingested documents and retrieval results pass through `_filter_rag_injection` and `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py`). A malicious document cannot embed a `[MEM_DELETE:]` tag that the LLM would copy verbatim.
 
 **Deep-nested JSON as a payload-engineering tampering (boundary 1).** Bounded by `MAX_NOSQL_DEPTH=100` in `detect_nosql_injection`. Previously crashed the process with `RecursionError`; now returns "suspicious" at depth > 100.
 
@@ -195,7 +195,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 ### 6.5 Denial of Service
 
-**Flood `/ui/chat` or `/v1/chat/completions` with concurrent requests.** Per-endpoint `slowapi` decorators enforce 20/min on chat (`core/endpoints/chat.py:318`), 30/min on `/status` family (`core/endpoints/root.py:104+`), 2/min on sensitive security endpoints (`plugins/security/api/routes.py:64`), 10/min on module operations (`plugins/security/api/routes.py:128`).
+**Flood `/ui/chat` or `/v1/chat/completions` with concurrent requests.** Per-endpoint `slowapi` decorators enforce 20/min on chat (`core/endpoints/chat.py`), 60/min on `/status` and 30/min on `/`, `/api/info` and `/health/circuits` (`core/endpoints/root.py`), 2/min on sensitive security endpoints (`plugins/security/api/routes.py`), 10/min on module operations (`plugins/security/api/routes.py`).
 
 **Bootstrap endpoint flooded (boundary 8).** `check_rate_limit` enforces 3/IP + 10 global per 5 min sliding window (`core/endpoints/bootstrap.py:67-96`). In production the endpoint returns 503 before any rate-limit logic runs.
 
@@ -203,7 +203,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 **Oversized request body.** Rejected by `RequestSizeLimiterMiddleware` before reaching handlers (`core/request_size_limiter.py`).
 
-**Out-of-memory via huge model load.** Out of scope: user explicitly selects the tier in the installer. The HardwareDetector (fixed v1.0.2-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) warns when a tier exceeds RAM.
+**Out-of-memory via huge model load.** Out of scope: user explicitly selects the tier in the installer. The HardwareDetector (fixed v1.0.3-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) warns when a tier exceeds RAM.
 
 ### 6.6 Elevation of Privilege
 
@@ -213,7 +213,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 **Path traversal in session IDs or filenames.** `validate_string_input(context="path")` runs the path-traversal detector on path-like inputs (chat context skips it, a documented trade-off). Filename validation on uploads is enforced server-side.
 
-**Master-key directory tightening silently fails.** `core/crypto/keys.py:_try_file_set` (line 80+) now logs a WARNING when `chmod 0o700` fails on `~/.nexe/`. The key file itself is still born `0o600` via `os.open(O_CREAT|O_EXCL)` so this is a defense-in-depth fix only.
+**Master-key directory tightening silently fails.** `core/crypto/keys.py:_try_file_set` now logs a WARNING when `chmod 0o700` fails on `~/.nexe/`. The key file itself is still born `0o600` via `os.open(O_CREAT|O_EXCL)` so this is a defense-in-depth fix only.
 
 **Jailbreak attempt inside chat.** 11 regex patterns (speed-bump detector, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, line 41; covers Catalan/English imperative forms and known handles such as `DAN mode`, `do anything now`) prefix a `[SECURITY NOTICE]` instead of refusing — sophisticated attacks evade trivially and this is explicitly documented (`SECURITY.md:36`). Real protection requires model-level moderation (out of scope, §7).
 
@@ -242,7 +242,7 @@ Honest disclosure of what is *not* closed by §6.
 - **No automated CVE tracking pipeline.** Dependencies are audited manually at release time. A CVE disclosed between releases is not caught until the next review (see `SECURITY.md:88`).
 - **No bug-bounty program; no external pen-test.** All security testing is AI-assisted plus the author. This document replaces the absence of a formal model, not the absence of an audit.
 - **Indirect prompt injection via plain-prose RAG documents is a known, documented limitation (B030).** A document whose instructions are written as ordinary prose (no tag markers) can reprogram a small local model — e.g. induce it to reveal a planted "secret code" or contradict the zero-cloud identity. `_filter_rag_injection` only neutralizes the known tag vocabulary; imperative prose passes clean. Four mitigation layers are applied (nonce-wrapped untrusted context labelled as *data, not instructions*; a static system rule; and turn separation so the RAG context arrives in its own turn before the user's question). A live A/B measurement shows the prompt-hardening has **diminishing returns**: with a 4B model the injected directive is obeyed ~50% of the time, and the limiting factor is **model size, not the prompt**. **Accepted** as a documented limitation: the real defenses are (a) using a model **≥7B** for untrusted documents (recommended in `SECURITY.md` and the knowledge base) and (b) requiring action-level authority an injected document does not have (see the MEM_SAVE risk below). A live regression test (`tests/test_live/test_redteam_regression.py`, unique-canary N-of-M) measures real adherence and becomes a hard CI gate once a ≥7B model is fixed in CI (B226).
-- **MEM_SAVE writes persist without a per-write confirmation rail.** Unlike `MEM_DELETE` / `clear_all` (two-turn confirmation, `plugins/web_ui_module/api/routes_chat.py:470-494`), a model-emitted `[MEM_SAVE:]` tag is persisted after only *structural* validation (`_is_valid_mem_save_text`: character whitelist + forbidden-keyword list + length bound). Because plain-prose indirect prompt injection via a RAG document is not deterministically filterable (see boundary 6 / B030), a crafted document can induce the model to emit a benign-looking `[MEM_SAVE:]` that passes the whitelist, writing attacker-chosen content into the user's long-term memory without confirmation. **Accepted** for a single-user, local-first tool: the only party who can plant such a document is the user themselves, and the impact is memory *pollution*, not action escalation — there are no RAG-fed tools or network sinks (the machine is air-gapped/loopback). A per-write confirmation rail was considered and **rejected**: it would add UX friction to every legitimate "remember this". Tracked as B247.
+- **MEM_SAVE writes persist without a per-write confirmation rail.** Unlike `MEM_DELETE` / `clear_all` (two-turn confirmation, `plugins/web_ui_module/api/routes_chat.py` — `_handle_delete_confirm_intent` / `_handle_clear_all_confirm_intent`), a model-emitted `[MEM_SAVE:]` tag is persisted after only *structural* validation (`_is_valid_mem_save_text`: character whitelist + forbidden-keyword list + length bound). Because plain-prose indirect prompt injection via a RAG document is not deterministically filterable (see boundary 6 / B030), a crafted document can induce the model to emit a benign-looking `[MEM_SAVE:]` that passes the whitelist, writing attacker-chosen content into the user's long-term memory without confirmation. **Accepted** for a single-user, local-first tool: the only party who can plant such a document is the user themselves, and the impact is memory *pollution*, not action escalation — there are no RAG-fed tools or network sinks (the machine is air-gapped/loopback). A per-write confirmation rail was considered and **rejected**: it would add UX friction to every legitimate "remember this". Tracked as B247.
 
 ## 9. Privacy considerations (LINDDUN appendix)
 
@@ -265,7 +265,8 @@ This document is reviewed:
 | Date | Version | Change | Driven by |
 |------|---------|--------|-----------|
 | 2026-04-24 | 1.0 | Initial formalization. STRIDE matrix, 8 boundaries, 6 asset categories, out-of-scope enumerated. | `AUD-INT-001` §2.11 (STRIDE threat model) |
+| 2026-07-04 | 1.1 | Windows ARM64 added as a supported platform (v1.0.7): trust assumptions extended (§3), Keyring boundary 7 generalized to OS credential stores (Windows Credential Manager; MEK file fallback). | v1.0.7 Windows ARM64 release |
 
 ---
 
-*server-nexe 1.0.6+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](SECURITY.md) for vulnerability reporting.*
+*server-nexe 1.0.7+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](SECURITY.md) for vulnerability reporting.*

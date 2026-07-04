@@ -1,6 +1,6 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-api-reference
 collection: nexe_documentation
 
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# REST API Reference — server-nexe 1.0.6
+# REST API Reference — server-nexe 1.0.7
 
 ## Base URL
 
@@ -25,7 +25,7 @@ expires: null
 http://127.0.0.1:9119
 ```
 
-Configurable via `personality/server.toml` `[core.server]` section or `.env` (HOST/PORT). Priority: server.toml > .env > defaults.
+Configurable via `personality/server.toml` `[core.server]` section or `.env` (NEXE_HOST/NEXE_PORT). Priority: server.toml > .env > defaults.
 
 API docs (Swagger): `http://127.0.0.1:9119/docs`
 
@@ -44,18 +44,17 @@ Most endpoints require `X-API-Key` header. Value from `.env` file (`NEXE_PRIMARY
 
 Rate limiting is applied to **all endpoints** — both API and Web UI.
 
-### API endpoints (configurable via `.env`)
+### Variables configurable via `.env`
 
 | Variable | Default | Applies to |
 |----------|---------|-----------|
-| NEXE_RATE_LIMIT_CHAT | 20/minute | /v1/chat/completions |
-| NEXE_RATE_LIMIT_MEMORY | 30/minute | /v1/memory/* |
-| NEXE_RATE_LIMIT_RAG | 30/minute | /v1/rag/* |
-| NEXE_RATE_LIMIT_UPLOAD | 5/minute | /ui/upload |
-| NEXE_RATE_LIMIT_DEFAULT | 120/minute | All other endpoints |
-| NEXE_RATE_LIMIT_GLOBAL | 100/minute | Global limit across all endpoints |
+| NEXE_RATE_LIMIT_GLOBAL | 100/minute | Per-IP global limit — **the only one actually enforced** (`core/dependencies.py` + SlowAPI middleware) |
+| NEXE_RATE_LIMIT_PUBLIC | (read but unused) | **Dead config** — read into `DEFAULT_RATE_LIMITS` but no limiter consumes it (advanced limiters removed, MC-123/124); no runtime effect |
+| NEXE_RATE_LIMIT_AUTHENTICATED | (read but unused) | **Dead config** — no runtime effect |
+| NEXE_RATE_LIMIT_ADMIN | (read but unused) | **Dead config** — no runtime effect |
+| NEXE_RATE_LIMIT_HEALTH | (read but unused) | **Dead config** — no runtime effect |
 
-**Note:** These variables are reserved for future implementation. Current limits are configured in source code.
+**Note:** Per-endpoint limits (chat 20/min, memory 30/60 per min, upload 5/min...) are **hardcoded in the source** via `@limiter.limit` (e.g. `core/endpoints/chat.py`, `routes_files.py`) and are **not** configurable via `.env`.
 
 ### Web UI endpoints (per endpoint)
 
@@ -122,6 +121,10 @@ OpenAI-compatible chat completion with RAG and streaming support.
 | `/status` | GET | Yes (X-API-Key) | Real-time status: `configured_engine` (intent), `resolved_engine` (the engine chat will effectively run, node-aware), `model` (the configured default — MLX/llama.cpp report their actually-loaded model only in the chat response), loaded modules |
 | `/api/info` | GET | No | API info and a representative subset of public endpoints (not exhaustive) |
 | `/docs` | GET | No | Swagger/OpenAPI interactive documentation |
+| `/admin/system/restart` | POST | Yes (X-API-Key) | Restart the server (used by the UI after config changes) |
+| `/admin/system/shutdown` | POST | Yes (X-API-Key) | Shut down the server |
+| `/admin/system/status` | GET | Yes (X-API-Key) | Admin system status |
+| `/admin/system/health` | GET | No | Public health check the UI polls after a restart |
 
 ### Modules
 
@@ -142,7 +145,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 
 | Endpoint | Method | Auth | Rate limit | Description |
 |----------|--------|------|------------|-------------|
-| `/v1/memory/store` | POST | Yes | `NEXE_RATE_LIMIT_MEMORY` (default 30/min) | Store text to a collection |
+| `/v1/memory/store` | POST | Yes | **30/min** (hardcoded, `memory/memory/api/v1.py`) | Store text to a collection |
 | `/v1/memory/search` | POST | Yes | **60/min** (hardcoded, `memory/memory/api/v1.py`) | Semantic search in a collection |
 | `/v1/memory/health` | GET | No | default | Memory subsystem health + Qdrant collections |
 
@@ -181,7 +184,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/v1/embeddings/encode` | POST | Yes | Generate embedding vectors for texts (stub, 501) |
-| `/v1/embeddings/models` | GET | No | List available embedding models (stub, 501) |
+| `/v1/embeddings/models` | GET | Yes | List available embedding models (stub, 501) |
 
 ## Web UI Endpoints (prefix: /ui)
 
@@ -257,7 +260,7 @@ Compatible with tools that use OpenAI API format: Cursor, Continue, Zed, custom 
 |---------|----------|---------|
 | Host/Port | server.toml `[core.server]` | Server bind address |
 | API keys | .env | NEXE_PRIMARY_API_KEY, NEXE_SECONDARY_API_KEY |
-| Rate limits | .env | NEXE_RATE_LIMIT_* variables |
+| Rate limits | .env | NEXE_RATE_LIMIT_GLOBAL (and security plugin variables); per-endpoint limits in source code |
 | Timeout | .env | NEXE_OLLAMA_STREAM_TIMEOUT (default 300, seconds) |
 | CORS origins | server.toml `[core.server]` | Allowed origins |
 | Encryption | .env | NEXE_ENCRYPTION_ENABLED (default auto) |

@@ -152,10 +152,10 @@ class TestCheckDiskSpace:
     assert "free_gb" in result
 
   def test_disk_space_warning(self):
-    """Verify warn with low space."""
+    """Verify warn with low space (never fail-by-value)."""
     result = check_disk_space(min_gb=10000000)
 
-    assert result["status"] in ["warn", "fail"]
+    assert result["status"] == "warn"
 
   def test_disk_space_contains_free_gb(self):
     """Verify result contains free_gb."""
@@ -238,7 +238,7 @@ class TestCheckHealth:
     Those checks reported 'pass' unconditionally for components that do not
     exist in this codebase (TransactionLedger / WriteCoordinator), so the
     health report lied. The real contract is exactly 5 sub-checks, none of
-    which is a phantom (non-existent) component.
+    which is a phantom component.
     """
     mock_source = MagicMock()
     mock_source.health.return_value = {"status": "healthy"}

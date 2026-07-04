@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-rag-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Complete reference of the server-nexe RAG memory system (v1.0.6). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent (DELETE_THRESHOLD 0.20 since v0.9.9), session-isolated document upload, embeddings (768D, fastembed ONNX primary offline), chunking parameters, context building with i18n labels, RAG weight visualization, RAG injection sanitization (_filter_rag_injection), 2-turn clear_all confirmation, precomputed KB embeddings, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
+abstract: "Complete reference of the server-nexe RAG memory system (v1.0.7). Covers 3 Qdrant collections with thresholds, MEM_SAVE automatic memory, delete intent (DELETE_THRESHOLD 0.20 since v0.9.9), session-isolated document upload, embeddings (768D, fastembed ONNX primary offline), chunking parameters, context building with i18n labels, RAG weight visualization, RAG injection sanitization (_filter_rag_injection), 2-turn clear_all confirmation, precomputed KB embeddings, smart pruning, deduplication, TextStore for encrypted text, and Qdrant payloads without text."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# RAG System — server-nexe 1.0.6
+# RAG System — server-nexe 1.0.7
 
 ## Table of contents
 
@@ -108,7 +108,7 @@ All text lives in SQLite (optionally encrypted via SQLCipher). This means even w
 
 **Precomputed KB embeddings** (v0.9.8+): files in `knowledge/` have precomputed embeddings in `knowledge/.embeddings/`. At startup, if the hashes match, the system skips the computation and loads directly (10.7× cold-boot speedup). Embeddings regenerate automatically if the content changes.
 
-All vectors are stored with 768 dimensions. This value is centralized in `memory/memory/constants.py` as `DEFAULT_VECTOR_SIZE = 768`.
+All vectors are stored with 768 dimensions. This value is centralized in `memory/embeddings/constants.py` as `DEFAULT_VECTOR_SIZE = 768` (re-exported via `memory/memory/constants.py`).
 
 **Similarity metric:** Cosine similarity. Range: -1 (opposite) to +1 (identical).
 

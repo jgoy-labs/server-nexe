@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.7] — 2026-07-04
+
+### Added
+
+- **Windows ARM64 support** (installer ships with nexe-app; unsigned — SmartScreen warns): automatic Ollama install on Windows (standalone zip), Windows-safe process liveness and shutdown signals (B081), self-contained Windows requirements with a vendored gRPC shim.
+- The graphical installer wizard offers the qwen3.5 4b 8-bit model (16 GB tier).
+
+### Changed
+
+- The RAG disk-space check degrades startup instead of blocking it (`NEXE_RAG_MIN_DISK_GB`, default 5 GB).
+- Shared ChatNode boilerplate extracted to `plugins/_shared` by composition (MC-030).
+
+### Fixed
+
+- **Memory**: a contextual name guard replaces the blanket name ban (B126 v2) — user names are saved again, with accent folding and honorific handling.
+- **Collection toggles now govern the system prompt too**, not only RAG retrieval; replies with invented memory tags are sanitized before reaching the UI.
+- Onboarding starts `ollama serve` before pulling models (Windows minimal mode).
+- Install/uninstall data-loss hardening (B249); June audit wave: 100+ fixes across memory, crypto, streaming, concurrency and the installer.
+
+### Security
+
+- Dependency updates: starlette 1.3.1, pydantic-settings 2.14.2, pypdf 6.13.3 (3 CVEs).
+
 ## [1.0.6] — 2026-06-07
 
 ### Security

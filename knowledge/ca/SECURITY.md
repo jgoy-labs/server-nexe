@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-security-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Seguretat de server-nexe 1.0.6: autenticacio dual-key, rate limiting (incl. PATCH thinking 10/min i NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectors d'injeccio, 49 patrons jailbreak, capsaleres OWASP, logging RFC5424, encriptacio AES-256-GCM at-rest (SQLCipher, sessions .enc), MEK fallback order (file->keyring->env->generate), sanititzacio RAG injection (_filter_rag_injection). Tot local, zero crides externes."
+abstract: "Seguretat de server-nexe 1.0.7: autenticacio dual-key, rate limiting (incl. PATCH thinking 10/min i NEXE_RATE_LIMIT_GLOBAL 100/min), 6 detectors d'injeccio, 49 patrons jailbreak, capsaleres OWASP, logging RFC5424, encriptacio AES-256-GCM at-rest (SQLCipher, sessions .enc), MEK fallback order (file->keyring->env->generate), sanititzacio RAG injection (_filter_rag_injection). Tot local, zero crides externes."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Seguretat — server-nexe 1.0.6
+# Seguretat — server-nexe 1.0.7
 
 ## Taula de continguts
 
@@ -49,7 +49,7 @@ expires: null
 - [Checklist de seguretat](#checklist-de-seguretat)
 - [Informar de vulnerabilitats](#informar-de-vulnerabilitats)
 
-server-nexe 1.0.6 esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
+server-nexe 1.0.7 esta dissenyat per a entorns locals de confiança. Totes les dades es queden al dispositiu. Sense telemetria, sense crides externes.
 
 ## Autenticacio
 
@@ -98,7 +98,7 @@ Implementacio: `slowapi` amb decorador `@limiter.limit()` a cada endpoint. `Rate
 
 Aplicades via `core/security_headers.py` i middleware:
 
-- `Content-Security-Policy`: script-src 'self' (sense scripts inline — i18n utilitza l'atribut `data-nexe-lang` en lloc d'inline)
+- `Content-Security-Policy`: script-src 'self' en mode standalone (sense `unsafe-inline`). L'HTML servit conte un script inline (obridor d'enllacos externs) que la CSP standalone bloqueja; en mode Tauri sidecar s'afegeix `'unsafe-inline'` perque s'executi. La i18n usa l'atribut `data-nexe-lang`, no script inline.
 - `Strict-Transport-Security`: max-age=31536000; includeSubDomains
 - `X-Content-Type-Options`: nosniff
 - `X-Frame-Options`: DENY
@@ -176,7 +176,7 @@ Logging d'events de seguretat **compatible amb RFC5424** via `plugins/security/s
 ### CryptoProvider
 
 - Algorisme: **AES-256-GCM** amb derivacio de claus **HKDF-SHA256**
-- **Cadena de fallback de la MEK (Master Encryption Key)** (corregit a v0.9.9): **fitxer `~/.nexe/master.key` (permisos 600) → OS Keyring (macOS Keychain) → variable d'entorn `NEXE_MASTER_KEY` → generacio nova**.
+- **Cadena de fallback de la MEK (Master Encryption Key)** (corregit a v0.9.9): **fitxer `~/.nexe/master.key` (permisos 600) → OS Keyring (macOS Keychain / Linux Secret Service / Windows Credential Locker) → variable d'entorn `NEXE_MASTER_KEY` → generacio nova**.
   - Aixo permet que sessions `.enc` sobrevisquin un reset del Keychain sempre que el fitxer local o l'env estiguin intactes.
   - Abans de v0.9.9 l'ordre era keyring primer, i un reset del Keychain feia les dades irrecuperables.
 - Claus derivades per proposit: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
@@ -303,7 +303,7 @@ Aquestes auditories IA troben molts problemes pero **no son exhaustives** — hi
 - [ ] Les claus API son fortes (32+ caracters hexadecimals)
 - [x] Qdrant embedded — cap port de xarxa exposat (no calen regles de firewall per Qdrant)
 - [ ] El port del servidor (9119) esta vinculat a 127.0.0.1 (no 0.0.0.0)
-- [ ] L'encriptacio de disc esta activada (FileVault a macOS, LUKS a Linux)
+- [ ] L'encriptacio de disc esta activada (FileVault a macOS, LUKS a Linux, BitLocker/Device Encryption a Windows)
 - [ ] El rate limiting esta configurat adequadament
 - [ ] L'encriptacio at-rest esta activada si es gestionen dades sensibles (`NEXE_ENCRYPTION_ENABLED=true`)
 - [ ] Les actualitzacions regulars s'apliquen

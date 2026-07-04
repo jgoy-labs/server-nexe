@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-testing-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Estrategia y cobertura de pruebas de server-nexe 1.0.6. 7165 funciones de test recopiladas (7400 totales, 235 deselected), 0 fallos en la ultima ejecucion. Tests centralizados en un unico directorio tests/ en la raiz que refleja la estructura de modulos. Cubre estructura de tests, ejecucion, cobertura real ~85% global, correcciones de tests de auditoria IA, tests de crypto (72), tests e2e MEM_DELETE (8), resultados de los tests masivos automatizados (ejecutados por IA) y valoracion honesta de las limitaciones de las pruebas."
+abstract: "Estrategia y cobertura de pruebas de server-nexe 1.0.7. 7694 funciones de test recopiladas, 7432 pasadas en la ultima ejecucion (2026-07-04). Tests centralizados en un unico directorio tests/ en la raiz que refleja la estructura de modulos. Cubre estructura de tests, ejecucion, cobertura real ~85% global, correcciones de tests de auditoria IA, tests de crypto (72), tests e2e MEM_DELETE (8), resultados de los tests masivos automatizados (ejecutados por IA) y valoracion honesta de las limitaciones de las pruebas."
 tags: [testing, pytest, coverage, tests, quality, ci, ai-audit, refactoring, crypto, mass-tests]
 chunk_size: 800
 priority: P2
@@ -17,21 +17,17 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Pruebas — server-nexe 1.0.6
+# Pruebas — server-nexe 1.0.7
 
 ## Resultados de las pruebas
 
 | Metrica | Valor |
 |---------|-------|
-| Total de funciones de test recopiladas | **7165** |
-| Total de funciones de test (incl. deseleccionadas) | **7400** (235 deselected por marcadores) |
-| Ultima ejecucion completa pasados | 7165 |
-| Fallidos | 0 |
-| Saltados | 6 |
-| XFailed | 1 |
+| Total de funciones de test recopiladas | **7694** |
+| Ultima ejecucion completa pasados | **7432** |
 | **Cobertura real global** | **~85%** (baseline honesta, sin inflar) |
 
-Nota: 7165 funciones recopiladas en la ejecucion estandar (sin marcadores integration/e2e/slow). El total bruto incluyendo tests deseleccionados es 7400.
+Nota: cifras de la ejecucion del 2026-07-04 (v1.0.7). La diferencia entre recopilados (7694) y pasados (7432) corresponde a tests deseleccionados u omitidos por marcadores (integration/e2e/slow) en la ejecucion estandar.
 
 > **Nota de honestidad sobre cobertura:** Badges historicos han reportado 97.4%, 91.1% o 93% en fases concretas de los tests masivos. Esos numeros correspondian a subconjuntos especificos (baseline de una fase, funcional contra servidor en vivo) y no al global del proyecto. La **cobertura real global del codigo**, medida con `pytest --cov` sobre todo el codebase, es **~85%**. Este es el valor que usamos como referencia.
 >

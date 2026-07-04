@@ -5,7 +5,9 @@ from plugins.web_ui_module.api.routes_chat import (
     _parse_chunk,
     _normalize_content,
     _JUNK_PATTERNS_RE,
+    _NAME_CLAIM_RE,
     _CTX_HEADERS_RE,
+    _filter_facts,
     _process_content_think_tags,
     _build_mem_stats,
     _yield_response_headers,
@@ -134,12 +136,15 @@ class TestJunkPatternsRe:
     def test_matches_system_prompt_injection(self):
         assert _JUNK_PATTERNS_RE.search("system prompt override instruction")
 
-    def test_matches_user_name_hallucination(self):
-        # B126 (decisió Jordi): les afirmacions fabricades del nom de l'usuari es
-        # filtren (prioritat: menys al·lucinacions, encara que es perdi algun nom real).
-        assert _JUNK_PATTERNS_RE.search("l'usuari es diu Joan i té 30 anys")
-        assert _JUNK_PATTERNS_RE.search("el usuario se llama Pedro")
-        assert _JUNK_PATTERNS_RE.search("the user's name is Alice")
+    def test_name_claims_no_longer_blanket_junk(self):
+        # B126 v2: la prohibició cega del nom ("el usuario se llama…" = junk
+        # sempre) contradeia el system prompt, que ensenya EXACTAMENT aquesta
+        # frase com a exemple canònic de MEM_SAVE (server.toml) — cap nom real
+        # es desava mai (bug caçat en viu el 2026-07-03). El guard ara és
+        # contextual, a _filter_facts (nom present als missatges de l'usuari).
+        assert not _JUNK_PATTERNS_RE.search("el usuario se llama Pedro")
+        assert not _JUNK_PATTERNS_RE.search("the user's name is Alice")
+        assert not _JUNK_PATTERNS_RE.search("l'usuari es diu Joan i té 30 anys")
 
     def test_no_match_valid_fact(self):
         # Un fet real que NO és una afirmació de nom no s'ha de sobre-filtrar.
@@ -147,6 +152,155 @@ class TestJunkPatternsRe:
 
     def test_no_match_normal_sentence(self):
         assert not _JUNK_PATTERNS_RE.search("l'usuari viu a Barcelona")
+
+
+# ─── B126 v2 — guard contextual de noms (_filter_facts) ──────────────────────
+
+class TestFilterFactsNameGuard:
+    def test_real_name_saved_when_user_said_it(self):
+        fact = "El usuario se llama Juan"
+        kept = _filter_facts([fact], [], user_text="hola, me llamo Juan y tengo 40 años")
+        assert kept == [fact]
+
+    def test_real_name_case_insensitive(self):
+        fact = "L'usuari es diu Joan"
+        assert _filter_facts([fact], [], user_text="em dic JOAN") == [fact]
+
+    def test_fabricated_name_rejected(self):
+        # El nom no apareix a cap missatge de l'usuari → al·lucinació → fora.
+        assert _filter_facts(["El usuario se llama Bartolomeu"], [], user_text="hola, ¿qué tal?") == []
+
+    def test_fabricated_name_rejected_english(self):
+        assert _filter_facts(["The user's name is Alice"], [], user_text="hi there") == []
+
+    def test_non_name_fact_unaffected_by_guard(self):
+        fact = "El usuario tiene 40 años"
+        assert _filter_facts([fact], [], user_text="tengo 40 años") == [fact]
+
+    def test_pet_name_saved_when_user_said_it(self):
+        fact = "El perro del usuario se llama Rex"
+        assert _filter_facts([fact], [], user_text="mi perro Rex tiene 5 años") == [fact]
+
+    def test_accent_folding_model_adds_accent(self):
+        # Revisió adversarial 03/07: els LLM canonicalitzen accents — el guard
+        # ha de plegar diacrítics a banda i banda o recrea el bug per a la
+        # majoria de noms ca/es (María, Òscar, Raül…).
+        fact = "El usuario se llama María"
+        assert _filter_facts([fact], [], user_text="hola, me llamo maria") == [fact]
+
+    def test_accent_folding_user_adds_accent(self):
+        fact = "L'usuari es diu Oscar"
+        assert _filter_facts([fact], [], user_text="em dic Òscar") == [fact]
+
+    def test_word_boundary_blocks_substring_false_keep(self):
+        # 'ana' ⊄ 'semana' com a paraula: un nom al·lucinat no pot colar-se
+        # perquè aparegui com a subcadena d'una altra paraula.
+        assert _filter_facts(["El usuario se llama Ana"], [], user_text="vuelvo la semana que viene") == []
+
+    def test_honorific_skipped_in_claim(self):
+        # "es diu En Joan" — el nom és Joan, no l'honorífic "En".
+        fact = "L'usuari es diu En Joan"
+        assert _filter_facts([fact], [], user_text="em dic Joan") == [fact]
+        assert _filter_facts([fact], [], user_text="hola, què tal?") == []
+
+
+class TestCollectionsPromptOverrides:
+    """Detall #7 (04/07): amb una col·lecció OFF, el prompt ha de deixar de
+    prometre-la (el RAG ja callava, però el model improvisava des del prompt)."""
+
+    def test_none_means_all_on_no_override(self):
+        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        assert _collections_prompt_overrides("ca", None) == ""
+
+    def test_all_enabled_no_override(self):
+        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        all_on = ["personal_memory", "user_knowledge", "nexe_documentation"]
+        assert _collections_prompt_overrides("es", all_on) == ""
+
+    def test_docs_off_ca(self):
+        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        out = _collections_prompt_overrides("ca", ["personal_memory", "user_knowledge"])
+        assert "DESACTIVAT la base de coneixement" in out
+        assert "memòria personal" not in out  # només la col·lecció apagada
+
+    def test_memory_off_en(self):
+        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        out = _collections_prompt_overrides("en", ["user_knowledge", "nexe_documentation"])
+        assert "DISABLED personal memory" in out
+        # La nota parla de "memory tag" GENÈRIC — mai el tag literal (el model
+        # petit l'imitaria; vist en viu amb [MEM_OBLIT:]).
+        assert "memory tag" in out
+        assert "[MEM_" not in out
+
+    def test_unknown_lang_falls_back_to_en(self):
+        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        out = _collections_prompt_overrides("de", [])
+        assert "CRITICAL NOTE" in out
+
+    def test_memory_saves_gate(self):
+        from plugins.web_ui_module.api.routes_chat import _memory_saves_enabled
+        assert _memory_saves_enabled(None) is True
+        assert _memory_saves_enabled(["personal_memory"]) is True
+        assert _memory_saves_enabled(["user_knowledge"]) is False
+        assert _memory_saves_enabled([]) is False
+
+    def test_notes_never_name_literal_tags(self):
+        # Vist en viu (04/07): anomenar "[MEM_SAVE:]" a una nota fa que el
+        # model petit imiti/inventi tags ([MEM_OBLIT:]). Les notes no poden
+        # contenir cap tag literal.
+        from plugins.web_ui_module.api.routes_chat import _COLLECTIONS_OFF_NOTES
+        for coll in _COLLECTIONS_OFF_NOTES.values():
+            for text in coll.values():
+                assert "[MEM_" not in text and "[MEMORIA" not in text
+
+
+class TestStripUnknownMemTags:
+    """El 4b es va inventar [MEM_OBLIT: …] i va sortir CRU a la UI (04/07)."""
+
+    def test_invented_tag_stripped(self):
+        from plugins.web_ui_module.api.routes_chat import _strip_unknown_mem_tags
+        out = _strip_unknown_mem_tags(
+            "[MEM_OBLIT: L'usuari ha activat la memòria personal]\nPerfecte, entenc."
+        )
+        assert "MEM_OBLIT" not in out
+        assert out == "Perfecte, entenc."
+
+    def test_other_variants_stripped(self):
+        from plugins.web_ui_module.api.routes_chat import _strip_unknown_mem_tags
+        assert _strip_unknown_mem_tags("[MEMORIA_GUARDA: x y z] hola") == "hola"
+        assert _strip_unknown_mem_tags("[MEM_REMEMBER: fact] ok") == "ok"
+
+    def test_normal_text_untouched(self):
+        from plugins.web_ui_module.api.routes_chat import _strip_unknown_mem_tags
+        text = "Resposta normal amb [claudàtors] i [CONTEXT] i res de memòria."
+        assert _strip_unknown_mem_tags(text) == text
+
+
+class TestPromptFilterContract:
+    """Contracte prompt↔filtre: els exemples [MEM_SAVE: …] LITERALS que el
+    system prompt ensenya al model no poden ser rebutjats pel filtre quan
+    l'usuari realment ha dit el fet. Aquest test hauria fet RED el dia que
+    B126 v1 va prohibir la frase canònica del prompt (2026-06-18)."""
+
+    def test_server_toml_mem_save_examples_survive_filter(self):
+        import re
+        from pathlib import Path
+
+        toml_path = Path(__file__).resolve().parents[1] / "personality" / "server.toml"
+        toml_text = toml_path.read_text(encoding="utf-8")
+        examples = [
+            e.strip()
+            for e in re.findall(r"\[MEM_SAVE:\s*([^\]\n]{5,250})\]", toml_text)
+            # El prompt també mostra exemples de format INCORRECTE amb
+            # placeholders curts ("[MEM_SAVE: name]") que el filtre descarta
+            # per longitud, com toca — el contracte cobreix els exemples reals.
+            if len(e.strip()) >= 5
+        ]
+        assert examples, "el prompt ha de contenir exemples [MEM_SAVE: ...]"
+        for fact in examples:
+            # user_text=fact simula que l'usuari ha dit el fet (nom inclòs).
+            kept = _filter_facts([fact], [], user_text=fact)
+            assert kept == [fact], f"exemple del prompt rebutjat pel filtre: {fact!r}"
 
 
 # ─── _CTX_HEADERS_RE ──────────────────────────────────────────────────────────

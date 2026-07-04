@@ -407,6 +407,17 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
         yield {"type": "progress", "stage": "Instal.lant Ollama...", "percent": 0}
         ollama = await _install_ollama_if_needed(request)
 
+    # In MINIMAL MODE (onboarding) the lifespan that auto-starts `ollama serve`
+    # is skipped, and on Windows the standalone-zip install has no background
+    # service — so `ollama pull` would hit a dead server (exit 1). Ensure the
+    # server is up (spawn + wait for readiness) before pulling. Idempotent: it
+    # returns early when Ollama is already running.
+    from plugins.ollama_module.core.client import resolve_base_url
+    from plugins.ollama_module.core.ollama_runtime import ensure_ollama_running
+
+    yield {"type": "progress", "stage": "Iniciant Ollama...", "percent": 0}
+    await ensure_ollama_running(resolve_base_url(), wait=True)
+
     proc = await asyncio.create_subprocess_exec(
         ollama, "pull", model_id,
         stdout=asyncio.subprocess.PIPE,

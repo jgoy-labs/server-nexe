@@ -61,7 +61,7 @@ MODEL_CATALOG = {
         },
     ],
     # ─────────────────────────────────────────────────────────────────────────
-    # MEDIUM MODELS - For 16 GB RAM machines (4 models, no default)
+    # MEDIUM MODELS - For 16 GB RAM machines (5 models, no default)
     # Slimmed 2026-05-23 to drop gemma3_12b and qwen3_vl_8b; added Mistral
     # Nemo 12B (Apache 2.0, 128K context) for European multilingual coverage.
     # ─────────────────────────────────────────────────────────────────────────
@@ -150,8 +150,8 @@ MODEL_CATALOG = {
         },
     ],
     # ─────────────────────────────────────────────────────────────────────────
-    # LARGE MODELS - For 24 GB RAM machines (4 models, no default)
-    # Order: Qwen → Gemma → Mistral → GPT-OSS. 2026-05-23 reshuffle:
+    # LARGE MODELS - For 24 GB RAM machines (3 models, no default)
+    # Order: Qwen → Mistral → GPT-OSS. 2026-05-23 reshuffle:
     # promoted Qwen3.5 27B from xlarge (ram_gb 20 fits 24 GB) and dropped
     # Qwen3 14B; added Mistral Small 3.2 24B (Apache 2.0, vision).
     # ─────────────────────────────────────────────────────────────────────────

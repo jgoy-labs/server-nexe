@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-rag-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v1.0.6). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat (DELETE_THRESHOLD 0.20 des de v0.9.9), pujada de documents amb aillament de sessio, embeddings (768D, fastembed ONNX principal offline), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio RAG injection (_filter_rag_injection), confirmacio clear_all 2-torns, precomputed KB embeddings, poda intel·ligent, deduplicacio, TextStore encriptat."
+abstract: "Referencia completa del sistema de memoria RAG de server-nexe (v1.0.7). Cobreix 3 col·leccions Qdrant amb llindars, memoria automatica MEM_SAVE, intent d'esborrat (DELETE_THRESHOLD 0.20 des de v0.9.9), pujada de documents amb aillament de sessio, embeddings (768D, fastembed ONNX principal offline), parametres de chunking, construccio de context amb etiquetes i18n, visualitzacio de pesos RAG, sanititzacio RAG injection (_filter_rag_injection), confirmacio clear_all 2-torns, precomputed KB embeddings, poda intel·ligent, deduplicacio, TextStore encriptat."
 tags: [rag, embeddings, qdrant, memory, mem_save, collections, thresholds, chunking, vectors, semantic-search, documents, session-isolation, delete-intent, pruning, deduplication, sanitization, text-store, encryption]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Sistema RAG — server-nexe 1.0.6
+# Sistema RAG — server-nexe 1.0.7
 
 ## Taula de continguts
 
@@ -108,7 +108,7 @@ Tot el text viu a SQLite (opcionalment encriptat via SQLCipher). Aixo significa 
 
 **KB embeddings precomputats** (v0.9.8+): els fitxers de `knowledge/` tenen embeddings pre-calculats a `knowledge/.embeddings/`. A l'arrencada, si els hashes coincideixen, el sistema salta el càlcul i carrega directament (10.7× speedup a cold boot). Els embeddings es regeneren automàticament si canvia el contingut.
 
-Tots els vectors s'emmagatzemen amb 768 dimensions. Aquest valor esta centralitzat a `memory/memory/constants.py` com `DEFAULT_VECTOR_SIZE = 768`.
+Tots els vectors s'emmagatzemen amb 768 dimensions. Aquest valor esta centralitzat a `memory/embeddings/constants.py` com `DEFAULT_VECTOR_SIZE = 768` (re-exportat via `memory/memory/constants.py`).
 
 **Metrica de similitud:** Similitud del cosinus. Rang: -1 (oposat) a +1 (identic).
 

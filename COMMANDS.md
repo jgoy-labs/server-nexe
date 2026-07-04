@@ -38,7 +38,7 @@
 
 ```bash
 ./nexe knowledge ingest        # Processar documents / Process documents
-./nexe knowledge list          # Llistar documents / List documents
+./nexe knowledge status        # Estat del knowledge base / Knowledge base status
 ```
 
 ## ⚙️ Configuració / Configuration

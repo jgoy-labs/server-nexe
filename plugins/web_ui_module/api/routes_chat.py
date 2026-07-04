@@ -21,6 +21,7 @@ import logging
 import os as _os
 import re as _re
 import threading
+import unicodedata as _unicodedata
 from fastapi import APIRouter, HTTPException, Depends, Request as FastAPIRequest
 from fastapi.responses import StreamingResponse
 from core.dependencies import limiter
@@ -111,6 +112,83 @@ _REPROMPT_OVERRIDE = {
     "en": "\n\nIMPORTANT: Memory has been saved successfully. Now respond naturally to the user's message. Do NOT emit [MEM_SAVE:] tags — already done. Just have a normal conversation.",
 }
 
+# ─── Collection-toggle prompt overrides (2026-07-04) ──────────────────────────
+# The RAG layer honours the UI collection toggles (rag_collections in the body),
+# but the static system prompt kept promising documentation/memories — so models
+# happily improvised "knowledge" with the collection OFF (found live: docs
+# disabled, RAG correctly empty, Qwen3.5-27B still answered doc questions from
+# the prompt's claims). Until 1.0.8 unifies collection state across every
+# surface (single source of truth: retrieval + prompt + UI), these
+# recency-positioned notes make the prompt tell the truth per request.
+# rag_collections absent/None (old clients, API users) = everything enabled.
+_COLLECTIONS_OFF_NOTES = {
+    # NB: never name literal tags here — a small model reads "[MEM_SAVE:]" in a
+    # note and starts echoing/inventing tag variants (seen live: [MEM_OBLIT:]).
+    "personal_memory": {
+        "ca": "NOTA CRÍTICA: L'usuari ha DESACTIVAT la memòria personal. No tens accés a cap record. NO afirmis recordar res de l'usuari, NO prometis desar ni oblidar res, i NO escriguis cap tag de memòria. Si no t'ho pregunten, no en parlis.",
+        "es": "NOTA CRÍTICA: El usuario ha DESACTIVADO la memoria personal. No tienes acceso a ningún recuerdo. NO afirmes recordar nada del usuario, NO prometas guardar ni olvidar nada, y NO escribas ningún tag de memoria. Si no te lo preguntan, no lo menciones.",
+        "en": "CRITICAL NOTE: The user has DISABLED personal memory. You have no access to any memories. Do NOT claim to remember anything about the user, do NOT promise to save or forget anything, and do NOT write any memory tag. Do not bring it up unless asked.",
+    },
+    "nexe_documentation": {
+        "ca": "NOTA CRÍTICA: L'usuari ha DESACTIVAT la base de coneixement (documentació de server-nexe). NO tens accés a la documentació: si et demanen detalls, digues que la col·lecció està desactivada. NO inventis contingut de la documentació.",
+        "es": "NOTA CRÍTICA: El usuario ha DESACTIVADO la base de conocimiento (documentación de server-nexe). NO tienes acceso a la documentación: si piden detalles, di que la colección está desactivada. NO inventes contenido de la documentación.",
+        "en": "CRITICAL NOTE: The user has DISABLED the knowledge base (server-nexe documentation). You have NO access to the documentation: if asked for details, say the collection is disabled. Do NOT invent documentation content.",
+    },
+    "user_knowledge": {
+        "ca": "NOTA CRÍTICA: L'usuari ha DESACTIVAT els documents pujats. NO tens accés als seus documents: no en citis ni n'inventis contingut.",
+        "es": "NOTA CRÍTICA: El usuario ha DESACTIVADO los documentos subidos. NO tienes acceso a sus documentos: no cites ni inventes su contenido.",
+        "en": "CRITICAL NOTE: The user has DISABLED uploaded documents. You have NO access to their documents: do not cite or invent their content.",
+    },
+}
+_ALL_RAG_COLLECTIONS = tuple(_COLLECTIONS_OFF_NOTES)
+
+
+def _collections_prompt_overrides(lang, rag_collections) -> str:
+    """Truth-telling prompt notes for every collection the user switched OFF.
+
+    Appended at the END of the system prompt (recency: small models obey the
+    closest instruction). Returns "" when rag_collections is None (all on).
+    """
+    if rag_collections is None:
+        return ""
+    _lk = (lang or "en")[:2]
+    if _lk not in ("ca", "es", "en"):
+        _lk = "en"
+    notes = [
+        _COLLECTIONS_OFF_NOTES[c][_lk]
+        for c in _ALL_RAG_COLLECTIONS
+        if c not in rag_collections
+    ]
+    return ("\n\n" + "\n".join(notes)) if notes else ""
+
+
+def _memory_saves_enabled(rag_collections) -> bool:
+    """False when the user disabled personal memory — MEM_SAVE must not persist.
+
+    Belt-and-braces with the prompt note: even if the model still emits the
+    tag, nothing is written while the collection is off.
+    """
+    return rag_collections is None or "personal_memory" in rag_collections
+
+
+# Unknown/invented memory-tag shapes (seen live 04/07: qwen3.5:4b emitted
+# "[MEM_OBLIT: …]" — not MEM_SAVE, not MEM_DELETE, not an _OBLIT_RE variant —
+# and it leaked RAW to the UI). Known tags are extracted/stripped upstream;
+# whatever [MEM*_X: …] survives is model confusion: strip it, log it, never
+# act on it.
+_UNKNOWN_MEM_TAG_RE = _re.compile(
+    r'\[(?:MEM|MEMORIA)_?[A-Z_]{2,24}:\s*[^\[\]\n\r\t]{0,250}\]\s*'
+)
+
+
+def _strip_unknown_mem_tags(text: str) -> str:
+    """Remove residual invented memory tags from the visible response."""
+    def _log_and_drop(m):
+        logger.info("Unknown memory tag stripped (not executed): %s",
+                    redact_user_content(m.group(0)[:80]))
+        return ""
+    return _UNKNOWN_MEM_TAG_RE.sub(_log_and_drop, text).strip()
+
 # ─── Context header patterns (compiled once) ─────────────────────────────────
 _CTX_HEADERS_RE = _re.compile(
     # (?:FI\s+)?CONTEXT(?:\s+hex)? covers [CONTEXT], [FI CONTEXT] and the
@@ -133,15 +211,57 @@ _JUNK_PATTERNS_RE = _re.compile(
     r"first\s+interaction|not\s+personal|no\s+data|"
     r"no\s+previous|cannot\s+recall|"
     r'\[MEM_SAVE|ignore\s+(all\s+)?previous|'
-    r'system\s+prompt|override\s+instruction|'
-    # B126 (Jordi's decision: prioritize FEWER hallucinations over less loss):
-    # also filter fabricated claims of personal data, like the
-    # non-streaming path (_MEMSAVE_JUNK_RE). An invented name that gets persisted poisons
-    # memory; a real name can be re-learned if the user repeats it.
-    r'se\s+llama\s+\w+\s+y\s+(vive|tiene|trabaja)|'
-    r'el\s+usuario\s+se\s+llama|the\s+user.s\s+name\s+is|'
-    r'l.usuari\s+es\s+diu)',
+    r'system\s+prompt|override\s+instruction)',
 )
+
+# B126 v2 — contextual name guard (replaces the old blanket ban on name claims).
+# The v1 ban ("el usuario se llama / l'usuari es diu / the user's name is" =
+# always junk) contradicted the system prompt, whose canonical MEM_SAVE example
+# for names uses EXACTLY that phrasing (personality/server.toml, all 3 langs):
+# the model obeyed the prompt, the filter silently killed every real name, and
+# only non-name facts (age, job…) survived — found live on the 2026-07-03
+# Windows clean-install test ("El usuario tiene 40 años" saved, "Juan" never).
+# Now a name claim is junk ONLY when the claimed name does not appear in any
+# user message of the session — a fabricated name the user never typed is still
+# dropped, which keeps the original B126 goal (fewer hallucinations persisted).
+#
+# Known accepted residuals (adversarial review 2026-07-03): (a) only the FIRST
+# name token is verified — "es diu Maria José" persists whole if the user said
+# just "Maria"; (b) names outside the Latin range of the class below (e.g.
+# "Łukasz") produce no claim match and skip the guard — deliberate fail-open.
+_NAME_CLAIM_RE = _re.compile(
+    r"(?i)(?:el\s+usuario\s+se\s+llama|l.usuari\s+es\s+diu|the\s+user.s\s+name\s+is|"
+    r"se\s+llama|es\s+diu|name\s+is)\s+"
+    r"(?:(?:En|Na|Don|Doña|Mr|Mrs|Ms)\s+)?"  # honorific, not the name itself
+    r"([A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’·\-]{1,39})"
+)
+
+
+def _fold_accents(text: str) -> str:
+    """Lowercase + strip combining marks: 'María' ≙ 'maria', 'Òscar' ≙ 'oscar'.
+
+    LLMs canonicalize diacritics both ways (user types "maria", model emits
+    "María" — or the reverse), so the name guard must compare accent-folded.
+    """
+    return "".join(
+        ch
+        for ch in _unicodedata.normalize("NFKD", text.lower())
+        if not _unicodedata.combining(ch)
+    )
+
+
+def _hallucinated_name(fact: str, user_text: str) -> bool:
+    """True when ``fact`` claims a name the user never typed (B126 v2 guard).
+
+    Accent-folded on both sides, and word-bounded so a hallucinated 'Ana' does
+    not slip through because the user wrote 'semana'.
+    """
+    claim = _NAME_CLAIM_RE.search(fact)
+    if not claim:
+        return False
+    name = _fold_accents(claim.group(1))
+    haystack = _fold_accents(user_text or "")
+    return not _re.search(r"(?<!\w)" + _re.escape(name) + r"(?!\w)", haystack)
 
 
 _ATOMIZER_SYSTEM = {
@@ -616,6 +736,8 @@ def _clean_full_response(full_response: str, user_input: str = "") -> tuple[str,
     clean_response = _CTX_HEADERS_RE.sub('', clean_response).strip()
     mem_saves = _extract_safe_mem_saves(clean_response, user_input=user_input)
     clean_response = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', clean_response).strip()
+    # Last pass: invented [MEM_*] variants must never reach the UI.
+    clean_response = _strip_unknown_mem_tags(clean_response)
     return clean_response, mem_saves, mem_deletes
 
 
@@ -1116,14 +1238,13 @@ async def _handle_memory_intent(
     return response_text, memory_action, resolved_intent, mem_deleted
 
 
+# B126 v2: name claims are no longer blanket-junk here either — the contextual
+# guard (_NAME_CLAIM_RE + user_text check) in _save_mem_saves_nonstreaming
+# replaces them, in parity with the streaming path (_filter_facts).
 _MEMSAVE_JUNK_RE = _re.compile(
     r'(?i)(no\s+(coneix|s.han|tinc|té|hi ha)|'
     r'no\s+s.han\s+detectat|busco\s+ajuda|necessit[oa]|'
-    r'primera\s+interacci|no\s+personal|sense\s+dades|'
-    # Anti-hallucination: detect fabricated personal data
-    r'se\s+llama\s+\w+\s+y\s+(vive|tiene|trabaja)|'
-    r'el\s+usuario\s+se\s+llama|the\s+user.s\s+name\s+is|'
-    r'l.usuari\s+es\s+diu)',
+    r'primera\s+interacci|no\s+personal|sense\s+dades)',
 )
 
 
@@ -1141,19 +1262,40 @@ async def _save_mem_saves_nonstreaming(
     mem_saves: list,
     session,
     memory_helper,
+    rag_collections: "list | None" = None,
 ) -> None:
     """Persist MEM_SAVE facts extracted from a non-streaming response."""
+    if not _memory_saves_enabled(rag_collections):
+        # Collection toggle belt-and-braces (parity with streaming): memory OFF
+        # → nothing persists, visibly.
+        logger.info(
+            "MEM_SAVE skip (personal memory disabled by user/no-stream): %d fact(s) dropped",
+            len(mem_saves),
+        )
+        return
     _prior_msgs = [msg for msg in session.messages if msg.get("role") == "user"]
     _is_first_turn = len(_prior_msgs) <= 1
+    # B126 v2 haystack: user turns + compaction summary (see _filter_facts call
+    # site). NB: this path has no atomizer, so a combined fact with a REAL name
+    # persists whole ("se llama Pedro y vive en Madrid") — accepted tradeoff.
+    _user_text = " ".join(str(m.get("content", "")) for m in _prior_msgs)
+    _user_text = f"{_user_text} {getattr(session, 'context_summary', None) or ''}".strip()
     for _fact in mem_saves:
         _fact = _fact.strip()
         if not _fact or len(_fact) < 5:
             continue
         if _MEMSAVE_JUNK_RE.search(_fact):
-            logger.debug("MEM_SAVE skip (junk/no-stream): %s", redact_user_content(_fact))
+            logger.info("MEM_SAVE skip (junk/no-stream): %s", redact_user_content(_fact))
+            continue
+        # B126 v2: contextual name guard, parity with _filter_facts (streaming).
+        if _hallucinated_name(_fact, _user_text):
+            logger.info(
+                "MEM_SAVE skip (name not present in user messages/no-stream): %s",
+                redact_user_content(_fact),
+            )
             continue
         if _is_first_turn:
-            logger.debug("MEM_SAVE skip (first turn, likely hallucination): %s", redact_user_content(_fact))
+            logger.info("MEM_SAVE skip (first turn, likely hallucination): %s", redact_user_content(_fact))
             continue
         try:
             _save_r = await memory_helper.save_to_memory(
@@ -1164,7 +1306,8 @@ async def _save_mem_saves_nonstreaming(
             if _save_r.get("document_id"):
                 logger.info("MEM_SAVE (no-stream): %s", redact_user_content(_fact))
         except Exception as e:
-            logger.debug("MEM_SAVE failed (no-stream): %s", e)
+            # MC-016 parity: an exception while saving must not be a DEBUG whisper.
+            logger.warning("MEM_SAVE failed (no-stream): %s", e)
 
 
 async def _arm_mem_deletes_nonstreaming(
@@ -1204,6 +1347,7 @@ async def _handle_nonstreaming_response(
     memory_helper,
     message: str,
     memory_action: Optional[str],
+    rag_collections: "list | None" = None,
 ) -> tuple[str, Optional[str], int]:
     """Returns (response_text, memory_action, mem_deleted_delta).
 
@@ -1223,7 +1367,7 @@ async def _handle_nonstreaming_response(
     # F1 fix: if the model generated inline MEM_SAVE, reflect it in memory_action
     if _mem_saves_ns:
         memory_action = "mem_save_inline"
-        await _save_mem_saves_nonstreaming(_mem_saves_ns, session, memory_helper)
+        await _save_mem_saves_nonstreaming(_mem_saves_ns, session, memory_helper, rag_collections)
     # Bug 18: Extract [MEM_DELETE: ...] and [OLVIDA/OBLIT/FORGET: ...] (non-streaming)
     response_text = _OBLIT_RE.sub(lambda m: f'[MEM_DELETE: {m.group(2)}]', response_text)
     _mem_deletes_ns = _MEM_DELETE_RE.findall(response_text)
@@ -1235,6 +1379,9 @@ async def _handle_nonstreaming_response(
         if _confirm_q:
             response_text = f"{response_text}\n\n{_confirm_q}" if response_text else _confirm_q
             memory_action = "delete_pending"
+    # Last pass (parity with _clean_full_response): invented [MEM_*] variants
+    # must never reach the client.
+    response_text = _strip_unknown_mem_tags(response_text)
     return response_text, memory_action, mem_deleted_delta
 
 
@@ -1449,10 +1596,16 @@ def _extract_nonstreaming_content(result) -> str:
     return ""
 
 
-def _filter_facts(facts: list, deleted_facts: list) -> list:
-    """Filter atomized facts: remove empty, short, deleted, and junk entries.
+def _filter_facts(facts: list, deleted_facts: list, user_text: str = "") -> list:
+    """Filter atomized facts: remove empty, short, deleted, junk and
+    hallucinated-name entries.
 
-    Pure function — no side effects.
+    ``user_text`` is the concatenated content of the session's user messages:
+    a name claim (B126 v2, _NAME_CLAIM_RE) is only kept when the claimed name
+    actually appears there. Pure function — no side effects.
+
+    Skips log at INFO (redacted): a legitimate fact silently rejected was
+    exactly the invisible failure mode of the 2026-07-03 name bug.
     """
     filtered = []
     for fact in facts:
@@ -1463,10 +1616,16 @@ def _filter_facts(facts: list, deleted_facts: list) -> list:
             fact.lower() in d.lower() or d.lower() in fact.lower()
             for d in deleted_facts
         ):
-            logger.debug("MEM_SAVE skip (recently deleted): %s", redact_user_content(fact))
+            logger.info("MEM_SAVE skip (recently deleted): %s", redact_user_content(fact))
             continue
         if _JUNK_PATTERNS_RE.search(fact):
-            logger.debug("MEM_SAVE skip (junk): %s", redact_user_content(fact))
+            logger.info("MEM_SAVE skip (junk): %s", redact_user_content(fact))
+            continue
+        if _hallucinated_name(fact, user_text):
+            logger.info(
+                "MEM_SAVE skip (name not present in user messages): %s",
+                redact_user_content(fact),
+            )
             continue
         filtered.append(fact)
     return filtered
@@ -1530,7 +1689,18 @@ async def _yield_atomize_and_save_mem_saves(
     # caller's mem_saves — consumed by _build_mem_stats and the re-prompt fallback —
     # reflects what was actually kept, not junk/dedup/recently-deleted entries.
     _deleted = getattr(session, '_recently_deleted_facts', [])
-    filtered = _filter_facts(_atomized, _deleted)
+    # B126 v2: the name guard needs the session's user messages to tell a real
+    # name (the user typed it) from a fabricated one. Compaction trims old user
+    # turns (COMPACT_KEEP) — the running summary still carries salient facts
+    # like the name, so it is part of the haystack too.
+    _user_text = " ".join(
+        str(m.get("content", ""))
+        for m in getattr(session, "messages", [])
+        if m.get("role") == "user"
+    )
+    _summary = getattr(session, "context_summary", None) or ""
+    _user_text = f"{_user_text} {_summary}".strip()
+    filtered = _filter_facts(_atomized, _deleted, _user_text)
     mem_saves[:] = filtered
     _mem_saved_count = await _persist_facts(filtered, memory_helper, session.id)
 
@@ -1848,6 +2018,9 @@ class StreamingChatContext:
     lang: "str | None"
     message: str
     disconnect_monitor_task: "asyncio.Task"
+    # UI collection toggles for this request; None = all collections enabled
+    # (old clients / bare API calls). Gates MEM_SAVE persistence.
+    rag_collections: "list | None" = None
 
 
 async def _generate_streaming_response(ctx: StreamingChatContext):
@@ -2009,6 +2182,15 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
         if clean_response:
             # Atomize + save LLM-extracted facts to memory
             _mem_saved_count = 0
+            if _mem_saves and not _memory_saves_enabled(ctx.rag_collections):
+                # Collection toggle belt-and-braces: the prompt already tells the
+                # model not to emit MEM_SAVE with memory off, but if it does,
+                # nothing may be persisted (and the drop must be visible).
+                logger.info(
+                    "MEM_SAVE skip (personal memory disabled by user): %d fact(s) dropped",
+                    len(_mem_saves),
+                )
+                _mem_saves = []
             if _mem_saves:
                 _count_out = []
                 async for _tok in _yield_atomize_and_save_mem_saves(
@@ -2220,6 +2402,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                     # 4. Construct Final System Prompt (reply language follows the message)
                     system_prompt, _lang = _build_system_prompt_with_time(message)
+                    # Collection toggles: the prompt must not promise sources the
+                    # user switched off (see _COLLECTIONS_OFF_NOTES).
+                    system_prompt += _collections_prompt_overrides(_lang, body.get("rag_collections"))
 
                     # 4. Prepare messages payload for engine
                     engine_messages = [
@@ -2374,6 +2559,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             lang=_lang,
                             message=message,
                             disconnect_monitor_task=_disconnect_monitor_task,
+                            rag_collections=body.get("rag_collections"),
                         )
                         _returning_stream = True
                         return "", model_name, StreamingResponse(
@@ -2500,7 +2686,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 return _streaming_resp
         if response_text and intent == "chat" and not response_text.startswith("Error:"):
             response_text, memory_action, _del_delta = await _handle_nonstreaming_response(
-                response_text, session, memory_helper, message, memory_action
+                response_text, session, memory_helper, message, memory_action,
+                body.get("rag_collections"),
             )
             _mem_deleted += _del_delta
 

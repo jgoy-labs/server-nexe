@@ -18,7 +18,7 @@ It does **not** defend against:
 ## Current protections
 
 ### Authentication
-- API key required for all endpoints (`X-API-Key` header)
+- API key required for all endpoints (`X-API-Key` header) **except a small set of public ones**: `/` (root), `/health`, `/health/ready` and `/api/info` (liveness/discovery, no secrets exposed)
 - Key configured via `.env` file with restricted permissions
 - Auth failures logged with client IP
 
@@ -93,7 +93,7 @@ and report them.
 - CSRF protection
 - CSP headers (`script-src 'self'` without `unsafe-inline` in standalone mode; in Tauri sidecar mode `'unsafe-inline'` is added to `script-src` because the Web UI relies on inline scripts and XSS isolation is provided by Tauri's sandboxed webview; `style-src 'self' 'unsafe-inline'` allowed for Web UI inline styles — documented trade-off)
 - Trusted host middleware
-- No inline scripts in standalone mode — language injection via `data-` HTML attributes (the packaged Tauri sidecar build does use inline scripts in the Web UI, which is why `script-src` is relaxed in sidecar mode; see above)
+- The served `index.html` contains one inline `<script>` (the external-link opener). In standalone mode the CSP (`script-src 'self'` without `unsafe-inline`) blocks it, so it does not execute; in Tauri sidecar mode `'unsafe-inline'` is added so it runs. Language selection uses `data-` HTML attributes, not inline script.
 
 ### Encryption at rest (default `auto`; fail-closed only with `NEXE_ENCRYPTION_ENABLED=true`, v0.9.2+)
 - AES-256-GCM with HKDF-SHA256 key derivation
@@ -114,7 +114,7 @@ and report them.
 
 Honest disclosure:
 
-- **Not tested in production.** Server Nexe has not been deployed in a production environment with real users. All testing has been done in development by the author. The 7165 automated tests cover code correctness, not real-world adversarial conditions.
+- **Not tested in production.** Server Nexe has not been deployed in a production environment with real users. All testing has been done in development by the author. The 7694 automated tests cover code correctness, not real-world adversarial conditions.
 - **No human security audit.** All security testing has been performed by AI (Claude, Gemini, and other models). AI can find patterns and run systematic checks, but it is not a substitute for a professional penetration test.
 - **Formal threat model** — the implicit threat model described above is now formalized in [THREAT_MODEL.md](THREAT_MODEL.md) (STRIDE, 8 trust boundaries, 6 asset categories, out-of-scope enumerated, residual risks declared). The summary above remains; see the formal document for the detail, mitigations and file:line citations.
 - **No bug bounty program.** This is a personal project with no budget for bounties.
@@ -127,12 +127,14 @@ The AI audit covered: injection detection, authentication flows, rate limiting, 
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.6         | Current release, receives fixes |
+| 1.0.7         | Current release, receives fixes |
+| 1.0.6         | End of line (superseded by 1.0.7)       |
 | 1.0.5         | End of line (superseded by 1.0.6)       |
 | 1.0.4-beta    | End of line (superseded by 1.0.5)       |
+| 1.0.3-beta    | End of line (superseded by 1.0.4-beta) |
 | 1.0.2-beta    | End of line (superseded by 1.0.3-beta) |
 | 0.9.9         | End of line (superseded by 1.0.2-beta) |
-| 0.9.0 – 0.9.8 | Not supported — upgrade to 1.0.6      |
+| 0.9.0 – 0.9.8 | Not supported — upgrade to 1.0.7      |
 | < 0.9.0       | Not supported |
 
 ## Reporting a vulnerability
@@ -162,4 +164,4 @@ Server Nexe uses `cryptography` (>=44.0.0) for encryption, `keyring` (>=25.0.0) 
 
 ---
 
-*v1.0.6 · Apache 2.0 · Jordi Goy*
+*v1.0.7 · Apache 2.0 · Jordi Goy*

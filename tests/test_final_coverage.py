@@ -1272,10 +1272,10 @@ class TestRagHealthFinal:
         assert result["status"] in ("warn", "fail")
 
     def test_check_disk_space_critical(self):
-        """Lines 239-246: disk space critical."""
+        """Critical disk degrades (warn), never fails — startup must not block."""
         from memory.rag.health import check_disk_space
         result = check_disk_space(min_gb=999999999)
-        assert result["status"] == "fail"
+        assert result["status"] == "warn"
 
     def test_check_rag_sources_not_initialized(self):
         """Lines 165-170: module not initialized."""

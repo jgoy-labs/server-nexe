@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-limitations
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Documentacion honesta de las limitaciones de server-nexe 1.0.6. Cubre soporte de plataformas (macOS 14+ Apple Silicon only, Linux soportado (Ollama, CPU), Intel NO soportado, Windows en desarrollo), calidad de modelos vs nube (GPT-4/Claude), limitaciones de RAG (embeddings, chunking, arranque en frio, contradicciones), compatibilidad parcial de API OpenAI, rendimiento (instancia unica, concurrencia), restricciones de seguridad, advertencias sobre encriptacion (default auto, nueva, no probada en batalla), y carencias funcionales (sin multi-usuario, sin sincronizacion, sin fine-tuning)."
+abstract: "Documentacion honesta de las limitaciones de server-nexe 1.0.7. Cubre soporte de plataformas (macOS 14+ Apple Silicon, Linux ARM64, Windows ARM64 (nuevo en 1.0.7; installer sin firmar — SmartScreen avisa; backend Ollama), Intel NO soportado), calidad de modelos vs nube (GPT-4/Claude), limitaciones de RAG (embeddings, chunking, arranque en frio, contradicciones), compatibilidad parcial de API OpenAI, rendimiento (instancia unica, concurrencia), restricciones de seguridad, advertencias sobre encriptacion (default auto, nueva, no probada en batalla), y carencias funcionales (sin multi-usuario, sin sincronizacion, sin fine-tuning)."
 tags: [limitations, platform, models, rag, performance, security, api, compatibility, honest, encryption]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Limitaciones — server-nexe 1.0.6
+# Limitaciones — server-nexe 1.0.7
 
 Este documento describe honestamente lo que server-nexe no puede hacer o no hace bien.
 
@@ -30,7 +30,7 @@ Este documento describe honestamente lo que server-nexe no puede hacer o no hace
 | macOS Intel | **NO soportado** (eliminado en v0.9.9 — wheels arm64-only, sin MLX) |
 | Linux ARM64 | Soportado (Ollama, CPU) — testeado en VM Ubuntu 24.04 ARM64 (UTM). Instalacion CLI o nexe-app (Tauri). Rutas XDG. |
 | Linux x86_64 | Soportado (Ollama, CPU) — tests unitarios pasan, CLI validada. |
-| Windows | En desarrollo (sin ETA pública) |
+| Windows ARM64 | Soportado desde v1.0.7 (**NUEVO**) — installer NSIS (WebView2, wizard ca/es/en); solo backend Ollama; installer sin firmar — SmartScreen avisa |
 
 ## Calidad de los modelos
 
@@ -47,7 +47,7 @@ El backend MLX soporta modelos de vision (imagen + texto) via `mlx-vlm 0.4.4`. L
 
 Limitaciones actuales:
 - **Familia Qwen3.5 (Omni VLM, tamanos 2B/4B/9B/27B):** Funciona via MLX y Ollama con vision. El bundle DMG y el venv de dev incluyen `PyTorch` + `torchvision` (wheels cp312 macOS-arm64, ~92 MB net). El detector VLM detecta arquitectura `Qwen3_5MoeForConditionalGeneration` + `vision_config` y carga via `mlx-vlm.load()`. Verificado empiricamente 2026-05-13 con `qwen3.5:4b` describiendo imagenes correctamente. **Aun no soportados en el pipeline:** `Qwen3-Omni` y `Kimi-VL` (audio/video branch en `mlx-vlm` no expuesto).
-- **Modelo por defecto recomendado:** `gemma-4-e4b-4bit` (4.9 GB) o `gemma-4-31b-8bit` (20 GB). Imagen only, sin dependencias torch.
+- **Modelo por defecto recomendado:** `gemma4:e4b` (4.5 GB) o `gemma4:31b` (18.5 GB). Imagen only, sin dependencias torch.
 - **Audio/voz:** No soportado. Modelos como Qwen3-Omni, Kimi-VL o DeepSeek-VL-V2 tienen rama de audio en `mlx-vlm` pero el pipeline de server-nexe aun no lo expone.
 - **Video nativamente:** No soportado (ver modelos omni).
 

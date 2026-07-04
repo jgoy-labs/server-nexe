@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────────────────────
+# Nexe Server 0.9 — Windows ARM64 dependencies (SELF-CONTAINED)
+# ─────────────────────────────────────────────────────────────
+# Unlike requirements-linux.txt (an OVERLAY on requirements.txt), this file is
+# SELF-CONTAINED: build-sidecar.sh installs ONLY this file on Windows, NOT the
+# cross-platform requirements.txt. Reason — several base pins have NO win_arm64
+# wheel and must be overridden here:
+#   - cryptography 48.0.1  → 46.0.3  (48.x has no win_arm64 wheel)
+#   - uvicorn[standard]    → uvicorn (httptools + uvloop are POSIX-only / no wheel)
+#   - psutil 5.9.8         → 7.2.2   (5.9.8 has no win_arm64 wheel)
+#   - lingua 2.1.1         → 2.2.0   (2.1.1 has no win_arm64 wheel)
+#   - qdrant-client        → installed separately with --no-deps + grpc-shim
+# Every pin below was validated live on the Win11 ARM64 VM (req-vm2, 2026-06/07).
+# Windows is Ollama-only on the first release (MLX is Apple-only; llama-cpp deferred).
+#
+# ⚠️ SECURITY DELTA vs base: cryptography 46.0.3 trails 48.0.1 — revisit when a
+# win_arm64 wheel >46 lands. Do NOT bump blindly (no wheel → build breaks).
+
+# --- Core Server ---
+fastapi==0.136.3
+starlette==1.3.1
+# uvicorn WITHOUT [standard]: httptools + uvloop have no win_arm64 wheel (uvloop is
+# POSIX-only). Plain uvicorn (asyncio + h11) is fully functional on Windows.
+uvicorn==0.34.3
+pydantic==2.10.6
+pydantic-settings==2.14.2
+python-multipart==0.0.32
+starlette-csrf==3.0.0
+httpx==0.28.1
+# qdrant-client is installed separately by build-sidecar.sh with --no-deps (grpcio
+# has no win_arm64 wheel; the vendored grpc-shim satisfies qdrant's unconditional
+# `import grpc`). Do NOT list it here or pip would try to resolve grpcio.
+toml==0.10.2
+structlog==25.5.0
+click==8.4.1
+# rich/typer pinned on purpose (typer 0.9.x API used by the code; bumping breaks the
+# build and forces hf>=1.14). Keep in sync with requirements.txt.
+rich==13.9.4
+typer==0.9.4
+python-dotenv==1.2.2
+pyyaml==6.0.3
+numpy==2.4.6
+slowapi==0.1.9
+prometheus-client==0.25.0
+tenacity==9.1.4
+# psutil 5.9.8 has no win_arm64 wheel; 7.2.2 ships one (validated on the ARM64 VM).
+psutil==7.2.2
+huggingface_hub>=1.13.0,<1.14
+filelock==3.29.3
+platformdirs==4.10.0
+
+# --- Windows platform ---
+# pywin32: portalocker's Win32Locker needs it (qdrant local uses portalocker.lock for its
+# storage file lock). Without it the sidecar dies at startup: "pywintypes is required for
+# Win32Locker". Has a win_arm64 wheel (build 312), validated on the ARM64 VM (2026-07-01).
+pywin32==312
+
+# --- Memory & RAG ---
+fastembed==0.8.0
+pypdf==6.13.3
+# lingua 2.2.0 ships the win_arm64 wheel (2.1.1 did not); validated on the VM.
+lingua-language-detector==2.2.0
+
+# --- Encryption at rest ---
+# cryptography 48.0.1 has NO win_arm64 wheel; 46.0.3 is the newest that does.
+cryptography==46.0.3
+keyring==25.7.0
+sqlcipher3==0.6.2
+
+# --- Security hardening ---
+defusedxml==0.7.1

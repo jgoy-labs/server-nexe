@@ -17,6 +17,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from core.server.process_utils import process_is_alive
 from core.env_utils import parse_port
 from core.paths.constants import BASE_CONFIG_RELATIVE
 
@@ -101,20 +102,19 @@ def _acquire_pidfile(pid_path: Path, port: int) -> bool:
         data = _json.loads(raw)
         existing_pid = int(data["pid"])
         existing_port = data.get("port", "?")
-        try:
-          os.kill(existing_pid, 0)  # signal 0 = liveness probe
+        # Windows-safe liveness probe (os.kill(pid, 0) is unreliable on Windows).
+        if process_is_alive(existing_pid):
           logger.error(
             "Server already running. PID: %s on port %s. Use './nexe stop' to stop it.",
             existing_pid, existing_port,
           )
           return False
-        except (ProcessLookupError, OSError):
-          logger.warning("Stale PID file found (PID %s dead), removing.", existing_pid)
-          try:
-            pid_path.unlink()
-          except OSError:
-            pass
-          # retry the atomic open in next iteration
+        logger.warning("Stale PID file found (PID %s dead), removing.", existing_pid)
+        try:
+          pid_path.unlink()
+        except OSError:
+          pass
+        # retry the atomic open in next iteration
       except (ValueError, KeyError, OSError, Exception) as e:
         logger.warning("Corrupt PID file (%s), removing.", e)
         try:

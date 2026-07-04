@@ -58,8 +58,13 @@ def test_resolve_falls_back_to_path(monkeypatch):
 
 def test_resolve_none_when_nothing_found(monkeypatch):
     monkeypatch.delenv("NEXE_OLLAMA_BIN", raising=False)
+    # isfile must be mocked too: the OLLAMA_BIN_CANDIDATES fallback loop checks
+    # os.path.isfile (not exists) — on a dev Mac with a real
+    # /usr/local/bin/ollama the loop found it and this test failed (env-drift:
+    # it silently passed on machines without Ollama installed).
     with patch.object(rt.platform, "system", return_value="Linux"), \
          patch.object(rt.os.path, "exists", return_value=False), \
+         patch.object(rt.os.path, "isfile", return_value=False), \
          patch.object(rt.shutil, "which", return_value=None):
         assert rt.resolve_ollama_bin() is None
 

@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-errors-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Errors comuns i solucions per a server-nexe 1.0.6. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, streaming, errors d'encriptacio i les correccions de memoria de v0.9.9 (MEK fallback, personal_memory wipe)."
+abstract: "Errors comuns i solucions per a server-nexe 1.0.7. Cobreix errors d'instal·lacio, arrencada del servidor, Web UI, autenticacio API, carrega de models, memoria/RAG, streaming, errors d'encriptacio i les correccions de memoria de v0.9.9 (MEK fallback, personal_memory wipe)."
 tags: [errors, troubleshooting, debugging, installation, startup, web-ui, api, models, memory, streaming, encryption]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Errors comuns — server-nexe 1.0.6
+# Errors comuns — server-nexe 1.0.7
 
 ## Errors d'instal·lacio
 
@@ -27,6 +27,16 @@ expires: null
 | Permission denied on setup.sh | Falta permis d'execucio | `chmod +x setup.sh` |
 | ModuleNotFoundError | Dependencies no instal·lades | Activa el venv: `source venv/bin/activate`, despres `pip install -r requirements.txt` |
 | rumps import error on Linux | Dependencia exclusiva de macOS | Normal a Linux — rumps esta a requirements-macos.txt, no a requirements.txt |
+
+### Windows ARM64 — suportat des de v1.0.7 (installer sense signar; SmartScreen avisa)
+
+A Windows el motor es **Ollama** (l'app l'instal·la automaticament; MLX es exclusiu d'Apple Silicon).
+
+| Error | Causa | Solucio |
+|-------|-------|----------|
+| SmartScreen: "Windows ha protegit el teu equip" | L'installer NSIS no esta signat — es l'avis esperat | Clica **"Mes informacio"** → **"Executar igualment"** |
+| Falta WebView2 | Runtime WebView2 absent | L'installer el gestiona automaticament. Si falla, torna a executar l'installer. |
+| `pkill` / `lsof`: command not found | Comandes Unix que no existeixen a Windows | Equivalents: `taskkill /F /IM <proces>` i `netstat -ano \| findstr 9119` |
 
 ## Errors d'arrencada del servidor
 
@@ -65,7 +75,7 @@ expires: null
 |-------|-------|----------|
 | OOM Killed | Model massa gran per a la RAM | Utilitza un model mes petit. 8GB RAM -> models 2B maxim. |
 | Carrega de model molt lenta | Model gran o GPU freda | Normal per a models 32B+. L'indicador de carrega mostra el progres. |
-| MLX not available | Mac Intel o Linux | MLX es nomes Apple Silicon. Utilitza llama.cpp o Ollama. |
+| MLX not available | Mac Intel, Linux o Windows | MLX es nomes Apple Silicon. Utilitza llama.cpp o Ollama; a Windows, usa Ollama (unic backend suportat a Windows). |
 | Qwen3.5 falla amb MLX (versions < v0.9.7) | Model multimodal incompatible | Des de v0.9.7 el backend MLX suporta VLM via mlx_vlm. Des de v0.9.8 el detector "any-of" cobreix més arquitectures. Si falla, utilitza el backend Ollama com a alternativa. |
 
 ## Errors de memoria/RAG
@@ -156,8 +166,8 @@ El menú del tray (veure `INSTALLATION.md` — App de safata (NexeTray, macOS)) 
 
 ### Què incloure al report (GitHub Issue)
 
-- **Versió**: la veuràs al menú del tray com a `server.nexe v1.0.6` (o executa `./nexe --version`)
-- **SO + hardware**: `sw_vers` i `uname -m` (M1/M2/M3/M4)
+- **Versió**: la veuràs al menú del tray com a `server.nexe v1.0.7` (o executa `./nexe --version`)
+- **SO + hardware**: macOS: `sw_vers` i `uname -m` (M1/M2/M3/M4) · Linux: `uname -a` · Windows: `systeminfo` o `winver` (Snapdragon/ARM64)
 - **Backend actiu**: MLX / llama.cpp / Ollama (el veus a `/ui/backends` o al tray)
 - **Model en ús**: nom del model carregat
 - **Passos per reproduir**: què estaves fent just abans de l'error

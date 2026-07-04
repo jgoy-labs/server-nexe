@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-security-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe 1.0.6 security: dual-key authentication, rate limiting (incl. PATCH thinking 10/min and NEXE_RATE_LIMIT_GLOBAL 100/min), 6 injection detectors, 49 jailbreak patterns, OWASP headers, RFC5424 logging, AES-256-GCM encryption at-rest (SQLCipher, .enc sessions), MEK fallback order (file->keyring->env->generate), RAG injection sanitization (_filter_rag_injection). Fully local, zero external calls."
+abstract: "server-nexe 1.0.7 security: dual-key authentication, rate limiting (incl. PATCH thinking 10/min and NEXE_RATE_LIMIT_GLOBAL 100/min), 6 injection detectors, 49 jailbreak patterns, OWASP headers, RFC5424 logging, AES-256-GCM encryption at-rest (SQLCipher, .enc sessions), MEK fallback order (file->keyring->env->generate), RAG injection sanitization (_filter_rag_injection). Fully local, zero external calls."
 tags: [security, authentication, api-key, dual-key, rate-limiting, headers, csp, injection, jailbreak, sanitizer, ai-audit, logging, rfc5424, encryption, crypto, sqlcipher, local, privacy]
 chunk_size: 600
 priority: P1
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Security — server-nexe 1.0.6
+# Security — server-nexe 1.0.7
 
 ## Table of contents
 
@@ -49,7 +49,7 @@ expires: null
 - [Security Checklist](#security-checklist)
 - [Reporting Vulnerabilities](#reporting-vulnerabilities)
 
-server-nexe 1.0.6 is designed for trusted local environments. All data stays on-device. No telemetry, no external calls.
+server-nexe 1.0.7 is designed for trusted local environments. All data stays on-device. No telemetry, no external calls.
 
 ## Authentication
 
@@ -98,7 +98,7 @@ Implementation: `slowapi` with `@limiter.limit()` decorator on every endpoint. `
 
 Applied via `core/security_headers.py` and middleware:
 
-- `Content-Security-Policy`: script-src 'self' (no inline scripts — i18n uses `data-nexe-lang` attribute instead)
+- `Content-Security-Policy`: script-src 'self' in standalone mode (no `unsafe-inline`). The served HTML contains one inline `<script>` (external-link opener) that the standalone CSP blocks; in Tauri sidecar mode `'unsafe-inline'` is added so it runs. i18n uses the `data-nexe-lang` attribute, not inline script.
 - `Strict-Transport-Security`: max-age=31536000; includeSubDomains
 - `X-Content-Type-Options`: nosniff
 - `X-Frame-Options`: DENY
@@ -176,7 +176,7 @@ This is part of the v0.9.9 MEM_DELETE fix (see RAG.md). It applies both on inges
 ### CryptoProvider
 
 - Algorithm: **AES-256-GCM** with **HKDF-SHA256** key derivation
-- **MEK (Master Encryption Key) fallback chain** (corrected in v0.9.9): **file `~/.nexe/master.key` (permissions 600) → OS Keyring (macOS Keychain) → env var `NEXE_MASTER_KEY` → new generation**.
+- **MEK (Master Encryption Key) fallback chain** (corrected in v0.9.9): **file `~/.nexe/master.key` (permissions 600) → OS Keyring (macOS Keychain / Linux Secret Service / Windows Credential Locker) → env var `NEXE_MASTER_KEY` → new generation**.
   - This allows `.enc` sessions to survive a Keychain reset provided the local file or env var remains intact.
   - Before v0.9.9 the order was keyring first, and a Keychain reset made the data unrecoverable.
 - Derived keys per purpose: `"sqlite"`, `"sessions"`, `"text_store"`, `"backup"`
@@ -303,7 +303,7 @@ These AI audits find many issues but are **not exhaustive** — there are certai
 - [ ] API keys are strong (32+ hex characters)
 - [x] Qdrant embedded — no network port exposed (no firewall rules needed for Qdrant)
 - [ ] Server port (9119) bound to 127.0.0.1 (not 0.0.0.0)
-- [ ] Disk encryption enabled (FileVault on macOS, LUKS on Linux)
+- [ ] Disk encryption enabled (FileVault on macOS, LUKS on Linux, BitLocker/Device Encryption on Windows)
 - [ ] Rate limiting configured appropriately
 - [ ] Encryption at rest enabled if handling sensitive data (`NEXE_ENCRYPTION_ENABLED=true`)
 - [ ] Regular updates applied

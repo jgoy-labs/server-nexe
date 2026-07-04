@@ -15,7 +15,7 @@
   <img src=".github/badges/coverage.svg" alt="Coverage">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
   <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white" alt="Python"></a>
-  <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI"></a>
+  <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white" alt="FastAPI"></a>
   <a href="https://v2.tauri.app"><img src="https://img.shields.io/badge/Tauri%20v2-desktop%20app-FFC131?logo=tauri&logoColor=white" alt="Tauri v2"></a>
 </p>
 
@@ -42,9 +42,11 @@
 
 ---
 
-> **v1.0.6 — Enduriment de seguretat.** Server Nexe ara es distribueix com a aplicació d'escriptori Tauri v2 amb wizard d'onboarding, safata del sistema, i gestió automàtica del sidecar. Disponible com a **macOS DMG** (Apple Silicon) i **Linux AppImage** (ARM64). Veure [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
+> **v1.0.7 — Correccions de memòria i col·leccions, suport Windows ARM64.** Server Nexe ara es distribueix com a aplicació d'escriptori Tauri v2 amb wizard d'onboarding, safata del sistema, i gestió automàtica del sidecar. Disponible com a **macOS DMG** (Apple Silicon), **Linux AppImage** (ARM64) i **installer Windows ARM64** (sense signar — SmartScreen avisa). Veure [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest).
 >
 > **Nota Linux:** provat a màquines virtuals Ubuntu 24.04 ARM64 (UTM). Inferència CPU (Ollama) verificada. Si proves en hardware natiu o amb acceleració GPU, si us plau [obre un issue](https://github.com/jgoy-labs/server-nexe/issues) amb els teus resultats.
+>
+> **Nota Windows:** Windows ARM64 — suportat des de v1.0.7 (installer sense signar; SmartScreen avisa: "Més informació" → "Executar igualment"). L'installer gestiona WebView2; l'app instal·la Ollama (el motor d'inferència a Windows) automàticament al primer ús, des de l'assistent d'onboarding.
 
 ---
 
@@ -54,7 +56,7 @@
 - [Captures](#captures)
 - [Per Què Server Nexe?](#per-què-server-nexe)
 - [Inici Ràpid](#inici-ràpid)
-  - [Opció A: App d'escriptori (macOS / Linux)](#opció-a-app-descriptori-macos--linux)
+  - [Opció A: App d'escriptori (macOS / Linux / Windows)](#opció-a-app-descriptori-macos--linux--windows)
   - [Opció B: Línia de comandes](#opció-b-línia-de-comandes)
   - [Opció C: Headless (servidors, scripts, CI)](#opció-c-headless-servidors-scripts-ci)
 - [Backends](#backends)
@@ -79,7 +81,7 @@ Server Nexe va començar com un experiment de learning-by-doing: *"Què caldria 
 
 **Tot aquest projecte — codi, tests, auditories, documentació — ha estat construït per una persona orquestrant diferents models d'IA**, tant locals (MLX, Ollama) com al núvol (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), com a col·laboradors. L'humà decideix què construir, dissenya l'arquitectura, revisa línia i executa test. Les IAs escriuen, auditen i fan stress-test sota direcció humana.
 
-El que va començar com un prototip s'ha convertit en un producte genuïnament útil: 7165 tests, auditories de seguretat, encriptació at-rest, un instal·lador macOS amb detecció de hardware, i un sistema de plugins. No està acabat — hi ha un roadmap ple d'idees — però ja fa el que es proposava: **executar un servidor d'IA a la teva màquina, amb memòria que persisteix, i zero dades sortint del teu dispositiu.**
+El que va començar com un prototip s'ha convertit en un producte genuïnament útil: 7694 tests, auditories de seguretat, encriptació at-rest, un instal·lador macOS amb detecció de hardware, i un sistema de plugins. No està acabat — hi ha un roadmap ple d'idees — però ja fa el que es proposava: **executar un servidor d'IA a la teva màquina, amb memòria que persisteix, i zero dades sortint del teu dispositiu.**
 
 No intenta competir amb ChatGPT ni Claude. Però sí pot ser complementari per a feines menys feixugues. És una eina open-source per a gent que vol ser propietària de la seva infraestructura d'IA. Construït per una persona a Barcelona, amb IA com a copilot, música, i tossuderia.
 
@@ -145,7 +147,7 @@ Plugins auto-descoberts amb manifests independents. Seguretat, web UI, RAG, back
 <td width="50%">
 
 ### App d'escriptori
-Aplicació Tauri v2 per macOS (DMG) i Linux (AppImage). L'assistent d'onboarding detecta el teu hardware, tria el backend adequat, recomana models per la teva RAM, i et posa en marxa en minuts. Safata del sistema, menús natius, i gestió automàtica del sidecar.
+Aplicació Tauri v2 per macOS (DMG), Linux (AppImage) i Windows ARM64 (installer, des de v1.0.7). L'assistent d'onboarding detecta el teu hardware, tria el backend adequat, recomana models per la teva RAM, i et posa en marxa en minuts. Safata del sistema, menús natius, i gestió automàtica del sidecar.
 
 </td>
 </tr>
@@ -159,7 +161,7 @@ Puja .txt, .md o .pdf i s'indexen automàticament per RAG. Cada document només 
 <td width="50%">
 
 ### Construït per Créixer
-7165 tests (~85% cobertura), auditoria de seguretat, i18n en 3 idiomes, API completa. El que va començar com un experiment es construeix amb pràctiques de producció.
+7694 tests (~85% cobertura), auditoria de seguretat, i18n en 3 idiomes, API completa. El que va començar com un experiment es construeix amb pràctiques de producció.
 
 </td>
 </tr>
@@ -167,14 +169,15 @@ Puja .txt, .md o .pdf i s'indexen automàticament per RAG. Cada document només 
 
 ## Inici Ràpid
 
-### Opció A: App d'escriptori (macOS / Linux)
+### Opció A: App d'escriptori (macOS / Linux / Windows)
 
 Descarrega l'últim paquet de **[Releases](https://github.com/jgoy-labs/server-nexe/releases/latest)**:
 
 | Plataforma | Paquet | Mida |
 |------------|--------|------|
-| macOS (Apple Silicon) | `nexe-app_1.0.6_aarch64.dmg` | ~1.3 GB |
-| Linux (ARM64) | `nexe-app_1.0.6_aarch64.AppImage` | ~1.2 GB |
+| macOS (Apple Silicon) | `nexe-app_1.0.7_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.7_aarch64.AppImage` | ~1.2 GB |
+| Windows (ARM64) | `nexe-app_1.0.7_arm64-setup.exe` (sense signar — SmartScreen avisa) | ~1.3 GB |
 
 L'assistent d'onboarding ho gestiona tot: detecció de hardware, selecció de backend, descàrrega de model, i configuració. L'app executa server-nexe com a procés sidecar amb integració a la safata del sistema.
 
@@ -199,7 +202,8 @@ nexe status             # estat del sistema
 ### Opció C: Headless (servidors, scripts, CI)
 
 ```bash
-python -m installer.install_headless --backend ollama --model qwen3.5:latest
+# La config es passa com a JSON per stdin — claus: model_key (una clau del catàleg) i engine
+echo '{"model_key": "qwen35_4b", "engine": "ollama"}' | python -m installer.install_headless
 nexe go
 ```
 
@@ -220,7 +224,7 @@ nexe go
 |---------|-----------|-------------|
 | **MLX** | macOS (Apple Silicon) | Recomanat per Mac — acceleració GPU Metal nativa, el més ràpid en xips M |
 | **llama.cpp** | macOS / Linux | Universal — format GGUF, Metal a Mac, CPU/CUDA a Linux |
-| **Ollama** | macOS / Linux | Pont a instal·lacions Ollama existents, gestió de models més fàcil |
+| **Ollama** | macOS / Linux / Windows | Pont a instal·lacions Ollama existents, gestió de models més fàcil — el motor a Windows (s'instal·la automàticament) |
 
 L'instal·lador detecta automàticament el teu hardware i recomana el millor backend. Pots canviar en qualsevol moment a `personality/server.toml`.
 
@@ -231,8 +235,8 @@ L'instal·lador organitza els 14 models del catàleg per la RAM disponible al te
 | Tier | Models | Origen |
 |------|--------|--------|
 | **8 GB** | Qwen3.5 4B | Alibaba |
-| **16 GB** | Qwen3.5 9B, Gemma 4 E4B, Mistral Nemo 12B, Salamandra 7B | Alibaba, Google, Mistral AI, BSC/AINA |
-| **24 GB** | Qwen3.5 27B, Gemma 4 31B, Mistral Small 3.2 24B, GPT-OSS 20B | Alibaba, Google, Mistral AI, OpenAI |
+| **16 GB** | Qwen3.5 9B, Qwen3.5 4B (8-bit), Gemma 4 E4B, Mistral Nemo 12B, Salamandra 7B | Alibaba, Alibaba, Google, Mistral AI, BSC/AINA |
+| **24 GB** | Qwen3.5 27B, Mistral Small 3.2 24B, GPT-OSS 20B | Alibaba, Mistral AI, OpenAI |
 | **32 GB** | Qwen3.5 35B-A3B, Gemma 4 31B, Mixtral 8x7B, DeepSeek R1 32B, ALIA-40B | Alibaba, Google, Mistral AI, DeepSeek, BSC (Barcelona Supercomputing Center) |
 
 A més, pots usar qualsevol model d'Ollama pel seu nom o qualsevol model GGUF de Hugging Face.
@@ -294,9 +298,9 @@ Server Nexe utilitza un protocol de duck typing (NexeModule Protocol) — sense 
 
 ## Documentació AI-Ready
 
-La carpeta `knowledge/` conté 14 documents temàtics × 3 idiomes = 42 fitxers, estructurats amb frontmatter YAML per a ingestió RAG:
+La carpeta `knowledge/` conté 15 documents temàtics × 3 idiomes = 45 fitxers, estructurats amb frontmatter YAML per a ingestió RAG:
 
-API, Arquitectura, Casos d'ús, Errors, Identitat, Instal·lació, Limitacions, Plugins, RAG, README, Seguretat, Testing, Threat Model, Ús.
+API, Arquitectura, Casos d'ús, Errors, Identitat, Idiomes, Instal·lació, Limitacions, Plugins, RAG, README, Seguretat, Testing, Threat Model, Ús.
 
 Apunta qualsevol assistent d'IA a aquest repo i pot entendre l'arquitectura completa.
 
@@ -331,28 +335,38 @@ Server Nexe inclou un mòdul de seguretat activat per defecte:
 | macOS Apple Silicon (M1+) | **Suportat** — tots 3 backends | MLX, llama.cpp, Ollama |
 | macOS Intel | **No suportat** des de v0.9.9 | — |
 | macOS 13 Ventura o anterior | **No suportat** des de v0.9.9 (requereix macOS 14 Sonoma+) | — |
-| Linux x86_64 | **Parcial** — tests unitaris passen, CI verd, **NO testejat en producció** | llama.cpp, Ollama |
-| Linux ARM64 | No testejat directament | llama.cpp, Ollama (teòric) |
-| Windows | No suportat | — |
+| Linux ARM64 | **Suportat** — AppImage + Ollama, testejat en VM | Ollama |
+| Linux x86_64 | **Suportat** (Ollama, CPU) — tests unitaris passen | Ollama, llama.cpp |
+| Windows ARM64 | **Suportat** (v1.0.7) — installer sense signar, SmartScreen avisa | Ollama |
 
-> Des de v0.9.9, server-nexe requereix **macOS 14 Sonoma+ amb Apple Silicon (M1 o superior)**. Els wheels pre-construïts al DMG són `arm64` exclusius. Linux amb els backends llama.cpp i Ollama hauria de funcionar però l'auditoria completa de compatibilitat està al roadmap.
+> Des de v0.9.9, server-nexe requereix **macOS 14 Sonoma+ amb Apple Silicon (M1 o superior)**. Els wheels pre-construïts al DMG són `arm64` exclusius. Linux és suportat amb el backend Ollama (CPU). Testejat en VM Ubuntu 24.04 ARM64. Validació en hardware natiu al roadmap. Windows ARM64 — suportat des de v1.0.7: l'installer va sense signar (SmartScreen avisa — "Més informació" → "Executar igualment") i gestiona WebView2; l'app instal·la Ollama automàticament al primer ús.
 
 ## Requisits
 
-| | Mínim | Recomanat |
+RAM i disc són iguals a totes les plataformes (depenen del model que triïs, no del SO). SO, CPU/arquitectura i el backend d'inferència disponible sí que difereixen:
+
+| | macOS | Linux | Windows |
+|---|---|---|---|
+| **SO** | 14 Sonoma+ | Ubuntu 24.04+ (testejat en VM) | 11 ARM64 (des de v1.0.7) |
+| **CPU / arq.** | Apple Silicon (M1+) | x86_64 o ARM64 | ARM64 |
+| **Backend d'inferència** | MLX + llama.cpp + Ollama | Ollama (+ llama.cpp a x86_64) | només Ollama |
+| **Deps natives extra** | — (bundled) | WebKitGTK 4.1 | WebView2 (ho gestiona l'installer) |
+
+| Comú (totes les plataformes) | Mínim | Recomanat |
 |---|-------|-----------|
-| **SO** | macOS 14 Sonoma+ (Apple Silicon only) | macOS 14+ amb xip M-series recent |
-| **Python** | 3.11+ | 3.12+ |
 | **RAM** | 8 GB | 16 GB+ (per a models més grans) |
 | **Disc** | 10 GB lliure | 20 GB+ lliure (DMG offline bundled ~1.2 GB) |
+| **Python** | 3.11+ (només si instal·les des de codi font; l'installer el porta) | 3.12+ |
+
+> **Nota de backends**: els models marcats *"MLX Apple Silicon"* al catàleg funcionen **només a macOS**. A Windows i Linux ARM64 (només Ollama) no estan disponibles — tria un model amb backend Ollama.
 
 ## Testing
 
-7165 tests (~85% cobertura honest). El CI executa la suite completa a cada push.
+7694 tests (~85% cobertura honesta). El CI executa la suite completa a cada push.
 
 ```bash
 # Tests unitaris
-pytest core memory personality plugins -m "not integration and not e2e and not slow" \
+pytest tests -m "not integration and not e2e and not slow" \
   --cov=core --cov=memory --cov=personality --cov=plugins \
   --cov-report=term --tb=short -q
 
@@ -375,7 +389,7 @@ Server Nexe està en desenvolupament actiu. Pròximament:
 - [x] RAG injection sanitization + CLEAR_ALL 2-turn confirm (v0.9.9)
 - [x] Instal·lació offline 100% — DMG ~1.2 GB amb wheels + embedding bundled (v0.9.9+)
 - [x] Thinking toggle per sessió — endpoint `PATCH /ui/session/{id}/thinking` (v0.9.9+)
-- [x] App d'escriptori (Tauri v2) — macOS DMG + Linux AppImage, wizard d'onboarding, safata del sistema (v1.0.6)
+- [x] App d'escriptori (Tauri v2) — macOS DMG + Linux AppImage + instal·lador Windows ARM64, wizard d'onboarding, safata del sistema (v1.0.7)
 - [ ] Paràmetres d'inferència configurables via UI
 - [ ] Fòrum de comunitat
 
@@ -440,5 +454,5 @@ Consulta [LICENSE](LICENSE) per als detalls.
 ---
 
 <p align="center">
-  <strong>Versió 1.0.6</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
+  <strong>Versió 1.0.7</strong> · Apache 2.0 · Fet per <a href="https://www.jgoy.net">Jordi Goy</a> a Barcelona
 </p>

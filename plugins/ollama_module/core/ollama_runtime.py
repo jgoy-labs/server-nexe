@@ -47,6 +47,10 @@ OLLAMA_BIN_CANDIDATES = (
     "~/bin/ollama",
     OLLAMA_BUNDLE_BIN,
     "~/Applications/Ollama.app/Contents/Resources/ollama",
+    # Windows: standalone-zip install location written by _install_ollama_windows
+    # (also the default OllamaSetup.exe per-user target). expanduser maps ~ to
+    # %USERPROFILE%; on non-Windows this simply never exists (harmless).
+    "~/AppData/Local/Programs/Ollama/ollama.exe",
 )
 
 # Default readiness wait (used by consumers that DO wait).
@@ -71,7 +75,17 @@ def resolve_ollama_bin() -> "str | None":
         return override
     if platform.system() == "Darwin" and os.path.exists(OLLAMA_BUNDLE_BIN):
         return OLLAMA_BUNDLE_BIN
-    return shutil.which("ollama")
+    found = shutil.which("ollama")
+    if found:
+        return found
+    # App-bundle sidecars run with a minimal PATH, and on Windows the
+    # standalone-zip install is never on PATH — fall back to the well-known
+    # install locations so `serve` can still auto-start after onboarding.
+    for candidate in OLLAMA_BIN_CANDIDATES:
+        candidate = os.path.expanduser(candidate)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
 
 def spawn_ollama_serve() -> "subprocess.Popen | None":

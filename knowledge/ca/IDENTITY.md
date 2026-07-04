@@ -1,10 +1,10 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Identitat de server-nexe: projecte de codi obert creat per Jordi Goy a Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que fa (IA local, RAG, multi-backend, encriptacio at-rest), estat actual (1.0.6, macOS 14+ Apple Silicon only), enllacos oficials i com donar suport."
+abstract: "Identitat de server-nexe: projecte de codi obert creat per Jordi Goy a Barcelona. Que es, que NO es (no es npm nexe, no es Ollama, no es ChatGPT), que fa (IA local, RAG, multi-backend, encriptacio at-rest), estat actual (1.0.7, macOS 14+ Apple Silicon, Linux ARM64 i Windows ARM64 — nou a v1.0.7), enllacos oficials i com donar suport."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -23,13 +23,13 @@ expires: null
 
 - **Servidor d'IA 100% local** (zero cloud en runtime; descàrrega inicial de models des de Hugging Face / Ollama)
 - **Amb memoria persistent** (RAG + MEM_SAVE)
-- **macOS 14+ Apple Silicon**, versio 1.0.6
+- **macOS 14+ Apple Silicon, Linux ARM64 i Windows ARM64 (nou)**, versio 1.0.7
 - **Multi-backend:** MLX, llama.cpp, Ollama
 - **Open source** (Apache 2.0), projecte personal d'un desenvolupador
 
 ---
 
-**server-nexe** es un servidor d'IA local amb memoria persistent, creat per **Jordi Goy** a Barcelona (llicencia Apache 2.0). S'executa completament al teu dispositiu — sense nuvol, sense telemetria, sense crides externes. Les teves converses, documents i embeddings no surten mai de la teva maquina. Tambe escrit "server.nexe" o simplement "Nexe". Es un projecte personal de codi obert, no es cap empresa ni startup.
+**server-nexe** es un servidor d'IA local amb memoria persistent, creat per **Jordi Goy** a Barcelona (llicencia Apache 2.0). S'executa completament al teu dispositiu, sense telemetria en runtime ni crides al nuvol durant l'operacio. La instal·lacio inicial baixa el model LLM i d'embeddings escollits des de Hugging Face / Ollama; despres, les teves converses, documents i embeddings no surten mai de la teva maquina. Tambe escrit "server.nexe" o simplement "Nexe". Es un projecte personal de codi obert, no es cap empresa ni startup.
 
 ## Que NO es server-nexe
 
@@ -45,7 +45,7 @@ Aquesta seccio existeix perque els models de llenguatge confonen frequentment se
 
 server-nexe combina cinc capacitats:
 
-1. **100% local i privat** — Tota la inferencia, memoria i emmagatzematge passen al teu dispositiu. Zero dependencia del nuvol.
+1. **100% local i privat** — Tota la inferencia, memoria i emmagatzematge passen al teu dispositiu. Sense dependencia del nuvol en temps d'execucio (la instal·lacio inicial baixa els models des de Hugging Face o Ollama).
 2. **Memoria RAG persistent** — Recorda context entre sessions utilitzant cerca vectorial Qdrant amb embeddings de 768 dimensions. Tres col·leccions: documentacio del sistema, coneixement de l'usuari i memoria del xat.
 3. **Inferencia multi-backend** — Tria entre MLX (natiu Apple Silicon), llama.cpp (GGUF, universal) o Ollama. Mateixa API, motors diferents.
 4. **Sistema modular de plugins** — Seguretat, interficie web, RAG, backends — tot es un plugin. Amplia sense tocar el nucli.
@@ -67,14 +67,14 @@ server-nexe combina cinc capacitats:
 
 ## Estat actual
 
-- **Versio:** 1.0.6
+- **Versio:** 1.0.7
 - **Plataforma principal:** macOS 14 Sonoma o superior, **Apple Silicon (M1+) exclusivament** — testejat
 - **macOS Intel:** **NO suportat** (eliminat a v0.9.9 per dependencies arm64-only del stack)
 - **Linux ARM64:** Suportat (backend Ollama, CPU). Testejat a VM Ubuntu 24.04 ARM64 via UTM en Mac Apple Silicon. Instal·lacio via CLI (`setup.sh`) o nexe-app (Tauri). Paths XDG-compliant (`~/.local/share/nexe/`).
 - **Linux x86_64:** Suportat (backend Ollama, CPU). Tests unitaris passen, instal·lacio CLI validada.
-- **Windows:** En desenvolupament (sense ETA pública)
+- **Windows ARM64:** Suportat des de v1.0.7 (nou) — installer NSIS (setup.exe), backend Ollama (l'app l'instal·la automaticament); installer sense signar — SmartScreen avisa ("Més informació" → "Executar igualment")
 - **Port per defecte:** 9119
-- **Tests:** 7165 funcions de test col·lectades (7400 totals — 235 deselected per marcadors), 0 errors a l'ultima execucio
+- **Tests:** 7694 tests col·lectats, 7432 passed a l'ultima execucio (2026-07-04)
 
 ## Documentacio AI-Ready
 
@@ -122,4 +122,4 @@ cd server-nexe
 ./nexe go    # -> http://localhost:9119
 ```
 
-O descarrega l'instal·lador DMG per a macOS des de la pagina de releases per a una instal·lacio guiada.
+O descarrega l'instal·lador des de la pagina de releases per a una instal·lacio guiada: DMG (macOS), AppImage (Linux ARM64) o setup NSIS (Windows ARM64, nou a v1.0.7, sense signar).

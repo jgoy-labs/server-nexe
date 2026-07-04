@@ -143,6 +143,13 @@ def _signal_process(process, sig: int, direct) -> None:
     grup no es pot resoldre (ProcessLookupError/OSError), recau al senyal
     directe sobre el procés pare per no trencar el shutdown actual.
     """
+    # Windows has no process groups: os.killpg/os.getpgid don't exist and would
+    # raise AttributeError — which would ESCAPE the (ProcessLookupError, OSError)
+    # except below and skip direct(), leaving Ollama (and its model runners)
+    # orphaned on every shutdown. Fall straight to the direct per-process signal.
+    if not hasattr(os, "killpg") or not hasattr(os, "getpgid"):
+        direct()
+        return
     try:
         os.killpg(os.getpgid(process.pid), sig)
     except (ProcessLookupError, OSError) as e:
@@ -168,7 +175,13 @@ def _stop_process(process, name: str) -> None:
         except Exception as e2:
             logger.debug("Terminate failed for %s: %s", name, e2)
             try:
-                _signal_process(process, _signal.SIGKILL, process.kill)
+                # SIGKILL doesn't exist on Windows (AttributeError evaluated at
+                # the call-site before _signal_process runs); fall back to
+                # SIGTERM there. On Windows the sig is unused anyway (the gate
+                # above routes to direct() = process.kill() = TerminateProcess).
+                _signal_process(
+                    process, getattr(_signal, "SIGKILL", _signal.SIGTERM), process.kill
+                )
             except Exception:
                 # AP-G01: log diagnòstic sense canviar el flux (force-stop best-effort)
                 logger.debug("Failed to force-stop %s process", name, exc_info=True)

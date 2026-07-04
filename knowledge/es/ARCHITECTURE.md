@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-architecture
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Arquitectura interna de server-nexe 1.0.6. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, detector VLM 3-signal, precomputed KB embeddings, thinking toggle y diagramas Mermaid."
+abstract: "Arquitectura interna de server-nexe 1.0.7. Diseno de cinco capas: Interfaces, Core (factory FastAPI, endpoints divididos, lifespan, crypto), Plugins (5 modulos con auto-descubrimiento), Servicios Base (RAG memoria de 3 capas con TextStore), Almacenamiento. Cubre refactorizacion modular, module manager, i18n, pipeline de encriptacion, pipeline de sanitizacion de peticiones, detector VLM 3-signal, precomputed KB embeddings, thinking toggle y diagramas Mermaid."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Arquitectura — server-nexe 1.0.6
+# Arquitectura — server-nexe 1.0.7
 
 ## Tabla de contenidos
 
@@ -232,8 +232,8 @@ server-nexe/
 │   ├── i18n/                     # Gestor i18n + traducciones (ca/es/en)
 │   └── module_manager/           # FUENTE UNICA DE VERDAD para todos los modulos
 │
-├── installer/                    # Instalador macOS
-│   ├── swift-wizard/             # Wizard SwiftUI (12 ficheros Swift, 6 pantallas)
+├── installer/                    # Instaladores (macOS + Windows NSIS)
+│   ├── swift-wizard/             # Wizard SwiftUI (13 ficheros Swift, 6 pantallas)
 │   ├── NexeTray.app/             # Bundle macOS oficial del tray (LSUIElement, CFBundleIdentifier=net.servernexe.tray)
 │   │   └── Contents/MacOS/NexeTray  # Bash wrapper → exec venv/python -m installer.tray "$@"
 │   ├── build_dmg.sh              # Constructor de DMG con firma
@@ -241,14 +241,17 @@ server-nexe/
 │   ├── tray_monitor.py           # _RamMonitor (hilo daemon para polling RAM)
 │   ├── tray_translations.py      # Traducciones i18n de la bandeja (ca/es/en)
 │   ├── tray_uninstaller.py       # Desinstalador con backup
-│   └── install_headless.py       # Instalador headless (compatible con Linux)
+│   ├── install_headless.py       # Instalador headless (compatible con Linux)
+│   └── win/                      # Instalador Windows ARM64 (NSIS, grpc_shim) — nuevo en v1.0.7
 │
 ├── knowledge/                    # Documentacion para ingestion RAG (ca/es/en x 15 ficheros)
 │   └── .embeddings/              # KB embeddings precomputados (ONNX, 10.7× speedup en el arranque)
 ├── storage/                      # Datos en tiempo de ejecucion (no en git)
-├── tests/                        # 7165 funciones de test recopiladas (7400 totales)
+├── tests/                        # ~7700 funciones de test recopiladas
 └── nexe                          # Ejecutable CLI
 ```
+
+**Plataformas soportadas:** macOS 14+ Apple Silicon (DMG) · Linux ARM64 (AppImage) · Windows ARM64 — soportado desde v1.0.7 (instalador NSIS sin firmar; SmartScreen avisa: "Más información" → "Ejecutar de todas formas"; WebView2 lo gestiona el instalador). En Windows el motor es Ollama (la app lo instala automáticamente; MLX es exclusivo de Apple Silicon).
 
 ## Patron Factory
 
@@ -331,7 +334,7 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 ```toml
 [module]
 name = "module_name"
-version = "1.0.6"
+version = "1.0.7"
 type = "local_llm_option"
 description = "Descripcion del modulo"
 location = "plugins/module_name/"
@@ -449,7 +452,7 @@ Diferencias en modo sidecar:
 
 ## Arquitectura de tests
 
-- 7165 funciones de test recopiladas (7400 totales — 235 deselected por marcadores), 0 fallos en la ultima ejecucion
+- 7694 funciones de test recopiladas (7432 passed en la ultima ejecucion, 2026-07-04), 0 errores
 - Cobertura real: ~85% global (baseline honesta, sin inflar)
 - Tests colocados junto a los modulos (cada modulo tiene carpeta tests/)
 - conftest.py raiz para fixtures compartidas

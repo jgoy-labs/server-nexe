@@ -27,7 +27,7 @@ class SystemResponse(BaseModel):
         "system": f"server-nexe {__version__}",
         "description": "Module orchestration system operational",
         "status": "System ready and operational",
-        "version": "1.0.6",
+        "version": __version__,
         "type": "basic_server"
       }
     }
@@ -45,7 +45,7 @@ class HealthResponse(BaseModel):
       "example": {
         "status": "operational",
         "message": "Basic server operational",
-        "version": "1.0.6",
+        "version": __version__,
         "uptime": "3600"
       }
     }
@@ -68,7 +68,7 @@ class ApiInfoResponse(BaseModel):
     json_schema_extra={
       "example": {
         "name": f"server-nexe {__version__}",
-        "version": "1.0.6",
+        "version": __version__,
         "description": "Module orchestration system operational",
         "endpoints": [
           {

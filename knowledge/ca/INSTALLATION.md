@@ -1,12 +1,12 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-installation-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Com instal-lar server-nexe: (1) Desktop App nexe-app (Tauri v2, recomanat) — DMG macOS (~1.3 GB) i AppImage Linux ARM64 (~1.2 GB) des de Releases, amb onboarding wizard (deteccio hardware, tria backend, descarrega model) i mode sidecar amb safata. (2) CLI des de codi font: git clone + ./setup.sh (macOS/Linux). (3) Legacy: DMG SwiftUI standalone (substituit per la Desktop App). Requisits: macOS 14+ Apple Silicon (M1+) o Linux ARM64, 8GB RAM. Backends: MLX, llama.cpp, Ollama. Cataleg a models.json. Port: 9119."
-tags: [installation, setup, desktop-app, tauri, appimage, dmg, cli, macos, linux, requirements, models, backends, mlx, ollama, llama-cpp, tray, encryption, sidecar, wizard, how-to]
+abstract: "Com instal-lar server-nexe: (1) Desktop App nexe-app (Tauri v2, recomanat) — DMG macOS (~1.3 GB), AppImage Linux ARM64 (~1.2 GB) i installer NSIS per a Windows ARM64 (~1.3 GB, nou a 1.0.7, sense signar — SmartScreen avisa) des de Releases, amb onboarding wizard (deteccio hardware, tria backend, descarrega model) i mode sidecar amb safata. (2) CLI des de codi font: git clone + ./setup.sh (macOS/Linux). (3) Legacy: DMG SwiftUI standalone (substituit per la Desktop App). Requisits: macOS 14+ Apple Silicon (M1+), Linux ARM64 o Windows 11 ARM64, 8GB RAM. Backends: MLX, llama.cpp, Ollama (unic backend a Windows). Cataleg a models.json. Port: 9119."
+tags: [installation, setup, desktop-app, tauri, appimage, dmg, cli, macos, linux, windows, nsis, requirements, models, backends, mlx, ollama, llama-cpp, tray, encryption, sidecar, wizard, how-to]
 chunk_size: 600
 priority: P1
 
@@ -17,13 +17,13 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Instal·lacio — server-nexe 1.0.6
+# Instal·lacio — server-nexe 1.0.7
 
 ## En 30 segons
 
 - **3 metodes:** Desktop App nexe-app (Tauri, recomanat), CLI des de codi font (`./setup.sh`), o l'installer DMG SwiftUI legacy
-- **Desktop App:** DMG per macOS (~1.3 GB) + AppImage per Linux ARM64 (~1.2 GB), des de [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest)
-- **Requereix macOS 14 Sonoma + Apple Silicon** (M1+) o Linux ARM64
+- **Desktop App:** DMG per macOS (~1.3 GB) + AppImage per Linux ARM64 (~1.2 GB) + setup NSIS per Windows ARM64 (~1.3 GB, nou a v1.0.7, sense signar — SmartScreen avisa), des de [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest)
+- **Requereix macOS 14 Sonoma + Apple Silicon** (M1+), Linux ARM64 o Windows 11 ARM64
 - **Tria de model segons RAM:** l'onboarding wizard llegeix el cataleg mantingut (`models.json`) i recomana per la teva RAM
 - **Port per defecte:** 9119
 
@@ -35,8 +35,8 @@ Tres metodes d'instal·lacio disponibles. Tria segons la teva plataforma i prefe
 
 | Requisit | Minim | Recomanat |
 |------------|---------|-------------|
-| SO | **macOS 14 Sonoma** (Apple Silicon) / Linux ARM64 Ubuntu 24.04 (testejat a VM) / Linux x86_64 (parcial) | macOS 14+ (Apple Silicon M1+) |
-| CPU | **Apple Silicon (M1+) obligatori** — Intel NO suportat | M2 Pro / M3 Pro / M4 |
+| SO | **macOS 14 Sonoma** (Apple Silicon) / Linux ARM64 Ubuntu 24.04 (testejat a VM) / Linux x86_64 (parcial) / Windows 11 ARM64 (nou a 1.0.7 — installer NSIS sense signar, backend Ollama) | macOS 14+ (Apple Silicon M1+) |
+| CPU | **Apple Silicon (M1+) obligatori** a macOS — Intel NO suportat | M2 Pro / M3 Pro / M4 |
 | RAM | 8 GB | 16+ GB |
 | Disc | 10 GB lliures | 20+ GB (per a models grans) |
 | Python | 3.11+ (metode CLI) | 3.12 inclos (metode DMG) |
@@ -51,13 +51,15 @@ Descarrega l'ultim paquet des de la pagina de [Releases](https://github.com/jgoy
 
 | Plataforma | Paquet | Mida |
 |------------|--------|------|
-| macOS (Apple Silicon) | `nexe-app_1.0.6_aarch64.dmg` | ~1.3 GB |
-| Linux (ARM64) | `nexe-app_1.0.6_aarch64.AppImage` | ~1.2 GB |
+| macOS (Apple Silicon) | `nexe-app_1.0.7_aarch64.dmg` | ~1.3 GB |
+| Linux (ARM64) | `nexe-app_1.0.7_aarch64.AppImage` | ~1.2 GB |
+| Windows (ARM64) | `nexe-app_1.0.7_arm64-setup.exe` (nou a v1.0.7, sense signar) | ~1.3 GB |
 
 - **Onboarding wizard** integrat al frontend (HTML/JS, no SwiftUI): deteccio de hardware, seleccio de backend, descarrega del model i configuracio, tot des de la mateixa app.
 - **Mode sidecar:** server-nexe corre amb `NEXE_SIDECAR=1`; els paths els gestiona Tauri (`NEXE_HOME`, `NEXE_DATA_DIR`).
 - **Safata de sistema** i gestio automatica del proces sidecar.
-- **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64).
+- **Cross-platform:** macOS (Apple Silicon) + Linux (ARM64) + Windows (ARM64, nou a v1.0.7).
+- **Windows:** suportat des de v1.0.7 — installer NSIS sense signar (SmartScreen avisa: "Mes informacio" → "Executar igualment"); WebView2 el gestiona l'installer; el motor es Ollama (l'app l'instal·la automaticament).
 - **Ollama bundled** o auto-instal·lat.
 
 El cataleg de models el llegeix el wizard del fitxer mantingut `models.json`. El binari Tauri (repo nexe-app) en porta una copia de fallback empotrada en temps de compilacio (`nexe-app/src-tauri/resources/catalog_fallback.json`), no a aquest repo. Vegeu el cataleg complet mes avall.
@@ -68,7 +70,7 @@ El cataleg de models el llegeix el wizard del fitxer mantingut `models.json`. El
 |---------|----------|----------|
 | MLX | Nomes Apple Silicon | El mes rapid en serie M, GPU Metal + Neural Engine |
 | llama.cpp | macOS + Linux | Format GGUF universal, acceleracio Metal a Mac |
-| Ollama | macOS + Linux | Si ja tens Ollama instal·lat, la configuracio mes facil |
+| Ollama | macOS + Linux + Windows (unic backend a Windows, nou a 1.0.7) | Si ja tens Ollama instal·lat, la configuracio mes facil |
 
 ## Metode 2: CLI des de codi font
 
@@ -104,7 +106,7 @@ Wizard natiu SwiftUI amb 6 pantalles, amb Python 3.12 bundled i instal·lacio 10
 
 ## Cataleg de models (4 tiers per RAM)
 
-El cataleg canonic viu a `installer/swift-wizard/Resources/models.json` (font de veritat, mantinguda al repo i llegida per l'onboarding wizard). La taula seguent n'es un reflex (actualment 15 entrades de model en 4 tiers; 14 models distints, ja que Gemma 4 31B apareix a 2 tiers):
+El cataleg canonic viu a `installer/swift-wizard/Resources/models.json` (font de veritat, mantinguda al repo i llegida per l'onboarding wizard). La taula seguent n'es un reflex (actualment 14 entrades de model en 4 tiers poblats; els tiers tier_48 i tier_64 existeixen pero son buits):
 
 ### tier_8 (8 GB RAM)
 | Model | Backends | 👁 | 🧠 | Rec. |
@@ -115,7 +117,7 @@ El cataleg canonic viu a `installer/swift-wizard/Resources/models.json` (font de
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
 | Qwen3.5 9B | Ollama, MLX | 👁 | 🧠 | |
-| Qwen3.5 4B (8-bit) | Ollama, MLX | 👁 | 🧠 | |
+| Qwen3.5 4B (8-bit) | MLX | 👁 | 🧠 | |
 | Gemma 4 E4B | Ollama, MLX | 👁 | 🧠 | |
 | Mistral Nemo 12B | Ollama, MLX | | 🧠 | |
 | Salamandra 7B | Ollama, llama.cpp | | | iberic |
@@ -124,7 +126,6 @@ El cataleg canonic viu a `installer/swift-wizard/Resources/models.json` (font de
 | Model | Backends | 👁 | 🧠 | Rec. |
 |-------|----------|-----|-----|------|
 | Qwen3.5 27B | Ollama, MLX | 👁 | 🧠 | |
-| Gemma 4 31B | Ollama, MLX | 👁 | 🧠 | |
 | Mistral Small 3.2 24B | Ollama, MLX | 👁 | 🧠 | |
 | GPT-OSS 20B | Ollama, MLX | | 🧠 | |
 
@@ -271,29 +272,29 @@ Aixo encripta les bases de dades SQLite (via SQLCipher), les sessions de xat (.j
 
 ## App de safata (NexeTray, macOS)
 
-Aplicacio de la barra de menu per controlar el servidor sense terminal. Implementada amb el framework `rumps` a la classe `NexeTray` (`installer/tray.py`, 711 linies). S'arrenca automaticament en mode `--attach` un cop el servidor esta en marxa (llançat per `core/server/runner.py`). El bundle `installer/NexeTray.app` (bash wrapper, `LSUIElement=true`, `CFBundleIdentifier=net.servernexe.tray`) evita les restriccions de provenance de macOS Sequoia.
+Aplicacio de la barra de menu per controlar el servidor sense terminal. Implementada amb el framework `rumps` a la classe `NexeTray` (`installer/tray.py`, 626 linies). S'arrenca automaticament en mode `--attach` un cop el servidor esta en marxa (llançat per `core/server/runner.py`). El bundle `installer/NexeTray.app` (bash wrapper, `LSUIElement=true`, `CFBundleIdentifier=net.servernexe.tray`) evita les restriccions de provenance de macOS Sequoia.
 
 ### Funcions del menu (d'amunt a avall)
 
 | Opcio | Que fa | Codi |
 |-------|--------|------|
-| **server.nexe v1.0.6** | Capçalera no clicable. La versio es llegeix dinamicament de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:196-206, 272` |
-| **Servidor actiu / aturat** | Indicador d'estat (no clicable). La icona de la barra canvia: `ICON_RUNNING` (verda) quan el servidor esta viu, `ICON_STOPPED` (gris) quan no. | `tray.py:223` |
-| **Aturar / Iniciar servidor** | Engega o atura el proces `core.app` (uvicorn + FastAPI + Qdrant). Fa SIGTERM i, si cal, SIGKILL. Gestio de PID a `storage/run/server.pid`. | `_toggle_server` → `tray.py:324` |
-| **Obrir Web UI** | Obre `http://127.0.0.1:9119/ui` al navegador per defecte. | `_open_web_ui` → `tray.py:564` |
-| **Obrir logs** | Obre `storage/logs/server.log` a l'editor associat amb `.log`. | `_open_logs` → `tray.py:567` |
-| **Server RAM** | RAM consumida pel proces servidor + model carregat. El polling (`psutil`) es fa a un daemon thread (`RamMonitor`, `installer/tray_monitor.py`, 142 linies) per no bloquejar el menu (fix post-v0.9.0 — abans freezava el teclat). | `tray_monitor.py`; `tray.py:231` |
-| **Temps (uptime)** | Temps viu del servidor calculat des de `server_start_time`. | `tray.py:234` |
-| **Documentacio** | Obre la documentacio oficial. Item afegit al menu principal per reemplaçar un enllaç duplicat. | `_open_docs` → `tray.py:578` |
-| **Configuracio** | Submenu amb 3 opcions: | `tray.py:253-269` |
-| ↳ server-nexe.com | Obre la web oficial al navegador. | `_open_website` → `tray.py:575` |
-| ↳ Suportar el projecte | Obre GitHub Sponsors. | `_open_donate` → `tray.py:583` |
-| ↳ Desinstal·lar Nexe | Llança el desinstal·lador amb doble confirmacio, calcula l'espai, elimina entrades Dock/Login Items, fa backup de `storage/` amb marca de temps. **NO esborra la carpeta del projecte** (opcio de seguretat). | `_uninstall` → `tray.py:586` + `installer/tray_uninstaller.py` (349 linies) |
-| **Sortir** | Atura el servidor si esta corrent i tanca l'app del tray. | `_quit` → `tray.py:636` |
+| **server.nexe v1.0.7** | Capçalera no clicable. La versio es llegeix dinamicament de `pyproject.toml` via `tomllib` (SSOT). | `tray.py:114-187` |
+| **Servidor actiu / aturat** | Indicador d'estat (no clicable). La icona de la barra canvia: `ICON_RUNNING` (verda) quan el servidor esta viu, `ICON_STOPPED` (gris) quan no. | `tray.py` |
+| **Aturar / Iniciar servidor** | Engega o atura el proces `core.app` (uvicorn + FastAPI + Qdrant). Fa SIGTERM i, si cal, SIGKILL. Gestio de PID a `storage/run/server.pid`. | `_toggle_server` |
+| **Obrir Web UI** | Obre `http://127.0.0.1:9119/ui` al navegador per defecte. | `_open_web_ui` |
+| **Obrir logs** | Obre `storage/logs/server.log` a l'editor associat amb `.log`. | `_open_logs` |
+| **Server RAM** | RAM consumida pel proces servidor + model carregat. El polling (`psutil`) es fa a un daemon thread (`RamMonitor`, `installer/tray_monitor.py`, 142 linies) per no bloquejar el menu (fix post-v0.9.0 — abans freezava el teclat). | `tray_monitor.py`; `_update_stats` |
+| **Temps (uptime)** | Temps viu del servidor calculat des de `server_start_time`. | `_update_stats` |
+| **Documentacio** | Obre la documentacio oficial. Item afegit al menu principal per reemplaçar un enllaç duplicat. | `_open_docs` |
+| **Configuracio** | Submenu amb 3 opcions: | `tray.py` |
+| ↳ server-nexe.com | Obre la web oficial al navegador. | `_open_website` |
+| ↳ Suportar el projecte | Obre GitHub Sponsors. | `_open_donate` |
+| ↳ Desinstal·lar Nexe | Llança el desinstal·lador amb doble confirmacio, calcula l'espai, elimina entrades Dock/Login Items, fa backup de `storage/` amb marca de temps. **NO esborra la carpeta del projecte** (opcio de seguretat). | `_uninstall` + `installer/tray_uninstaller.py` (264 linies) |
+| **Sortir** | Atura el servidor si esta corrent i tanca l'app del tray. | `_quit` |
 
 ### Actualitzacio automatica
 
-Un `rumps.Timer(self._update_stats, 5)` (`tray.py:302`) executa el callback `_update_stats` (`tray.py:513`) cada 5 segons: refresca RAM, uptime, i verifica estat (si el proces ha mort inesperadament → canvia icona i status).
+Un `rumps.Timer(self._update_stats, 5)` (`tray.py:217`) executa el callback `_update_stats` (`tray.py:428`) cada 5 segons: refresca RAM, uptime, i verifica estat (si el proces ha mort inesperadament → canvia icona i status).
 
 ### Traduccions
 

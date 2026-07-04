@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import os
 from pathlib import Path  # noqa: F401  # patched by tests via patch("memory.rag.health.Path")
 from typing import Dict, Any, List
 import psutil
@@ -137,8 +138,24 @@ def check_rag_sources(module) -> Dict[str, Any]:
       "message": i18n.t("rag.health.sources_check_error", "Error checking sources: {error}", error=str(e))
     }
 
-def check_disk_space(min_gb: float = 10.0) -> Dict[str, Any]:
-  """Check 6: Verify available disk space (>10GB)."""
+def check_disk_space(min_gb: float | None = None) -> Dict[str, Any]:
+  """Check 6: Verify available disk space.
+
+  Low disk DEGRADES the RAG; it never blocks startup. The critical branch
+  reports "warn" (not "fail"), so the aggregate stays "degraded" and the app
+  still boots (readiness treats only "unhealthy" as not-ready). The threshold
+  is configurable via NEXE_RAG_MIN_DISK_GB (default 5 GB) so a desktop/VM with
+  a small disk does not warn too eagerly.
+  """
+  if min_gb is None:
+    try:
+      min_gb = float(os.environ.get("NEXE_RAG_MIN_DISK_GB", "5.0"))
+    except (TypeError, ValueError):
+      min_gb = 5.0
+    if min_gb <= 0:
+      # A non-positive threshold would make the check always "pass" and silently
+      # disable the disk signal — fall back to the documented default.
+      min_gb = 5.0
   i18n = get_i18n()
   try:
     disk = psutil.disk_usage(".")
@@ -161,7 +178,11 @@ def check_disk_space(min_gb: float = 10.0) -> Dict[str, Any]:
         required=min_gb
       )
     else:
-      status = "fail"
+      # Low disk DEGRADES the RAG; it does NOT block startup. Readiness treats
+      # "unhealthy" as not-ready (the web UI holds the "Iniciando…" overlay for
+      # ~6 min), but a critical disk still lets the RAG serve reads — so report
+      # "warn" (→ aggregate "degraded", app boots) while keeping the critical text.
+      status = "warn"
       message = i18n.t(
         "rag.health.disk_space_critical",
         "{free}GB available (critical: <{critical}GB)",
@@ -205,7 +226,7 @@ def check_health(module) -> Dict[str, Any]:
     checks.append(check_rag_sources(module))
     checks.append(check_qdrant_available())
     checks.append(check_storage_paths())
-    checks.append(check_disk_space(min_gb=10.0))
+    checks.append(check_disk_space())
 
     metadata = {
       "module_id": module.module_id,

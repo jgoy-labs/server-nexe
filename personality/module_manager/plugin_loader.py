@@ -190,7 +190,9 @@ class PluginLoaderMixin:
 
         module_path = module_info.path
         relative_path = Path(module_path).resolve().relative_to(project_root.resolve())
-        base_import_path = str(relative_path).replace('/', '.')
+        # Path.parts is separator-agnostic (Windows uses '\\'; a str.replace('/', '.')
+        # would leave backslashes and break the import path)
+        base_import_path = '.'.join(relative_path.parts)
 
         manifest_module = None
         tried_paths = []

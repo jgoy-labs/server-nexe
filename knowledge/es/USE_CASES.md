@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-use-cases
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Casos de uso practicos de server-nexe 1.0.6: asistente personal con memoria, base de conocimiento privada, desarrollo asistido (Cursor/Continue/Zed), busqueda semantica, experimentacion con backends, IA local segura para compliance. Incluye guia de cuando server-nexe tiene sentido (privacidad, offline, control) y cuando NO (multi-usuario, modelos frontier, hardware limitado, fine-tuning, SLA)."
+abstract: "Casos de uso practicos de server-nexe 1.0.7: asistente personal con memoria, base de conocimiento privada, desarrollo asistido (Cursor/Continue/Zed), busqueda semantica, experimentacion con backends, IA local segura para compliance. Incluye guia de cuando server-nexe tiene sentido (privacidad, offline, control) y cuando NO (multi-usuario, modelos frontier, hardware limitado, fine-tuning, SLA)."
 tags: [use-cases, casos-de-uso, asistente, rag, cursor, continue, zed, api, privacy, privacidad, local, compliance]
 chunk_size: 600
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Casos de uso — server-nexe 1.0.6
+# Casos de uso — server-nexe 1.0.7
 
 server-nexe esta pensado para escenarios donde **privacidad, control local y memoria persistente** tienen valor concreto. Esta es la lista de los casos de uso mas probados, con contexto practico para cada uno.
 
@@ -57,7 +57,7 @@ La API compatible con OpenAI (`/v1/chat/completions`) funciona con cualquier her
 
 **Para quien:** usuarios que quieren comparar empiricamente velocidad y calidad de distintos backends y modelos locales.
 
-Cambia entre **MLX** (nativo Apple Silicon), **llama.cpp** (GGUF universal) y **Ollama** (gestion facil) con un cambio de config. Catalogo de 15 modelos en 4 tiers de RAM — desde Qwen3.5 4B hasta ALIA-40B.
+Cambia entre **MLX** (nativo Apple Silicon), **llama.cpp** (GGUF universal) y **Ollama** (gestion facil) con un cambio de config. Catalogo de 14 modelos en 4 tiers de RAM — desde Qwen3.5 4B hasta ALIA-40B.
 
 **Ejemplo:** prueba Qwen3.5 9B (Ollama, tier_16) vs Gemma 4 E4B (MLX, tier_16) para saber cual encaja mejor con tu hardware y caso de uso.
 
@@ -79,7 +79,7 @@ Se honesto sobre las limitaciones. Hay casos de uso donde otras opciones son mej
 |-----------------|-----------|
 | Modelos frontier (GPT-5, Claude Opus 4.5, Gemini 3) | Servicios cloud oficiales — los modelos locales aun son menos capaces |
 | Multi-usuario con sync entre dispositivos | server-nexe es **mono-usuario por diseno**. Considera un despliegue client-server externo |
-| Soporte Windows de produccion | Windows esta en desarrollo activo — no recomendable para produccion ahora mismo. Linux ARM64 y x86_64 **estan soportados** (backend Ollama/llama.cpp, CPU) |
+| Soporte Windows de produccion | Windows ARM64 **esta soportado desde v1.0.7** (nuevo; installer sin firmar — SmartScreen avisa — y solo backend Ollama) — para produccion aun es prudente esperar a que madure. Windows x86_64 no esta soportado. Linux ARM64 y x86_64 **estan soportados** (backend Ollama/llama.cpp, CPU) |
 | Fine-tuning o entrenamiento de modelos | No es funcion de server-nexe. Usa MLX, transformers o Axolotl directamente |
 | Garantia de uptime y SLA | Es un proyecto open-source mantenido por una persona — no hay SLA |
 | Auditoria de seguridad profesional | Las auditorias actuales son IA-asistidas (Claude, Gemini), no por empresas humanas especializadas |

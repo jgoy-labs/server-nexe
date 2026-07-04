@@ -4,7 +4,7 @@ Thanks for considering a contribution to Server Nexe. This guide covers the deve
 
 ## Local development setup
 
-**Requirements:** Python 3.11+ (3.12 recommended), macOS or Linux.
+**Requirements:** Python 3.11+ (3.12 recommended), macOS, Linux, or Windows ARM64 (since v1.0.7 — see `requirements-windows.txt`).
 
 ```bash
 git clone https://github.com/jgoy-labs/server-nexe.git
@@ -30,7 +30,7 @@ nexe go
 
 ## Running tests
 
-The test suite collects **7165 tests** (of 7400 total; 235 deselected by default markers).
+The test suite collects **7694 tests**.
 
 ```bash
 # Fast unit tests (default gate — no external services needed)
@@ -54,7 +54,7 @@ Server Nexe uses auto-discovered plugins. Each plugin is a directory under `plug
 ```
 plugins/my_module/
 ├── manifest.toml    # Required: module metadata, dependencies, endpoints
-├── module.py        # Required: module class implementing ModuleInterface
+├── module.py        # Required: module class implementing the NexeModule protocol
 ├── __init__.py
 ├── tests/           # Tests for the plugin
 └── ...              # Additional files as needed
@@ -175,4 +175,4 @@ Be respectful and constructive. This is a personal project maintained in spare t
 
 ---
 
-*v1.0.6 · Apache 2.0 · Jordi Goy*
+*v1.0.7 · Apache 2.0 · Jordi Goy*

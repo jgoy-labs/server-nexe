@@ -2,7 +2,7 @@
 Additional coverage tests for memory/rag/health.py
 Covers: check_qdrant_available exception branches, check_storage_paths not writable,
         check_rag_sources source health exception, check_health exception path,
-        check_disk_space warn/fail
+        check_disk_space warn/degrade (never fail-by-value)
 """
 
 import pytest
@@ -86,13 +86,13 @@ class TestCheckRagSourcesCoverage:
 class TestCheckDiskSpaceCoverage:
 
     def test_disk_space_critical(self):
-        """Disk space below critical threshold."""
+        """Disk below the critical threshold degrades (warn), never fails."""
         mock_usage = MagicMock()
         mock_usage.free = 1 * 1024 ** 3  # 1 GB
         with patch("memory.rag.health.psutil") as mock_psutil:
             mock_psutil.disk_usage.return_value = mock_usage
             result = check_disk_space(min_gb=100.0)
-            assert result["status"] == "fail"
+            assert result["status"] == "warn"
 
     def test_disk_space_warn(self):
         """Disk space in warning range."""
@@ -102,6 +102,34 @@ class TestCheckDiskSpaceCoverage:
             mock_psutil.disk_usage.return_value = mock_usage
             result = check_disk_space(min_gb=10.0)
             assert result["status"] == "warn"
+
+    def test_disk_space_never_fails_on_zero_free(self):
+        """Even 0 bytes free degrades (warn) — the app must still boot."""
+        mock_usage = MagicMock()
+        mock_usage.free = 0
+        with patch("memory.rag.health.psutil") as mock_psutil:
+            mock_psutil.disk_usage.return_value = mock_usage
+            result = check_disk_space(min_gb=10.0)
+            assert result["status"] == "warn"
+
+    def test_disk_space_threshold_from_env(self, monkeypatch):
+        """NEXE_RAG_MIN_DISK_GB overrides the default; malformed falls back to 5 GB."""
+        mock_usage = MagicMock()
+        mock_usage.free = 3 * 1024 ** 3  # 3 GB free
+        with patch("memory.rag.health.psutil") as mock_psutil:
+            mock_psutil.disk_usage.return_value = mock_usage
+            # Default 5 GB → 3 GB below → warn
+            monkeypatch.delenv("NEXE_RAG_MIN_DISK_GB", raising=False)
+            assert check_disk_space()["status"] == "warn"
+            # Override to 2 GB → 3 GB above → pass
+            monkeypatch.setenv("NEXE_RAG_MIN_DISK_GB", "2")
+            assert check_disk_space()["status"] == "pass"
+            # Malformed → fallback to 5 GB default → 3 GB below → warn
+            monkeypatch.setenv("NEXE_RAG_MIN_DISK_GB", "not-a-number")
+            assert check_disk_space()["status"] == "warn"
+            # Non-positive → clamped to 5 GB default (not an always-pass no-op) → warn
+            monkeypatch.setenv("NEXE_RAG_MIN_DISK_GB", "-5")
+            assert check_disk_space()["status"] == "warn"
 
 
 class TestCheckHealthCoverage:

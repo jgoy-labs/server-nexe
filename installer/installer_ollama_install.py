@@ -71,12 +71,20 @@ def _find_ollama() -> str:
     found = shutil.which("ollama")
     if found:
         return found
-    for path in [
-        "/usr/local/bin/ollama",
-        "/opt/homebrew/bin/ollama",  # nosemgrep
-        os.path.expanduser("~/bin/ollama"),
-        "/Applications/Ollama.app/Contents/Resources/ollama",
-    ]:
+    if platform.system().lower() == "windows":
+        # Windows is never on PATH from a sidecar; check the standalone-zip
+        # install location (and the default OllamaSetup.exe per-user target).
+        candidates = [
+            os.path.expanduser(r"~\AppData\Local\Programs\Ollama\ollama.exe"),
+        ]
+    else:
+        candidates = [
+            "/usr/local/bin/ollama",
+            "/opt/homebrew/bin/ollama",  # nosemgrep
+            os.path.expanduser("~/bin/ollama"),
+            "/Applications/Ollama.app/Contents/Resources/ollama",
+        ]
+    for path in candidates:
         if os.path.isfile(path) and os.access(path, os.X_OK):
             return path
     return "ollama"  # fallback — let subprocess raise FileNotFoundError
@@ -150,6 +158,8 @@ def ensure_ollama_installed(headless: bool = False) -> bool:
         return _install_ollama_macos()
     if system == "linux":
         return _install_ollama_linux()
+    if system == "windows":
+        return _install_ollama_windows()
     print_warn(f"Ollama auto-install not supported on {system}")
     print(f"  {DIM}{t('ollama_install_manual')}{RESET}")
     return False
@@ -332,10 +342,123 @@ def _install_ollama_linux() -> bool:
                 pass
 
 
+def _install_ollama_windows() -> bool:
+    """Install Ollama on Windows from the official standalone zip.
+
+    Windows ships no ``Ollama.app`` and the GUI installer (``OllamaSetup.exe``)
+    is an InnoSetup wizard whose silent mode is broken upstream
+    (ollama/ollama#7969), so we mirror the macOS zip-extraction path instead:
+    download ``ollama-windows-<arch>.zip`` and unpack it (Zip-Slip-guarded)
+    under ``%LOCALAPPDATA%\\Programs\\Ollama`` — the same location _find_ollama
+    and OLLAMA_BIN_CANDIDATES look in. Unlike macOS there is no tray app, so we
+    also start ``ollama serve`` headless and wait for the daemon to accept
+    connections, otherwise the ``ollama pull`` that follows cannot connect.
+
+    The SHA-256 is compared against ``NEXE_OLLAMA_WINDOWS_SHA256`` when set
+    (opt-in pin, like the macOS/Linux paths); a mismatch aborts the install.
+    """
+    import hashlib
+    import socket
+    import tempfile
+
+    arch = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "amd64"
+    url = f"https://ollama.com/download/ollama-windows-{arch}.zip"
+    dest = Path(os.path.expandvars(r"%LOCALAPPDATA%\Programs\Ollama"))
+    expected_sha256 = os.environ.get("NEXE_OLLAMA_WINDOWS_SHA256", "").strip().lower()
+    zip_path: str | None = None
+    # DETACHED_PROCESS (0x8) | CREATE_NO_WINDOW (0x0800_0000): serve outlives us,
+    # no console window flashes in GUI mode.
+    detached_no_window = 0x0000_0008 | 0x0800_0000
+
+    try:
+        # No emoji: the Windows sidecar stdout is cp1252, not UTF-8 — a raw
+        # print() of an emoji raises UnicodeEncodeError and aborts the install.
+        print("  Downloading Ollama for Windows...")
+        tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+        zip_path = tmp.name
+        tmp.close()
+        result = subprocess.run(  # nosec B603 B607: url is the literal ollama.com download; zip_path is our tempfile; curl ships with Windows 10+
+            ["curl", "-fSL", "-o", zip_path, url],
+            timeout=600, capture_output=True,
+        )
+        if result.returncode != 0:
+            print_warn(t('ollama_install_failed'))
+            print(f"  {CYAN}Download: {url}{RESET}")
+            return False
+
+        with open(zip_path, "rb") as _f:
+            observed_sha256 = hashlib.sha256(_f.read()).hexdigest()
+        print(f"  {DIM}ollama-windows-{arch}.zip SHA-256: {observed_sha256}{RESET}")
+        if expected_sha256:
+            if observed_sha256 != expected_sha256:
+                print_warn(
+                    f"ollama-windows-{arch}.zip SHA-256 mismatch: "
+                    f"expected {expected_sha256}, got {observed_sha256}. Aborting install."
+                )
+                return False
+            print(f"  {DIM}SHA-256 matches NEXE_OLLAMA_WINDOWS_SHA256 pin{RESET}")
+        else:
+            print(
+                f"  {DIM}(no NEXE_OLLAMA_WINDOWS_SHA256 pin set — pin the "
+                f"digest above to fail-fast on future drift){RESET}"
+            )
+
+        dest.mkdir(parents=True, exist_ok=True)
+        print(f"  Installing to {dest}...")
+        # Zip Slip protection (same helper as macOS): a tampered archive must
+        # not write outside dest via absolute paths or ../ traversals.
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            _safe_extract_zip(zf, str(dest))
+
+        ollama_exe = dest / "ollama.exe"
+        if not ollama_exe.is_file():
+            print_warn("Ollama zip extracted but ollama.exe not found")
+            return False
+
+        print("  Starting Ollama...")
+        try:
+            subprocess.Popen(  # nosec B603: ollama_exe is the file we just extracted under our own %LOCALAPPDATA%; literal `serve`
+                [str(ollama_exe), "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=detached_no_window,
+            )
+        except Exception as e:  # noqa: BLE001 — serve is best-effort; the pull will surface a clear error if it never came up
+            print_warn(f"ollama serve did not start: {e}")
+
+        # Wait for the daemon to accept connections so the subsequent
+        # `ollama pull` can reach it (default 127.0.0.1:11434).
+        for _ in range(20):
+            try:
+                with socket.create_connection(("127.0.0.1", 11434), timeout=1):
+                    print_success(t('ollama_installed'))
+                    return True
+            except OSError:
+                time.sleep(1)
+        # Binary is installed even if serve is slow; let the pull retry.
+        print_success(t('ollama_installed'))
+        return True
+
+    except subprocess.TimeoutExpired:
+        print_warn("Ollama download timed out (>10 min)")
+        return False
+    except Exception as e:
+        print_warn(f"{t('ollama_install_failed')}: {e}")
+        print(f"  {CYAN}{url}{RESET}")
+        return False
+    finally:
+        if zip_path and os.path.isfile(zip_path):
+            try:
+                os.unlink(zip_path)
+            except OSError:
+                pass
+
+
 __all__ = [
     "_find_ollama",
     "_find_bundle_ollama_zip",
     "ensure_ollama_installed",
     "_install_ollama_macos",
     "_install_ollama_linux",
+    "_install_ollama_windows",
 ]

@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from .config import LlamaCppConfig
 from .model_pool import ModelPool
 from core.utils import compute_system_hash
+from plugins._shared.chat_node import make_threadsafe_callback, base_chat_result
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +133,7 @@ class LlamaCppChatNode:
         # Capture event loop for thread-safe streaming
         loop = asyncio.get_running_loop()
 
-        def threadsafe_callback(piece: str):
-            if stream_callback and callable(stream_callback):
-                loop.call_soon_threadsafe(stream_callback, piece)
+        threadsafe_callback = make_threadsafe_callback(loop, stream_callback)
 
         try:
             # Get model from pool (handles cache/reset automatically)
@@ -211,15 +210,17 @@ class LlamaCppChatNode:
             )
 
             return {
-                "response": result["text"],
-                "model_used": self.config.model_path,
-                "elapsed_ms": elapsed_ms,
-                "tokens": result["tokens"],
-                "tokens_per_second": round(tokens_per_second, 1),
-                "prompt_tokens": result["prompt_tokens"],
-                "context_used": context_used,
-                "system_tokens": system_tokens,
-                "system_prompt": system,
+                **base_chat_result(
+                    response=result["text"],
+                    model_used=self.config.model_path,
+                    elapsed_ms=elapsed_ms,
+                    tokens=result["tokens"],
+                    tokens_per_second=tokens_per_second,
+                    prompt_tokens=result["prompt_tokens"],
+                    context_used=context_used,
+                    system_tokens=system_tokens,
+                    system_prompt=system,
+                ),
                 "session_id": session_id,
                 "cache_hit": cache_hit,  # Restored for compatibility
                 "timing": timing,

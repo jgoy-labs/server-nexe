@@ -79,6 +79,7 @@ logger = logging.getLogger(__name__)
 
 
 from core.server.helpers import translate as _translate  # noqa: E402  # after warnings filter
+from core.server.process_utils import process_is_alive  # noqa: E402
 
 # Startup phase timeout: raise default from 30s to 120s and
 # accept the more descriptive `NEXE_LIFESPAN_TIMEOUT` alongside the legacy name.
@@ -138,20 +139,19 @@ def _write_pid_file(project_root: Path, port: int) -> bool:
         data = _json.loads(raw)
         existing_pid = int(data["pid"])
         existing_port = data.get("port", "?")
-        try:
-          os.kill(existing_pid, 0)  # liveness probe
+        # Windows-safe liveness probe (os.kill(pid, 0) is unreliable on Windows).
+        if process_is_alive(existing_pid):
           logger.error(
             "Server already running. PID: %s on port %s. "
             "Use './nexe stop' to stop it.",
             existing_pid, existing_port,
           )
           return False
-        except (ProcessLookupError, OSError):
-          logger.warning("Stale PID file (PID %s dead), removing.", existing_pid)
-          try:
-            pid_path.unlink()
-          except OSError:
-            pass
+        logger.warning("Stale PID file (PID %s dead), removing.", existing_pid)
+        try:
+          pid_path.unlink()
+        except OSError:
+          pass
       except (ValueError, KeyError, OSError, Exception) as exc:
         logger.warning("Corrupt PID file (%s), removing.", exc)
         try:

@@ -5,8 +5,11 @@ The wizard writes the user's engine + model selection to a JSON file. The
 sidecar reads it at startup and configures env vars accordingly. This is the
 single source of truth — no other layer holds onboarding state.
 
-Location: $NEXE_DATA_DIR/onboarding.json (sidecar mode injects NEXE_DATA_DIR)
-Fallback (no NEXE_DATA_DIR):
+Location: $NEXE_DATA_DIR/onboarding.json (sidecar mode injects NEXE_DATA_DIR =
+<app_data_dir>/sidecar/data — see nexe-app lib.rs — so the real on-disk path is
+…/com.nexe.app/sidecar/data/onboarding.json; nexe-app's reset_installation
+removes exactly that path).
+Fallback (no NEXE_DATA_DIR — legacy/standalone only, note NO /data/ segment):
   - macOS:   ~/Library/Application Support/com.nexe.app/sidecar/onboarding.json
              (legacy literal preserved for backward compat with v0.9 Macs)
   - Linux:   platformdirs.user_data_dir("nexe-app", "nexe")/sidecar/onboarding.json

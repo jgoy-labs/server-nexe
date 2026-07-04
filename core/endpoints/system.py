@@ -17,6 +17,7 @@ import logging
 from typing import Dict, Any
 
 from core.paths import get_logs_dir
+from core.server.process_utils import process_liveness
 from core.version import __version__
 from core.i18n_utils import translate
 from core.uptime import uptime_str
@@ -67,10 +68,42 @@ def get_supervisor_pid() -> int:
   try:
     pid = int(SUPERVISOR_PID_FILE.read_text().strip())
 
-    os.kill(pid, 0)
+    # Windows-safe tri-state liveness probe (os.kill(pid, 0) is unreliable on
+    # Windows). None = exists but inaccessible (PermissionError) → 500;
+    # False = no such process → 503 (zombie); True = running.
+    liveness = process_liveness(pid)
+    if liveness is None:
+      raise HTTPException(
+        status_code=500,
+        detail={
+          "error": "permission_denied",
+          "message": _t(
+            "system.supervisor_permission_denied",
+            "Permission denied accessing supervisor process"
+          )
+        }
+      )
+    if not liveness:
+      raise HTTPException(
+        status_code=503,
+        detail={
+          "error": "supervisor_dead",
+          "message": _t(
+            "system.supervisor_dead",
+            "Supervisor PID found but process does not exist (zombie)"
+          ),
+          "pid_file": str(SUPERVISOR_PID_FILE),
+          "suggestion": _t(
+            "system.supervisor_dead_suggestion",
+            "Delete the PID file and restart the supervisor"
+          )
+        }
+      )
 
     return pid
 
+  except HTTPException:
+    raise
   except ValueError as e:
     raise HTTPException(
       status_code=503,
@@ -82,22 +115,6 @@ def get_supervisor_pid() -> int:
           error=str(e)
         ),
         "pid_file": str(SUPERVISOR_PID_FILE)
-      }
-    )
-  except ProcessLookupError:
-    raise HTTPException(
-      status_code=503,
-      detail={
-        "error": "supervisor_dead",
-        "message": _t(
-          "system.supervisor_dead",
-          "Supervisor PID found but process does not exist (zombie)"
-        ),
-        "pid_file": str(SUPERVISOR_PID_FILE),
-        "suggestion": _t(
-          "system.supervisor_dead_suggestion",
-          "Delete the PID file and restart the supervisor"
-        )
       }
     )
   except PermissionError as e:
@@ -138,9 +155,15 @@ async def send_restart_signal():
     supervisor_pid = get_supervisor_pid()
     logger.info("Sending SIGHUP to supervisor PID %d", supervisor_pid)
 
-    os.kill(supervisor_pid, signal.SIGHUP)
-
-    logger.info(_t("core.endpoints.system.restart_signal_sent", "Restart signal sent successfully"))
+    # SIGHUP doesn't exist on Windows; the supervisor is POSIX-only (sidecar
+    # mode returns 501 above), so guard the reference to avoid AttributeError
+    # on a standalone Windows launch.
+    sighup = getattr(signal, "SIGHUP", None)
+    if sighup is None:
+      logger.warning("SIGHUP unavailable on this platform — cannot signal supervisor restart")
+    else:
+      os.kill(supervisor_pid, sighup)
+      logger.info(_t("core.endpoints.system.restart_signal_sent", "Restart signal sent successfully"))
 
   except HTTPException as e:
     logger.error(_t("core.endpoints.system.restart_signal_error", "Error sending restart signal: {detail}", detail=str(e.detail)))
@@ -243,7 +266,11 @@ async def shutdown_server(
     await asyncio.sleep(0.3)
     pid = os.getpid()
     try:
-      os.kill(pid, signal.SIGINT)
+      # raise_signal() goes through the CRT to uvicorn's main-thread SIGINT
+      # handler (graceful shutdown). os.kill(self, SIGINT) on Windows would be
+      # TerminateProcess — a hard kill that skips the lifespan shutdown that
+      # stops Ollama (same rationale as watchdog._terminate_self).
+      signal.raise_signal(signal.SIGINT)
       logger.info("SIGINT delivered to self (pid=%d)", pid)
     except Exception as exc:
       logger.error("failed to deliver SIGINT to self (pid=%d): %s", pid, exc)
@@ -305,7 +332,7 @@ async def system_health() -> Dict[str, Any]:
   Example Response:
     {
       "status": "healthy",
-      "version": "1.0.6",
+      "version": "x.y.z",
       "platform": "Nexe Framework",
       "uptime": "3600"
     }

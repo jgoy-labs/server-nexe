@@ -7,8 +7,8 @@
       "year": 2026,
       "role": "general",
       "params": "4B",
-      "ram_gb": 4.0,
-      "disk_gb": 3.4,
+      "ram_gb": 3.0,
+      "disk_gb": 2.9,
       "backends": [
         "ollama",
         "mlx"

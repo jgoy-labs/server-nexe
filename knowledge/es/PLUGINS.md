@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-plugins-system
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Guia completa del sistema de plugins de server-nexe 1.0.6. Cubre el Protocol NexeModule (duck typing, no herencia), formato manifest.toml, estructura de ficheros del plugin, ciclo de vida (discovery -> loading -> initialization -> integration -> shutdown), objeto context, registro de routers, plugins existentes (5: MLX, llama.cpp, Ollama, Security con normalizacion Unicode, Web UI con validacion de entrada), como crear un plugin nuevo paso a paso, errores comunes y buenas practicas."
+abstract: "Guia completa del sistema de plugins de server-nexe 1.0.7. Cubre el Protocol NexeModule (duck typing, no herencia), formato manifest.toml, estructura de ficheros del plugin, ciclo de vida (discovery -> loading -> initialization -> integration -> shutdown), objeto context, registro de routers, plugins existentes (5: MLX, llama.cpp, Ollama, Security con normalizacion Unicode, Web UI con validacion de entrada), como crear un plugin nuevo paso a paso, errores comunes y buenas practicas."
 tags: [plugins, extensibility, nexe-module, protocol, manifest, lifecycle, router, mlx, ollama, llama-cpp, security, web-ui, create-plugin, tutorial, duck-typing]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Sistema de plugins — server-nexe 1.0.6
+# Sistema de plugins — server-nexe 1.0.7
 
 server-nexe usa una arquitectura de plugins basada en descubrimiento automatico via ficheros manifest.toml. Los plugins son modulos independientes que anaden funcionalidad sin modificar el core. No hace falta registro manual — el sistema escanea, descubre y carga plugins automaticamente.
 
@@ -238,7 +238,7 @@ server-nexe tiene **tres mecanismos complementarios** para decidir que plugins s
 
 ### 1. `server.toml` — seccion `[plugins.modules]`
 
-Lista estatica declarativa en `personality/server.toml` (linea 197). Es la fuente primaria: indica al servidor que plugins DEBE activar al arrancar.
+Lista estatica declarativa en el fichero `personality/server.toml` (seccion `[plugins.modules]`). Es la fuente primaria: indica al servidor que plugins DEBE activar al arrancar.
 
 ```toml
 [plugins.modules]
@@ -251,7 +251,7 @@ Para anadir un plugin nuevo hay que incluirlo explicitamente aqui.
 
 ### 2. `NEXE_APPROVED_MODULES` — variable de entorno (allowlist de seguridad)
 
-Validada por `get_module_allowlist()` en `core/config.py:362`. Es una capa de seguridad adicional sobre la lista de `server.toml`:
+Validada por `get_module_allowlist()` en `core/config.py`. Es una capa de seguridad adicional sobre la lista de `server.toml`:
 
 - **Modo desarrollo** (`NEXE_ENV=development` o no definido): `NEXE_APPROVED_MODULES` es **opcional**. Si no esta definida, `get_module_allowlist()` devuelve `None` y no filtra nada.
 - **Modo produccion** (`NEXE_ENV=production` o `[core.environment].mode = "production"`): `NEXE_APPROVED_MODULES` es **OBLIGATORIA**. Si falta, el servidor aborta con `ValueError("SECURITY ERROR: NEXE_APPROVED_MODULES is required in production")`.
@@ -284,13 +284,13 @@ known_paths = [
 
 ## Arquitectura del ModuleManager
 
-El ModuleManager vive en `personality/module_manager/` — 15 ficheros, ~3485 lineas. Es la facade central del sistema de plugins.
+El ModuleManager vive en `personality/module_manager/` — 15 ficheros, ~3500 lineas. Es la facade central del sistema de plugins.
 
 ### Componentes principales
 
 | Fichero | Responsabilidad |
 |---------|----------------|
-| `module_manager.py` | Facade central, ciclo de vida, load/unload/health (416 lineas) |
+| `module_manager.py` | Facade central, ciclo de vida, load/unload/health (~420 lineas) |
 | `config_manager.py` | Carga `server.toml`, config parseada, secrets |
 | `config_validator.py` | Validaciones y esquemas de configuracion |
 | `module_lifecycle.py` | Inicializacion, shutdown, manejo de errores |
@@ -417,6 +417,6 @@ Ambos metodos pueden llamarse multiples veces. Siempre poner guard `self._initia
 | Ciclo de vida de modulos | `personality/module_manager/module_lifecycle.py` |
 | Gestor de configuracion | `personality/module_manager/config_manager.py` |
 | Registro de modulos | `personality/module_manager/registry.py` |
-| Allowlist de seguridad | `core/config.py:362` (`get_module_allowlist()`) |
+| Allowlist de seguridad | `core/config.py` (`get_module_allowlist()`) |
 | Registro de routers | `core/server/factory_modules.py` |
 | Plugin de referencia (mas limpio) | `plugins/llama_cpp_module/` |

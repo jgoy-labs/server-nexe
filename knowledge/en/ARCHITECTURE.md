@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-architecture
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Internal architecture of server-nexe 1.0.6. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, VLM 3-signal detector, precomputed KB embeddings, thinking toggle, and Mermaid diagrams."
+abstract: "Internal architecture of server-nexe 1.0.7. Five-layer design: Interfaces, Core (FastAPI factory, split endpoints, lifespan, crypto), Plugins (5 modules with auto-discovery), Base Services (RAG 3-layer memory with TextStore), Storage. Covers modular refactoring, module manager, i18n, encryption pipeline, request sanitization pipeline, VLM 3-signal detector, precomputed KB embeddings, thinking toggle, and Mermaid diagrams."
 tags: [architecture, fastapi, plugins, qdrant, memory, lifespan, cli, design, factory, modules, refactoring, i18n, module-manager, crypto, encryption, sanitization, mermaid]
 chunk_size: 800
 priority: P2
@@ -17,7 +17,7 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# Architecture — server-nexe 1.0.6
+# Architecture — server-nexe 1.0.7
 
 ## Table of contents
 
@@ -232,8 +232,8 @@ server-nexe/
 │   ├── i18n/                     # I18n manager + translations (ca/es/en)
 │   └── module_manager/           # SINGLE SOURCE OF TRUTH for all modules
 │
-├── installer/                    # macOS installer
-│   ├── swift-wizard/             # SwiftUI wizard (12 Swift files, 6 screens)
+├── installer/                    # Installers (macOS + Windows NSIS)
+│   ├── swift-wizard/             # SwiftUI wizard (13 Swift files, 6 screens)
 │   ├── NexeTray.app/             # Official macOS tray bundle (LSUIElement, CFBundleIdentifier=net.servernexe.tray)
 │   │   └── Contents/MacOS/NexeTray  # Bash wrapper → exec venv/python -m installer.tray "$@"
 │   ├── build_dmg.sh              # DMG builder with signing
@@ -241,14 +241,17 @@ server-nexe/
 │   ├── tray_monitor.py           # _RamMonitor (daemon thread for RAM polling)
 │   ├── tray_translations.py      # i18n translations for the tray (ca/es/en)
 │   ├── tray_uninstaller.py       # Uninstaller with backup
-│   └── install_headless.py       # Headless installer (Linux compatible)
+│   ├── install_headless.py       # Headless installer (Linux compatible)
+│   └── win/                      # Windows ARM64 installer (NSIS, grpc_shim) — new in v1.0.7
 │
 ├── knowledge/                    # Docs for RAG ingestion (ca/es/en × 15 files)
 │   └── .embeddings/              # Precomputed KB embeddings (ONNX, 10.7× startup speedup)
 ├── storage/                      # Runtime data (not in git)
-├── tests/                        # 7165 test functions collected (7400 total)
+├── tests/                        # ~7700 test functions collected
 └── nexe                          # CLI executable
 ```
+
+**Supported platforms:** macOS 14+ Apple Silicon (DMG) · Linux ARM64 (AppImage) · Windows ARM64 — supported since v1.0.7 (unsigned NSIS installer; SmartScreen warns: "More info" → "Run anyway"; WebView2 is handled by the installer). On Windows the engine is Ollama (the app installs it automatically; MLX is exclusive to Apple Silicon).
 
 ## Factory Pattern
 
@@ -331,7 +334,7 @@ Handles startup and shutdown of the server. Split into 4 submodules.
 ```toml
 [module]
 name = "module_name"
-version = "1.0.6"
+version = "1.0.7"
 type = "local_llm_option"
 description = "Module description"
 location = "plugins/module_name/"
@@ -449,7 +452,7 @@ Differences in sidecar mode:
 
 ## Test Architecture
 
-- 7165 test functions collected (7400 total — 235 deselected by markers), 0 failures in latest run
+- 7694 test functions collected (7432 passed in latest run, 2026-07-04), 0 errors
 - Actual coverage: ~85% global (honest baseline, not inflated)
 - Tests collocated with modules (each module has tests/ folder)
 - Root conftest.py for shared fixtures

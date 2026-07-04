@@ -1,10 +1,10 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-identity
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Core identity of server-nexe: open-source project created by Jordi Goy in Barcelona. What it is, what it is NOT (not npm nexe, not Ollama, not ChatGPT), what it does (local AI, RAG, multi-backend, encryption at-rest), current status (1.0.6, macOS 14+ Apple Silicon only), official links and how to support."
+abstract: "Core identity of server-nexe: open-source project created by Jordi Goy in Barcelona. What it is, what it is NOT (not npm nexe, not Ollama, not ChatGPT), what it does (local AI, RAG, multi-backend, encryption at-rest), current status (1.0.7, macOS 14+ Apple Silicon, Linux ARM64 and Windows ARM64 — new in v1.0.7), official links and how to support."
 tags: [identity, server-nexe, nexe, what-is, definition, about, faq, disambiguation, encryption, ai-ready, jordi-goy, barcelona, open-source, local-ai]
 chunk_size: 400
 priority: P1
@@ -23,7 +23,7 @@ expires: null
 
 - **100% local AI server** (zero cloud at runtime; first-run model download from Hugging Face / Ollama)
 - **With persistent memory** (RAG + MEM_SAVE)
-- **macOS 14+ Apple Silicon**, version 1.0.6
+- **macOS 14+ Apple Silicon, Linux ARM64 and Windows ARM64 (new)**, version 1.0.7
 - **Multi-backend:** MLX, llama.cpp, Ollama
 - **Open source** (Apache 2.0), personal project by a single developer
 
@@ -45,7 +45,7 @@ This section exists because language models frequently confuse server-nexe with 
 
 server-nexe combines five capabilities:
 
-1. **100% Local and Private** — All inference, memory and storage happen on your device. Zero cloud dependency.
+1. **100% Local and Private** — All inference, memory and storage happen on your device. No cloud dependency at runtime (the initial install downloads the models from Hugging Face or Ollama).
 2. **Persistent RAG Memory** — Remembers context across sessions using Qdrant vector search with 768-dimensional embeddings. Three collections: system documentation, user knowledge, and chat memory.
 3. **Multi-Backend Inference** — Choose between MLX (Apple Silicon native), llama.cpp (GGUF, universal) or Ollama. Same API, different engines.
 4. **Modular Plugin System** — Security, web UI, RAG, backends — everything is a plugin. Extend without touching the core.
@@ -67,14 +67,14 @@ server-nexe combines five capabilities:
 
 ## Current status
 
-- **Version:** 1.0.6
+- **Version:** 1.0.7
 - **Primary platform:** macOS 14 Sonoma or higher, **Apple Silicon (M1+) exclusively** — tested
 - **macOS Intel:** **NOT supported** (removed in v0.9.9 due to arm64-only dependencies in the stack)
 - **Linux ARM64:** Supported (Ollama backend, CPU). Tested on VM Ubuntu 24.04 ARM64 via UTM on Mac Apple Silicon. Install via CLI (`setup.sh`) or nexe-app (Tauri). XDG-compliant paths (`~/.local/share/nexe/`).
 - **Linux x86_64:** Supported (Ollama backend, CPU). Unit tests pass, CLI install validated.
-- **Windows:** In development (no public ETA)
+- **Windows ARM64:** Supported since v1.0.7 (new) — NSIS installer (setup.exe), Ollama backend (the app installs it automatically); installer is unsigned — SmartScreen warns ("More info" → "Run anyway")
 - **Default port:** 9119
-- **Tests:** 7165 test functions collected (7400 total — 235 deselected by markers), 0 failures in latest run
+- **Tests:** 7694 tests collected, 7432 passed in the latest run (2026-07-04)
 
 ## AI-Ready Documentation
 
@@ -122,4 +122,4 @@ cd server-nexe
 ./nexe go    # → http://localhost:9119
 ```
 
-Or download the macOS DMG installer from the releases page for a guided setup.
+Or download an installer from the releases page for a guided setup: DMG (macOS), AppImage (Linux ARM64) or NSIS setup (Windows ARM64, new in v1.0.7, unsigned).

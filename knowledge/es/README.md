@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe es un servidor de IA local con memoria RAG persistente creado por Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalidades: MEM_SAVE, i18n (ca/es/en), aislamiento de sesiones, encriptacion en reposo, thinking toggle. Modelos por tiers (8GB a 32GB, 14 modelos 4 tiers), 3 metodos de instalacion (nexe-app Tauri desktop recomendado, CLI, DMG SwiftUI legacy). macOS 14+ Apple Silicon only, Linux soportado (Ollama, CPU)."
+abstract: "server-nexe es un servidor de IA local con memoria RAG persistente creado por Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalidades: MEM_SAVE, i18n (ca/es/en), aislamiento de sesiones, encriptacion en reposo, thinking toggle. Modelos por tiers (8GB a 32GB, 14 modelos 4 tiers), 3 metodos de instalacion (nexe-app Tauri desktop recomendado, CLI, DMG SwiftUI legacy). macOS 14+ Apple Silicon, Linux (Ollama, CPU) y Windows ARM64 (nuevo en 1.0.7; installer NSIS sin firmar, backend Ollama)."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -17,13 +17,13 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# server-nexe 1.0.6 — Servidor de IA local con memoria persistente
+# server-nexe 1.0.7 — Servidor de IA local con memoria persistente
 
-**Version:** 1.0.6
+**Version:** 1.0.7
 **Puerto por defecto:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Licencia:** Apache 2.0
-**Plataformas:** macOS 14 Sonoma+ Apple Silicon (M1+) — probado. Linux ARM64 y x86_64 — soportado (Ollama, CPU).
+**Plataformas:** macOS 14 Sonoma+ Apple Silicon (M1+) — probado. Linux ARM64 y x86_64 — soportado (Ollama, CPU). Windows ARM64 — soportado desde v1.0.7 (installer NSIS sin firmar; SmartScreen avisa; backend Ollama).
 **Web:** https://server-nexe.org | https://server-nexe.com
 
 ## Que es server-nexe
@@ -74,7 +74,7 @@ server-nexe/
 │   ├── cli/               # Comandos CLI
 │   ├── server/            # Patron factory, lifespan
 │   ├── ingest/            # Ingestion de documentos (docs + knowledge)
-│   └── lifespan*.py       # Arranque/apagado (dividido en 4 submodulos)
+│   └── lifespan*.py       # Arranque/apagado (dividido en 8 submodulos)
 ├── plugins/               # Sistema modular de plugins
 │   ├── mlx_module/        # Backend Apple Silicon
 │   ├── llama_cpp_module/  # Backend universal GGUF
@@ -84,9 +84,9 @@ server-nexe/
 ├── memory/                # Sistema RAG (Qdrant + embeddings + persistencia + TextStore)
 ├── knowledge/             # Documentacion para ingestion RAG (ca/es/en)
 ├── personality/           # System prompts, module manager, i18n, server.toml
-├── installer/             # Wizard SwiftUI, constructor DMG, tray app, instalador headless
+├── installer/             # Wizard SwiftUI, constructor DMG, tray app, instalador headless, installer Windows (NSIS)
 ├── storage/               # Datos en tiempo de ejecucion (modelos, logs, vectores qdrant)
-├── tests/                 # Suite de tests (7165 recopiladas / 7400 totales)
+├── tests/                 # Suite de tests (cifras actualizadas en TESTING.md)
 └── nexe                   # Ejecutable CLI principal
 ```
 
@@ -117,7 +117,7 @@ La base de conocimiento (`knowledge/`) esta disenada tanto para consumo humano c
 
 ### tier_16 (16 GB RAM)
 - 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama + MLX.
-- 👁 🧠 Qwen3.5 4B (8-bit) — Alibaba, 2026. Ollama + MLX. Precision 8-bit (mas fiel que el 4B base).
+- 👁 🧠 Qwen3.5 4B (8-bit) — Alibaba, 2026. MLX (Apple Silicon, solo macOS). Precision 8-bit (mas fiel que el 4B base).
 - 👁 🧠 Gemma 4 E4B — Google, 2026. Ollama + MLX.
 - 🧠 Mistral Nemo 12B — Mistral AI, 2024. Ollama + MLX.
 - Salamandra 7B — BSC/AINA, 2025. Ollama + llama.cpp (GGUF). El mejor para catalan.
@@ -130,7 +130,7 @@ La base de conocimiento (`knowledge/`) esta disenada tanto para consumo humano c
 ### tier_32 (32 GB RAM)
 - 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Ollama + MLX.
 - 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
-- 🧠 Mixtral 8x7B (MoE) — Mistral AI, 2024. Ollama + MLX.
+- 🧠 Mixtral 8x7B (MoE) — Mistral AI, 2023. Ollama + MLX.
 - 🧠 DeepSeek R1 Distill 32B — DeepSeek, 2025. Ollama + llama.cpp (MLX no soportado: arch qwen2).
 - **ALIA-40B Instruct** — BSC, 2026. Ollama + llama.cpp (GGUF). 9 idiomas ibericos. **Recomendado iberico.**
 
@@ -146,7 +146,7 @@ Tambien se soportan modelos personalizados via Ollama (nombre) o Hugging Face (r
 ## Metodos de instalacion
 
 ### 1. Aplicacion de escritorio — nexe-app (Tauri v2, recomendado)
-Aplicacion de escritorio que integra server-nexe como sidecar Python dentro de un shell Tauri v2. Descarga el `nexe-app_*_aarch64.dmg` (macOS) o `.AppImage` (Linux ARM64) desde la pagina de [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest). Incluye wizard de onboarding, system tray y gestion automatica del sidecar.
+Aplicacion de escritorio que integra server-nexe como sidecar Python dentro de un shell Tauri v2. Descarga el `nexe-app_*_aarch64.dmg` (macOS), el `.AppImage` (Linux ARM64) o el setup `.exe` NSIS (Windows ARM64, nuevo en 1.0.7 — installer sin firmar, SmartScreen avisa) desde la pagina de [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest). Incluye wizard de onboarding, system tray y gestion automatica del sidecar.
 
 ### 2. CLI headless
 ```bash
@@ -188,7 +188,7 @@ Autenticacion requerida: cabecera `X-API-Key` con el valor de `.env` (`NEXE_PRIM
 | macOS Intel | **NO soportado** (eliminado en v0.9.9 — wheels arm64-only) |
 | Linux ARM64 | Soportado (Ollama, CPU) — testeado en VM Ubuntu 24.04 ARM64 (UTM) |
 | Linux x86_64 | Soportado (Ollama, CPU) — tests unitarios pasan, CLI validada |
-| Windows | En desarrollo (sin ETA pública) |
+| Windows ARM64 | Soportado desde v1.0.7 (NUEVO) — installer NSIS; solo backend Ollama (la app lo instala automaticamente); installer sin firmar (SmartScreen avisa: "Mas informacion" → "Ejecutar de todas formas") |
 
 ## Limitaciones actuales
 

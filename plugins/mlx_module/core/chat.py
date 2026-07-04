@@ -39,6 +39,7 @@ from .generate_helpers import (
     extract_metrics,
 )
 from core.utils import compute_system_hash
+from plugins._shared.chat_node import make_threadsafe_callback, base_chat_result
 
 logger = logging.getLogger(__name__)
 
@@ -507,10 +508,7 @@ class MLXChatNode:
         # Capture event loop for thread-safe streaming
         loop = asyncio.get_running_loop()
 
-        def threadsafe_callback(text: str) -> None:
-            """Bridge streaming tokens from the MLX worker thread to the async event loop."""
-            if stream_callback and callable(stream_callback):
-                loop.call_soon_threadsafe(stream_callback, text)
+        threadsafe_callback = make_threadsafe_callback(loop, stream_callback)
 
         try:
             # VLM path: if the model is a VLM, all generation goes through mlx_vlm.
@@ -594,15 +592,17 @@ class MLXChatNode:
             )
 
             return {
-                "response": result["text"],
-                "model_used": self.config.model_path,
-                "elapsed_ms": elapsed_ms,
-                "tokens": result["tokens"],
-                "tokens_per_second": round(generation_tps, 1),
-                "prompt_tokens": result["prompt_tokens"],
-                "context_used": context_used,
-                "system_tokens": system_tokens,
-                "system_prompt": system,
+                **base_chat_result(
+                    response=result["text"],
+                    model_used=self.config.model_path,
+                    elapsed_ms=elapsed_ms,
+                    tokens=result["tokens"],
+                    tokens_per_second=generation_tps,
+                    prompt_tokens=result["prompt_tokens"],
+                    context_used=context_used,
+                    system_tokens=system_tokens,
+                    system_prompt=system,
+                ),
                 "cache_active": result.get("cache_active", False),  # Compatibility alias
                 "prefix_reuse": prefix_reuse,  # True = prefix matching succeeded
                 "reuse_ratio": round(reuse_ratio, 2),  # Cached/new tokens ratio

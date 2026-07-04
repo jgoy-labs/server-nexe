@@ -135,11 +135,12 @@ class TestAtomizeAndSave_JunkFiltered:
 
 
 class TestFilterFactsPersonalDataHallucination:
-    """B126 (decisió Jordi): el filtre de streaming descarta afirmacions fabricades
-    de dades personals — paritat amb el camí no-streaming (_MEMSAVE_JUNK_RE).
-    Prioritat: menys al·lucinacions persistides, encara que es perdi algun nom real."""
+    """B126 v2: el guard de noms és CONTEXTUAL — un nom fabricat (que l'usuari
+    mai ha escrit) es descarta; un nom real (present als missatges user de la
+    sessió) es desa. La v1 (prohibició cega) matava la frase canònica que el
+    system prompt ensenya i cap nom real es desava mai (bug 2026-07-03)."""
 
-    def test_personal_data_hallucinations_filtered(self):
+    def test_fabricated_names_filtered_without_user_context(self):
         from plugins.web_ui_module.api.routes_chat import _filter_facts
 
         hallucinations = [
@@ -148,7 +149,15 @@ class TestFilterFactsPersonalDataHallucination:
             "l'usuari es diu Carles",
             "se llama Pedro y vive en Madrid",
         ]
-        assert _filter_facts(hallucinations, []) == []
+        # Cap dels noms apareix als missatges de l'usuari → tots fora.
+        assert _filter_facts(hallucinations, [], user_text="hola, com va?") == []
+
+    def test_real_name_survives_with_user_context(self):
+        from plugins.web_ui_module.api.routes_chat import _filter_facts
+
+        fact = "el usuario se llama Juan"
+        kept = _filter_facts([fact], [], user_text="me llamo Juan y tengo 40 años")
+        assert kept == [fact]
 
     def test_legitimate_non_name_fact_survives(self):
         """Don't over-filter: a real preference (without a name) is preserved."""

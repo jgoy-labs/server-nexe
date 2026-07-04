@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "1.0"
-data: 2026-04-24
+data: 2026-07-04
 id: nexe-threat-model-stride
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe formal STRIDE threat model (v1.0, 2026-04-24). Single-user local-first AI server: 8 trust boundaries (browser/CLI/Qdrant/Ollama/HF/disk/keyring/LAN-bootstrap), 6 asset categories (user data, operational secrets, model weights, code integrity, availability, metadata), STRIDE matrix with mitigations citing file:line, explicit scope, residual risks disclosed, LINDDUN privacy appendix. Supersedes the informal threat model at SECURITY.md:3-15. Driven by the internal AI-assisted security review AUD-INT-001 §2.11 (STRIDE threat model)."
+abstract: "server-nexe formal STRIDE threat model (v1.1, 2026-07-04). Single-user local-first AI server: 8 trust boundaries (browser/CLI/Qdrant/Ollama/HF/disk/keyring/LAN-bootstrap), 6 asset categories (user data, operational secrets, model weights, code integrity, availability, metadata), STRIDE matrix with mitigations citing file:line, explicit scope, residual risks disclosed, LINDDUN privacy appendix. Supersedes the informal threat model at SECURITY.md:3-15. Driven by the internal AI-assisted security review AUD-INT-001 §2.11 (STRIDE threat model)."
 tags: [threat-model, stride, security, audit, local-first, single-user, boundaries, assets, mitigations, privacy, lindduan, compliance, spoofing, tampering, repudiation, disclosure, dos, elevation-of-privilege]
 chunk_size: 800
 priority: P1
@@ -19,8 +19,8 @@ expires: null
 
 # server-nexe — Threat Model (STRIDE)
 
-**Version:** 1.0 (initial formalization)
-**Date:** 2026-04-24
+**Version:** 1.1
+**Date:** 2026-07-04
 **Status:** Active, reviewed at each minor release.
 **Supersedes:** `SECURITY.md` §"Scope and threat model" (informal, lines 3–15 and 80–90). That section remains as a one-paragraph summary and points here for the detail.
 
@@ -30,7 +30,7 @@ This document formalizes the threat model that until v1.0.4-beta was implicit in
 
 ## 1. Purpose and scope
 
-server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.6 release plus the `[Unreleased]` hardening on `main` (security hardening and the STRIDE threat model).
+server-nexe is a **single-user, local-first AI server** with persistent RAG memory. It runs on the user's own machine, binds to `127.0.0.1:9119` by default, and assumes a trusted local user. This threat model covers the 1.0.7 release.
 
 In scope:
 
@@ -55,7 +55,7 @@ You evaluate server-nexe against an internal policy (ISO 27001 or similar). You 
 
 ## 3. Assumptions
 
-- The operating system (macOS 14+, Linux partial) is not compromised. server-nexe cannot protect against a kernel-level adversary or a malicious macOS update.
+- The operating system (macOS 14+ Apple Silicon, Linux ARM64, Windows ARM64 — new in 1.0.7) is not compromised. server-nexe cannot protect against a kernel-level adversary or a malicious operating-system update. On Windows, the NSIS installer ships unsigned (SmartScreen warns) — see §4.4 and §8.
 - The user has a minimum trust in themselves: they do not paste their API key into a shared document, do not copy `~/.nexe/` to a USB drive and forget it, do not run server-nexe as root on a multi-user server.
 - The local network is untrusted by default, but **not** hostile at the LAN level. server-nexe binds to loopback; LAN exposure requires an explicit opt-in (VPN allow-list, SSH tunnel, reverse proxy the user sets up).
 - Python dependencies listed in `requirements.txt` are considered trusted after install. Their own supply chain (PyPI, Hugging Face Hub) is audited offline before building a release, but not at every boot.
@@ -87,7 +87,7 @@ Primary sensitivity: **confidentiality** of the secret material, **integrity** o
 
 ### 4.3 Model weights
 
-LLM weights pulled by the installer on first boot (Hugging Face snapshot_download, Ollama pull, or a direct GGUF URL), plus the fastembed ONNX embedding model bundled in the DMG. After install they live under `~/.cache/huggingface/`, `~/.ollama/`, and the install tree's `embeddings/` subdirectory.
+LLM weights pulled by the installer on first boot (Hugging Face snapshot_download, Ollama pull, or a direct GGUF URL), plus the fastembed ONNX embedding model bundled with the install artefact (DMG/AppImage/Windows installer). After install they live under `~/.cache/huggingface/`, `~/.ollama/`, and the install tree's `embeddings/` subdirectory.
 
 First-boot weights are integrity-checked before they are trusted — by source, never silently (ADR B046b). **MLX & GGUF** snapshots are SHA-256 pinned: self-computed digests in `installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256` plus Hugging-Face-published per-LFS-file digests in `installer/provider_pins.json` (fetched metadata-only, no model download). A mismatch aborts the install (fail-closed). **Ollama** models are verified by Ollama's own content-addressed pull (each layer checked against the manifest digest); we keep no client-side Ollama pin (ADR B251 — its tags are mutable upstream, so a client pin would false-positive on a legitimate re-publish). Residual risk: an upstream tag-substitution attack is not caught while the catalog uses mutable tags. An MLX/GGUF artefact with no available pin is never installed silently — the installer requires explicit consent (`NEXE_ALLOW_UNPINNED=1` or an interactive prompt). The DMG-bundled fastembed model carries an `embeddings.manifest.json` (three digests for `model*.onnx`, `tokenizer.json`, `config.json`).
 
@@ -95,7 +95,7 @@ Primary sensitivity: **integrity**. A tampered model weight backdoors every subs
 
 ### 4.4 Code integrity
 
-Python modules, Swift installer, shell scripts. Any process running as the same user can read them; they are not defended against local tampering at runtime. Integrity at distribution time is provided by Apple notarization of the DMG and the installer bundle (`installer/swift-wizard/`).
+Python modules, Swift installer, shell scripts. Any process running as the same user can read them; they are not defended against local tampering at runtime. Integrity at distribution time is provided, on macOS, by Apple notarization of the DMG and the installer bundle (`installer/swift-wizard/`). On Windows, the NSIS installer is **not signed** (SmartScreen warns: "More info" → "Run anyway"): no code signature covers distribution integrity on that platform — a residual risk declared in §8 until it is signed.
 
 ### 4.5 Availability
 
@@ -146,7 +146,7 @@ Numbered for the STRIDE matrix:
 4. **Server ↔ Ollama daemon.** HTTP loopback, port 11434, no auth on the Ollama side (see §6.1 Spoofing).
 5. **Server ↔ Hugging Face / Ollama registry / GGUF URL.** HTTPS; only crossed at install time and on explicit model download.
 6. **Server ↔ Filesystem.** `~/.nexe/master.key` (`0o600`), SQLCipher DBs, `.enc` session files.
-7. **Server ↔ macOS Keyring.** `Security.framework` via `keyring` (Python). Mirrors the MEK.
+7. **Server ↔ system keystore.** macOS Keyring (`Security.framework`) or Windows Credential Manager, via `keyring` (Python). Mirrors the MEK; if the keystore is unavailable, the MEK falls back to the `0o600` file fallback of `get_or_create_master_key`.
 8. **LAN ↔ `/api/bootstrap`.** Gated by `NEXE_ENV` (`core/endpoints/bootstrap.py:97-106`): production → HTTP 503; development → loopback + RFC1918 + VPN allow-list (`core/endpoints/bootstrap.py:109-117`).
 
 ## 6. STRIDE analysis
@@ -216,7 +216,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 **Oversized request body.** Rejected by `RequestSizeLimiterMiddleware` before reaching handlers (`core/request_size_limiter.py`).
 
-**Out-of-memory via huge model load.** Out of scope: user explicitly selects the tier in the installer. The HardwareDetector (fixed v1.0.4-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) warns when a tier exceeds RAM.
+**Out-of-memory via huge model load.** Out of scope: user explicitly selects the tier in the installer. The HardwareDetector (fixed v1.0.3-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) warns when a tier exceeds RAM.
 
 ### 6.6 Elevation of Privilege
 
@@ -252,6 +252,7 @@ Honest disclosure of what is *not* closed by §6.
 - **`embeddings.manifest.json` and `MODEL_WEIGHT_SHA256` are code-signed by being inside the notarized DMG or the signed Git repo.** There is no external transparency log. An attacker who compromises both the notarized build pipeline and the git repo could replace the pin and the weight simultaneously. Out of scope per §7 "Python supply-chain", but reopened here for honesty.
 - **Prometheus `/metrics` reveals session count, model loaded, recent error rate.** An attacker with the API key sees these. Low sensitivity, but not zero.
 - **Dev-mode allow-remote toggle.** `NEXE_DEV_MODE_ALLOW_REMOTE=true` disables the loopback-only gate. Setting this in production is a misuse; we log a WARNING but do not refuse to start.
+- **Unsigned Windows installer (NSIS).** On Windows ARM64 (supported since v1.0.7) there is no equivalent of Apple notarization: SmartScreen warns and the user must choose "Run anyway". An attacker who substitutes the `.exe` in transit or on the download mirror is not caught by any code signature. Will be mitigated by signing the installer.
 - **No automated CVE tracking pipeline.** Dependencies are audited manually at release time. A CVE disclosed between releases is not caught until the next review (see `SECURITY.md:121`).
 - **No bug-bounty program; no external pen-test.** All security testing is AI-assisted plus the author. This document replaces the absence of a formal model, not the absence of an audit.
 
@@ -276,7 +277,8 @@ This document is reviewed:
 | Date | Version | Change | Driven by |
 |------|---------|--------|-----------|
 | 2026-04-24 | 1.0 | Initial formalization. STRIDE matrix, 8 boundaries, 6 asset categories, out-of-scope enumerated. | `AUD-INT-001` §2.11 (STRIDE threat model) |
+| 2026-07-04 | 1.1 | 1.0.7 release: Windows ARM64 platform added (assumptions, §4.3, §4.4, boundary 7); unsigned NSIS installer declared as a residual risk in §8. | 1.0.7 release |
 
 ---
 
-*server-nexe 1.0.6+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](SECURITY.md) for vulnerability reporting.*
+*server-nexe 1.0.7+ · Apache 2.0 · Jordi Goy · see [SECURITY.md](../../SECURITY.md) for vulnerability reporting.*

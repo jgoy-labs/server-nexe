@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest, thinking toggle. Models by RAM tiers (8GB to 32GB, 14 models, 4 tiers), 3 installation methods (nexe-app Tauri desktop recommended, CLI, SwiftUI DMG legacy). macOS 14+ Apple Silicon only, Linux supported (Ollama, CPU)."
+abstract: "server-nexe is a local AI server with persistent RAG memory created by Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Features: MEM_SAVE, i18n (ca/es/en), session isolation, encryption at-rest, thinking toggle. Models by RAM tiers (8GB to 32GB, 14 models, 4 tiers), 3 installation methods (nexe-app Tauri desktop recommended, CLI, SwiftUI DMG legacy). macOS 14+ Apple Silicon, Linux (Ollama, CPU) and Windows ARM64 (new in 1.0.7; unsigned NSIS installer, Ollama backend)."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -17,13 +17,13 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# server-nexe 1.0.6 — Local AI Server with Persistent Memory
+# server-nexe 1.0.7 — Local AI Server with Persistent Memory
 
-**Version:** 1.0.6
+**Version:** 1.0.7
 **Default port:** 9119
 **Author:** Jordi Goy (Barcelona)
 **License:** Apache 2.0
-**Platforms:** macOS 14 Sonoma+ Apple Silicon (M1+) — tested. Linux ARM64 and x86_64 — supported (Ollama, CPU).
+**Platforms:** macOS 14 Sonoma+ Apple Silicon (M1+) — tested. Linux ARM64 and x86_64 — supported (Ollama, CPU). Windows ARM64 — supported since v1.0.7 (unsigned NSIS installer; SmartScreen warns; Ollama backend).
 **Website:** https://server-nexe.org | https://server-nexe.com
 
 ## What is server-nexe
@@ -74,7 +74,7 @@ server-nexe/
 │   ├── cli/               # CLI commands
 │   ├── server/            # Factory pattern, lifespan
 │   ├── ingest/            # Document ingestion (docs + knowledge)
-│   └── lifespan*.py       # Startup/shutdown (split into 4 submodules)
+│   └── lifespan*.py       # Startup/shutdown (split into 8 submodules)
 ├── plugins/               # Modular plugin system
 │   ├── mlx_module/        # Apple Silicon backend
 │   ├── llama_cpp_module/  # GGUF universal backend
@@ -84,9 +84,9 @@ server-nexe/
 ├── memory/                # RAG system (Qdrant + embeddings + persistence + TextStore)
 ├── knowledge/             # Documentation for RAG ingestion (ca/es/en)
 ├── personality/           # System prompts, module manager, i18n, server.toml
-├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer
+├── installer/             # SwiftUI wizard, DMG builder, tray app, headless installer, Windows installer (NSIS)
 ├── storage/               # Runtime data (models, logs, qdrant vectors)
-├── tests/                 # Test suite (7165 collected / 7400 total)
+├── tests/                 # Test suite (figures kept up to date in TESTING.md)
 └── nexe                   # Main CLI executable
 ```
 
@@ -117,7 +117,7 @@ The knowledge base (`knowledge/`) is designed for both human and AI consumption:
 
 ### tier_16 (16 GB RAM)
 - 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama + MLX.
-- 👁 🧠 Qwen3.5 4B (8-bit) — Alibaba, 2026. Ollama + MLX. 8-bit precision (more faithful than base 4B).
+- 👁 🧠 Qwen3.5 4B (8-bit) — Alibaba, 2026. MLX (Apple Silicon, macOS only). 8-bit precision (more faithful than base 4B).
 - 👁 🧠 Gemma 4 E4B — Google, 2026. Ollama + MLX.
 - 🧠 Mistral Nemo 12B — Mistral AI, 2024. Ollama + MLX.
 - Salamandra 7B — BSC/AINA, 2025. Ollama + llama.cpp (GGUF). Best for Catalan.
@@ -130,7 +130,7 @@ The knowledge base (`knowledge/`) is designed for both human and AI consumption:
 ### tier_32 (32 GB RAM)
 - 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Ollama + MLX.
 - 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
-- 🧠 Mixtral 8x7B (MoE) — Mistral AI, 2024. Ollama + MLX.
+- 🧠 Mixtral 8x7B (MoE) — Mistral AI, 2023. Ollama + MLX.
 - 🧠 DeepSeek R1 Distill 32B — DeepSeek, 2025. Ollama + llama.cpp (MLX unsupported: qwen2 arch).
 - **ALIA-40B Instruct** — BSC, 2026. Ollama + llama.cpp (GGUF). 9 Iberian languages. **Recommended Iberian.**
 
@@ -146,7 +146,7 @@ Custom models also supported via Ollama (name) or Hugging Face (GGUF repo).
 ## Installation methods
 
 ### 1. Desktop App — nexe-app (Tauri v2, recommended)
-Desktop application embedding server-nexe as a Python sidecar inside a Tauri v2 shell. Download the latest `nexe-app_*_aarch64.dmg` (macOS) or `.AppImage` (Linux ARM64) from the [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest) page. Includes an onboarding wizard, system tray, and automatic sidecar management.
+Desktop application embedding server-nexe as a Python sidecar inside a Tauri v2 shell. Download the `nexe-app_*_aarch64.dmg` (macOS), the `.AppImage` (Linux ARM64) or the NSIS setup `.exe` (Windows ARM64, new in 1.0.7 — unsigned installer, SmartScreen warns) from the [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest) page. Includes an onboarding wizard, system tray, and automatic sidecar management.
 
 ### 2. CLI headless
 ```bash
@@ -188,7 +188,7 @@ Authentication required: `X-API-Key` header with value from `.env` (`NEXE_PRIMAR
 | macOS Intel | **NOT supported** (removed in v0.9.9 — arm64-only wheels) |
 | Linux ARM64 | Supported (Ollama, CPU) — tested on VM Ubuntu 24.04 ARM64 (UTM) |
 | Linux x86_64 | Supported (Ollama, CPU) — unit tests pass, CLI validated |
-| Windows | In development (no public ETA) |
+| Windows ARM64 | Supported since v1.0.7 (NEW) — NSIS installer; Ollama backend only (the app installs it automatically); unsigned installer (SmartScreen warns: "More info" → "Run anyway") |
 
 ## Current limitations
 

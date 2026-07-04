@@ -7,7 +7,6 @@ to SIGKILL. The endpoint must:
   * require the API key dependency (covered by override here).
 """
 
-import os
 import signal
 from unittest.mock import patch
 
@@ -33,7 +32,7 @@ def test_shutdown_endpoint_returns_initiated():
   app = _make_app()
   client = TestClient(app)
 
-  with patch("core.endpoints.system.os.kill") as mock_kill:
+  with patch("core.endpoints.system.signal.raise_signal") as mock_raise:
     response = client.post("/admin/system/shutdown")
 
   assert response.status_code == 200
@@ -43,21 +42,19 @@ def test_shutdown_endpoint_returns_initiated():
   assert "shutting down" in body["message"].lower()
 
   # TestClient awaits background tasks before returning, so the SIGINT
-  # delivery must have run by now.
-  mock_kill.assert_called_once()
-  pid_arg, sig_arg = mock_kill.call_args.args
-  assert pid_arg == os.getpid()
-  assert sig_arg == signal.SIGINT
+  # delivery must have run by now. raise_signal() (not os.kill) is used so on
+  # Windows it reaches uvicorn's handler instead of TerminateProcess (B081).
+  mock_raise.assert_called_once_with(signal.SIGINT)
 
 
 def test_shutdown_endpoint_swallows_kill_failure():
-  """If os.kill raises, the endpoint must still have returned 200 first."""
+  """If signal delivery raises, the endpoint must still have returned 200 first."""
   app = _make_app()
   client = TestClient(app)
 
   with patch(
-    "core.endpoints.system.os.kill",
-    side_effect=PermissionError("not allowed in CI sandbox"),
+    "core.endpoints.system.signal.raise_signal",
+    side_effect=OSError("not allowed in CI sandbox"),
   ):
     response = client.post("/admin/system/shutdown")
 
@@ -65,6 +62,24 @@ def test_shutdown_endpoint_swallows_kill_failure():
   # is logged but must not break the response.
   assert response.status_code == 200
   assert response.json()["status"] == "shutdown_initiated"
+
+
+async def test_send_restart_signal_gates_missing_sighup(monkeypatch):
+  """B081: without SIGHUP (Windows), send_restart_signal must not raise AttributeError."""
+  import core.endpoints.system as sysmod
+
+  async def _noop_sleep(*_a, **_k):
+    return None
+
+  monkeypatch.setattr(sysmod.asyncio, "sleep", _noop_sleep)
+  monkeypatch.setattr(sysmod, "get_supervisor_pid", lambda: 12345)
+  monkeypatch.delattr(sysmod.signal, "SIGHUP", raising=False)
+  kills = []
+  monkeypatch.setattr(sysmod.os, "kill", lambda pid, sig: kills.append((pid, sig)))
+
+  await sysmod.send_restart_signal()  # must not raise AttributeError
+
+  assert kills == []  # SIGHUP absent → gated, os.kill never called
 
 
 def test_shutdown_endpoint_requires_authentication():

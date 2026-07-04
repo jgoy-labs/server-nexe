@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "2.0"
-data: 2026-04-16
+data: 2026-07-04
 id: nexe-overview
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "server-nexe es un servidor d'IA local amb memoria RAG persistent creat per Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalitats: MEM_SAVE, i18n (ca/es/en), aillament de sessions, encriptacio at-rest, thinking toggle. Models per tiers (8GB a 32GB, 14 models 4 tiers), 3 metodes d'instal-lacio (nexe-app Tauri desktop recomanat, CLI, DMG SwiftUI legacy). macOS 14+ Apple Silicon only, Linux suportat (Ollama, CPU)."
+abstract: "server-nexe es un servidor d'IA local amb memoria RAG persistent creat per Jordi Goy. Backends: MLX (Apple Silicon), llama.cpp, Ollama. Funcionalitats: MEM_SAVE, i18n (ca/es/en), aillament de sessions, encriptacio at-rest, thinking toggle. Models per tiers (8GB a 32GB, 14 models 4 tiers), 3 metodes d'instal-lacio (nexe-app Tauri desktop recomanat, CLI, DMG SwiftUI legacy). macOS 14+ Apple Silicon, Linux (Ollama, CPU) i Windows ARM64 (nou a 1.0.7; installer NSIS sense signar, backend Ollama)."
 tags: [overview, server-nexe, backends, rag, memory, mem_save, i18n, models, installation, architecture, ollama, mlx, llama-cpp, encryption, ai-ready, jordi-goy]
 chunk_size: 600
 priority: P1
@@ -17,13 +17,13 @@ author: "Jordi Goy with AI collaboration"
 expires: null
 ---
 
-# server-nexe 1.0.6 — Servidor d'IA local amb memoria persistent
+# server-nexe 1.0.7 — Servidor d'IA local amb memoria persistent
 
-**Versio:** 1.0.6
+**Versio:** 1.0.7
 **Port per defecte:** 9119
 **Autor:** Jordi Goy (Barcelona)
 **Llicencia:** Apache 2.0
-**Plataformes:** macOS 14 Sonoma+ Apple Silicon (M1+) — testejat. Linux ARM64 i x86_64 — suportat (Ollama, CPU).
+**Plataformes:** macOS 14 Sonoma+ Apple Silicon (M1+) — testejat. Linux ARM64 i x86_64 — suportat (Ollama, CPU). Windows ARM64 — suportat des de v1.0.7 (installer NSIS sense signar; SmartScreen avisa; backend Ollama).
 **Web:** https://server-nexe.org | https://server-nexe.com
 
 ## Que es server-nexe
@@ -74,7 +74,7 @@ server-nexe/
 │   ├── cli/               # Comandes CLI
 │   ├── server/            # Patro factory, lifespan
 │   ├── ingest/            # Ingestio de documents (docs + knowledge)
-│   └── lifespan*.py       # Arrencada/aturada (separat en 4 submoduls)
+│   └── lifespan*.py       # Arrencada/aturada (separat en 8 submoduls)
 ├── plugins/               # Sistema modular de plugins
 │   ├── mlx_module/        # Backend Apple Silicon
 │   ├── llama_cpp_module/  # Backend universal GGUF
@@ -84,9 +84,9 @@ server-nexe/
 ├── memory/                # Sistema RAG (Qdrant + embeddings + persistencia + TextStore)
 ├── knowledge/             # Documentacio per a ingestio RAG (ca/es/en)
 ├── personality/           # Prompts del sistema, module manager, i18n, server.toml
-├── installer/             # Wizard SwiftUI, constructor de DMG, app de safata, instal·lador headless
+├── installer/             # Wizard SwiftUI, constructor de DMG, app de safata, instal·lador headless, installer Windows (NSIS)
 ├── storage/               # Dades en temps d'execucio (models, logs, vectors Qdrant)
-├── tests/                 # Suite de tests (7165 col·lectades / 7400 totals)
+├── tests/                 # Suite de tests (xifres actualitzades a TESTING.md)
 └── nexe                   # Executable CLI principal
 ```
 
@@ -117,7 +117,7 @@ La base de coneixement (`knowledge/`) esta dissenyada tant per a consum huma com
 
 ### tier_16 (16 GB RAM)
 - 👁 🧠 Qwen3.5 9B — Alibaba, 2026. Ollama + MLX.
-- 👁 🧠 Qwen3.5 4B (8-bit) — Alibaba, 2026. Ollama + MLX. Precisio 8-bit (mes fidel que el 4B base).
+- 👁 🧠 Qwen3.5 4B (8-bit) — Alibaba, 2026. MLX (Apple Silicon, només macOS). Precisio 8-bit (mes fidel que el 4B base).
 - 👁 🧠 Gemma 4 E4B — Google, 2026. Ollama + MLX.
 - 🧠 Mistral Nemo 12B — Mistral AI, 2024. Ollama + MLX.
 - Salamandra 7B — BSC/AINA, 2025. Ollama + llama.cpp (GGUF). El millor per catala.
@@ -130,7 +130,7 @@ La base de coneixement (`knowledge/`) esta dissenyada tant per a consum huma com
 ### tier_32 (32 GB RAM)
 - 👁 🧠 Qwen3.5 35B-A3B (MoE) — Alibaba, 2026. Ollama + MLX.
 - 👁 🧠 Gemma 4 31B — Google, 2026. Ollama + MLX.
-- 🧠 Mixtral 8x7B (MoE) — Mistral AI, 2024. Ollama + MLX.
+- 🧠 Mixtral 8x7B (MoE) — Mistral AI, 2023. Ollama + MLX.
 - 🧠 DeepSeek R1 Distill 32B — DeepSeek, 2025. Ollama + llama.cpp (MLX no suportat: qwen2 arch).
 - **ALIA-40B Instruct** — BSC, 2026. Ollama + llama.cpp (GGUF). 9 idiomes iberics. **Recomanat iberic.**
 
@@ -146,7 +146,7 @@ Tambe es suporten models personalitzats via Ollama (per nom) o Hugging Face (rep
 ## Metodes d'instal·lacio
 
 ### 1. Aplicacio d'escriptori — nexe-app (Tauri v2, recomanat)
-Aplicacio d'escriptori que integra server-nexe com a sidecar Python dins un shell Tauri v2. Descarrega el `nexe-app_*_aarch64.dmg` (macOS) o `.AppImage` (Linux ARM64) des de la pagina de [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest). Inclou wizard d'onboarding, system tray i gestio automatica del sidecar.
+Aplicacio d'escriptori que integra server-nexe com a sidecar Python dins un shell Tauri v2. Descarrega el `nexe-app_*_aarch64.dmg` (macOS), el `.AppImage` (Linux ARM64) o el setup `.exe` NSIS (Windows ARM64, nou a 1.0.7 — installer sense signar, SmartScreen avisa) des de la pagina de [Releases](https://github.com/jgoy-labs/server-nexe/releases/latest). Inclou wizard d'onboarding, system tray i gestio automatica del sidecar.
 
 ### 2. CLI headless
 ```bash
@@ -188,7 +188,7 @@ Autenticacio requerida: capcalera `X-API-Key` amb el valor de `.env` (`NEXE_PRIM
 | macOS Intel | **NO suportat** (eliminat a v0.9.9 — wheels arm64-only) |
 | Linux ARM64 | Suportat (Ollama, CPU) — testejat a VM Ubuntu 24.04 ARM64 (UTM) |
 | Linux x86_64 | Suportat (Ollama, CPU) — tests unitaris passen, CLI validada |
-| Windows | En desenvolupament (sense ETA pública) |
+| Windows ARM64 | Suportat des de v1.0.7 (NOU) — installer NSIS; només backend Ollama (l'app l'instal·la automàticament); installer sense signar (SmartScreen avisa: "Més informació" → "Executar igualment") |
 
 ## Limitacions actuals
 

@@ -54,7 +54,7 @@ Tot el que necessita la versió del projecte s'actualitza des d'aquí:
 # 2. Sincronitza els Info.plist dels bundles macOS:
 python3 -m installer.sync_plist_versions
 # 3. Verifica que tot quadra:
-pytest core/tests/test_version.py core/tests/test_plist_versions.py
+pytest tests/core/test_version.py tests/core/test_plist_versions.py
 ```
 
 ### Mapa de propagació

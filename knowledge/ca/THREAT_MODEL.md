@@ -1,11 +1,11 @@
 # === METADATA RAG ===
 versio: "1.0"
-data: 2026-04-24
+data: 2026-07-04
 id: nexe-threat-model-stride
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Threat model formal STRIDE de server-nexe (v1.0, 2026-04-24). Servidor d'IA local mono-usuari: 8 trust boundaries (navegador/CLI/Qdrant/Ollama/HF/disc/keyring/LAN-bootstrap), 6 categories d'assets (dades d'usuari, secrets operatius, pesos de model, integritat de codi, disponibilitat, metadades), matriu STRIDE amb mitigacions citant file:line, abast explicit, riscos residuals declarats, apendix LINDDUN de privacitat. Substitueix el threat model informal a SECURITY.md:3-15. Impulsat per la revisio interna de seguretat assistida per IA AUD-INT-001 §2.11 (STRIDE threat model)."
+abstract: "Threat model formal STRIDE de server-nexe (v1.1, 2026-07-04). Servidor d'IA local mono-usuari: 8 trust boundaries (navegador/CLI/Qdrant/Ollama/HF/disc/keyring/LAN-bootstrap), 6 categories d'assets (dades d'usuari, secrets operatius, pesos de model, integritat de codi, disponibilitat, metadades), matriu STRIDE amb mitigacions citant file:line, abast explicit, riscos residuals declarats, apendix LINDDUN de privacitat. Substitueix el threat model informal a SECURITY.md:3-15. Impulsat per la revisio interna de seguretat assistida per IA AUD-INT-001 §2.11 (STRIDE threat model)."
 tags: [threat-model, stride, seguretat, audit, local-first, mono-usuari, boundaries, assets, mitigacions, privacitat, lindduan, compliance, spoofing, tampering, repudi, disclosure, dos, elevacio-privilegi]
 chunk_size: 800
 priority: P1
@@ -19,8 +19,8 @@ expires: null
 
 # server-nexe — Threat Model (STRIDE)
 
-**Versio:** 1.0 (formalitzacio inicial)
-**Data:** 2026-04-24
+**Versio:** 1.1
+**Data:** 2026-07-04
 **Estat:** Actiu, revisat a cada minor release.
 **Substitueix:** `SECURITY.md` §"Scope and threat model" (informal, linies 3–15 i 80–90). Aquella seccio es queda com a resum d'un paragraf i apunta aqui per al detall.
 
@@ -30,7 +30,7 @@ Aquest document formalitza el threat model que fins a la v1.0.4-beta estava impl
 
 ## 1. Proposit i abast
 
-server-nexe es un **servidor d'IA local, mono-usuari** amb memoria RAG persistent. S'executa a la maquina de l'usuari, bind a `127.0.0.1:9119` per defecte, i assumeix un usuari local de confiança. Aquest threat model cobreix la release 1.0.6 mes el hardening `[Unreleased]` a `main` (hardening de seguretat i el threat model STRIDE).
+server-nexe es un **servidor d'IA local, mono-usuari** amb memoria RAG persistent. S'executa a la maquina de l'usuari, bind a `127.0.0.1:9119` per defecte, i assumeix un usuari local de confiança. Aquest threat model cobreix la release 1.0.7.
 
 Dins l'abast:
 
@@ -55,7 +55,7 @@ Avalues server-nexe contra una politica interna (ISO 27001 o similar). Necessite
 
 ## 3. Assumpcions
 
-- El sistema operatiu (macOS 14+, Linux parcial) no esta compromes. server-nexe no pot protegir contra un adversari a nivell de kernel o una actualitzacio maliciosa de macOS.
+- El sistema operatiu (macOS 14+ Apple Silicon, Linux ARM64, Windows ARM64 — nou a 1.0.7) no esta compromes. server-nexe no pot protegir contra un adversari a nivell de kernel o una actualitzacio maliciosa del sistema operatiu. A Windows, l'installer NSIS va sense signar (SmartScreen avisa) — vegeu §4.4 i §8.
 - L'usuari te una confiança minima en ell mateix: no enganxa la seva API key a un document compartit, no copia `~/.nexe/` a un USB i se l'oblida, no executa server-nexe com a root en un servidor multi-usuari.
 - La xarxa local es considera no fiable per defecte, pero **no** hostil a nivell LAN. server-nexe fa bind a loopback; l'exposicio LAN requereix un opt-in explicit (whitelist VPN, tunel SSH, reverse proxy que l'usuari monti).
 - Les dependencies Python llistades a `requirements.txt` es consideren de confiança despres d'instal·lar. La seva propia cadena de subministrament (PyPI, Hugging Face Hub) s'audita offline abans de construir una release, no a cada arrencada.
@@ -87,7 +87,7 @@ Sensibilitat primaria: **confidencialitat** del material secret, **integritat** 
 
 ### 4.3 Pesos del model
 
-Pesos LLM descarregats per l'installer a la primera arrencada (Hugging Face snapshot_download, Ollama pull, o URL GGUF directa), mes el model d'embedding fastembed ONNX empaquetat al DMG. Despres de l'instal·lacio viuen sota `~/.cache/huggingface/`, `~/.ollama/`, i el subdirectori `embeddings/` de l'arbre d'instal·lacio.
+Pesos LLM descarregats per l'installer a la primera arrencada (Hugging Face snapshot_download, Ollama pull, o URL GGUF directa), mes el model d'embedding fastembed ONNX empaquetat amb l'artefacte d'instal·lacio (DMG/AppImage/installer Windows). Despres de l'instal·lacio viuen sota `~/.cache/huggingface/`, `~/.ollama/`, i el subdirectori `embeddings/` de l'arbre d'instal·lacio.
 
 Els pesos de la primera arrencada es verifiquen abans de confiar-hi — segons l'origen, mai en silenci (ADR B046b). Els snapshots **MLX i GGUF** estan pinnats SHA-256: digests self-computed a `installer/installer_catalog_data.py::MODEL_WEIGHT_SHA256` mes els digests per-fitxer-LFS publicats per Hugging Face a `installer/provider_pins.json` (obtinguts nomes per metadata, sense baixar cap model). Una discrepancia avorta la instalacio (fail-closed). Els models **Ollama** es verifiquen pel propi pull content-addressed d'Ollama (cada layer es contrasta amb el digest del manifest); no mantenim cap pin de client per a Ollama (ADR B251 — els seus tags son mutables upstream, aixi que un pin de client donaria falsos positius en una re-publicacio legitima). Risc residual: un atac de substitucio de tag upstream no es detecta mentre el cataleg usi tags mutables. Un artefacte MLX/GGUF sense pin disponible mai s'instala en silenci — l'installer exigeix consentiment explicit (`NEXE_ALLOW_UNPINNED=1` o un prompt interactiu). El model fastembed empaquetat al DMG ve acompanyat d'un `embeddings.manifest.json` (tres digests per a `model*.onnx`, `tokenizer.json`, `config.json`).
 
@@ -95,7 +95,7 @@ Sensibilitat primaria: **integritat**. Un pes manipulat fa de backdoor a cada in
 
 ### 4.4 Integritat del codi
 
-Moduls Python, installer Swift, scripts shell. Qualsevol proces corrent com el mateix usuari els pot llegir; no es defensen contra manipulacio local en runtime. La integritat al moment de distribucio la proporciona la notaritzacio d'Apple del DMG i el bundle d'installer (`installer/swift-wizard/`).
+Moduls Python, installer Swift, scripts shell. Qualsevol proces corrent com el mateix usuari els pot llegir; no es defensen contra manipulacio local en runtime. La integritat al moment de distribucio la proporciona, a macOS, la notaritzacio d'Apple del DMG i el bundle d'installer (`installer/swift-wizard/`). A Windows, l'installer NSIS **no esta signat** (SmartScreen avisa: "Mes informacio" → "Executar igualment"): cap signatura cobreix la integritat de distribucio en aquesta plataforma — risc residual declarat a §8 fins que se signi.
 
 ### 4.5 Disponibilitat
 
@@ -146,7 +146,7 @@ Numerats per a la matriu STRIDE:
 4. **Servidor ↔ Daemon Ollama.** HTTP loopback, port 11434, sense auth al costat Ollama (vegeu §6.1 Spoofing).
 5. **Servidor ↔ Hugging Face / registry Ollama / URL GGUF.** HTTPS; nomes es creua a install-time i en descarrega explicita de model.
 6. **Servidor ↔ Filesystem.** `~/.nexe/master.key` (`0o600`), DBs SQLCipher, fitxers de sessio `.enc`.
-7. **Servidor ↔ macOS Keyring.** `Security.framework` via `keyring` (Python). Mirror del MEK.
+7. **Servidor ↔ keystore del sistema.** macOS Keyring (`Security.framework`) o Windows Credential Manager, via `keyring` (Python). Mirror del MEK; si el keystore no es disponible, el MEK cau al fallback fitxer `0o600` de `get_or_create_master_key`.
 8. **LAN ↔ `/api/bootstrap`.** Gated per `NEXE_ENV` (`core/endpoints/bootstrap.py:97-106`): produccio → HTTP 503; development → loopback + RFC1918 + whitelist VPN (`core/endpoints/bootstrap.py:109-117`).
 
 ## 6. Analisi STRIDE
@@ -216,7 +216,7 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 **Cos de peticio sobredimensionat.** Rebutjat per `RequestSizeLimiterMiddleware` abans d'arribar als handlers (`core/request_size_limiter.py`).
 
-**OOM via carrega de model gegant.** Fora d'abast: l'usuari escull el tier explicitament a l'installer. L'HardwareDetector (fixat v1.0.4-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) avisa quan un tier supera la RAM.
+**OOM via carrega de model gegant.** Fora d'abast: l'usuari escull el tier explicitament a l'installer. L'HardwareDetector (fixat v1.0.3-beta, `installer/swift-wizard/Sources/InstallNexe/HardwareDetector.swift`) avisa quan un tier supera la RAM.
 
 ### 6.6 Elevacio de privilegi
 
@@ -252,6 +252,7 @@ Declaracio honesta del que *no* queda tancat pel §6.
 - **`embeddings.manifest.json` i `MODEL_WEIGHT_SHA256` estan code-signats nomes per estar dins del DMG notaritzat o del repo Git signat.** No hi ha transparency log extern. Un atacant que comprometi alhora el pipeline de build notaritzat i el repo git podria substituir el pin i el pes simultaniament. Fora d'abast per §7 "Python supply-chain", pero reobert aqui per honestedat.
 - **Prometheus `/metrics` revela compte de sessio, model carregat, taxa d'error recent.** Un atacant amb l'API key els veu. Baixa sensibilitat, pero no zero.
 - **Toggle dev-mode allow-remote.** `NEXE_DEV_MODE_ALLOW_REMOTE=true` desactiva la porta loopback-only. Posar aixo en produccio es un mal us; logem un WARNING pero no ens neguem a arrencar.
+- **Installer Windows (NSIS) sense signar.** A Windows ARM64 (suportat des de v1.0.7) no hi ha equivalent de la notaritzacio d'Apple: SmartScreen avisa i l'usuari ha de triar "Executar igualment". Un atacant que substitueixi l'`.exe` en transit o al mirall de descarrega no es detectat per cap signatura de codi. Es mitigara signant l'installer.
 - **Sense pipeline automatic de tracking de CVEs.** Les dependencies s'auditen manualment al moment de release. Un CVE divulgat entre releases no es capturat fins a la seguent revisio (vegeu `SECURITY.md:121`).
 - **Sense programa bug-bounty; sense pen-test extern.** Tot el testing de seguretat es assistit per IA mes l'autor. Aquest document substitueix l'abstencia d'un model formal, no l'abstencia d'una auditoria.
 
@@ -276,7 +277,8 @@ Aquest document es revisa:
 | Data | Versio | Canvi | Impulsat per |
 |------|--------|-------|--------------|
 | 2026-04-24 | 1.0 | Formalitzacio inicial. Matriu STRIDE, 8 boundaries, 6 categories d'assets, fora d'abast enumerat. | `AUD-INT-001` §2.11 (threat model STRIDE) |
+| 2026-07-04 | 1.1 | Release 1.0.7: plataforma Windows ARM64 afegida (assumpcions, §4.3, §4.4, boundary 7); installer NSIS sense signar declarat com a risc residual a §8. | Release 1.0.7 |
 
 ---
 
-*server-nexe 1.0.6+ · Apache 2.0 · Jordi Goy · vegeu [SECURITY.md](../../SECURITY.md) per informar de vulnerabilitats.*
+*server-nexe 1.0.7+ · Apache 2.0 · Jordi Goy · vegeu [SECURITY.md](../../SECURITY.md) per informar de vulnerabilitats.*
