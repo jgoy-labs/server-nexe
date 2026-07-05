@@ -87,7 +87,7 @@ echo "    This may take several minutes the first time."
 #   older ORT, broken with current. sentence-transformers/model_O4.onnx
 #   loads but takes ~108s first-time (graph compilation) — UX blocker for
 #   first-run users. int8 quantized loads in <0.5s.
-#   See: PLA-20260501-onnx-fp16.md, memory feedback_verificacio_empirica_repos_hf
+#   int8 chosen over fp16 after empirical load-time benchmarking.
 #
 # THREE HACKS, validated empirically 2026-05-01:
 #

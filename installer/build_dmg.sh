@@ -54,8 +54,7 @@ NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
-# Exit code 14: offline-install bundles missing or too small. See
-# PLA-20260415-offline-install-bundle.md and skill /dmg-nexe.
+# Exit code 14: offline-install bundles missing or too small.
 bundle_error() { echo -e "${RED}[ERROR]${NC} $1"; exit 14; }
 
 # ── Step 0: Preflight checks ────────────────────────────────────

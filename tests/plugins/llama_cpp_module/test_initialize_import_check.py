@@ -115,7 +115,7 @@ class TestImportErrorMessageDoesNotSuggestCmakeArgs:
   missing must NOT suggest `CMAKE_ARGS=...` installs. That pattern forces
   a source build and triggers the Xcode Command Line Tools prompt — which
   was the root cause of the clean M1 install failure (2026-04-15) that
-  drove the move to bundled wheels (PLA-20260415-offline-install-bundle).
+  drove the move to bundled wheels.
 
   The PyPI wheel for arm64 macOS already ships with Metal enabled; a plain
   `pip install llama-cpp-python` is sufficient."""
@@ -130,5 +130,5 @@ class TestImportErrorMessageDoesNotSuggestCmakeArgs:
       "plugins/llama_cpp_module/module.py references CMAKE_ARGS. The PyPI "
       "wheel for arm64 macOS already ships with Metal — suggesting "
       "CMAKE_ARGS to users forces source build and triggers Xcode CLT "
-      "prompt. See PLA-20260415-offline-install-bundle.md."
+      "prompt."
     )

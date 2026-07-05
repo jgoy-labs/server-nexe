@@ -162,7 +162,7 @@ class GCDaemon:
                 continue
             try:
                 self._store.add_tombstone(user_id=user_id, content_hash=content_hash, reason="gc_decay")
-            except Exception:  # nosec B110: best-effort tombstone insertion during GC; failure logged elsewhere via outer error path (BACKLOG-v1.0.5 M5-02 review for log.debug upgrade)
+            except Exception:  # nosec B110: best-effort tombstone insertion during GC; failure logged elsewhere via outer error path
                 pass
 
     def _gc_expire_tombstones(self, conn, user_id: str, dry_run: bool) -> int:

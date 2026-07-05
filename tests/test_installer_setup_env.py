@@ -538,7 +538,7 @@ class TestDefaultFastembedCacheDir:
 class TestNoCmakeArgsRegression:
     """Once llama-cpp-python wheels are bundled, CMAKE_ARGS forcing source
     build must never come back — it was the cause of the Xcode CLT prompt
-    bug that blocked clean M1 installs. See PLA-20260415-offline-install-bundle."""
+    bug that blocked clean M1 installs."""
 
     def test_installer_setup_env_does_not_set_cmake_args(self):
         from pathlib import Path as _Path
@@ -547,8 +547,7 @@ class TestNoCmakeArgsRegression:
         )
         assert "CMAKE_ARGS" not in src, (
             "CMAKE_ARGS is back in installer_setup_env.py — this forces source "
-            "build of llama-cpp-python and triggers Xcode CLT prompt on clean Macs. "
-            "See PLA-20260415-offline-install-bundle.md."
+            "build of llama-cpp-python and triggers Xcode CLT prompt on clean Macs."
         )
 
 

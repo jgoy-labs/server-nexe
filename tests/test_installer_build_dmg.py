@@ -8,7 +8,7 @@ Description: Smoke tests for installer/build_dmg.sh — the orchestrator
              of the offline install phase (bundle build + size validation).
 
              They do NOT run the actual DMG build (slow + network +
-             Apple signing keychain). That's covered by /dmg-nexe.
+             Apple signing keychain). That's covered by the DMG build tooling.
 ────────────────────────────────────
 """
 
@@ -73,7 +73,7 @@ def test_validates_embedding_bundle_size(script_content: str) -> None:
 
 def test_uses_exit_code_14_for_bundle_errors(script_content: str) -> None:
     """Bundle failures must exit with code 14 (distinct from generic exit 1)
-    so /dmg-nexe can handle them with a specific message."""
+    so the DMG build tooling can handle them with a specific message."""
     assert "bundle_error" in script_content
     assert "exit 14" in script_content
 

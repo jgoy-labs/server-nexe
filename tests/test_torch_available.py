@@ -10,7 +10,6 @@ present in the bundle (supply-side) and importable in the test env
 (runtime-side, may differ from client install).
 
 Author: Jordi Goy
-Refs: PLA-v1.0.4-beta TODO 1.5 + PLA-20260502-tests-bundle (TODO 1.3 + 1.5 closure)
 """
 
 from __future__ import annotations

@@ -48,8 +48,7 @@
 #      and check the official compat matrix at
 #      https://pytorch.org/get-started/previous-versions/ — torchvision is
 #      ALWAYS pinned exactly to a torch version (Requires-Dist: torch (==X.Y.Z)).
-#   2. Empirical compat probe (do NOT trust release notes alone — see
-#      memory/feedback_verificacio_empirica_repos_hf.md):
+#   2. Empirical compat probe (do NOT trust release notes alone):
 #         pip download \
 #             --only-binary=:all: \
 #             --platform macosx_14_0_arm64 \

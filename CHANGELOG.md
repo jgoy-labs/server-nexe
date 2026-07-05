@@ -673,8 +673,7 @@ Derived from a full security audit with plan v2.4.
     effectively never triggered. A full multi-user architecture refactor
     (multi-pool LRU cache + `config_override` per request + removal of
     class-level singletons + horizontal uvicorn workers) is **deferred**
-    until multi-user becomes an actual use case. See the complete
-    deferred-work scope documented in ISSUE-multiuser-refactor.md.
+    until multi-user becomes an actual use case.
 
 - **P1-1** — Jailbreak speed-bump: regex detector for common patterns
   (ca/en: "ignora instruccions", "you are now a/an WORD", "forget your

@@ -15,7 +15,6 @@ incompatibility. The basename remains `model.onnx` (Xenova HF cache redirect to
 the int8 quantized variant). Bundle size dropped from 1058 MB FP32 → 282 MB int8.
 
 Author: Jordi Goy
-Refs: PLA-v1.0.4-beta TODO 1.5 + PLA-20260502-tests-bundle
 """
 
 from __future__ import annotations

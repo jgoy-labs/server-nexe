@@ -38,4 +38,4 @@ python -m plugins.security workflow
 ## Estructura
 
 Segueix l'estructura canonica de plugins Nexe (6 fitxers + 10 directoris obligatoris).
-Veure GUIA-PLUGINS.md per detalls.
+Cada plugin ha de respectar aquesta estructura.
