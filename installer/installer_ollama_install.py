@@ -361,6 +361,11 @@ def _install_ollama_windows() -> bool:
     import socket
     import tempfile
 
+    # Lazy import: this module is also loaded by the standalone macOS DMG path
+    # where `core` may not be on sys.path at import time; here (Windows sidecar
+    # onboarding) core is always importable.
+    from core.proc_utils import no_window_kwargs
+
     arch = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "amd64"
     url = f"https://ollama.com/download/ollama-windows-{arch}.zip"
     dest = Path(os.path.expandvars(r"%LOCALAPPDATA%\Programs\Ollama"))
@@ -380,6 +385,9 @@ def _install_ollama_windows() -> bool:
         result = subprocess.run(  # nosec B603 B607: url is the literal ollama.com download; zip_path is our tempfile; curl ships with Windows 10+
             ["curl", "-fSL", "-o", zip_path, url],
             timeout=600, capture_output=True,
+            # Windows: CREATE_NO_WINDOW — the forgotten sibling of the serve at
+            # ~line 420; without it curl flashes a console window on download.
+            **no_window_kwargs(),
         )
         if result.returncode != 0:
             print_warn(t('ollama_install_failed'))

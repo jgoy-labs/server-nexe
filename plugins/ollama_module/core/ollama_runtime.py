@@ -29,6 +29,8 @@ import platform
 import shutil
 import subprocess
 
+from core.proc_utils import detached_kwargs
+
 logger = logging.getLogger(__name__)
 
 # macOS Ollama.app ships the `serve` binary inside its bundle; invoking it
@@ -104,7 +106,9 @@ def spawn_ollama_serve() -> "subprocess.Popen | None":
             [binary, "serve"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True,
+            # POSIX: own session/process group (unchanged). Windows: also
+            # CREATE_NO_WINDOW|DETACHED_PROCESS so no console flashes in GUI mode.
+            **detached_kwargs(),
         )
         logger.info("ollama serve started headless (%s)", binary)
         return process

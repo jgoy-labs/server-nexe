@@ -38,6 +38,7 @@ from core.onboarding_state import (
     _read_hf_token_from_keychain,
     _store_hf_token_in_keychain,
 )
+from core.proc_utils import no_window_kwargs
 
 # cleanup: import DownloadIntegrityError at top to
 # avoid pyright `reportPossiblyUnboundVariable` when the lazy import inside
@@ -422,6 +423,9 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
         ollama, "pull", model_id,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        # Windows: CREATE_NO_WINDOW so the pull does not flash a console window
+        # during onboarding (blocking: we read stdout=PIPE, so not detached).
+        **no_window_kwargs(),
     )
 
     assert proc.stdout is not None  # noqa: S101  # nosec B101 — type guard: proc created with stdout=PIPE so stdout cannot be None by construction
