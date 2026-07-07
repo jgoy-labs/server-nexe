@@ -7,7 +7,7 @@
 fastapi==0.136.3
 # starlette 1.x: PYSEC-2026-161 (Host header) fixed in >=1.0.1; CVE-2025-54121/CVE-2025-62727 in 0.40+. FastAPI >=0.133 relaxed the starlette<1.0.0 cap (upgraded from fastapi==0.128.8 / starlette==0.52.1, 2026-05-29).
 starlette==1.3.1  # CVE-2026-54283: request.form() max_fields/max_part_size ignored on url-encoded -> DoS, fixed in 1.3.1
-uvicorn[standard]==0.34.3
+uvicorn[standard]==0.50.2
 pydantic==2.10.6
 pydantic-settings==2.14.2  # GHSA-4xgf-cpjx-pc3j: NestedSecretsSettingsSource follows symlinks outside secrets_dir (local file read), fixed in 2.14.2
 python-multipart==0.0.32  # CVE-2026-40347; GHSA-pp6c-gr5w-3c5g fixed in 0.0.27
