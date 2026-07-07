@@ -8,7 +8,7 @@
 # build-wheels-bundle.sh (offline bundle) and check_cves_osv.py (CVE audit).
 # Cross-checked by tests/test_installer_mlx_pin_consistency.py (B069).
 mlx-lm==0.31.3
-mlx-vlm==0.4.4
+mlx-vlm==0.6.4
 
 # Tray app (macOS menu bar)
 rumps==0.4.0  # macOS menu bar tray app (requires PyObjC)
