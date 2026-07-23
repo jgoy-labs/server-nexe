@@ -31,32 +31,106 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-def _auto_max_kv_size() -> int:
-    """
-    Calculates optimal max_kv_size based on available RAM.
+# B004 — per-model KV budget. The old formula reserved a flat 20 GB (zero on
+# any machine under 20 GB → always the floor) and hardcoded the 32B model's
+# 256 KB/token even when loading the 4B (real cost: 128 KB/token). Field
+# measurement (M1 8 GB, 2026-07-23): footprint = weights + max_kv_size ×
+# kv_bytes_per_token + ~1.15 GB runtime, flat during generation.
 
-    Qwen3-32B KV cache: 64 layers × 2 (k+v) × 8 heads × 128 dims × 2 bytes = 256KB/token
-    Reserve 20GB for model + system, the rest for KV cache.
-    Cap at 131072 for safety (Qwen3 supports up to 131072 natively).
-    """
+DEFAULT_KV_BYTES_PER_TOKEN = 256 * 1024  # old assumption, kept as the fallback
+_RUNTIME_GB = 1.15   # measured runtime baseline (Python + Metal, 2026-07-23)
+_OS_RESERVE_GB = 1.5
+
+
+def _read_model_config_json(model_path: str):
+    """Return the model's config.json as a dict, or None if unreadable."""
+    if not model_path:
+        return None
     try:
-        import psutil
-        total_gb = psutil.virtual_memory().total / (1024 ** 3)
-        available_for_kv_gb = max(0, total_gb - 20)  # Reserve 20GB for model+system
-        kv_bytes_per_token = 256 * 1024  # 256KB/token (Qwen3-32B)
-        max_tokens = int((available_for_kv_gb * 1024 ** 3) / kv_bytes_per_token)
-        max_tokens = min(65536, (max_tokens // 1024) * 1024)
-        if total_gb < 12:
-            floor = 4096   # 8 GB: model ~4 GB + KV ~1 GB + system ~3 GB
-        elif total_gb < 24:
-            floor = 8192
-        else:
-            floor = 16384
-        max_tokens = max(floor, max_tokens)
-        logger.info(f"MLXConfig: auto max_kv_size={max_tokens} (RAM={total_gb:.0f}GB)")
-        return max_tokens
-    except Exception:
-        return 65536  # Conservative fallback
+        import json
+        with open(Path(model_path) / "config.json") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def model_kv_bytes_per_token(model_path: str, *, effective: bool = False) -> int:
+    """KV-cache bytes per token of THIS model: 2 (k+v) × layers × kv_heads ×
+    head_dim × 2 bytes (f16 — weight quantization does not touch the KV).
+
+    Default is the NAIVE figure (every layer counted): it is what a
+    RotatingKVCache would store and deliberately over-reserves on models with
+    linear-attention/sliding-window layers. ``effective=True`` counts only the
+    ``full_attention`` entries of ``layer_types`` (realistic growth) — used by
+    the RAM guard so it never over-refuses (gemma-4-31b: 960 KB/token naive
+    vs ~160 real). Falls back to DEFAULT_KV_BYTES_PER_TOKEN when the config
+    is unreadable or malformed.
+    """
+    cfg = _read_model_config_json(model_path)
+    if cfg is None:
+        return DEFAULT_KV_BYTES_PER_TOKEN
+    tc = cfg.get("text_config") or cfg  # VLMs nest the text model's params
+    layers = tc.get("num_hidden_layers")
+    kv_heads = tc.get("num_key_value_heads") or tc.get("num_attention_heads")
+    head_dim = tc.get("head_dim")
+    if not head_dim:
+        hs, nah = tc.get("hidden_size"), tc.get("num_attention_heads")
+        head_dim = hs // nah if (hs and nah) else None
+    if not all(isinstance(x, int) and x > 0 for x in (layers, kv_heads, head_dim)):
+        return DEFAULT_KV_BYTES_PER_TOKEN
+    if effective:
+        lt = tc.get("layer_types")
+        if isinstance(lt, list) and lt:
+            layers = sum(1 for t in lt if t == "full_attention") or layers
+    bytes_per_token = 2 * layers * kv_heads * head_dim * 2
+    if not (8 * 1024 <= bytes_per_token <= 4 * 1024 * 1024):  # sanity clamp
+        return DEFAULT_KV_BYTES_PER_TOKEN
+    return bytes_per_token
+
+
+def model_weights_gb(model_path: str):
+    """Sum of the model's ``*.safetensors`` in GB, or None if not measurable."""
+    if not model_path:
+        return None
+    try:
+        p = Path(model_path)
+        if not p.is_dir():
+            return None
+        total = sum(f.stat().st_size for f in p.glob("*.safetensors"))
+        return total / (1024 ** 3) if total > 0 else None
+    except OSError:
+        return None
+
+
+def auto_max_kv_size(model_path: str, total_gb=None) -> int:
+    """KV window budgeted from the REAL model and the machine's RAM.
+
+    budget = total − OS reserve − runtime − weights; tokens = budget / cost
+    per token, rounded down to 4096. Floor 8192 (4096 is PROVEN too small for
+    normal conversations); per-tier caps encode "conservative where not
+    measured": <12 GB → 16384 (the measured point), <24 GB → 32768, else
+    65536. NEXE_MLX_MAX_KV_SIZE overrides all of this in from_env().
+    """
+    if total_gb is None:
+        try:
+            import psutil
+            total_gb = psutil.virtual_memory().total / (1024 ** 3)
+        except Exception:
+            return 16384  # safe fallback (the old 65536 was NOT conservative)
+    weights = model_weights_gb(model_path)
+    weights_gb = weights if weights is not None else 3.5
+    budget_gb = total_gb - _OS_RESERVE_GB - _RUNTIME_GB - weights_gb
+    tokens = int(max(0.0, budget_gb) * (1024 ** 3) / model_kv_bytes_per_token(model_path))
+    tokens = (tokens // 4096) * 4096
+    cap = 16384 if total_gb < 12 else (32768 if total_gb < 24 else 65536)
+    result = max(8192, min(cap, tokens))
+    logger.info(
+        "MLXConfig: auto max_kv_size=%d (RAM=%.0fGB, weights=%s, kv/tok=%dKB)",
+        result, total_gb,
+        f"{weights_gb:.2f}GB" if weights is not None else "unknown→3.5GB",
+        model_kv_bytes_per_token(model_path) // 1024,
+    )
+    return result
 
 
 def detect_hardware_tier() -> str:
@@ -174,10 +248,19 @@ class MLXConfig:
         config = cls(
             model_path=model_path,
             max_tokens=int(os.getenv("NEXE_MLX_MAX_TOKENS", "2048")),
-            max_kv_size=int(os.getenv("NEXE_MLX_MAX_KV_SIZE", str(_auto_max_kv_size()))),
             temperature=float(os.getenv("NEXE_MLX_TEMPERATURE", "0.7")),
             top_p=float(os.getenv("NEXE_MLX_TOP_P", "0.9")),
             max_session_caches=int(os.getenv("NEXE_MLX_MAX_SESSION_CACHES", "4")),
+        )
+        # B004: max_kv_size AFTER construction (__post_init__ has normalised
+        # ~/relative paths) and derived from the model actually being loaded.
+        # The env var short-circuits everything — and is only evaluated when
+        # set (the old default-arg pattern computed the auto value even when
+        # the env var was defined). Hot-swap recalculates for free: every
+        # model switch goes through from_env() again.
+        _raw_kv = os.getenv("NEXE_MLX_MAX_KV_SIZE")
+        config.max_kv_size = (
+            int(_raw_kv) if _raw_kv else auto_max_kv_size(config.model_path)
         )
 
         logger.info(

@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 """
 from __future__ import annotations
 import logging
+import os
 import threading
 from pathlib import Path
 from typing import Optional
@@ -72,6 +73,11 @@ def _create_client(path: Optional[str], url: Optional[str]) -> QdrantClient:
         return QdrantClient(url=url, prefer_grpc=False)
     qdrant_path = _anchor_path(path)
     qdrant_path.mkdir(parents=True, exist_ok=True)
+    # NEXE-SRV-WS3-06: el dir de vectors guarda embeddings (PII) — força
+    # 0o700 owner-only replicant el patró de sqlite_store, perquè mkdir
+    # hereta l'umask (0o755 amb umask 022) i exposaria els vectors a
+    # altres comptes en un Mac compartit.
+    os.chmod(qdrant_path, 0o700)
     return QdrantClient(path=str(qdrant_path))
 
 

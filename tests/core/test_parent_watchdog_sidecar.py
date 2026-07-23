@@ -157,6 +157,95 @@ def test_posix_wait_treats_permission_error_as_alive(monkeypatch):
     assert outcomes == []  # both probes consumed
 
 
+# ── NEXE-SRV-WS7-05: POSIX PID-reuse revalidation ──────────────────────────
+
+
+def test_posix_wait_returns_when_identity_changes(monkeypatch):
+    """PID stays 'alive' (os.kill OK) but its creation time changed → the PID
+    was recycled onto another process → treat parent as gone and return."""
+    monkeypatch.setattr(os, "kill", lambda pid, sig: None)  # PID number is live
+    monkeypatch.setattr(watchdog_mod.time, "sleep", lambda s: None)
+    # First revalidation reports a DIFFERENT creation time than the anchor.
+    monkeypatch.setattr(watchdog_mod, "_parent_create_time", lambda pid: 2222.0)
+
+    # anchor identity = 1111.0; live probe now yields 2222.0 → reuse detected
+    _wait_parent_exit_posix(4242, poll_interval=0.01, identity=1111.0)  # must return
+
+
+def test_posix_wait_keeps_polling_while_identity_matches(monkeypatch):
+    """Same creation time = same process → keep polling until the PID vanishes."""
+    kill_calls = []
+
+    def fake_kill(pid, sig):
+        kill_calls.append(pid)
+        if len(kill_calls) >= 3:
+            raise ProcessLookupError  # parent finally exits
+        # else: alive
+
+    monkeypatch.setattr(os, "kill", fake_kill)
+    monkeypatch.setattr(watchdog_mod.time, "sleep", lambda s: None)
+    # Identity is stable across polls → no false reuse trigger.
+    monkeypatch.setattr(watchdog_mod, "_parent_create_time", lambda pid: 1111.0)
+
+    _wait_parent_exit_posix(4242, poll_interval=0.01, identity=1111.0)
+
+    assert len(kill_calls) == 3  # polled until ProcessLookupError, no early exit
+
+
+def test_posix_wait_without_identity_ignores_create_time(monkeypatch):
+    """identity=None (psutil unavailable) → fall back to bare signal-0 poll,
+    never consult creation time (no regression vs the original behaviour)."""
+    def boom(pid):  # pragma: no cover - must not be called
+        raise AssertionError("_parent_create_time must not run when identity is None")
+
+    monkeypatch.setattr(watchdog_mod, "_parent_create_time", boom)
+    outcomes = [None, ProcessLookupError]  # alive once, then gone
+
+    def fake_kill(pid, sig):
+        outcome = outcomes.pop(0)
+        if outcome is not None:
+            raise outcome
+
+    monkeypatch.setattr(os, "kill", fake_kill)
+    monkeypatch.setattr(watchdog_mod.time, "sleep", lambda s: None)
+
+    _wait_parent_exit_posix(4242, poll_interval=0.01)  # identity defaults to None
+
+    assert outcomes == []
+
+
+def test_parent_create_time_none_when_psutil_missing(monkeypatch):
+    """No psutil → identity token is None (fail-open anchor)."""
+    monkeypatch.setattr(watchdog_mod, "psutil", None)
+    assert watchdog_mod._parent_create_time(4242) is None
+
+
+def test_parent_create_time_none_on_lookup_failure(monkeypatch):
+    """psutil raises (process gone / access denied) → None, never propagates."""
+    class _FakePsutil:
+        @staticmethod
+        def Process(pid):  # noqa: N802
+            raise RuntimeError("NoSuchProcess")
+
+    monkeypatch.setattr(watchdog_mod, "psutil", _FakePsutil)
+    assert watchdog_mod._parent_create_time(4242) is None
+
+
+def test_parent_create_time_returns_value(monkeypatch):
+    """Happy path: psutil supplies the creation time verbatim."""
+    class _FakeProc:
+        def create_time(self):
+            return 98765.0
+
+    class _FakePsutil:
+        @staticmethod
+        def Process(pid):  # noqa: N802
+            return _FakeProc()
+
+    monkeypatch.setattr(watchdog_mod, "psutil", _FakePsutil)
+    assert watchdog_mod._parent_create_time(4242) == 98765.0
+
+
 def test_windows_wait_parent_death_detected():
     """WAIT_OBJECT_0 → parent gone (True) and the handle is closed."""
     fake = _FakeKernel32(open_result=777, wait_result=_WAIT_OBJECT_0)

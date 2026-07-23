@@ -1459,9 +1459,27 @@ async def _switch_engine_model(engine, engine_name: str, body: dict, model_name:
         models_dir = Path(_gss().project_root) / models_dir  # type: ignore[arg-type]
     local_path = models_dir / model_name  # type: ignore[operator]
 
-    if engine_name == "mlx_module" and local_path.exists():
+    # Validate BEFORE switching (2026-07-23, 8 GB M1): a bare `.exists()` let
+    # a grouping folder (~/models/mlx — the BACKEND name served as a model by
+    # the old scan) through, the module switched its global state to the ghost
+    # path, the RAM guard estimated a model that did not exist, and the user
+    # got a raw FileNotFoundError. And a *failed* gate fell through silently:
+    # the user kept chatting with the OLD model with no signal at all.
+    # ValueError with "not found" is deliberate: the caller's except-ValueError
+    # maps it to a clean HTTP 404 (raising HTTPException here would be
+    # swallowed by the engine loop's generic `except Exception: continue`).
+    if engine_name == "mlx_module":
+        if not (local_path / "config.json").is_file():
+            raise ValueError(
+                f"Model '{model_name}' not found: no MLX model (config.json) "
+                f"under the models directory"
+            )
         _switch_mlx_model(engine, local_path)
-    elif engine_name == "llama_cpp_module" and local_path.exists():
+    elif engine_name == "llama_cpp_module":
+        if not (local_path.is_file() and local_path.suffix == ".gguf"):
+            raise ValueError(
+                f"Model '{model_name}' not found: not a GGUF file"
+            )
         _switch_llama_cpp_model(engine, local_path)
 
 
@@ -1766,10 +1784,48 @@ _MONTHS_BY_LANG: dict[str, list[str]] = {
            "July", "August", "September", "October", "November", "December"],
 }
 _DATE_PHRASE_BY_LANG: dict[str, str] = {
-    "ca": "Avui és {dow}, {day} de {month} de {year}, a les {hms} {tz}.",
-    "es": "Hoy es {dow}, {day} de {month} de {year}, a las {hms} {tz}.",
-    "en": "Today is {dow}, {month} {day}, {year}, at {hms} {tz}.",
+    # B007: DAY granularity only — the phrase lives inside the system prompt,
+    # which is the head of every tokenized prompt. Any faster-changing value
+    # (hh:mm:ss) makes identity_hash and the token prefix change every second,
+    # so no prefix cache (MLX trie/VLM state, llama.cpp ModelPool, Ollama's
+    # internal cache) can ever hit. Clock questions are answered on demand via
+    # _time_context_line() injected into that single turn instead.
+    "ca": "Avui és {dow}, {day} de {month} de {year}.",
+    "es": "Hoy es {dow}, {day} de {month} de {year}.",
+    "en": "Today is {dow}, {month} {day}, {year}.",
 }
+
+# B007/D-A: the current time is read from the system ONLY when the user asks
+# for it, and travels inside that turn's user message (ephemeral — the session
+# persists the raw message, so the cache diverges only on that turn).
+_TIME_INTENT_RE = _re.compile(
+    r"(quina\s+hora|hora\s+(és|es\s+ara|tenim)"
+    r"|qu[eé]\s+hora"
+    r"|what(\s+is|'s)?\s+the\s+time|what\s+time|current\s+time)",
+    _re.IGNORECASE,
+)
+_TIME_PHRASE_BY_LANG: dict[str, str] = {
+    "ca": "[Hora actual del sistema: {hm} ({tz}) — llegida ara mateix]",
+    "es": "[Hora actual del sistema: {hm} ({tz}) — leída ahora mismo]",
+    "en": "[Current system time: {hm} ({tz}) — read just now]",
+}
+
+
+def _time_context_line(message: str, lang: str, _now=None) -> str:
+    """Return a one-line current-time note when the user asks the time, else ''.
+
+    Injected as a prefix of that turn's user message (never the system prompt),
+    so the prefix cache only diverges on the turn that actually needs the clock.
+    """
+    if not message or not _TIME_INTENT_RE.search(message):
+        return ""
+    if _now is None:
+        from datetime import datetime as _dt
+        _now = _dt.now().astimezone()
+    base = lang if lang in _TIME_PHRASE_BY_LANG else "en"
+    return _TIME_PHRASE_BY_LANG[base].format(
+        hm=_now.strftime("%H:%M"), tz=_now.strftime("%Z")
+    )
 
 
 def _format_now_natural(_now, _lang: str) -> str:
@@ -1785,17 +1841,18 @@ def _format_now_natural(_now, _lang: str) -> str:
         base = "en"
     dow = _WEEKDAYS_BY_LANG[base][_now.weekday()]
     month = _MONTHS_BY_LANG[base][_now.month]
+    # B007: day granularity only — no time-of-day here, ever (see the guard
+    # test test_b007_system_prompt_stable.py; the clock goes via
+    # _time_context_line on demand).
     return _DATE_PHRASE_BY_LANG[base].format(
         dow=dow,
         day=_now.day,
         month=month,
         year=_now.year,
-        hms=_now.strftime("%H:%M:%S"),
-        tz=_now.strftime("%Z"),
     )
 
 
-def _build_system_prompt_with_time(message: str = "") -> tuple[str, str]:
+def _build_system_prompt_with_time(message: str = "", _now=None) -> tuple[str, str]:
     """Read system prompt from server.toml, adapt to the user's language and
     inject current datetime.
 
@@ -1822,8 +1879,9 @@ def _build_system_prompt_with_time(message: str = "") -> tuple[str, str]:
     except Exception:
         base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
     base_system_prompt = prepend_language_directive(base_system_prompt, _lang)
-    from datetime import datetime as _dt
-    _now = _dt.now().astimezone()
+    if _now is None:  # injectable clock for tests (B007 stability guard)
+        from datetime import datetime as _dt
+        _now = _dt.now().astimezone()
     # The datetime phrase only has ca/es/en variants; use 'en' for other langs.
     _date_lang = _lang if _lang in ("ca", "es", "en") else "en"
     system_prompt = base_system_prompt + "\n\n" + _format_now_natural(_now, _date_lang)
@@ -2021,6 +2079,38 @@ class StreamingChatContext:
     # UI collection toggles for this request; None = all collections enabled
     # (old clients / bare API calls). Gates MEM_SAVE persistence.
     rag_collections: "list | None" = None
+    # FD-S6: this stream RESUMES the session's last assistant message — the
+    # tail must MERGE into it (never add_message: get_context_messages
+    # dedupes consecutive roles keeping only the latest, which would erase
+    # the first half of the answer).
+    continue_mode: bool = False
+
+
+def _oom_notice(err_msg: str, lang: str) -> str:
+    """Curated out-of-memory notice for the chat body, by originating engine.
+
+    The MLX pre-load guard already raises a message telling the user to switch
+    engines, but the streaming handler used to replace every OOM with a generic
+    "close other applications" — and since the UI always streams, that advice
+    never reached anyone. It is restored here, gated on the failure actually
+    coming from MLX: this branch also catches OOM raised by other engines, and
+    telling a user who is already on Ollama to switch to Ollama is nonsense.
+
+    MC-133 still holds: the text is curated per language and never echoes the
+    raw exception, which can carry internal paths or state.
+    """
+    mlx_specific = {
+        "ca": "Memòria insuficient per carregar el model amb MLX. Canvia el motor a Ollama (fa servir molta menys memòria) o tanca altres aplicacions i torna-ho a provar.",
+        "es": "Memoria insuficiente para cargar el modelo con MLX. Cambia el motor a Ollama (usa mucha menos memoria) o cierra otras aplicaciones e inténtalo de nuevo.",
+        "en": "Not enough memory to load the model with MLX. Switch the engine to Ollama (it uses far less memory) or close other applications and try again.",
+    }
+    generic = {
+        "ca": "Memòria insuficient. Tanca altres aplicacions per alliberar memòria i torna-ho a provar.",
+        "es": "Memoria insuficiente. Cierra otras aplicaciones para liberar memoria e inténtalo de nuevo.",
+        "en": "Not enough memory. Close other applications to free up memory and try again.",
+    }
+    table = mlx_specific if "MLX" in (err_msg or "") else generic
+    return table.get(lang, table["en"])
 
 
 async def _generate_streaming_response(ctx: StreamingChatContext):
@@ -2051,6 +2141,10 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
         import time as _time_mod
         _stream_start_t = _time_mod.time()
         _has_any_thinking = False
+        # FD-S5: truncation marker state. Set by the in-band sentinel (MLX
+        # via queue_generator) or by an Ollama done_reason=='length' chunk.
+        _trunc = False
+        _trunc_continuable = False
         try:
             # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
             if inspect.isasyncgen(ctx.chat_result) or hasattr(ctx.chat_result, '__aiter__'):
@@ -2061,6 +2155,21 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
                 # text so _clean_full_response can strip tags at persist (INV-HIGH-07).
                 _think_parser = _StreamThinkParser(ctx.model_name)
                 async for chunk in ctx.chat_result:
+                    # FD-S5 sentinel (own yield, never mixed with text): the
+                    # engine hit the max_tokens ceiling.
+                    if isinstance(chunk, dict) and chunk.get("__nexe_trunc__"):
+                        _trunc = True
+                        _trunc_continuable = bool(chunk.get("continuable"))
+                        continue
+                    # Ollama passthrough chunks: the final one carries
+                    # done_reason ('length' = truncated). No continue — the
+                    # done chunk may still carry content for _parse_chunk.
+                    if (
+                        isinstance(chunk, dict)
+                        and chunk.get("done")
+                        and chunk.get("done_reason") == "length"
+                    ):
+                        _trunc = True
                     content, thinking = _parse_chunk(chunk)
 
                     # Model loaded — any chunk = model is responding
@@ -2101,12 +2210,7 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
             ))
             _lk = ctx.lang[:2] if ctx.lang else "ca"
             if _is_oom:
-                _oom = {
-                    "ca": "Memòria insuficient. Tanca altres aplicacions per alliberar memòria i torna-ho a provar.",
-                    "es": "Memoria insuficiente. Cierra otras aplicaciones para liberar memoria e inténtalo de nuevo.",
-                    "en": "Not enough memory. Close other applications to free up memory and try again.",
-                }
-                yield f"\n⚠️ {_oom.get(_lk, _oom['en'])}"
+                yield f"\n⚠️ {_oom_notice(err_msg, _lk)}"
             else:
                 # MC-133: do not echo the raw exception text (err_msg) — it can
                 # carry internal paths/state. Surface a generic, localized notice.
@@ -2122,6 +2226,18 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
 
         # Save clean response (no think/GPT-OSS tags) to session/disk
         clean_response, _mem_saves, _mem_deletes = _clean_full_response(full_response, ctx.message)
+
+        # FD-S5: tell the client the answer was cut by the token ceiling —
+        # a silent cut mid-sentence reads as the model going mute. Emitted as
+        # its OWN yield (a marker split across reads would not be parsed).
+        # Degrades to :0 (informative, no Continue) when the visible text is
+        # empty or the think-only placeholder — there is nothing to resume.
+        if _trunc:
+            _cont_flag = 1 if (
+                _trunc_continuable and clean_response and clean_response != "…"
+            ) else 0
+            yield f"\x00[GEN_TRUNCATED:{_cont_flag}]\x00"
+
         for _del_fact in _mem_deletes:
             _encoded = _del_fact.replace('|', '\\|')
             # MC-117: arm the 2-turn TEXT confirmation (a typed "sí" next
@@ -2206,7 +2322,32 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
                 ctx.session, ctx.rag_count, ctx.rag_items, ctx.model_name,
                 _elapsed, len(full_response), _mem_saved_count, _mem_saves,
             )
-            ctx.session.add_message("assistant", clean_response, stats=_stats)
+            if ctx.continue_mode and ctx.session.messages \
+                    and ctx.session.messages[-1].get("role") == "assistant":
+                # FD-S6: MERGE the tail into the truncated turn — direct
+                # concatenation, no separator (the tail resumes mid-sentence).
+                # Never add_message: get_context_messages dedupes consecutive
+                # assistant turns keeping only the LATEST, which would erase
+                # the first half of the answer.
+                _last = ctx.session.messages[-1]
+                _last["content"] += clean_response
+                if _trunc and _trunc_continuable:
+                    # Chained continue (truncated again): extend the raw so
+                    # the NEXT continue prompt stays an exact token prefix.
+                    if _last.get("gen_raw"):
+                        _last["gen_raw"] += full_response
+                    else:
+                        _last["gen_raw"] = _last["content"]
+                else:
+                    _last.pop("gen_raw", None)  # completed: drop the raw
+            else:
+                ctx.session.add_message("assistant", clean_response, stats=_stats)
+                if _trunc and _trunc_continuable and ctx.session.messages:
+                    # FD-S6: persist the RAW generation next to the clean
+                    # content. With thinking ON the clean text's re-render
+                    # diverges token-wise from the KV cache entry — gen_raw is
+                    # what makes the future continue prompt an exact prefix.
+                    ctx.session.messages[-1]["gen_raw"] = full_response
             ctx.session_mgr._save_session_to_disk(ctx.session)
             _assistant_saved = True  # MC-116
 
@@ -2225,7 +2366,14 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
             try:
                 _partial_clean, _, _ = _clean_full_response(full_response, ctx.message)
                 _partial_clean = _think_only_placeholder(_partial_clean, full_response)
-                if _partial_clean:
+                if _partial_clean and ctx.continue_mode and ctx.session.messages \
+                        and ctx.session.messages[-1].get("role") == "assistant":
+                    # FD-S6 (MC-116): interrupted continue → merge the partial
+                    # tail in-place, same no-separator contract as the clean
+                    # path (add_message would trip the consecutive-role dedupe).
+                    ctx.session.messages[-1]["content"] += _partial_clean
+                    ctx.session.messages[-1].pop("gen_raw", None)
+                elif _partial_clean:
                     ctx.session.add_message("assistant", _partial_clean, stats={"interrupted": True})
                     ctx.session_mgr._save_session_to_disk(ctx.session)
             except Exception:
@@ -2278,6 +2426,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         model_name = None
         image_b64 = body.get("image_b64")
         stream = body.get("stream", False)
+        # FD-S6: continue mode — resume the last assistant turn.
+        _continue = body.get("continue") is True
         # Opt-in nucleus sampling from the UI body → forwarded to every engine.
         # Empty dict when absent so the engine keeps its current default.
         _top_p = _parse_ui_top_p(body)
@@ -2378,27 +2528,45 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     logger.info(f"Calling {engine_name}.chat with model={model_name} thinking={thinking_enabled}")
 
                     # --- Context Compacting ---
-                    # If the session has too many messages, compact with LLM summary
-                    await _compact_session(session, engine, session_mgr)
+                    # If the session has too many messages, compact with LLM summary.
+                    # FD-S6: skipped on continue — compaction rewrites the
+                    # history (an extra LLM generation between cut and resume)
+                    # and would invalidate the prefix the resume relies on.
+                    if not _continue:
+                        await _compact_session(session, engine, session_mgr)
 
                     # --- Build Context ---
                     # 1. Get recent conversation history with summary context
                     context_messages_full = session.get_context_messages()
-                    # Exclude the very last message (just added) to avoid duplication
-                    context_messages = context_messages_full[:-1] if context_messages_full else []
+                    # Exclude the very last message (just added) to avoid duplication.
+                    # FD-S6: on continue there is NO just-added user message —
+                    # the last message is the truncated assistant turn we are
+                    # about to resume, and it must stay.
+                    if _continue:
+                        context_messages = list(context_messages_full)
+                    else:
+                        context_messages = context_messages_full[:-1] if context_messages_full else []
 
                     # 2. Check for attached document (takes priority over RAG)
-                    attached_doc = session.get_and_clear_attached_document()
-                    session_mgr._save_session_to_disk(session)
+                    # FD-S6: none of this on continue — a doc/RAG turn injected
+                    # between the cut and the resume would both derail the
+                    # answer and shatter the prefix the resume reuses.
+                    if _continue:
+                        attached_doc = None
+                        document_context = ""
+                        rag_context, rag_count, _rag_items = "", 0, []
+                    else:
+                        attached_doc = session.get_and_clear_attached_document()
+                        session_mgr._save_session_to_disk(session)
 
-                    document_context = ""
-                    if attached_doc:
-                        document_context, _shown, _total_chunks = _build_document_context(attached_doc)
+                        document_context = ""
+                        if attached_doc:
+                            document_context, _shown, _total_chunks = _build_document_context(attached_doc)
 
-                    # 3. Get Memory Context (RAG) - ALWAYS search, not just with patterns
-                    rag_context, rag_count, _rag_items = await _build_rag_context(
-                        memory_helper, message, body, attached_doc,
-                    )
+                        # 3. Get Memory Context (RAG) - ALWAYS search, not just with patterns
+                        rag_context, rag_count, _rag_items = await _build_rag_context(
+                            memory_helper, message, body, attached_doc,
+                        )
 
                     # 4. Construct Final System Prompt (reply language follows the message)
                     system_prompt, _lang = _build_system_prompt_with_time(message)
@@ -2438,14 +2606,42 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     available_chars = _budget["available_chars"]
 
                     # Inject context into messages (not system prompt -> MLX can cache the prefix)
-                    engine_messages, _doc_truncated_pct, _ctx_injected = _inject_context_into_messages(
-                        engine_messages, message, document_context, rag_context,
-                        _budget, available_chars, history_chars,
-                    )
+                    if _continue:
+                        # FD-S6: no new user turn — the prompt must END at the
+                        # truncated assistant message. Swap its content for the
+                        # RAW generation (gen_raw) when present: with thinking
+                        # ON the persisted content is CLEAN (think stripped)
+                        # and its re-render diverges token-wise from the KV
+                        # that was just built — gen_raw makes the continue
+                        # prompt an exact token prefix of the cache entry
+                        # (prefill ~0 instead of the full 50s re-prefill).
+                        _doc_truncated_pct, _ctx_injected = 0, False
+                        _raw = (
+                            session.messages[-1].get("gen_raw")
+                            if session.messages else None
+                        )
+                        if _raw and engine_messages and engine_messages[-1]["role"] == "assistant":
+                            engine_messages[-1]["content"] = _raw
+                    else:
+                        engine_messages, _doc_truncated_pct, _ctx_injected = _inject_context_into_messages(
+                            engine_messages, message, document_context, rag_context,
+                            _budget, available_chars, history_chars,
+                        )
                     # B030: when untrusted retrieved content is in the message,
                     # arm the (static, cache-friendly) data-not-instructions rule.
                     if _ctx_injected:
                         system_prompt += "\n\n" + rag_security_rule(_lang)
+
+                    # B007/D-A: clock on demand — if the user asks the time,
+                    # prefix THIS turn's user message with the system clock.
+                    # Never the system prompt (it would poison the prefix cache
+                    # for the whole conversation); the session keeps the raw
+                    # message, so only this turn diverges in the cache.
+                    _time_line = _time_context_line(message, _lang)
+                    if _time_line and engine_messages and engine_messages[-1]["role"] == "user":
+                        engine_messages[-1]["content"] = (
+                            f"{_time_line}\n\n{engine_messages[-1]['content']}"
+                        )
 
                     messages = engine_messages
                     response_chunks: list[str] = []
@@ -2498,11 +2694,24 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                     logger.debug("stream_cb: chunk #%d (%d chars)", _stream_chunk_count[0], len(token))
                                 queue.put_nowait(token)
 
+                            # FD-S6: continue only reaches the MLX text path
+                            # (the marker is only :1 there). llama_cpp would
+                            # silently ignore the kwarg and REPEAT — hard gate.
+                            _continue_kwargs = {}
+                            if _continue:
+                                if engine_name != "mlx_module":
+                                    raise ValueError(
+                                        "continue is only supported on the MLX engine"
+                                    )
+                                _continue_kwargs = {"continue_final": True}
                             # Launch chat in background task
+                            # B007 (1b): session_id scopes the prefix-cache key —
+                            # without it every conversation shares ":default".
                             ml_task = asyncio.create_task(engine.chat(
                                 messages=messages, system=system_prompt, stream_callback=stream_cb,
+                                session_id=session.id,
                                 images=_images_arg, thinking_enabled=thinking_enabled,
-                                **cancel_kwargs, **sampling_kwargs,
+                                **_continue_kwargs, **cancel_kwargs, **sampling_kwargs,
                             ))
 
                             # Async generator that yields from queue until task is done
@@ -2519,6 +2728,21 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                         _exc = ml_task.exception()
                                         if _exc is not None:
                                             raise _exc
+                                        # FD-S5: the engine's result dict was
+                                        # discarded here — finish_reason died
+                                        # with it. Surface the truncation as
+                                        # an in-band sentinel. Defensive
+                                        # isinstance: llama_cpp shares this
+                                        # branch with its own result shape.
+                                        _res = ml_task.result()
+                                        if (
+                                            isinstance(_res, dict)
+                                            and _res.get("finish_reason") == "length"
+                                        ):
+                                            yield {
+                                                "__nexe_trunc__": True,
+                                                "continuable": bool(_res.get("continuable")),
+                                            }
                                         break
 
                                     # Wait for new tokens with short timeout
@@ -2531,9 +2755,15 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             chat_result = queue_generator()
 
                         else:
+                            # Generic engine: only pass session_id if accepted.
+                            _sid_kwargs = (
+                                {"session_id": session.id}
+                                if "session_id" in sig.parameters else {}
+                            )
                             chat_result = engine.chat(messages=messages, system=system_prompt,
                                                       images=_images_arg,
                                                       thinking_enabled=thinking_enabled,
+                                                      **_sid_kwargs,
                                                       **cancel_kwargs, **sampling_kwargs)
 
                     # Flag if compacted to notify the client
@@ -2560,6 +2790,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             message=message,
                             disconnect_monitor_task=_disconnect_monitor_task,
                             rag_collections=body.get("rag_collections"),
+                            continue_mode=_continue,
                         )
                         _returning_stream = True
                         return "", model_name, StreamingResponse(
@@ -2627,6 +2858,52 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             raise HTTPException(status_code=400, detail="Invalid session_id")
         stream = body.get("stream", False)
         image_b64 = body.get("image_b64")
+
+        # ── FD-S6: Continue — resume the last (truncated) assistant turn ──
+        # Dedicated branch BEFORE _validate_chat_input (which 400s an empty
+        # message). No new user message is persisted, no intent detection, no
+        # compaction, no doc/RAG injection: the engine re-enters the last
+        # assistant message with continue_final=True and the tail merges
+        # in-place. Server-side stateless: everything derives from the
+        # session history at click time.
+        if body.get("continue") is True:
+            if not session_id:
+                raise HTTPException(
+                    status_code=400, detail="continue requires session_id"
+                )
+            _c_session = session_mgr.get_or_create_session(session_id)
+            if (
+                not _c_session.messages
+                or _c_session.messages[-1].get("role") != "assistant"
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="continue requires the last message to be an assistant turn",
+                )
+            # The last REAL user message drives language detection + system.
+            _last_user = next(
+                (m.get("content", "") for m in reversed(_c_session.messages)
+                 if m.get("role") == "user"),
+                "",
+            )
+            response_text, model_name, _streaming_resp = await _handle_chat_engine(
+                body, _c_session, _get_memory_helper(), _last_user, request
+            )
+            if _streaming_resp is not None:
+                return _streaming_resp
+            # Non-streaming continue: merge the tail in-place (same contract
+            # as the streaming finally).
+            if response_text and not response_text.startswith("Error:"):
+                _c_session.messages[-1]["content"] += response_text
+                _c_session.messages[-1].pop("gen_raw", None)
+                session_mgr._save_session_to_disk(_c_session)
+            return {
+                "response": response_text,
+                "session_id": _c_session.id,
+                "intent": "chat",
+                "memory_action": None,
+            }
+
         image_bytes, message = _validate_chat_input(body, request)
 
         session = session_mgr.get_or_create_session(session_id)

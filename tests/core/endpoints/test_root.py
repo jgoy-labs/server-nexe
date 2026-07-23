@@ -638,7 +638,10 @@ class TestCircuitStatusEndpoint:
         data = resp.json()
         assert "circuits" in data
         assert isinstance(data["circuits"], list)
-        assert len(data["circuits"]) == 3
+        # WS7-01: ollama is the only wired breaker (qdrant/http were
+        # decorative and always reported closed — removed)
+        assert len(data["circuits"]) == 1
+        assert data["circuits"][0]["name"] == "ollama"
         assert "timestamp" in data
 
     def test_circuit_status_without_api_key_returns_401(self):

@@ -10,6 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from typing import Optional, Dict, Any
+import os
 import threading
 import logging
 
@@ -200,10 +201,16 @@ class MemoryModule:
       # Initialize MemoryService (v1 facade)
       try:
         from .memory_service import MemoryService
+        from core.config import encryption_is_mandatory
         self._memory_service = MemoryService(
           db_path=vectors_path / "memory_v1.db",
           qdrant_path=str(qdrant_path),
           crypto_provider=crypto,
+          # WS3-03: under NEXE_ENCRYPTION_ENABLED=true a failed migration
+          # raises; the except below turns that into memory-DISABLED (loud
+          # warning) rather than plaintext PII — data-wise fail-closed.
+          require_encryption=encryption_is_mandatory(
+            os.environ.get("NEXE_ENCRYPTION_ENABLED", "auto")),
         )
         await self._memory_service.initialize()
         logger.info("MemoryService initialized")

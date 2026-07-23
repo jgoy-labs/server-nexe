@@ -63,6 +63,8 @@ class PluginLoaderMixin:
 
         # Configure security allowlist
         allowlist_config = self._configure_plugin_allowlist()
+        # WS4-01: core-module trust is path-verified, so the check needs the root
+        allowlist_config['project_root'] = project_root
 
         for module_name in discovered:  # pyright: ignore[reportOptionalIterable]  # discovered is set just above if None
             module_info = None
@@ -163,20 +165,37 @@ class PluginLoaderMixin:
     def _check_plugin_security(self, ctx: SecurityCheckContext) -> bool:
         """Check if plugin passes security allowlist validation."""
         from personality.data.models import ModuleState
+        from personality.module_manager.core_modules import is_core_module_at
 
         effective_allowlist = ctx.allowlist_config['effective_allowlist']
 
-        if effective_allowlist is not None and ctx.module_name not in effective_allowlist:
-            ctx.module_info.enabled = False
-            ctx.module_info.state = ModuleState.DISABLED
-            logger.warning(f"Module {ctx.module_name} not in allowlist, skipping")
-
-            if hasattr(ctx.app.state, 'security_logger'):
-                ctx.app.state.security_logger.log_module_rejected(
-                    module_name=ctx.module_name,
-                    reason="Not in NEXE_APPROVED_MODULES allowlist",
+        if effective_allowlist is not None:
+            approved = set(ctx.allowlist_config.get('approved_modules') or ())
+            allowed = ctx.module_name in approved
+            if not allowed and ctx.module_name in ctx.allowlist_config.get('internal_modules', ()):
+                # WS4-01: a directory merely NAMED like a core module must not
+                # inherit core trust — the path has to be the canonical one.
+                allowed = is_core_module_at(
+                    ctx.module_name,
+                    getattr(ctx.module_info, 'path', None),
+                    ctx.allowlist_config.get('project_root'),
                 )
-            return False
+                if not allowed:
+                    logger.warning(
+                        f"Module {ctx.module_name} claims a core-module name but is not "
+                        f"at its canonical path — treating as unapproved (WS4-01)"
+                    )
+            if not allowed:
+                ctx.module_info.enabled = False
+                ctx.module_info.state = ModuleState.DISABLED
+                logger.warning(f"Module {ctx.module_name} not in allowlist, skipping")
+
+                if hasattr(ctx.app.state, 'security_logger'):
+                    ctx.app.state.security_logger.log_module_rejected(
+                        module_name=ctx.module_name,
+                        reason="Not in NEXE_APPROVED_MODULES allowlist",
+                    )
+                return False
 
         if hasattr(ctx.module_info, 'enabled') and not ctx.module_info.enabled:
             logger.info(f"Module {ctx.module_name} disabled, skipping")

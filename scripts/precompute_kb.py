@@ -195,8 +195,17 @@ def _collect_items_for_language(lang: str, *, verbose: bool = False) -> List[Dic
 def _embed_texts(texts: List[str], model_name: str) -> np.ndarray:
     """One-shot encode with fastembed + L2-normalise to match the runtime
     path (MemoryAPI._generate_embeddings_batch normalises the same way)."""
-    from fastembed import TextEmbedding
-    model = TextEmbedding(model_name)
+    # Must go through the shared factory like every runtime call site: a bare
+    # TextEmbedding(model_name) falls back to fastembed's default cache under
+    # tempfile.gettempdir(), which macOS purges — so the generator of the
+    # *shipped* vectors was resolving the model from a different (and possibly
+    # differently-quantized) copy than the runtime that consumes them. The
+    # cache_dir contract in memory/embeddings/paths.py exists precisely for
+    # this; its test gate only scans runtime call sites, so scripts/ slipped
+    # through. Honouring FASTEMBED_CACHE_DIR here is also what lets a build
+    # regenerate against the int8 variant it actually ships.
+    from memory.embeddings.shared import get_text_embedding
+    model = get_text_embedding(model_name)
     raw = list(model.embed(texts))
     arr = np.stack([np.asarray(v, dtype=np.float32) for v in raw])
     norms = np.linalg.norm(arr, axis=1, keepdims=True)

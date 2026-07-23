@@ -13,35 +13,27 @@ import tempfile
 
 
 class TestAutoMaxKvSize:
-    """Test lines 53-54: fallback when psutil fails."""
+    """B004: auto_max_kv_size budgets from the real model + RAM.
 
-    def test_auto_max_kv_returns_int(self):
-        from plugins.mlx_module.core.config import _auto_max_kv_size
-        result = _auto_max_kv_size()
+    The full policy table (per-machine/per-model pins + formula mutation
+    kills) lives in test_auto_max_kv_size.py; these keep the coverage of the
+    basic contracts this file always pinned (int result, psutil fallback).
+    """
+
+    def test_auto_max_kv_returns_int_above_floor(self):
+        from plugins.mlx_module.core.config import auto_max_kv_size
+        result = auto_max_kv_size("")  # no model → weights fallback 3.5 GB
         assert isinstance(result, int)
-        # The floor depends on the real RAM (config.py: <12GB→4096, <24GB→8192, else→16384).
-        # We assert against the derived floor so the test passes on any host
-        # (large dev machine = 16384; ~16GB CI runner = 8192) without hiding anything.
-        import psutil
-        total_gb = psutil.virtual_memory().total / (1024 ** 3)
-        floor = 4096 if total_gb < 12 else 8192 if total_gb < 24 else 16384
-        assert result >= floor
+        assert result >= 8192  # B004 floor (4096 is proven to degenerate)
 
-    def test_auto_max_kv_exception_fallback(self):
-        """Line 53-54: exception in psutil returns 65536."""
-        from plugins.mlx_module.core.config import _auto_max_kv_size
+    def test_auto_max_kv_psutil_failure_falls_back_conservative(self):
+        """psutil unavailable → 16384 (the old 65536 was NOT conservative)."""
+        from plugins.mlx_module.core.config import auto_max_kv_size
         import sys
-        # Temporarily remove psutil to trigger exception path
         orig = sys.modules.get('psutil')
         sys.modules['psutil'] = None
         try:
-            # Force reimport to pick up the None
-            import importlib
-            import plugins.mlx_module.core.config as cfg
-            # Directly test: when import fails inside the function
-            result = _auto_max_kv_size()
-            # Either returns calculated value or fallback
-            assert isinstance(result, int)
+            assert auto_max_kv_size("") == 16384
         finally:
             if orig is not None:
                 sys.modules['psutil'] = orig

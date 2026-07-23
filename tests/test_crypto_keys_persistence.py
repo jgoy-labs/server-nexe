@@ -146,17 +146,25 @@ def test_keyring_broken_falls_back_to_file_only(tmp_path, fake_keyring_broken):
     assert second == first
 
 
-def test_file_corrupt_falls_through_to_keyring(tmp_path, fake_keyring):
-    """If the file exists but has the wrong size (corrupt/tampered),
-    the system must fall through to the keyring, not crash."""
+def test_file_corrupt_refuses_to_continue(tmp_path, fake_keyring):
+    """WS3-02: a wrong-length (corrupt/tampered) master.key must FAIL CLOSED —
+    not silently fall through and regenerate, which would quarantine the existing
+    encrypted DB. It raises even when the keyring holds a valid key: the corrupt
+    file is a red flag, not to be bypassed silently. Removing the bad file lets the
+    keyring recovery path take over on the next start (asserted below)."""
     key_path = tmp_path / "master.key"
     key_path.write_bytes(b"corrupted-too-short")
     keyring_key = b"\x55" * crypto_keys.KEY_SIZE
     fake_keyring["value"] = keyring_key
 
-    loaded = crypto_keys.get_or_create_master_key(key_file_path=key_path)
+    with pytest.raises(RuntimeError, match="wrong length"):
+        crypto_keys.get_or_create_master_key(key_file_path=key_path)
 
-    assert loaded == keyring_key, "Must fall back to keyring if file is corrupt"
+    # Operational recovery: once the corrupt file is removed, the key is recovered
+    # from the keyring — no regeneration, no quarantine of the encrypted DB.
+    key_path.unlink()
+    recovered = crypto_keys.get_or_create_master_key(key_file_path=key_path)
+    assert recovered == keyring_key
 
 
 def test_generate_populates_both_sources(tmp_path, fake_keyring):
@@ -225,6 +233,36 @@ def test_present_but_unreadable_key_fails_closed(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError):
         crypto_keys.get_or_create_master_key(key_path)
+
+
+def test_env_key_warns_and_is_not_persisted(tmp_path, fake_keyring_broken, monkeypatch, caplog):
+    """BONUS-04: a key loaded from NEXE_MASTER_KEY is ephemeral by policy.
+
+    Conservative security policy: we do NOT silently mirror the env-supplied
+    secret to master.key nor to the keyring. Instead we emit a clear WARNING so
+    the operator knows the key won't survive a restart once the env var is
+    unset on a persistent host. This asserts BOTH: (1) the warning fires, and
+    (2) nothing is written to disk (no silent persistence).
+    """
+    import logging
+
+    key_path = tmp_path / "master.key"
+    env_key = b"\xab" * crypto_keys.KEY_SIZE
+    monkeypatch.setenv(crypto_keys.ENV_VAR_NAME, env_key.hex())
+    assert not key_path.exists()
+
+    with caplog.at_level(logging.WARNING, logger="core.crypto.keys"):
+        loaded = crypto_keys.get_or_create_master_key(key_file_path=key_path)
+
+    # Positive: the env key is returned as-is.
+    assert loaded == env_key
+    # Negative: it must NOT be silently written to disk (durability warning, not mirror).
+    assert not key_path.exists(), "env-only key must NOT be silently persisted to disk"
+    # The operator is warned about the ephemeral nature.
+    warnings = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+    assert any(
+        crypto_keys.ENV_VAR_NAME in m and "ephemeral" in m.lower() for m in warnings
+    ), f"expected an ephemeral-key WARNING mentioning {crypto_keys.ENV_VAR_NAME}, got: {warnings}"
 
 
 def test_keyring_read_failure_returns_none(monkeypatch):

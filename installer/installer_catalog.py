@@ -127,13 +127,25 @@ def _select_model_from_list(models: list) -> dict:
         return models[0]
 
 
-def _build_available_engines(selected_model: dict, has_metal: bool) -> list:
-    """Build the list of available engines for the selected model."""
+def _build_available_engines(selected_model: dict, has_metal: bool, ram_gb: int = 0) -> list:
+    """Build the list of available engines for the selected model.
+
+    MLX is the recommended engine whenever Metal is present — including 8 GB
+    machines. History: the 18/07 fix recommended Ollama on <=8 GB because the
+    RAM guard made MLX a dead-end there; the 23/07 field measurement (M1 8 GB)
+    showed MLX loads and generates fine (footprint 6.05 GB, ~2 GB of swap,
+    zero jetsam) and the guard now defaults to warn, so the dead-end is gone.
+    Product decision (Jordi, 23/07): MLX default on Mac. The ``ram_gb``
+    parameter is kept for signature stability (and future policy changes).
+    Findings NEXE-8GB-MLX-SELECTION / NEXE-MLX-GUARD-DEADEND.
+    """
     available = []
+    _ = ram_gb  # RAM no longer changes the recommendation (see docstring)
+    mlx_recommended = bool(has_metal)
     if has_metal and selected_model.get("mlx"):
-        available.append(("mlx", "MLX", t('engine_mlx_desc'), True))
+        available.append(("mlx", "MLX", t('engine_mlx_desc'), mlx_recommended))
     if selected_model.get("ollama"):
-        available.append(("ollama", "Ollama", t('engine_ollama_desc'), not has_metal))
+        available.append(("ollama", "Ollama", t('engine_ollama_desc'), not mlx_recommended))
     if selected_model.get("gguf"):
         available.append(("llama_cpp", "llama.cpp (GGUF)", t('engine_gguf_desc'), False))
     return available
@@ -210,7 +222,7 @@ def select_model(hw):
     _print_model_list(models, usable_ram, disk_free_gb, lang)
 
     selected_model = _select_model_from_list(models)
-    available_engines = _build_available_engines(selected_model, has_metal)
+    available_engines = _build_available_engines(selected_model, has_metal, ram)
     engine = _select_engine_interactive(selected_model, available_engines)
 
     _warn_qwen35_mlx(engine, selected_model)

@@ -47,7 +47,7 @@ def uptime_seconds() -> float:
   if _HAVE_PSUTIL:
     try:
       return max(0.0, time.time() - _PROC.create_time())
-    except Exception:
+    except Exception:  # nosec B110 — psutil probe is best-effort; monotonic fallback below
       pass
   return max(0.0, time.monotonic() - _IMPORT_MONO)
 

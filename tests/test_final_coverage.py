@@ -1106,22 +1106,6 @@ class TestRagModuleFinal:
         with pytest.raises(ValueError, match="Unknown RAG source"):
             m.get_source("nonexistent")
 
-    def test_get_file_rag_singleton(self):
-        """Lines 383-403: get_file_rag creates singleton."""
-        import memory.rag.module as mod
-
-        old = mod._file_rag_instance
-        mod._file_rag_instance = None
-        try:
-            mock_frs_cls = MagicMock(return_value=MagicMock())
-            with patch.dict("sys.modules", {
-                "memory.rag_sources.file.source": MagicMock(FileRAGSource=mock_frs_cls)
-            }):
-                result = mod.get_file_rag()
-                assert result is not None
-        finally:
-            mod._file_rag_instance = old
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 19. memory/rag/router.py — lines 34, 39, 59, 64, 69, 74
@@ -1130,78 +1114,18 @@ class TestRagModuleFinal:
 class TestRagRouterFinal:
 
     def test_router_has_expected_routes(self):
-        """Lines 34-74: router has all expected route paths."""
-        from memory.rag.router import router_public, get_router, get_metadata
-
-        r = get_router()
-        assert r is router_public
-
-        meta = get_metadata()
-        assert meta["name"] == "rag"
-        assert "router" in meta
-
-        paths = [route.path for route in r.routes if hasattr(route, 'path')]
-        assert "/document" in paths or any("/document" in p for p in paths)
-
+        """WS6-01/02: only health/info remain after the surface retirement."""
+        from memory.rag.router import router_public
+        paths = {r.path for r in router_public.routes}
+        assert "/rag/health" in paths
+        assert "/rag/info" in paths
+        for gone in ("/rag/search", "/rag/document", "/rag/upload",
+                     "/rag/files/stats", "/rag/ui"):
+            assert gone not in paths, f"retired route resurrected: {gone}"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 20. memory/rag/routers/ui.py — lines 54-59, 63-68
 # ═══════════════════════════════════════════════════════════════════════════
-
-class TestRagUiFinal:
-
-    def test_serve_ui_no_index(self):
-        """Lines 24-45: serve_ui when index.html doesn't exist."""
-        from memory.rag.routers.ui import serve_ui
-
-        with patch("memory.rag.routers.ui.UI_PATH", Path("/nonexistent/ui")):
-            result = asyncio.run(serve_ui())
-            assert result.status_code == 200
-
-    def test_serve_ui_with_index(self, tmp_path):
-        """Lines 47-50: serve_ui with existing index.html."""
-        from memory.rag.routers.ui import serve_ui
-
-        ui_dir = tmp_path / "ui"
-        ui_dir.mkdir()
-        index = ui_dir / "index.html"
-        index.write_text("<html>Test</html>")
-
-        with patch("memory.rag.routers.ui.UI_PATH", ui_dir):
-            result = asyncio.run(serve_ui())
-            assert result.status_code == 200
-
-    def test_serve_assets(self, tmp_path):
-        """Lines 54-59: serve_assets with valid file."""
-        from memory.rag.routers.ui import serve_assets
-
-        ui_dir = tmp_path / "ui"
-        assets_dir = ui_dir / "assets"
-        assets_dir.mkdir(parents=True)
-        css = assets_dir / "style.css"
-        css.write_text("body { color: red; }")
-
-        with patch("memory.rag.routers.ui.UI_PATH", ui_dir), \
-             patch("plugins.security.core.validators.validate_safe_path",
-                   return_value=css):
-            result = asyncio.run(serve_assets("style.css"))
-            assert result is not None
-
-    def test_serve_js(self, tmp_path):
-        """Lines 63-68: serve_js with valid file."""
-        from memory.rag.routers.ui import serve_js
-
-        ui_dir = tmp_path / "ui"
-        js_dir = ui_dir / "js"
-        js_dir.mkdir(parents=True)
-        js_file = js_dir / "app.js"
-        js_file.write_text("console.log('hi');")
-
-        with patch("memory.rag.routers.ui.UI_PATH", ui_dir), \
-             patch("plugins.security.core.validators.validate_safe_path",
-                   return_value=js_file):
-            result = asyncio.run(serve_js("app.js"))
-            assert result is not None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1230,37 +1154,6 @@ class TestRagEndpointsFinal:
         from memory.rag.routers.endpoints import info_endpoint
         result = asyncio.run(info_endpoint())
         assert result.status_code == 200
-
-    def test_files_stats_endpoint(self):
-        """Lines 236-262: files stats endpoint."""
-        from memory.rag.routers.endpoints import files_stats_endpoint
-
-        mock_file_rag = MagicMock()
-        mock_file_rag.get_metrics.return_value = {
-            "total_documents": 0, "total_chunks": 0, "total_vectors": 0
-        }
-
-        with patch("memory.rag.routers.endpoints._get_file_rag",
-                   return_value=mock_file_rag):
-            result = asyncio.run(files_stats_endpoint())
-            assert result.status_code == 200
-
-    def test_metrics_lazy_import(self):
-        """Lines 31-42: _get_metrics lazy import."""
-        from memory.rag.routers import endpoints
-        old = endpoints._metrics_imported
-        endpoints._metrics_imported = False
-
-        with patch.dict("sys.modules", {"core.metrics.registry": None}):
-            result = endpoints._get_metrics()
-
-        # Comprovació de comportament: l'import fallit no peta, retorna el
-        # parell de mètriques i marca l'import com a fet.
-        assert len(result) == 2
-        assert endpoints._metrics_imported is True
-
-        endpoints._metrics_imported = old
-
 
 class TestRagHealthFinal:
 

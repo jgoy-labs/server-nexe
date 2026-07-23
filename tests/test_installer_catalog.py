@@ -272,6 +272,39 @@ class TestBuildAvailableEngines:
         monkeypatch.setattr(ic, "t", lambda k: k)
         assert _build_available_engines({}, has_metal=True) == []
 
+    def test_low_ram_metal_recommends_mlx_too(self, monkeypatch):
+        # 840 superseded 2026-07-23 (D-B): MLX is the recommended default on
+        # EVERY Metal Mac, 8 GB included. The 18/07 RAM special-case existed
+        # because the strict guard made MLX a dead-end; the field measurement
+        # (footprint 6.05 GB, zero jetsam) plus the warn-default guard removed
+        # it. Product decision by Jordi — this pin is the mutation control
+        # against re-introducing the RAM special-case.
+        import installer.installer_catalog as ic
+        monkeypatch.setattr(ic, "t", lambda k: k)
+        engines = _build_available_engines(
+            {"mlx": "m", "ollama": "o"}, has_metal=True, ram_gb=8
+        )
+        by_key = {e[0]: e for e in engines}
+        assert by_key["mlx"][3] is True       # recommended default on 8 GB too
+        assert by_key["ollama"][3] is False   # available, not the default
+
+    def test_high_ram_metal_recommends_mlx(self, monkeypatch):
+        import installer.installer_catalog as ic
+        monkeypatch.setattr(ic, "t", lambda k: k)
+        engines = _build_available_engines(
+            {"mlx": "m", "ollama": "o"}, has_metal=True, ram_gb=16
+        )
+        by_key = {e[0]: e for e in engines}
+        assert by_key["mlx"][3] is True
+        assert by_key["ollama"][3] is False
+
+    def test_no_ram_arg_is_backward_compatible(self, monkeypatch):
+        # Legacy callers without ram_gb keep the old behaviour: MLX recommended.
+        import installer.installer_catalog as ic
+        monkeypatch.setattr(ic, "t", lambda k: k)
+        engines = _build_available_engines({"mlx": "m", "ollama": "o"}, has_metal=True)
+        assert {e[0]: e[3] for e in engines}["mlx"] is True
+
 
 class TestGetModelId:
     _M = {"mlx": "mlx-id", "ollama": "oll-id", "gguf": "gguf.bin"}

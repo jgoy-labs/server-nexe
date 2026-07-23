@@ -12,9 +12,12 @@ Covers:
 - Deterministic sha256_of_source_dir across calls.
 - Vector + metadata loading from the on-disk artefacts.
 
-A heavier integration-level coherence test (embed_runtime vs
-embed_precomputed, cosine > 0.99999) is gated behind `integration`
-and `slow` markers so the everyday test loop stays fast.
+A heavier integration-level coherence test compares the SHIPPED
+`knowledge/.embeddings/` vectors against text re-embedded at runtime
+(cosine > 0.99, which tolerates the FP32/int8 quantization difference
+between a dev cache and the int8 variant the bundle ships, but not a
+stale artefact or a changed chunker). Gated behind `integration` and
+`slow` markers so the everyday test loop stays fast.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -308,20 +311,53 @@ def test_runtime_vs_precomputed_cosine_equivalence(tmp_path):
     fast path is safe to substitute for the embed pipeline.
     """
     from fastembed import TextEmbedding
+
+    # This test used to embed two ad-hoc strings TWICE with the same model and
+    # assert the two results matched — i.e. it asserted that the model is
+    # deterministic, and never opened the shipped artefacts at all. It could
+    # not have caught a stale .npz, a chunker change, or the runtime resolving
+    # a different quantization of the model than the one the vectors were
+    # generated with. It now compares the ACTUAL shipped vectors against text
+    # re-embedded at runtime, which is the guarantee the name promises.
+    repo_root = Path(__file__).resolve().parents[3]
+    art_dir = repo_root / "knowledge" / ".embeddings"
+    vectors_path = art_dir / "vectors-ca.npz"
+    metadata_path = art_dir / "metadata-ca.jsonl"
+    if not vectors_path.is_file() or not metadata_path.is_file():
+        pytest.skip("precomputed artefacts not present in this checkout")
+
+    shipped = np.load(vectors_path)["embeddings"]
+    with metadata_path.open(encoding="utf-8") as fh:
+        records = [json.loads(line) for line in fh]
+    assert len(records) == shipped.shape[0], (
+        f"metadata/vector count mismatch: {len(records)} vs {shipped.shape[0]}"
+    )
+
+    # A sample spread across the file, not just the head: a partial regeneration
+    # leaves the first chunks correct and the tail stale.
+    idx = [0, len(records) // 3, (2 * len(records)) // 3, len(records) - 1]
+    texts = [records[i]["text"] for i in idx]
+
     # cache_dir pinned to the same cache the skipif gate checks, so the
     # test never falls back to an empty tmp cache (fail) or a re-download.
     model = TextEmbedding(_COHERENCE_MODEL, cache_dir=_FASTEMBED_CACHE)
-    texts = ["Sample one content.", "Another chunk of text."]
-    raw = np.stack([np.asarray(v, dtype=np.float32) for v in model.embed(texts)])
-    norms = np.linalg.norm(raw, axis=1, keepdims=True)
-    raw = raw / np.where(norms > 0, norms, 1.0)
-
-    # Second call on the same model — must be identical up to float32 noise.
-    raw2 = np.stack([np.asarray(v, dtype=np.float32) for v in model.embed(texts)])
-    norms2 = np.linalg.norm(raw2, axis=1, keepdims=True)
-    raw2 = raw2 / np.where(norms2 > 0, norms2, 1.0)
-
-    cosine = (raw * raw2).sum(axis=1) / (
-        np.linalg.norm(raw, axis=1) * np.linalg.norm(raw2, axis=1)
+    fresh = np.stack([np.asarray(v, dtype=np.float32) for v in model.embed(texts)])
+    fresh = fresh / np.where(
+        np.linalg.norm(fresh, axis=1, keepdims=True) > 0,
+        np.linalg.norm(fresh, axis=1, keepdims=True),
+        1.0,
     )
-    assert (cosine > 0.99999).all(), f"cosine too low: {cosine}"
+    stored = shipped[idx]
+
+    cosine = (fresh * stored).sum(axis=1) / (
+        np.linalg.norm(fresh, axis=1) * np.linalg.norm(stored, axis=1)
+    )
+    # 0.99 tolerates the FP32/int8 quantization difference between a developer's
+    # local cache and the int8 variant the bundle ships (measured cos 0.9977
+    # across 360 real chunks, min 0.9960) while still failing loudly on a stale
+    # artefact, a changed chunker or a different model — all of which land two
+    # orders of magnitude lower.
+    assert (cosine > 0.99).all(), (
+        f"shipped vectors disagree with runtime embedding: {cosine} "
+        f"(indices {idx}) — regenerate with scripts/precompute_kb.py"
+    )

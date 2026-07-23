@@ -17,27 +17,17 @@ MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "rag",
   "version": "0.9.1",
-  "description": "RAG System (Retrieval-Augmented Generation) with multi-source and circuit breaker",
+  "description": "RAG module: health/info introspection + PersonalityRAG source for the chat pipeline (the standalone /rag surface was retired, WS6-01/02)",
   "author": "J.Goy",
   "category": "memory.core",
 
   "dependencies": ["embeddings"],
 
   "capabilities": [
-    "keyword_search",
-    "multi_rag_management",
-    "personality_rag",
-    "temp_upload_rag",
-    "catalog_rag",
-    "circuit_breaker"
+    "personality_rag"
   ],
 
   "health_check": "memory.rag.health:check",
-
-  "workflow_nodes": [
-    "memory.rag.workflow.nodes.search_node",
-    "memory.rag.workflow.nodes.create_rag_node"
-  ],
 
   "specialists": [
     "memory.rag.specialists.rag_specialist"

@@ -1135,6 +1135,7 @@ class NexeUI {
 
     async loadSession(sessionId) {
         this._abortIfGenerating();
+        this._clearTruncState();  // FD-S6: a session switch kills any pending Continue
         try {
             // Bug #6 fix: use full session endpoint (not /history) to also receive attached_document
             const response = await this.fetchWithCsrf(`/ui/session/${sessionId}`);
@@ -1197,10 +1198,15 @@ class NexeUI {
         this.scrollToBottom();
     }
 
-    async sendMessage() {
+    async sendMessage(continueState = null) {
         if (this.isGenerating) return;
-        const message = this.messageInput.value.trim();
-        if (!message) return;
+        // FD-S6: continueState = {sessionId, raw, bubble, backend, model} —
+        // resume the last truncated assistant turn instead of a new message.
+        if (continueState && continueState.sessionId !== this.currentSessionId) return;
+        const message = continueState ? '' : this.messageInput.value.trim();
+        if (!continueState && !message) return;
+        // A NEW message invalidates any pending Continue (stale button = no-op).
+        this._clearTruncState();
 
         // Auto-create session if we don't have one — server doesn't return ID via streaming
         if (!this.currentSessionId) {
@@ -1232,10 +1238,12 @@ class NexeUI {
         this._clearSelectedImage();
 
         // Add user message to chat — if there is an attached image, show it inline
-        const userImageUrl = pendingImage ? `data:${pendingImage.type};base64,${pendingImage.b64}` : null;
-        this.addMessageToChat('user', message, true, null, userImageUrl);
-        this.messageInput.value = '';
-        this.messageInput.style.height = 'auto';
+        if (!continueState) {
+            const userImageUrl = pendingImage ? `data:${pendingImage.type};base64,${pendingImage.b64}` : null;
+            this.addMessageToChat('user', message, true, null, userImageUrl);
+            this.messageInput.value = '';
+            this.messageInput.style.height = 'auto';
+        }
 
         try {
             const ragSlider = document.getElementById('ragThresholdSlider');
@@ -1244,7 +1252,13 @@ class NexeUI {
             const modelSel = document.getElementById('modelSelect');
             // Collection toggles — build list of active collections
             const ragCollections = this._getActiveCollections();
-            const chatBody = {
+            const chatBody = continueState ? {
+                continue: true,
+                session_id: continueState.sessionId,
+                stream: true,
+                backend: continueState.backend,
+                model: continueState.model,
+            } : {
                 message: message,
                 session_id: this.currentSessionId,
                 stream: true,
@@ -1282,10 +1296,19 @@ class NexeUI {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
 
-                // Add empty message for assistant
-                this.addMessageToChat('assistant', '', true);
-                const messages = this.chatMessages.querySelectorAll('.message.assistant');
-                const lastMsg = messages[messages.length - 1];
+                // Add empty message for assistant — or, on Continue, resume
+                // INSIDE the same bubble: fullResponse is seeded with the raw
+                // first half so every re-render paints the full markdown
+                // across the seam (a code block split by the cut renders whole).
+                let lastMsg;
+                if (continueState && continueState.bubble && continueState.bubble.isConnected) {
+                    lastMsg = continueState.bubble;
+                    fullResponse = continueState.raw || '';
+                } else {
+                    this.addMessageToChat('assistant', '', true);
+                    const messages = this.chatMessages.querySelectorAll('.message.assistant');
+                    lastMsg = messages[messages.length - 1];
+                }
                 assistantMessageDiv = lastMsg.querySelector('.message-text');
                 // "Processing…" wave placeholder only when both
                 // conditions allow it (Jordi logic 2026-04-22):
@@ -1579,6 +1602,19 @@ class NexeUI {
                             lastMsg.querySelector('.message-content').insertBefore(truncNotice, assistantMessageDiv);
                         }
 
+                        // FD-S5: generation cut by the max_tokens ceiling.
+                        // GEN_TRUNCATED:1 = resumable (FD-S6 wires the Continue
+                        // button to this flag); :0 = informative only.
+                        const genTruncMatch = chunk.match(/\x00\[GEN_TRUNCATED:(\d)\]\x00/); // eslint-disable-line no-control-regex
+                        if (genTruncMatch) {
+                            chunk = chunk.replace(/\x00\[GEN_TRUNCATED:\d\]\x00/, ''); // eslint-disable-line no-control-regex
+                            const genNotice = document.createElement('div');
+                            genNotice.className = 'trunc-notice';
+                            genNotice.textContent = this.t('gen_truncated');
+                            lastMsg.querySelector('.message-content').insertBefore(genNotice, assistantMessageDiv);
+                            this._genTruncContinuable = genTruncMatch[1] === '1';
+                        }
+
                         // Detect MODEL_LOADING (model loading into VRAM)
                         const loadingMatch = chunk.match(/\x00\[MODEL_LOADING:([^\]|]+)\|?([^\]]*)\]\x00/); // eslint-disable-line no-control-regex
                         if (loadingMatch) {
@@ -1753,14 +1789,59 @@ class NexeUI {
                     fullResponse = fullResponse.replace(/\[MEM\]/g, '');
                     // Strip [DEL:N:...] tokens from final render
                     fullResponse = fullResponse.replace(/\[DEL:\d+:.+?\]/g, '');
-                    // Note: renderMarkdown sanitizes HTML via marked.js (safe render)
+                    // Note: renderMarkdown escapes HTML + attributes via a custom marked.js renderer (no raw HTML)
                     // Guard: if for some reason _scheduleRender was never entered,
                     // clean the placeholder class here (not visible but we remove it).
                     if (assistantMessageDiv.classList.contains('thinking-placeholder')) {
                         assistantMessageDiv.classList.remove('thinking-placeholder');
                     }
+                    // FD-S5 fallback (live-verified 2026-07-23 on the 8 GB smoke):
+                    // TCP does not honour the backend's yield boundaries — the
+                    // marker can arrive SPLIT across two reads, the per-chunk
+                    // regex misses it, and the render strip silently eats the
+                    // pieces (no notice, no residue). fullResponse accumulates
+                    // the stream verbatim, so the marker always ends up whole
+                    // here: catch it at end-of-stream and strip it from the text.
+                    {
+                        const lateTrunc = fullResponse.match(/\x00?\[GEN_TRUNCATED:(\d)\]\x00?/); // eslint-disable-line no-control-regex
+                        if (lateTrunc) {
+                            fullResponse = fullResponse.replace(/\x00?\[GEN_TRUNCATED:\d\]\x00?/g, ''); // eslint-disable-line no-control-regex
+                            if (!lastMsg.querySelector('.trunc-notice')) {
+                                const genNotice = document.createElement('div');
+                                genNotice.className = 'trunc-notice';
+                                genNotice.textContent = this.t('gen_truncated');
+                                lastMsg.querySelector('.message-content').insertBefore(genNotice, assistantMessageDiv);
+                            }
+                            this._genTruncContinuable = lateTrunc[1] === '1';
+                        }
+                    }
                     assistantMessageDiv.innerHTML = this.renderMarkdown(fullResponse);
                     if (tMode !== 'responding' && tMode !== 'init') closeThinkBlock();
+                    // FD-S6: the stream ended cut-by-ceiling and resumable —
+                    // offer Continue. OUTSIDE the stats block (a cut inside
+                    // think yields 0 visible tokens and stats never render).
+                    if (this._genTruncContinuable) {
+                        this._genTruncContinuable = false;
+                        const backendSel2 = document.getElementById('backendSelect');
+                        const modelSel2 = document.getElementById('modelSelect');
+                        this._truncState = {
+                            sessionId: this.currentSessionId,
+                            raw: fullResponse,
+                            bubble: lastMsg,
+                            backend: backendSel2 ? backendSel2.value : undefined,
+                            model: modelSel2 ? modelSel2.value : undefined,
+                        };
+                        const contBtn = document.createElement('button');
+                        contBtn.className = 'continue-btn';
+                        contBtn.textContent = this.t('continue_btn');
+                        contBtn.addEventListener('click', () => {
+                            const st = this._truncState;
+                            this._clearTruncState();
+                            if (st && !this.isGenerating) this.sendMessage(st);
+                        });
+                        const notice = lastMsg.querySelector('.trunc-notice:last-of-type');
+                        (notice || lastMsg.querySelector('.message-content')).appendChild(contBtn);
+                    }
                     // Per-message stats
                     const elapsed = (Date.now() - this._streamStart) / 1000;
                     const finalTok = this._streamTokens;
@@ -2021,7 +2102,7 @@ class NexeUI {
             if (role === 'user') {
                 textDiv.textContent = content;
             } else {
-                textDiv.innerHTML = this.renderMarkdown(content); // renderMarkdown sanitizes HTML (custom renderer)
+                textDiv.innerHTML = this.renderMarkdown(content); // renderMarkdown escapes HTML + attributes (custom renderer, no raw HTML)
             }
             contentDiv.appendChild(textDiv);
         }
@@ -2237,6 +2318,7 @@ class NexeUI {
             .replace(/\[MEM(?::\d+)?\]/g, '')          // [MEM] and [MEM:N]
             .replace(/\[DEL:\d+(?::[^\]]*)?\]/g, '')   // [DEL:N:facts]
             .replace(/\[MEM_SAVE:[^\]]*\]/g, '')       // [MEM_SAVE: ...]
+            .replace(/\[GEN_TRUNCATED:\d\]/g, '')       // FD-S5 marker (belt-and-braces)
             .replace(/\[MEM_DELETE:[^\]]*\]/g, '')     // [MEM_DELETE: ...]
             .replace(/\[MEMORIA:[^\]]*\]/g, '')        // [MEMORIA: ...] gpt-oss alias
             .trimStart();                               // leading whitespace after strip
@@ -2247,6 +2329,11 @@ class NexeUI {
                 // Override raw HTML renderer to prevent XSS injection via HTML blocks
                 const renderer = new marked.Renderer();
                 const _escape = this.escapeHtml.bind(this);
+                // WS5-02: escapeHtml() (textContent→innerHTML) does NOT escape quotes,
+                // so it is unsafe inside an HTML attribute — a `"`/`'` in a poisoned
+                // markdown title/href would break out of the attribute (XSS). Use
+                // _escapeAttr for every attribute-context interpolation below.
+                const _escapeAttr = this.escapeAttr.bind(this);
                 renderer.html = function(token) {
                     const raw = typeof token === 'string' ? token : (token.text || '');
                     return _escape(raw);
@@ -2276,15 +2363,15 @@ class NexeUI {
                         text = _escape((token && token.text) || '');
                     }
                     if (!_isSafeHref(href)) return text;
-                    const title = (token && token.title) ? ` title="${_escape(token.title)}"` : '';
-                    return `<a href="${_escape(href)}"${title} target="_blank" rel="noopener noreferrer">${text}</a>`;
+                    const title = (token && token.title) ? ` title="${_escapeAttr(token.title)}"` : '';
+                    return `<a href="${_escapeAttr(href)}"${title} target="_blank" rel="noopener noreferrer">${text}</a>`;
                 };
                 renderer.image = function(token) {
                     const href = (token && typeof token === 'object') ? (token.href || '') : token;
-                    const alt = _escape((token && token.text) || '');
+                    const alt = _escapeAttr((token && token.text) || '');
                     if (!_isSafeHref(href)) return alt;
-                    const title = (token && token.title) ? ` title="${_escape(token.title)}"` : '';
-                    return `<img src="${_escape(href)}" alt="${alt}"${title}>`;
+                    const title = (token && token.title) ? ` title="${_escapeAttr(token.title)}"` : '';
+                    return `<img src="${_escapeAttr(href)}" alt="${alt}"${title}>`;
                 };
                 return marked.parse(cleaned, { breaks: true, gfm: true, renderer });
             } catch (e) {
@@ -2634,14 +2721,31 @@ class NexeUI {
             this._renderTimer = null;
             // renderMarkdown now centralizes the strip (bug #18 follow-up)
             const _rendered = this.renderMarkdown(content);
-            el.innerHTML = _rendered;  // safe: renderMarkdown sanitizes via marked.js custom renderer
+            el.innerHTML = _rendered;  // renderMarkdown escapes HTML blocks + attribute values (custom renderer, no raw HTML)
         }, 80);
+    }
+
+    // FD-S6: drop any pending Continue affordance (new message, session
+    // change, or the button itself was used). Removes stale buttons so a
+    // click can never resume against the wrong context.
+    _clearTruncState() {
+        this._truncState = null;
+        this._genTruncContinuable = false;
+        document.querySelectorAll('.continue-btn').forEach((b) => b.remove());
     }
 
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // WS5-02: escapeHtml() encodes < > & (textContent→innerHTML) but NOT quotes,
+    // which is unsafe when the result lands inside an HTML attribute. escapeAttr
+    // additionally encodes " and ' so an attacker-controlled markdown title/href
+    // cannot break out of the attribute and inject an event handler.
+    escapeAttr(text) {
+        return this.escapeHtml(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 }
 

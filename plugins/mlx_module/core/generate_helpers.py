@@ -78,9 +78,30 @@ def sanitize_messages_for_alternation(messages: List[Dict]) -> List[Dict]:
     return _enforce_alternation(merged)
 
 
-def _apply_template(tokenizer: Any, messages: List[Dict], thinking_enabled: bool) -> str:
-    """Apply chat template with optional thinking control (Qwen3 enable_thinking)."""
-    kwargs: dict = {"add_generation_prompt": True, "tokenize": False}
+def _apply_template(
+    tokenizer: Any,
+    messages: List[Dict],
+    thinking_enabled: bool,
+    continue_final: bool = False,
+) -> str:
+    """Apply chat template with optional thinking control (Qwen3 enable_thinking).
+
+    ``continue_final=True`` (FD-S6): render the prompt so it ENDS at the last
+    assistant message's partial text — no ``<|im_end|>`` after it, no new
+    assistant block. Validated empirically against the Qwen3.5 tokenizer:
+    ``continue_final_message=True`` produces exactly that, while the normal
+    flow closes the partial and opens a fresh assistant block (the model then
+    REPEATS instead of continuing). transformers raises if
+    ``add_generation_prompt`` is True at the same time — hence the flip.
+    """
+    if continue_final:
+        kwargs = {
+            "add_generation_prompt": False,
+            "continue_final_message": True,
+            "tokenize": False,
+        }
+    else:
+        kwargs = {"add_generation_prompt": True, "tokenize": False}
     # Qwen3/Qwen3.5 supports enable_thinking=False to suppress <think> blocks.
     # Pass defensively — tokenizers that don't know the kwarg will raise TypeError.
     if not thinking_enabled:
@@ -98,6 +119,7 @@ def prepare_tokens(
     tokenizer: Any,
     thinking_enabled: bool = True,
     model_type: str = "",
+    continue_final: bool = False,
 ) -> Tuple[List[int], List[int], List[Dict], List[Dict]]:
     """
     Prepares and tokenizes messages for generation and cache.
@@ -139,14 +161,18 @@ def prepare_tokens(
         )
 
     # Tokenize for generation (with memory context)
-    prompt_text = _apply_template(tokenizer, all_messages, thinking_enabled)
+    prompt_text = _apply_template(
+        tokenizer, all_messages, thinking_enabled, continue_final=continue_final
+    )
     if isinstance(prompt_text, str):
         full_tokens = tokenizer.encode(prompt_text)
     else:
         full_tokens = list(prompt_text)
 
     # Tokenize for cache lookup (clean, without memory context)
-    cache_prompt_text = _apply_template(tokenizer, all_cache_messages, thinking_enabled)
+    cache_prompt_text = _apply_template(
+        tokenizer, all_cache_messages, thinking_enabled, continue_final=continue_final
+    )
     if isinstance(cache_prompt_text, str):
         cache_lookup_tokens = tokenizer.encode(cache_prompt_text)
     else:
@@ -184,6 +210,23 @@ def lookup_prefix_cache(
     # If there is no cache, create a new one
     if cached_kv is None:
         cached_kv = make_prompt_cache(model, max_kv_size=max_kv_size)
+        # B004 instrumentation: mlx-lm delegates to model.make_cache() when
+        # the model defines it (Qwen3.5/gemma4/gpt-oss do), IGNORING
+        # max_kv_size — so the "rotating safety net" only exists for models
+        # without it (qwen3/llama/mistral-style). Log which world we're in:
+        # this is the field data that re-attributes degeneration reports.
+        try:
+            from collections import Counter
+            _kinds = Counter(type(c).__name__ for c in cached_kv)
+            _enforced = not hasattr(model, "make_cache")
+            logger.info(
+                "MLX cache created: %s · max_kv_size=%d %s",
+                dict(_kinds), max_kv_size,
+                "(enforced via RotatingKVCache)" if _enforced
+                else "(model-owned cache — NOT enforced by mlx-lm)",
+            )
+        except (TypeError, AttributeError):  # non-iterable fake in tests
+            pass
 
     # Calculate how many prefix tokens are cached
     cached_token_count = len(cache_lookup_tokens) - len(remaining_tokens)
@@ -362,6 +405,7 @@ def save_cache_post_generation(
     tokenizer: Any,
     cached_kv: Any,
     full_tokens_count: int,
+    continue_final: bool = False,
 ) -> None:
     """
     Saves the cache after generation (clean messages, without memory context).
@@ -385,10 +429,14 @@ def save_cache_post_generation(
     try:
         # Check if it already ends with assistant (for placeholders)
         if all_cache_messages and all_cache_messages[-1].get("role") == "assistant":
-            # Merge with the last assistant message
+            # Merge with the last assistant message. FD-S6: on a continue the
+            # tail resumes MID-SENTENCE — a "\n\n" separator would corrupt the
+            # seam (and diverge from the KV that was just built). Direct
+            # concatenation there; legacy "\n\n" for the placeholder case.
+            _sep = "" if continue_final else "\n\n"
             cache_messages_with_response = all_cache_messages[:-1] + [{
                 "role": "assistant",
-                "content": all_cache_messages[-1]["content"] + "\n\n" + text
+                "content": all_cache_messages[-1]["content"] + _sep + text
             }]
             logger.debug("MLXChatNode: merged response with last assistant (cache)")
         else:
@@ -462,6 +510,11 @@ def extract_metrics(
             "cached_tokens": cached_token_count,
             "actual_prefill_tokens": actual_prefill_tokens,
             "identity_hash": identity_hash,
+            # FD-S5: mlx-lm's final yield carries finish_reason ('length'
+            # when the max_tokens ceiling cut the answer, 'stop' on EOS).
+            # It was silently dropped here — the whole truncation-marker
+            # chain starts with this field.
+            "finish_reason": getattr(last_response, "finish_reason", None),
         }
     else:
         return {
@@ -476,6 +529,7 @@ def extract_metrics(
             "cached_tokens": 0,
             "actual_prefill_tokens": 0,
             "identity_hash": identity_hash,
+            "finish_reason": None,
         }
 
 

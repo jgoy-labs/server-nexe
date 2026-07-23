@@ -149,6 +149,17 @@ class MLXModule:
             return False
         if self._node.config.model_path == new_config.model_path:
             return False
+        # Deep belt (2026-07-23): validate BEFORE mutating state. Without it a
+        # caller could point config.model_path at a ghost directory and every
+        # later load (and the RAM guard's estimate) would chase a model that
+        # does not exist. MLXConfig.validate() existed and nobody called it
+        # here.
+        if hasattr(new_config, "validate") and not new_config.validate():
+            logger.error(
+                "MLXModule.switch_model: refusing invalid config: %s",
+                new_config.model_path,
+            )
+            return False
         self._node.apply_config(new_config)
         logger.info("MLXModule: model switched to %s", new_config.model_path)
         return True

@@ -152,19 +152,19 @@ def _check_param_injection(key: str, value: str, client_ip: str, endpoint: str,
   if detect_xss_attempt(value):
     logger.warning("🚫 XSS attempt in query param '%s' from %s", key, client_ip)
     if sec_log:
-      sec_log.log_xss_attempt(ip_address=client_ip, endpoint=endpoint, payload=value[:200])
+      sec_log.log_xss_attempt(input_data=value[:200], ip_address=client_ip, endpoint=endpoint, parameter=key)
     raise HTTPException(400, get_message(i18n, 'security.request.invalid_query_param', param=key))
 
   if detect_sql_injection(value):
     logger.warning("🚫 SQL injection attempt in query param '%s' from %s", key, client_ip)
     if sec_log:
-      sec_log.log_sql_injection_attempt(ip_address=client_ip, endpoint=endpoint, payload=value[:200])
+      sec_log.log_sql_injection_attempt(input_data=value[:200], ip_address=client_ip, endpoint=endpoint, parameter=key)
     raise HTTPException(400, get_message(i18n, 'security.request.invalid_query_param', param=key))
 
   if detect_command_injection(value):
     logger.warning("🚫 Command injection attempt in query param '%s' from %s", key, client_ip)
     if sec_log:
-      sec_log.log_command_injection_attempt(ip_address=client_ip, endpoint=endpoint, payload=value[:200])
+      sec_log.log_command_injection_attempt(input_data=value[:200], ip_address=client_ip, endpoint=endpoint, parameter=key)
     raise HTTPException(400, get_message(i18n, 'security.request.invalid_query_param', param=key))
 
   if detect_path_traversal(value):

@@ -12,19 +12,10 @@ www.jgoy.net · https://server-nexe.org
 from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable, Optional, TypeVar
+from typing import Optional, TypeVar
 from contextlib import asynccontextmanager
 import asyncio
 import logging
-from functools import wraps
-
-from tenacity import (
-  retry,
-  stop_after_attempt,
-  wait_exponential,
-  retry_if_exception_type,
-  before_sleep_log,
-)
 
 T = TypeVar("T")
 
@@ -55,17 +46,26 @@ class CircuitBreakerState:
   success_count: int = 0
   last_failure_time: Optional[datetime] = None
   last_state_change: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+  # WS7-03: number of probes admitted while HALF_OPEN and not yet resolved
+  # via record_success/record_failure. Bounds the herd to one probe at a time.
+  half_open_inflight: int = 0
 
 class CircuitBreaker:
   """
   Circuit Breaker to protect external services
 
-  Usage:
-    cb = CircuitBreaker("ollama", config)
+  Usage (manual guard — the pattern the live ollama call-sites use;
+  it distinguishes infrastructure errors, which count, from semantic
+  HTTP 4xx errors, which must not trip the breaker):
 
-    @cb.protect
-    async def call_ollama(prompt: str):
-      return await ollama_client.generate(prompt)
+    if not await breaker.check_circuit():
+      raise CircuitOpenError(...)
+    try:
+      result = await call_external_service()
+      await breaker.record_success()
+    except TRANSPORT_ERRORS as e:
+      await breaker.record_failure(e)
+      raise
   """
 
   def __init__(self, name: str, config: Optional[CircuitBreakerConfig] = None):
@@ -111,6 +111,8 @@ class CircuitBreaker:
       self._state.failure_count = 0
 
       if self._state.state == CircuitState.HALF_OPEN:
+        # WS7-03: this probe has resolved — free the slot for the next one
+        self._state.half_open_inflight = max(0, self._state.half_open_inflight - 1)
         if self._state.success_count >= self.config.success_threshold:
           self._transition_to(CircuitState.CLOSED)
           logger.info(f"CircuitBreaker [{self.name}]: CLOSED (recovered)")
@@ -139,6 +141,7 @@ class CircuitBreaker:
     self._state.last_state_change = datetime.now(timezone.utc)
     self._state.success_count = 0
     self._state.failure_count = 0
+    self._state.half_open_inflight = 0
 
   async def _can_execute(self) -> bool:
     """Determines whether execution is allowed"""
@@ -149,52 +152,22 @@ class CircuitBreaker:
       if self._state.state == CircuitState.OPEN:
         if await self._check_timeout():
           self._transition_to(CircuitState.HALF_OPEN)
+          self._state.half_open_inflight = 1
           logger.info(f"CircuitBreaker [{self.name}]: HALF_OPEN (testing)")
           return True
         return False
 
-      return True
-
-  def protect(self, func: Callable) -> Callable:
-    """
-    Decorator to protect functions with the circuit breaker
-
-    Usage:
-      @circuit_breaker.protect
-      async def my_function():
-        ...
-    """
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-      if not await self._can_execute():
-        raise CircuitOpenError(
-          f"Circuit [{self.name}] is OPEN. "
-          f"Will retry in {self.config.timeout_seconds}s"
-        )
-
-      try:
-        @retry(
-          stop=stop_after_attempt(self.config.max_retries),
-          wait=wait_exponential(
-            multiplier=1,
-            min=self.config.min_wait_seconds,
-            max=self.config.max_wait_seconds
-          ),
-          retry=retry_if_exception_type((ConnectionError, TimeoutError)),
-          before_sleep=before_sleep_log(logger, logging.WARNING),
-        )
-        async def _with_retry():
-          return await func(*args, **kwargs)
-
-        result = await _with_retry()
-        await self._record_success()
-        return result
-
-      except Exception as e:
-        await self._record_failure(e)
-        raise
-
-    return wrapper
+      # HALF_OPEN (WS7-03): admit one probe at a time — a herd of concurrent
+      # callers must not hammer a service that is still recovering. The slot
+      # frees when the probe resolves via record_success/record_failure; a
+      # probe that never resolves (e.g. cancelled task) must not wedge the
+      # breaker, so the slot goes stale after timeout_seconds.
+      elapsed = (datetime.now(timezone.utc) - self._state.last_state_change).total_seconds()
+      if self._state.half_open_inflight == 0 or elapsed >= self.config.timeout_seconds:
+        self._state.half_open_inflight = 1
+        self._state.last_state_change = datetime.now(timezone.utc)  # re-arm staleness window
+        return True
+      return False
 
   def get_status(self) -> dict:
     """Returns current state for monitoring"""
@@ -270,6 +243,11 @@ class CircuitOpenError(Exception):
   """Exception raised when the circuit is open"""
   pass
 
+# WS7-01: ollama_breaker is the ONLY global breaker — the former
+# qdrant_breaker/http_breaker were defined but never wired to any call
+# (they always reported CLOSED, which /health/circuits surfaced as fake
+# observability). If Qdrant/external-HTTP protection is ever wanted, wire
+# a new breaker with the manual-guard pattern the ollama call-sites use.
 ollama_breaker = CircuitBreaker(
   "ollama",
   CircuitBreakerConfig(
@@ -281,26 +259,6 @@ ollama_breaker = CircuitBreaker(
   )
 )
 
-qdrant_breaker = CircuitBreaker(
-  "qdrant",
-  CircuitBreakerConfig(
-    failure_threshold=3,
-    success_threshold=2,
-    timeout_seconds=30,
-    max_retries=3,
-  )
-)
-
-http_breaker = CircuitBreaker(
-  "http_external",
-  CircuitBreakerConfig(
-    failure_threshold=10,
-    success_threshold=3,
-    timeout_seconds=120,
-    max_retries=3,
-  )
-)
-
 
 def reset_all_circuit_breakers() -> None:
   """Resets all global circuit breakers to clean CLOSED state. N03.
@@ -308,5 +266,5 @@ def reset_all_circuit_breakers() -> None:
   Called from lifespan shutdown. Prevents an OPEN breaker from a previous
   session from contaminating the next server restart (corrupt state on restart).
   """
-  for _breaker in (ollama_breaker, qdrant_breaker, http_breaker):
+  for _breaker in (ollama_breaker,):
     _breaker.reset()

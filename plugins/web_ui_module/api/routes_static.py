@@ -58,6 +58,14 @@ def register_static_routes(router: APIRouter, *, module_ref):
         file_path = (module_ref.ui_dir / filename).resolve()
         if not file_path.is_relative_to(module_ref.ui_dir.resolve()):
             raise HTTPException(status_code=403, detail=get_message(i18n, "webui.static.forbidden"))
+        # WS5-01: user uploads live under ui_dir (ui_dir/uploads) but are auth-gated
+        # (/ui/upload and /ui/files require X-API-Key). serve_static has NO auth, so it
+        # must NOT serve anything under the uploads dir — otherwise a document could be
+        # exfiltrated by name over an opt-in remote binding (Tailscale/LAN) without the
+        # key. 404 (not 403) so we don't confirm whether a given upload exists.
+        _upload_dir = getattr(module_ref, "upload_dir", module_ref.ui_dir / "uploads").resolve()
+        if file_path == _upload_dir or file_path.is_relative_to(_upload_dir):
+            raise HTTPException(status_code=404, detail=get_message(i18n, "webui.static.file_not_found"))
         if not file_path.exists():
             raise HTTPException(status_code=404, detail=get_message(i18n, "webui.static.file_not_found"))
 

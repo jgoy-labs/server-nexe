@@ -66,6 +66,59 @@ def _safe_extract_zip(zf: zipfile.ZipFile, dest_dir: str) -> None:
     zf.extractall(real_dest)
 
 
+_OLLAMA_PIN_ENV = {
+    "darwin": "NEXE_OLLAMA_MACOS_SHA256",
+    "linux_install_sh": "NEXE_OLLAMA_INSTALL_SHA256",
+    "windows_arm64": "NEXE_OLLAMA_WINDOWS_SHA256",
+    "windows_amd64": "NEXE_OLLAMA_WINDOWS_SHA256",
+}
+
+
+def _resolve_ollama_pin(key: str) -> tuple[str | None, str | None, str | None]:
+    """WS9-01: resolve (expected_sha256, pinned_url, pinned_version).
+
+    Resolution order:
+      1. operator env override (NEXE_OLLAMA_*_SHA256) — keeps the default
+         download URL (the operator pinned whatever that URL serves);
+      2. embedded release pin from installer/provider_pins.json section
+         ``ollama_installer`` — carries a VERSIONED GitHub URL (and the
+         Ollama version), so an upstream release cannot drift under the pin;
+      3. (None, None, None) — no pin available (corrupt/missing pins file);
+         the caller must fail closed unless NEXE_ALLOW_UNPINNED consents.
+    """
+    env_pin = os.environ.get(_OLLAMA_PIN_ENV[key], "").strip().lower()
+    if env_pin:
+        return env_pin, None, None
+    try:
+        import json
+        pins_path = Path(__file__).with_name("provider_pins.json")
+        section = json.loads(pins_path.read_text()).get("ollama_installer", {})
+        entry = section.get(key) or {}
+        sha = (entry.get("sha256") or "").strip().lower()
+        if sha:
+            return sha, entry.get("url") or None, section.get("version") or None
+    except Exception:  # nosec — fall through to the fail-closed branch in the caller
+        pass
+    return None, None, None
+
+
+def _unpinned_ollama_allowed(artefact: str) -> bool:
+    """WS9-01: no pin at all → refuse to execute an unverified binary unless
+    the operator explicitly opted in. Never a silent fail-open."""
+    if os.environ.get("NEXE_ALLOW_UNPINNED", "").strip().lower() in {"1", "true", "yes"}:
+        print_warn(
+            f"No SHA-256 pin for {artefact} — proceeding UNPINNED "
+            f"(NEXE_ALLOW_UNPINNED is set)."
+        )
+        return True
+    print_warn(
+        f"No SHA-256 pin available for {artefact} (neither env override nor "
+        f"provider_pins.json). Refusing to execute an unverified binary — "
+        f"set the NEXE_OLLAMA_*_SHA256 pin or NEXE_ALLOW_UNPINNED=1."
+    )
+    return False
+
+
 def _find_ollama() -> str:
     """Locate the ollama binary — app bundles run with a minimal PATH."""
     found = shutil.which("ollama")
@@ -188,7 +241,10 @@ def _install_ollama_macos() -> bool:
 
     url = "https://ollama.com/download/Ollama-darwin.zip"
     dest = Path("/Applications/Ollama.app")
-    expected_sha256 = os.environ.get("NEXE_OLLAMA_MACOS_SHA256", "").strip().lower()
+    # WS9-01: env override → embedded versioned pin → fail closed.
+    expected_sha256, _pinned_url, _ = _resolve_ollama_pin("darwin")
+    if _pinned_url:
+        url = _pinned_url
 
     try:
         bundle_zip = _find_bundle_ollama_zip()
@@ -221,12 +277,10 @@ def _install_ollama_macos() -> bool:
                     )
                     os.unlink(zip_path)
                     return False
-                print(f"  {DIM}SHA-256 matches NEXE_OLLAMA_MACOS_SHA256 pin{RESET}")
-            else:
-                print(
-                    f"  {DIM}(no NEXE_OLLAMA_MACOS_SHA256 pin set — pin the "
-                    f"digest above to fail-fast on future drift){RESET}"
-                )
+                print(f"  {DIM}SHA-256 matches the Ollama installer pin{RESET}")
+            elif not _unpinned_ollama_allowed("Ollama-darwin.zip"):
+                os.unlink(zip_path)
+                return False
 
         print("  📦 Installing to /Applications/Ollama.app...")
         # Zip Slip protection. zipfile.extractall
@@ -271,19 +325,21 @@ def _install_ollama_macos() -> bool:
 def _install_ollama_linux() -> bool:
     """Install Ollama on Linux via the official install script.
 
-    Instead of piping `curl | bash` (which executes whatever
-    bytes the network returns), download the script to a tempfile first, log
-    its SHA-256, and — if the operator has pinned `NEXE_OLLAMA_INSTALL_SHA256`
-    — abort when the digest does not match. Ollama does not publish a stable
-    SHA upstream, so the pin is opt-in; logging the observed digest at INFO
-    level lets operators record a pin for their environment.
+    Instead of piping `curl | bash` (which executes whatever bytes the
+    network returns), download the script to a tempfile first and verify
+    its SHA-256 against the pin (WS9-01: env override → embedded versioned
+    pin from provider_pins.json → fail closed unless NEXE_ALLOW_UNPINNED).
+    With the embedded pin the script comes from the VERSIONED raw URL and
+    OLLAMA_VERSION pins the binary the script installs.
     """
     import hashlib
     import os
     import tempfile
 
     url = "https://ollama.com/install.sh"
-    expected = os.environ.get("NEXE_OLLAMA_INSTALL_SHA256", "").strip().lower()
+    expected, _pinned_url, _pinned_version = _resolve_ollama_pin("linux_install_sh")
+    if _pinned_url:
+        url = _pinned_url
     tmp_path: str | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -311,16 +367,18 @@ def _install_ollama_linux() -> bool:
                     f"expected {expected}, got {observed}. Aborting install."
                 )
                 return False
-            print(f"  {DIM}SHA-256 matches NEXE_OLLAMA_INSTALL_SHA256 pin{RESET}")
-        else:
-            print(
-                f"  {DIM}(no NEXE_OLLAMA_INSTALL_SHA256 pin set — pin the "
-                f"digest above to fail-fast on future drift){RESET}"
-            )
+            print(f"  {DIM}SHA-256 matches the Ollama installer pin{RESET}")
+        elif not _unpinned_ollama_allowed("ollama install.sh"):
+            return False
 
+        script_env = dict(os.environ)
+        if _pinned_version:
+            # Pin the BINARY the script installs, not just the script bytes.
+            script_env["OLLAMA_VERSION"] = _pinned_version.lstrip("v")
         result = subprocess.run(  # nosec B603 B607: tmp_path is a tempfile we just created and hashed; bash via PATH
             ["bash", tmp_path],
             timeout=180,
+            env=script_env,
         )
         if result.returncode == 0:
             print_success(t('ollama_installed'))
@@ -369,11 +427,16 @@ def _install_ollama_windows() -> bool:
     arch = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "amd64"
     url = f"https://ollama.com/download/ollama-windows-{arch}.zip"
     dest = Path(os.path.expandvars(r"%LOCALAPPDATA%\Programs\Ollama"))
-    expected_sha256 = os.environ.get("NEXE_OLLAMA_WINDOWS_SHA256", "").strip().lower()
+    # WS9-01: env override → embedded versioned pin → fail closed.
+    expected_sha256, _pinned_url, _ = _resolve_ollama_pin(f"windows_{arch}")
+    if _pinned_url:
+        url = _pinned_url
     zip_path: str | None = None
-    # DETACHED_PROCESS (0x8) | CREATE_NO_WINDOW (0x0800_0000): serve outlives us,
-    # no console window flashes in GUI mode.
-    detached_no_window = 0x0000_0008 | 0x0800_0000
+    # CREATE_NEW_PROCESS_GROUP (0x200) | CREATE_NO_WINDOW (0x0800_0000): serve runs
+    # in its own group with NO console window. We do NOT use DETACHED_PROCESS (0x8):
+    # per MSDN it makes Windows IGNORE CREATE_NO_WINDOW, so `ollama serve` would pop
+    # a VISIBLE console — the "terminals flashing" bug the 06/07 fix missed.
+    detached_no_window = 0x0000_0200 | 0x0800_0000
 
     try:
         # No emoji: the Windows sidecar stdout is cp1252, not UTF-8 — a raw
@@ -404,12 +467,9 @@ def _install_ollama_windows() -> bool:
                     f"expected {expected_sha256}, got {observed_sha256}. Aborting install."
                 )
                 return False
-            print(f"  {DIM}SHA-256 matches NEXE_OLLAMA_WINDOWS_SHA256 pin{RESET}")
-        else:
-            print(
-                f"  {DIM}(no NEXE_OLLAMA_WINDOWS_SHA256 pin set — pin the "
-                f"digest above to fail-fast on future drift){RESET}"
-            )
+            print(f"  {DIM}SHA-256 matches the Ollama installer pin{RESET}")
+        elif not _unpinned_ollama_allowed(f"ollama-windows-{arch}.zip"):
+            return False
 
         dest.mkdir(parents=True, exist_ok=True)
         print(f"  Installing to {dest}...")

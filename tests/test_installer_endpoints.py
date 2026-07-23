@@ -30,7 +30,15 @@ def app():
 
 @pytest.fixture()
 def client(app):
-    return TestClient(app, raise_server_exceptions=True)
+    # WS1-01: /installer/finalize is loopback-guarded; the default TestClient
+    # presents as "testclient" (non-loopback) and would be 403'd.
+    return TestClient(app, raise_server_exceptions=True, client=("127.0.0.1", 50000))
+
+
+@pytest.fixture()
+def remote_client(app):
+    """A client that presents a non-loopback peer address (LAN attacker)."""
+    return TestClient(app, raise_server_exceptions=True, client=("192.168.1.66", 50000))
 
 
 @pytest.fixture()
@@ -46,6 +54,21 @@ def isolated_data_dir(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 class TestFinalize:
+    def test_get_finalize_refuses_non_loopback_client(self, remote_client, isolated_data_dir):
+        """WS1-01: the primary key is never served across the network, even
+        if the operator opted into a public bind."""
+        resp = remote_client.get("/installer/finalize")
+        assert resp.status_code == 403
+        assert "api_key" not in resp.text
+
+    def test_post_finalize_refuses_non_loopback_client(self, remote_client, isolated_data_dir):
+        resp = remote_client.post(
+            "/installer/finalize",
+            json={"engine": "ollama", "model_id": "qwen3.5:4b", "lang": "ca"},
+        )
+        assert resp.status_code == 403
+        assert "api_key" not in resp.text
+
     def test_returns_json_with_status_ready(self, client, isolated_data_dir):
         resp = client.get("/installer/finalize")
         assert resp.status_code == 200

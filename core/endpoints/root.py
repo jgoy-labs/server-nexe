@@ -22,11 +22,7 @@ logger = logging.getLogger(__name__)
 from core.dependencies import limiter, get_i18n  # noqa: E402
 from plugins.security.core.auth_dependencies import require_api_key  # noqa: E402
 
-from core.resilience import (  # noqa: E402
-  ollama_breaker,
-  qdrant_breaker,
-  http_breaker,
-)
+from core.resilience import ollama_breaker  # noqa: E402
 
 from core.models import (  # noqa: E402
   SystemResponse,
@@ -322,7 +318,7 @@ async def server_status(
     "minimal_mode": bool(getattr(request.app.state, "minimal_mode", False)),
   }
 
-@router.get("/health/circuits", summary="Circuit breaker status (Ollama, Qdrant, external HTTP) (API key required)", response_model=dict, operation_id="circuit_status")
+@router.get("/health/circuits", summary="Circuit breaker status (Ollama) (API key required)", response_model=dict, operation_id="circuit_status")
 @limiter.limit("30/minute")
 async def circuit_status(
   request: Request,
@@ -332,9 +328,9 @@ async def circuit_status(
   Circuit Breaker status endpoint.
 
   Returns the current state of all circuit breakers:
-  - ollama: LLM inference service
-  - qdrant: Vector search service
-  - http_external: External HTTP services
+  - ollama: LLM inference service (the only wired breaker — the former
+    qdrant/http_external entries were decorative and always reported
+    closed, WS7-01)
 
   States:
   - closed: Normal operation
@@ -344,8 +340,6 @@ async def circuit_status(
   return {
     "circuits": [
       ollama_breaker.get_status(),
-      qdrant_breaker.get_status(),
-      http_breaker.get_status(),
     ],
     "timestamp": datetime.now(timezone.utc).isoformat(),
   }

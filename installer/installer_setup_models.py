@@ -17,6 +17,8 @@ import sys
 import subprocess
 from pathlib import Path
 
+from core.proc_utils import detached_kwargs, no_window_kwargs
+
 from .download_verify import (
     DownloadIntegrityError,
     consent_for_unpinned,
@@ -83,10 +85,12 @@ def _ollama_ensure_running(ollama_bin):
     """Start ollama serve if not already running and wait up to 15s."""
     import time
     import socket
-    result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted absolute paths or PATH-resolved); literal subcommand
+    result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True, **no_window_kwargs())  # nosec B603: ollama_bin from _find_ollama (whitelisted absolute paths or PATH-resolved); literal subcommand
     if result.returncode != 0:
         print(f"{YELLOW}[...]{RESET} {t('starting_ollama')}")
-        subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal `serve` subcommand
+        # `ollama serve` is a daemon that must outlive this call → detached_kwargs
+        # (no console window on Windows; own session on POSIX).
+        subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **detached_kwargs())  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal `serve` subcommand
         for _ in range(30):
             try:
                 with socket.create_connection(("localhost", 11434), timeout=0.5):
@@ -104,7 +108,8 @@ def _ollama_pull_model(ollama_bin, model_id):
     process = subprocess.Popen(  # nosec B603: ollama_bin from _find_ollama (whitelisted); model_id from internal MODEL_CATALOG (supply chain trust)
         [ollama_bin, "pull", model_id],
         stdout=sys.stdout,
-        stderr=sys.stderr
+        stderr=sys.stderr,
+        **no_window_kwargs()
     )
     return_code = process.wait()
     if return_code != 0:
@@ -114,7 +119,7 @@ def _ollama_pull_model(ollama_bin, model_id):
 def _ollama_verify_and_report(ollama_bin, model_id):
     """Check model appears in ollama list and run SHA256 integrity check."""
     print(f"\n{CYAN}[3/4]{RESET} {t('verifying_download')}")
-    result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True)  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal subcommand (post-download verification)
+    result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True, **no_window_kwargs())  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal subcommand (post-download verification)
     model_base = model_id.split(":")[0]
     if model_base in result.stdout or model_id in result.stdout:
         # ADR B251: Ollama integrity is delegated to its content-addressed
@@ -140,7 +145,8 @@ def _ollama_pull_embeddings(ollama_bin):
     embed_process = subprocess.Popen(  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal model name "nomic-embed-text"
         [ollama_bin, "pull", "nomic-embed-text"],
         stdout=sys.stdout,
-        stderr=sys.stderr
+        stderr=sys.stderr,
+        **no_window_kwargs()
     )
     embed_return = embed_process.wait()
     if embed_return == 0:
@@ -234,7 +240,7 @@ def _gguf_fetch_and_verify(model_config, project_root):
         "curl", "-L", "--progress-bar",
         "-o", str(output_path),
         model_config['id']
-    ], check=True)
+    ], check=True, **no_window_kwargs())
 
     if not output_path.exists() or output_path.stat().st_size == 0:
         raise RuntimeError(f"Downloaded file is empty or missing: {output_path}")
@@ -360,7 +366,8 @@ for attempt in range(max_retries):
         [str(python_path), "-c", download_script],
         stdout=sys.stdout,
         stderr=sys.stderr,
-        env={**os.environ, "PYTHONPATH": str(project_root)}
+        env={**os.environ, "PYTHONPATH": str(project_root)},
+        **no_window_kwargs()
     )
     return_code = process.wait()
     if return_code != 0:

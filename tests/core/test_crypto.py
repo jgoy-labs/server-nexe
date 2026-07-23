@@ -144,9 +144,13 @@ class TestKeyManagement:
         assert _try_file_get(tmp_path / "nope.key") is None
 
     def test_file_get_wrong_length(self, tmp_path):
+        # WS3-02: a wrong-length key file fails closed (raise), not None — a
+        # corrupt/truncated key must not be treated as absent, which would
+        # quarantine the encrypted DB via regeneration.
         key_path = tmp_path / "bad.key"
         key_path.write_bytes(b"short")
-        assert _try_file_get(key_path) is None
+        with pytest.raises(RuntimeError, match="wrong length"):
+            _try_file_get(key_path)
 
     def test_file_set_permissions(self, tmp_path):
         key_path = tmp_path / "perm.key"

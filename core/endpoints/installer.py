@@ -648,42 +648,156 @@ def _preflight_repo_id(model_id: str) -> "str | None":
     return model_id
 
 
+# SSRF/disk-fill guard per a _stream_gguf (NEXE-SRV-WS2-01). El router
+# /installer és unauth + CSRF-exempt i model_id arriba verbatim, així que una
+# pàgina web cross-origin podria fer-lo servir per fer un fetch cec a un host
+# intern (p.ex. http://127.0.0.1:11434/api/tags) o per omplir el disc amb un cos
+# infinit. Restringim el fetch a https + host HF, imposem un cap de mida i un
+# timeout de lectura finit, i rebutgem les redireccions fora de l'allow-list.
+_GGUF_MAX_BYTES = 100 * 1024**3        # 100 GiB — sostre finit anti disk-fill
+_GGUF_MAX_REDIRECTS = 5                 # redireccions HF→CDN acotades
+_GGUF_READ_TIMEOUT_S = 60.0            # sense bytes durant 60s → avorta (no penja)
+
+
+def _is_allowed_gguf_url(url: str) -> bool:
+    """True iff ``url`` és una font GGUF baixable: una URL https amb host a
+    l'allow-list del HuggingFace Hub.
+
+    Guarda SSRF/disk-fill de _stream_gguf: reutilitza ``_is_hf_hub_url`` per al
+    host i exigeix a més esquema ``https``, de manera que ni ``http://`` ni un
+    host intern (``http://127.0.0.1:11434/api/tags``) ni un host de catàleg
+    arbitrari poden arribar mai al fetch.
+    """
+    try:
+        scheme = (urlparse(url).scheme or "").lower()
+    except ValueError:
+        return False
+    if scheme != "https":
+        return False
+    return _is_hf_hub_url(url)
+
+
 async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
-    """Download a GGUF model via HTTP with progress reporting."""
+    """Download a GGUF model via HTTP with progress reporting.
+
+    SSRF/disk-fill guard (NEXE-SRV-WS2-01): ``model_id`` ha de ser una URL https
+    amb host del HuggingFace Hub. Qualsevol altre esquema/host es rebutja abans
+    del fetch (evita el fetch cec a hosts interns), s'imposa un cap de mida i un
+    timeout de lectura finit, i es rebutgen les redireccions que surtin de
+    l'allow-list.
+    """
     import httpx
+
+    # Guarda d'entrada: cap fetch cap a un target no permès.
+    if not _is_allowed_gguf_url(model_id):
+        yield {
+            "type": "error",
+            "code": "INVALID_MODEL_URL",
+            "message": (
+                "GGUF download URL must be an https:// URL on the Hugging Face "
+                "Hub (huggingface.co / hf.co)."
+            ),
+        }
+        return
 
     filename = _safe_model_basename(model_id)
     dest = _models_dir() / filename
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     # B255: a gated GGUF on the HF Hub needs an "Authorization: Bearer <HF_TOKEN>"
-    # header. Attach it ONLY when the URL points at the HF Hub, so the token is
-    # never handed to an arbitrary catalog host. httpx already strips the
-    # Authorization header on cross-origin redirects (verified on 0.28.1), so the
-    # HF→CDN hop that follows a /resolve/ URL does not leak it to the CDN.
+    # header. model_id ja està restringit a hosts HF per la guarda de dalt, així
+    # que el token només pot anar a HF. En seguir redireccions manualment
+    # eliminem l'Authorization en canviar de host (el CDN de HF usa URLs signades
+    # i no el necessita), reproduint l'antic strip cross-origin d'httpx.
     headers: dict[str, str] = {}
     if _is_hf_hub_url(model_id):
         token = await _ensure_hf_token_in_env()
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=None) as client:  # nosec B113 — GGUF downloads are unbounded by design; disconnect detection via request.is_disconnected()
-        async with client.stream("GET", model_id, headers=headers) as resp:
-            resp.raise_for_status()
-            total = int(resp.headers.get("content-length", 0))
-            downloaded = 0
-            last_pct = -1
-            with dest.open("wb") as fh:
-                async for chunk in resp.aiter_bytes(chunk_size=1024 * 256):
-                    if await request.is_disconnected():
+    # Timeout finit: read=60s avorta un stream que es queda mut sense trencar les
+    # baixades llargues legítimes (cada chunk rebut reinicia el rellotge).
+    timeout = httpx.Timeout(
+        connect=30.0, read=_GGUF_READ_TIMEOUT_S, write=60.0, pool=30.0,
+    )
+    # follow_redirects=False: seguim els salts a mà per validar-ne cada destí
+    # contra l'allow-list (un 30x cap a un host no-HF avorta).
+    async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
+        url = model_id
+        req_headers = dict(headers)
+        for _hop in range(_GGUF_MAX_REDIRECTS + 1):
+            async with client.stream("GET", url, headers=req_headers) as resp:
+                if resp.is_redirect:
+                    location = resp.headers.get("location", "")
+                    next_url = str(resp.url.join(location))
+                    if not _is_allowed_gguf_url(next_url):
+                        yield {
+                            "type": "error",
+                            "code": "REDIRECT_OFF_ALLOWLIST",
+                            "message": (
+                                "GGUF download redirected off the Hugging Face "
+                                "allow-list."
+                            ),
+                        }
                         return
-                    fh.write(chunk)
-                    downloaded += len(chunk)
-                    if total:
-                        pct = int(downloaded * 100 / total)
-                        if pct != last_pct:
-                            last_pct = pct
-                            yield {"type": "progress", "percent": pct, "speed": "—", "eta": "—"}
+                    # Canvi de host → no reenviïs el bearer (strip cross-origin).
+                    if urlparse(next_url).hostname != urlparse(url).hostname:
+                        req_headers = {
+                            k: v for k, v in req_headers.items()
+                            if k.lower() != "authorization"
+                        }
+                    url = next_url
+                    continue
+
+                resp.raise_for_status()
+                total = int(resp.headers.get("content-length", 0) or 0)
+                if total and total > _GGUF_MAX_BYTES:
+                    yield {
+                        "type": "error",
+                        "code": "MODEL_TOO_LARGE",
+                        "message": (
+                            f"GGUF exceeds the {_GGUF_MAX_BYTES} byte cap "
+                            f"(content-length={total})."
+                        ),
+                    }
+                    return
+                downloaded = 0
+                last_pct = -1
+                with dest.open("wb") as fh:
+                    async for chunk in resp.aiter_bytes(chunk_size=1024 * 256):
+                        if await request.is_disconnected():
+                            return
+                        downloaded += len(chunk)
+                        if downloaded > _GGUF_MAX_BYTES:
+                            # Cap superat en streaming (cos sense content-length o
+                            # amb un de mentider): avorta i neteja el parcial.
+                            fh.close()
+                            try:
+                                dest.unlink()
+                            except OSError:
+                                pass
+                            yield {
+                                "type": "error",
+                                "code": "MODEL_TOO_LARGE",
+                                "message": (
+                                    f"GGUF download exceeded the {_GGUF_MAX_BYTES} "
+                                    "byte cap; aborted."
+                                ),
+                            }
+                            return
+                        fh.write(chunk)
+                        if total:
+                            pct = int(downloaded * 100 / total)
+                            if pct != last_pct:
+                                last_pct = pct
+                                yield {"type": "progress", "percent": pct, "speed": "—", "eta": "—"}
+                return
+        # Massa redireccions consecutives → avorta.
+        yield {
+            "type": "error",
+            "code": "TOO_MANY_REDIRECTS",
+            "message": "GGUF download exceeded the redirect limit.",
+        }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1195,8 +1309,29 @@ def _resolve_model_path(engine: str, model_id: str) -> str:
     return model_id  # ollama
 
 
+def _client_is_loopback(request: Request) -> bool:
+    """True when the request originates from the local machine.
+
+    WS1-01: /installer/finalize returns NEXE_PRIMARY_API_KEY without auth
+    (the wizard runs before the key exists client-side). Even when the
+    operator deliberately binds non-loopback (NEXE_ALLOW_PUBLIC_BIND), the
+    primary key must never be served across the network.
+    """
+    import ipaddress
+    client = request.client
+    if client is None or not client.host:
+        return False
+    host = client.host.strip().lower()
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 @router.post("/finalize", operation_id="installer_finalize_post")
-async def finalize_post(body: FinalizeBody) -> JSONResponse:
+async def finalize_post(body: FinalizeBody, request: Request) -> JSONResponse:
     """Persist onboarding state and return the local API key and server status.
 
     the wizard calls this after a successful download. The model_path
@@ -1204,6 +1339,9 @@ async def finalize_post(body: FinalizeBody) -> JSONResponse:
     state is written atomically to `$NEXE_DATA_DIR/onboarding.json`; the next
     sidecar restart will pick it up and configure the right engine.
     """
+    # WS1-01: the primary key is only ever served to loopback clients.
+    if not _client_is_loopback(request):
+        return JSONResponse(status_code=403, content={"detail": "Forbidden: loopback only"})
     # Symmetric guard with GET /finalize (INST-001): once onboarding has
     # completed, this unauthenticated, repeatable endpoint must not keep
     # re-serving NEXE_PRIMARY_API_KEY to any local process. A clean re-install
@@ -1256,7 +1394,7 @@ def _finalize_marker_path() -> Path:
 
 
 @router.get("/finalize", operation_id="installer_finalize_get")
-async def finalize_get() -> JSONResponse:
+async def finalize_get(request: Request) -> JSONResponse:
     """Legacy GET endpoint — returns api_key + status without persisting state.
 
     The Advanced wizard flow (`engine === "local"` in step5-apikey.js) calls
@@ -1271,6 +1409,9 @@ async def finalize_get() -> JSONResponse:
     marker; the rest receive FileExistsError and return 404. This closes
     the TOCTOU window that a simple ``exists() + touch()`` would leave open.
     """
+    # WS1-01: the primary key is only ever served to loopback clients.
+    if not _client_is_loopback(request):
+        return JSONResponse(status_code=403, content={"detail": "Forbidden: loopback only"})
     if OnboardingState.is_completed():
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 

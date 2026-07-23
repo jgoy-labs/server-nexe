@@ -9,6 +9,13 @@
 # Cross-checked by tests/test_installer_mlx_pin_consistency.py (B069).
 mlx-lm==0.31.3
 mlx-vlm==0.4.4
+# transformers: transitiva de mlx-lm (>=5.0.0) i mlx-vlm (>=5.1.0), tots dos SENSE
+# sostre → uv/pip resol la 5.13.0, que trenca mlx-lm 0.31.3 a l'import: auto_factory.py:680
+# fa key.__module__ sobre l'string 'NewlineTokenizer' de tokenizer_utils.py:505 →
+# AttributeError. 5.12.1 és l'últim tag ABANS d'aquest canvi (cos antic de _LazyAutoMapping.
+# register, sense la línia __module__). NO al requirements.txt base: transformers només
+# entra a la ruta MLX/VLM (Apple-only); fastembed NO el declara. Ref: finding 820 (nexe-8gb).
+transformers==5.12.1
 
 # Tray app (macOS menu bar)
 rumps==0.4.0  # macOS menu bar tray app (requires PyObjC)

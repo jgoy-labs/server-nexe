@@ -208,13 +208,11 @@ class MemoryAPI:
 
     def _load_model() -> Any:
       """Instantiate the fastembed TextEmbedding model (blocking, run in executor)."""
-      from fastembed import TextEmbedding
-      from memory.embeddings.paths import default_fastembed_cache_dir
-      kwargs: dict[str, Any] = {"cache_dir": str(default_fastembed_cache_dir())}
-      if embed_threads is not None:
-        kwargs["threads"] = embed_threads
+      from memory.embeddings.shared import get_text_embedding
       try:
-        return TextEmbedding(self.embedding_model, **kwargs)
+        # Shared process-wide: the ingestion pipeline used to build a second
+        # ONNX session with its own copy of the weights (~1.4 GB in FP32).
+        return get_text_embedding(self.embedding_model, threads=embed_threads)
       except Exception as e:
         raise RuntimeError(
             f"Embedding model '{self.embedding_model}' not available locally. "

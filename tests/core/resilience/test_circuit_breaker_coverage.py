@@ -22,13 +22,49 @@ class TestCheckTimeout:
 
 
 class TestCanExecuteHalfOpen:
-    """Line 154: _can_execute returns True when HALF_OPEN."""
+    """WS7-03: HALF_OPEN admits ONE probe at a time (bounded, no herd)."""
 
-    def test_can_execute_in_half_open(self):
+    def test_half_open_admits_single_probe(self):
         breaker = CircuitBreaker("test", CircuitBreakerConfig())
         breaker._transition_to(CircuitState.HALF_OPEN)
-        result = asyncio.run(breaker._can_execute())
-        assert result is True
+
+        async def scenario():
+            first = await breaker._can_execute()
+            second = await breaker._can_execute()   # concurrent probe: refused
+            return first, second
+
+        first, second = asyncio.run(scenario())
+        assert first is True
+        assert second is False
+
+    def test_half_open_slot_frees_after_probe_resolves(self):
+        breaker = CircuitBreaker(
+            "test", CircuitBreakerConfig(success_threshold=2)
+        )
+        breaker._transition_to(CircuitState.HALF_OPEN)
+
+        async def scenario():
+            assert await breaker._can_execute() is True
+            await breaker.record_success()          # probe resolved, still HALF_OPEN
+            return await breaker._can_execute()     # next probe allowed
+
+        assert asyncio.run(scenario()) is True
+
+    def test_half_open_stale_probe_does_not_wedge(self):
+        """A probe that never resolves frees the slot after timeout_seconds."""
+        from datetime import datetime, timedelta, timezone
+        breaker = CircuitBreaker("test", CircuitBreakerConfig(timeout_seconds=30))
+        breaker._transition_to(CircuitState.HALF_OPEN)
+
+        async def scenario():
+            assert await breaker._can_execute() is True   # probe admitted, never resolves
+            assert await breaker._can_execute() is False  # slot busy
+            breaker._state.last_state_change = (
+                datetime.now(timezone.utc) - timedelta(seconds=31)
+            )
+            return await breaker._can_execute()           # stale slot re-admits
+
+        assert asyncio.run(scenario()) is True
 
 
 class TestGuardStreaming:

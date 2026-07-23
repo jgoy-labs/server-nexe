@@ -18,8 +18,6 @@ from core.resilience.circuit_breaker import (
   CircuitState,
   CircuitOpenError,
   ollama_breaker,
-  qdrant_breaker,
-  http_breaker,
 )
 
 class TestCircuitBreakerBasic:
@@ -145,66 +143,6 @@ class TestCircuitBreakerTransitions:
     assert breaker.state == CircuitState.OPEN
     assert breaker.is_open
 
-class TestCircuitBreakerProtectDecorator:
-  """Tests for the protect decorator"""
-
-  @pytest.fixture
-  def breaker(self):
-    """Circuit breaker per tests de decorador"""
-    return CircuitBreaker(
-      "test_protect",
-      CircuitBreakerConfig(
-        failure_threshold=2,
-        success_threshold=1,
-        timeout_seconds=1,
-        max_retries=1,
-        min_wait_seconds=0.01,
-        max_wait_seconds=0.1,
-      )
-    )
-
-  @pytest.mark.asyncio
-  async def test_protect_success(self, breaker):
-    """Decorator allows successes"""
-    @breaker.protect
-    async def successful_func():
-      return "success"
-
-    result = await successful_func()
-    assert result == "success"
-
-    status = breaker.get_status()
-    assert status["success_count"] == 1
-    assert status["failure_count"] == 0
-
-  @pytest.mark.asyncio
-  async def test_protect_raises_circuit_open_error(self, breaker):
-    """Decorator raises CircuitOpenError when open"""
-    for _ in range(2):
-      await breaker._record_failure(Exception("force open"))
-
-    @breaker.protect
-    async def any_func():
-      return "won't reach"
-
-    with pytest.raises(CircuitOpenError) as exc_info:
-      await any_func()
-
-    assert "OPEN" in str(exc_info.value)
-    assert breaker.name in str(exc_info.value)
-
-  @pytest.mark.asyncio
-  async def test_protect_propagates_exceptions(self, breaker):
-    """Decorator propagates original exceptions"""
-    @breaker.protect
-    async def failing_func():
-      raise ValueError("custom error")
-
-    with pytest.raises(ValueError) as exc_info:
-      await failing_func()
-
-    assert "custom error" in str(exc_info.value)
-
 class TestPreConfiguredBreakers:
   """Tests for pre-configured circuit breakers"""
 
@@ -215,25 +153,15 @@ class TestPreConfiguredBreakers:
     assert ollama_breaker.config.failure_threshold == 5
     assert ollama_breaker.config.timeout_seconds == 60
 
-  def test_qdrant_breaker_exists(self):
-    """Qdrant breaker is configured"""
-    assert qdrant_breaker is not None
-    assert qdrant_breaker.name == "qdrant"
-    assert qdrant_breaker.config.failure_threshold == 3
-    assert qdrant_breaker.config.timeout_seconds == 30
-
-  def test_http_breaker_exists(self):
-    """HTTP breaker is configured"""
-    assert http_breaker is not None
-    assert http_breaker.name == "http_external"
-    assert http_breaker.config.failure_threshold == 10
-    assert http_breaker.config.timeout_seconds == 120
+  def test_ollama_is_the_only_global_breaker(self):
+    """WS7-01: qdrant/http breakers were decorative (never wired) and are gone."""
+    import core.resilience as resilience
+    assert not hasattr(resilience, "qdrant_breaker")
+    assert not hasattr(resilience, "http_breaker")
 
   def test_all_breakers_start_closed(self):
     """All breakers start closed"""
     assert ollama_breaker.is_closed
-    assert qdrant_breaker.is_closed
-    assert http_breaker.is_closed
 
 class TestCircuitBreakerConcurrency:
   """Concurrency tests for the Circuit Breaker"""

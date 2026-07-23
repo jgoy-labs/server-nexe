@@ -234,8 +234,7 @@ class IngestionPipeline:
     if os.getenv("NEXE_ENV") == "test" or os.getenv("PYTEST_CURRENT_TEST"):
       return self._generate_test_embedding(text)
 
-    from fastembed import TextEmbedding
-    from memory.embeddings.paths import default_fastembed_cache_dir
+    from memory.embeddings.shared import get_text_embedding
     import numpy as np
 
     if not text.strip():
@@ -245,7 +244,9 @@ class IngestionPipeline:
     if fe_model is None:
       logger.info("Loading fastembed model: %s", self.embedding_model)
       try:
-        fe_model = TextEmbedding(self.embedding_model, cache_dir=str(default_fastembed_cache_dir()))
+        # Shared with MemoryAPI's embedder: a second TextEmbedding here meant a
+        # second ONNX session holding its own ~1.4 GB copy of the weights.
+        fe_model = get_text_embedding(self.embedding_model)
         self._fe_model = fe_model
       except Exception as e:
         raise RuntimeError(

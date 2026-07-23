@@ -80,13 +80,18 @@ class SQLiteStore:
     user_id is mandatory on all tables from day 1.
     """
 
-    def __init__(self, db_path: Path, crypto_provider: Any = None):
+    def __init__(self, db_path: Path, crypto_provider: Any = None,
+                 require_encryption: bool = False):
         self._db_path = Path(db_path)
         # mode= is modulated by the umask → explicit chmod to guarantee 0o700 on
         # the dir holding PII (parity with engines/persistence_sqlite.py).
         self._db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self._db_path.parent, 0o700)
         self._crypto = crypto_provider
+        # WS3-03: when the user explicitly set NEXE_ENCRYPTION_ENABLED=true, a
+        # failed SQLCipher migration must fail closed instead of opening the
+        # PII in plaintext (parity with keys.py wrong-length, WS3-02).
+        self._require_encryption = require_encryption
         self._encrypted = False
         self._conn: Optional[sqlite3.Connection] = None
         # Reentrant so that an operation can call _connect() under the lock
@@ -163,6 +168,17 @@ class SQLiteStore:
             # .unrecoverable-* (data loss + PII left in clear).
             if self._db_path.exists() and self._is_plaintext_sqlite(self._db_path):
                 self._encrypted = False
+                if self._require_encryption:
+                    # WS3-03: encryption was explicitly demanded — refuse to
+                    # open PII in plaintext. The plaintext file stays intact
+                    # on disk (no quarantine: it is the user's only copy).
+                    raise RuntimeError(
+                        "memory_v1.db remains plaintext after SQLCipher migration "
+                        "and NEXE_ENCRYPTION_ENABLED=true demands encryption. "
+                        "Refusing to open PII in plaintext (WS3-03) — check "
+                        "sqlcipher3 and disk space, or set "
+                        "NEXE_ENCRYPTION_ENABLED=auto to tolerate the fallback."
+                    )
                 logger.error(
                     "memory_v1.db remains plaintext after migration; opening in "
                     "plaintext mode. PII is NOT encrypted — check sqlcipher3 and disk space."

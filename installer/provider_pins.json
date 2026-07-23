@@ -1,5 +1,5 @@
 {
-  "_comment": "ADR B046b — provider-published weight pins (metadata-only, no model downloads). Generated/refreshed by installer/bootstrap_catalog_pins.py. mlx_file_hashes: per-LFS-file HF sha256 (the big .safetensors weights; small non-LFS config/tokenizer files are out of scope). These defend MITM/corruption, NOT a compromised provider repo — see ADR. Ollama is NOT pinned here (ADR B251): its content-addressed pull verifies layer integrity itself and its tags are mutable upstream.",
+  "_comment": "ADR B046b — provider-published weight pins (metadata-only, no model downloads). Generated/refreshed by installer/bootstrap_catalog_pins.py. mlx_file_hashes: per-LFS-file HF sha256 (the big .safetensors weights; small non-LFS config/tokenizer files are out of scope). These defend MITM/corruption, NOT a compromised provider repo — see ADR. Ollama MODEL pulls are NOT pinned (ADR B251): the content-addressed pull verifies layer integrity itself. The Ollama INSTALLER binaries ARE pinned (WS9-01, section ollama_installer): versioned GitHub release URL + sha256 per platform, refreshed at each server-nexe release (digests from the GitHub release API).",
   "mlx_file_hashes": {
     "lmstudio-community/Mistral-Small-3.2-24B-Instruct-2506-MLX-4bit": {
       "model-00001-of-00003.safetensors": "271b2009bf595520d9a020378b6b29a53d00733e16968856c59cbebd626b57c5",
@@ -60,5 +60,25 @@
       "tokenizer.json": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4"
     }
   },
-  "schema_version": 1
+  "schema_version": 1,
+  "ollama_installer": {
+    "_comment": "WS9-01 — pinned Ollama installer artefacts. Env NEXE_OLLAMA_{MACOS,WINDOWS,INSTALL}_SHA256 overrides; missing pin fails closed unless NEXE_ALLOW_UNPINNED. Refresh at release: GitHub API /repos/ollama/ollama/releases -> asset .digest; install.sh sha via curl+shasum of the versioned raw URL.",
+    "version": "v0.31.2",
+    "darwin": {
+      "url": "https://github.com/ollama/ollama/releases/download/v0.31.2/Ollama-darwin.zip",
+      "sha256": "e8e7ad9e312b2dff11da2c1f3b18401e2096afaaa9ac8abbf01c64e67bad802d"
+    },
+    "windows_arm64": {
+      "url": "https://github.com/ollama/ollama/releases/download/v0.31.2/ollama-windows-arm64.zip",
+      "sha256": "52d2273a05e1d939f112aff9f160e87d64ee01a47c81d93c1549fe22ffe8773a"
+    },
+    "windows_amd64": {
+      "url": "https://github.com/ollama/ollama/releases/download/v0.31.2/ollama-windows-amd64.zip",
+      "sha256": "6988b58d2223ae3f9d5766b46b0be614dec36524b80317159718b5adf3006f3b"
+    },
+    "linux_install_sh": {
+      "url": "https://raw.githubusercontent.com/ollama/ollama/v0.31.2/scripts/install.sh",
+      "sha256": "25f64b810b947145095956533e1bdf56eacea2673c55a7e586be4515fc882c9f"
+    }
+  }
 }

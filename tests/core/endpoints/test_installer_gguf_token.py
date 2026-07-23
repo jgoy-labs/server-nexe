@@ -40,6 +40,8 @@ def test_is_hf_hub_url(url, expected):
 
 
 class _FakeResp:
+    is_redirect = False
+
     def __init__(self):
         self.headers = {"content-length": "2"}
 
@@ -101,12 +103,27 @@ def test_gguf_attaches_bearer_for_hf_url_with_token(monkeypatch, tmp_path):
     assert headers.get("Authorization") == "Bearer hf_gtok"
 
 
-def test_gguf_no_bearer_for_non_hf_url(monkeypatch, tmp_path):
-    """A token must NEVER be sent to a non-HF catalog host (leak guard)."""
+def test_gguf_rejects_non_hf_url(monkeypatch, tmp_path):
+    """SSRF guard (NEXE-SRV-WS2-01): a non-HF host is rejected BEFORE any fetch,
+    so a token can never even reach it and no bytes are written."""
     monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: None)
     monkeypatch.setenv("HF_TOKEN", "hf_gtok")  # token IS available
-    headers = _run_stream("https://example.com/models/m.gguf", monkeypatch, tmp_path)
-    assert "Authorization" not in headers, "token leaked to a non-HF host"
+    monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
+    monkeypatch.setattr("httpx.AsyncClient", _FakeClient)
+    _FakeClient.captured = {}
+
+    async def _collect():
+        return [
+            ev async for ev in installer_mod._stream_gguf(
+                "https://example.com/models/m.gguf", _FakeReq()
+            )
+        ]
+
+    events = asyncio.run(_collect())
+    assert events and events[0]["type"] == "error"
+    assert events[0]["code"] == "INVALID_MODEL_URL"
+    assert _FakeClient.captured == {}, "httpx must not be called for a non-HF host"
+    assert not list(tmp_path.iterdir()), "no file written on rejection"
 
 
 def test_gguf_no_bearer_when_no_token(monkeypatch, tmp_path):

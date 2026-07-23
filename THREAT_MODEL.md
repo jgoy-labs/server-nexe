@@ -38,7 +38,7 @@ You evaluate server-nexe against an internal policy (ISO 27001 or similar). You 
 
 - The operating system (macOS 14+, Linux ARM64, or Windows 11 ARM64 — the latter supported since v1.0.7) is not compromised. server-nexe cannot protect against a kernel-level adversary or a malicious OS update.
 - The user has a minimum trust in themselves: they do not paste their API key into a shared document, do not copy `~/.nexe/` to a USB drive and forget it, do not run server-nexe as root on a multi-user server.
-- The local network is untrusted by default, but **not** hostile at the LAN level. server-nexe binds to loopback; LAN exposure requires an explicit opt-in (VPN allow-list, SSH tunnel, reverse proxy the user sets up).
+- The local network is untrusted by default, but **not** hostile at the LAN level. server-nexe binds to loopback and refuses to start on a non-loopback host unless `NEXE_ALLOW_PUBLIC_BIND=1` is set (enforced in `core/server/runner.py`); `/installer/finalize` only ever serves the primary API key to loopback clients. Further LAN exposure requires an explicit opt-in (VPN allow-list, SSH tunnel, reverse proxy the user sets up).
 - Python dependencies listed in `requirements.txt` are considered trusted after install. Their own supply chain (PyPI, Hugging Face Hub) is audited offline before building a release, but not at every boot.
 - The user's browser respects standard web security (Same-Origin Policy, cookie scoping, CSP enforcement).
 

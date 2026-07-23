@@ -300,8 +300,8 @@ class TestCircuitBreakerIntegration:
 
   @pytest.mark.asyncio
   async def test_circuit_breaker_async_compatible(self):
-    """Circuit Breaker works with async"""
-    from core.resilience import CircuitBreaker, CircuitBreakerConfig
+    """Circuit Breaker works with async (manual-guard pattern, WS7-02)"""
+    from core.resilience import CircuitBreaker, CircuitBreakerConfig, CircuitOpenError
 
     breaker = CircuitBreaker(
       "test_async",
@@ -310,11 +310,13 @@ class TestCircuitBreakerIntegration:
 
     call_count = 0
 
-    @breaker.protect
     async def async_service():
       nonlocal call_count
+      if not await breaker.check_circuit():
+        raise CircuitOpenError("open")
       call_count += 1
       await asyncio.sleep(0.01)
+      await breaker.record_success()
       return "success"
 
     result = await async_service()
@@ -323,8 +325,8 @@ class TestCircuitBreakerIntegration:
 
   @pytest.mark.asyncio
   async def test_concurrent_protected_calls(self):
-    """Concurrent protected calls work correctly"""
-    from core.resilience import CircuitBreaker, CircuitBreakerConfig
+    """Concurrent guarded calls work correctly (manual-guard pattern, WS7-02)"""
+    from core.resilience import CircuitBreaker, CircuitBreakerConfig, CircuitOpenError
 
     breaker = CircuitBreaker(
       "test_concurrent",
@@ -333,11 +335,13 @@ class TestCircuitBreakerIntegration:
 
     counter = 0
 
-    @breaker.protect
     async def counting_service():
       nonlocal counter
+      if not await breaker.check_circuit():
+        raise CircuitOpenError("open")
       counter += 1
       await asyncio.sleep(0.01)
+      await breaker.record_success()
       return counter
 
     results = await asyncio.gather(*[counting_service() for _ in range(5)])

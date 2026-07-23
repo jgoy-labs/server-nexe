@@ -176,8 +176,9 @@ class TestInstallRequirements:
         assert mock_subprocess.run.call_count == 1
 
     @patch("installer.installer_setup_env.subprocess")
-    def test_install_requirements_offline_fallback(self, mock_subprocess, tmp_path):
-        """Offline fail (pip.conf present) → pip.conf removed + retry (2 subprocess calls)."""
+    def test_install_requirements_offline_fallback(self, mock_subprocess, tmp_path, monkeypatch):
+        """Offline fail + explicit consent (env) → pip.conf removed + retry (WS8-05)."""
+        monkeypatch.setenv("NEXE_ALLOW_UNPINNED", "1")
         err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
         mock_subprocess.CalledProcessError = subprocess.CalledProcessError
         mock_subprocess.run.side_effect = [err, MagicMock(returncode=0)]
@@ -195,6 +196,61 @@ class TestInstallRequirements:
 
         assert not pip_conf.exists(), "pip.conf should have been removed on fallback"
         assert mock_subprocess.run.call_count == 2
+
+    @patch("installer.installer_setup_env.subprocess")
+    def test_install_requirements_offline_fallback_refused_without_consent(
+        self, mock_subprocess, tmp_path, monkeypatch
+    ):
+        """WS8-05: offline fail WITHOUT consent (headless) → abort fail-closed, pip.conf preserved."""
+        monkeypatch.delenv("NEXE_ALLOW_UNPINNED", raising=False)
+        monkeypatch.setattr("installer.download_verify.sys.stdin", MagicMock(isatty=lambda: False))
+        err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
+        mock_subprocess.CalledProcessError = subprocess.CalledProcessError
+        mock_subprocess.run.side_effect = [err, MagicMock(returncode=0)]
+
+        pip_path = tmp_path / "pip3"
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("flask\n")
+        venv_path = tmp_path / "venv"
+        venv_path.mkdir()
+        pip_conf = venv_path / "pip.conf"
+        pip_conf.write_text("[global]\nno-index = true\n")
+
+        from installer.download_verify import UnpinnedModelError
+        from installer.installer_setup_env import _install_requirements
+        with pytest.raises(UnpinnedModelError):
+            _install_requirements(pip_path, req_file, venv_path)
+
+        assert pip_conf.exists(), "pip.conf must be preserved when consent is refused"
+        assert mock_subprocess.run.call_count == 1, "no PyPI retry without consent"
+
+    @patch("installer.installer_setup_env.subprocess")
+    def test_install_requirements_offline_fallback_interactive_decline(
+        self, mock_subprocess, tmp_path, monkeypatch
+    ):
+        """WS8-05: interactive user answers 'n' → abort, pip.conf preserved."""
+        monkeypatch.delenv("NEXE_ALLOW_UNPINNED", raising=False)
+        monkeypatch.setattr("installer.download_verify.sys.stdin", MagicMock(isatty=lambda: True))
+        monkeypatch.setattr("builtins.input", lambda _prompt: "n")
+        err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
+        mock_subprocess.CalledProcessError = subprocess.CalledProcessError
+        mock_subprocess.run.side_effect = [err, MagicMock(returncode=0)]
+
+        pip_path = tmp_path / "pip3"
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("flask\n")
+        venv_path = tmp_path / "venv"
+        venv_path.mkdir()
+        pip_conf = venv_path / "pip.conf"
+        pip_conf.write_text("[global]\nno-index = true\n")
+
+        from installer.download_verify import UnpinnedModelError
+        from installer.installer_setup_env import _install_requirements
+        with pytest.raises(UnpinnedModelError):
+            _install_requirements(pip_path, req_file, venv_path)
+
+        assert pip_conf.exists()
+        assert mock_subprocess.run.call_count == 1
 
     @patch("installer.installer_setup_env.subprocess")
     def test_install_requirements_online_failure_raises(self, mock_subprocess, tmp_path):
@@ -251,8 +307,9 @@ class TestInstallMacosDeps:
         assert mock_subprocess.run.call_count == 1
 
     @patch("installer.installer_setup_env.subprocess")
-    def test_install_macos_deps_offline_fallback(self, mock_subprocess, tmp_path):
-        """Offline fail (pip.conf present) → pip.conf unlinked + retry."""
+    def test_install_macos_deps_offline_fallback(self, mock_subprocess, tmp_path, monkeypatch):
+        """Offline fail + explicit consent (env) → pip.conf unlinked + retry (WS8-05)."""
+        monkeypatch.setenv("NEXE_ALLOW_UNPINNED", "1")
         err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
         mock_subprocess.CalledProcessError = subprocess.CalledProcessError
         mock_subprocess.run.side_effect = [err, MagicMock(returncode=0)]
@@ -270,6 +327,51 @@ class TestInstallMacosDeps:
 
         assert not pip_conf.exists(), "pip.conf should be unlinked after fallback"
         assert mock_subprocess.run.call_count == 2
+
+    @patch("installer.installer_setup_env.subprocess")
+    def test_install_macos_deps_refused_without_consent(self, mock_subprocess, tmp_path, monkeypatch):
+        """WS8-05: macOS fallback fails closed headless without consent."""
+        monkeypatch.delenv("NEXE_ALLOW_UNPINNED", raising=False)
+        monkeypatch.setattr("installer.download_verify.sys.stdin", MagicMock(isatty=lambda: False))
+        err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
+        mock_subprocess.CalledProcessError = subprocess.CalledProcessError
+        mock_subprocess.run.side_effect = [err, MagicMock(returncode=0)]
+        pip_path = tmp_path / "pip3"
+        (tmp_path / "requirements-macos.txt").write_text("rumps\n")
+        venv_path = tmp_path / "venv"; venv_path.mkdir()
+        pip_conf = venv_path / "pip.conf"; pip_conf.write_text("[global]\nno-index = true\n")
+
+        from installer.download_verify import UnpinnedModelError
+        from installer.installer_setup_env import _install_macos_deps
+        with pytest.raises(UnpinnedModelError):
+            _install_macos_deps(pip_path, tmp_path, venv_path)
+        assert pip_conf.exists()
+        assert mock_subprocess.run.call_count == 1
+
+
+# ── _install_linux_deps ──────────────────────────────────────────────────────
+
+
+class TestInstallLinuxDepsRefusal:
+    @patch("installer.installer_setup_env.subprocess")
+    def test_install_linux_deps_refused_without_consent(self, mock_subprocess, tmp_path, monkeypatch):
+        """WS8-05: Linux fallback fails closed headless without consent."""
+        monkeypatch.delenv("NEXE_ALLOW_UNPINNED", raising=False)
+        monkeypatch.setattr("installer.download_verify.sys.stdin", MagicMock(isatty=lambda: False))
+        err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
+        mock_subprocess.CalledProcessError = subprocess.CalledProcessError
+        mock_subprocess.run.side_effect = [err, MagicMock(returncode=0)]
+        pip_path = tmp_path / "pip3"
+        (tmp_path / "requirements-linux.txt").write_text("secretstorage\n")
+        venv_path = tmp_path / "venv"; venv_path.mkdir()
+        pip_conf = venv_path / "pip.conf"; pip_conf.write_text("[global]\nno-index = true\n")
+
+        from installer.download_verify import UnpinnedModelError
+        from installer.installer_setup_env import _install_linux_deps
+        with pytest.raises(UnpinnedModelError):
+            _install_linux_deps(pip_path, tmp_path, venv_path)
+        assert pip_conf.exists()
+        assert mock_subprocess.run.call_count == 1
 
 
 # ── _install_mlx_engines ──────────────────────────────────────────────────────
@@ -295,8 +397,9 @@ class TestInstallMlxEngines:
 
     @patch("installer.installer_setup_env.t", side_effect=lambda x: x)
     @patch("installer.installer_setup_env.subprocess")
-    def test_install_mlx_engines_fallback(self, mock_subprocess, mock_t, tmp_path):
-        """Second package fails offline (pip.conf present) → pip.conf unlinked + retry = 3 total calls."""
+    def test_install_mlx_engines_fallback(self, mock_subprocess, mock_t, tmp_path, monkeypatch):
+        """Second package fails offline + consent (env) → pip.conf unlinked + retry = 3 total calls (WS8-05)."""
+        monkeypatch.setenv("NEXE_ALLOW_UNPINNED", "1")
         err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
         mock_subprocess.CalledProcessError = subprocess.CalledProcessError
         # First package (mlx-lm) OK, second (mlx-vlm) fails first, then OK
@@ -317,6 +420,25 @@ class TestInstallMlxEngines:
 
         assert not pip_conf.exists(), "pip.conf should be unlinked after fallback"
         assert mock_subprocess.run.call_count == 3
+
+    @patch("installer.installer_setup_env.t", side_effect=lambda x: x)
+    @patch("installer.installer_setup_env.subprocess")
+    def test_install_mlx_engines_refused_without_consent(self, mock_subprocess, mock_t, tmp_path, monkeypatch):
+        """WS8-05: mlx fallback fails closed headless without consent."""
+        monkeypatch.delenv("NEXE_ALLOW_UNPINNED", raising=False)
+        monkeypatch.setattr("installer.download_verify.sys.stdin", MagicMock(isatty=lambda: False))
+        err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
+        mock_subprocess.CalledProcessError = subprocess.CalledProcessError
+        mock_subprocess.run.side_effect = [MagicMock(returncode=0), err, MagicMock(returncode=0)]
+        pip_path = tmp_path / "pip3"
+        venv_path = tmp_path / "venv"; venv_path.mkdir()
+        pip_conf = venv_path / "pip.conf"; pip_conf.write_text("[global]\nno-index = true\n")
+
+        from installer.download_verify import UnpinnedModelError
+        from installer.installer_setup_env import _install_mlx_engines
+        with pytest.raises(UnpinnedModelError):
+            _install_mlx_engines(pip_path, venv_path)
+        assert pip_conf.exists()
 
 
 # ── _install_llama_cpp ────────────────────────────────────────────────────────
@@ -339,13 +461,34 @@ class TestInstallLlamaCpp:
         from installer.installer_setup_env import _install_llama_cpp
         _install_llama_cpp(pip_path, venv_path)  # must not raise
 
+    @patch("installer.installer_setup_env.print_success")
+    @patch("installer.installer_setup_env.t", side_effect=lambda x: x)
+    @patch("installer.installer_setup_env.subprocess")
+    def test_install_llama_cpp_refused_without_consent(self, mock_subprocess, mock_t, mock_ps, tmp_path, monkeypatch):
+        """WS8-05: llama-cpp fallback fails closed headless without consent."""
+        monkeypatch.delenv("NEXE_ALLOW_UNPINNED", raising=False)
+        monkeypatch.setattr("installer.download_verify.sys.stdin", MagicMock(isatty=lambda: False))
+        err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
+        mock_subprocess.CalledProcessError = subprocess.CalledProcessError
+        mock_subprocess.run.side_effect = [err, MagicMock(returncode=0)]
+        pip_path = tmp_path / "pip3"
+        venv_path = tmp_path / "venv"; venv_path.mkdir()
+        pip_conf = venv_path / "pip.conf"; pip_conf.write_text("[global]\nno-index = true\n")
+
+        from installer.download_verify import UnpinnedModelError
+        from installer.installer_setup_env import _install_llama_cpp
+        with pytest.raises(UnpinnedModelError):
+            _install_llama_cpp(pip_path, venv_path)
+        assert pip_conf.exists()
+
         assert mock_subprocess.run.call_count == 1
 
     @patch("installer.installer_setup_env.print_success")
     @patch("installer.installer_setup_env.t", side_effect=lambda x: x)
     @patch("installer.installer_setup_env.subprocess")
-    def test_install_llama_cpp_offline_fallback(self, mock_subprocess, mock_t, mock_print_success, tmp_path):
-        """Offline fail (pip.conf present) → pip.conf unlinked + retry = 2 subprocess calls."""
+    def test_install_llama_cpp_offline_fallback(self, mock_subprocess, mock_t, mock_print_success, tmp_path, monkeypatch):
+        """Offline fail + consent (env) → pip.conf unlinked + retry = 2 subprocess calls (WS8-05)."""
+        monkeypatch.setenv("NEXE_ALLOW_UNPINNED", "1")
         err = subprocess.CalledProcessError(1, "pip", stderr=b"error")
         mock_subprocess.CalledProcessError = subprocess.CalledProcessError
         mock_subprocess.run.side_effect = [err, MagicMock(returncode=0)]

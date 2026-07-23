@@ -1188,6 +1188,22 @@ html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar 
     font-size: 0.82rem;
 }
 
+/* FD-S6: resume a ceiling-cut answer from inside the truncation notice */
+.continue-btn {
+    margin-left: 0.6rem;
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--color-warn);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.continue-btn:hover {
+    background: rgb(234 179 8 / 20%);
+}
+
 /* Model loading indicator */
 .model-loading-indicator {
     display: flex;

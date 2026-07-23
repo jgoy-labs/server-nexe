@@ -30,7 +30,6 @@ PROTECTED_ENDPOINTS = [
     "/memory/profile/test-user",
     "/rag/health",
     "/rag/info",
-    "/rag/files/stats",
     # Audit r4 B2: info/health for mlx, llama-cpp, security
     "/mlx/info",
     "/llama-cpp/info",
@@ -45,8 +44,7 @@ PROTECTED_ENDPOINTS = [
 PROTECTED_WRITE_ENDPOINTS = [
     ("POST", "/ollama/api/pull", {"name": "dummy-model"}),
     ("DELETE", "/ollama/api/models/dummy-model", None),
-    ("POST", "/rag/document", {"text": "dummy", "metadata": {}}),
-    ("POST", "/rag/search", {"query": "dummy"}),
+    # WS6-01/02: /rag/document, /rag/search retired (standalone surface gone)
 ]
 
 

@@ -72,19 +72,31 @@ class TestCallSitesPassCacheDir:
         SimpleEmbedder._instances.clear()
 
     def test_simple_embedder_passes_cache_dir(self, monkeypatch, tmp_path):
-        """SimpleEmbedder.__init__ forwards cache_dir to TextEmbedding."""
+        """SimpleEmbedder gets its model through the shared factory, which pins cache_dir.
+
+        It no longer builds its own TextEmbedding — that private ONNX session
+        was duplicating ~925 MB of weights already held by MemoryAPI's. The
+        cache_dir contract is unchanged, it is just honoured one level down, so
+        this asserts the delegation AND that the factory really pins the dir.
+        """
         monkeypatch.setenv("FASTEMBED_CACHE_DIR", str(tmp_path))
+        from memory.embeddings import shared
         from memory.embeddings.simple_embedder import SimpleEmbedder
 
         mock_model = MagicMock()
         mock_model.embed.return_value = iter([[0.1] * 768])
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", return_value=mock_model) as fake:
-            SimpleEmbedder("test-model")
-
-        fake.assert_called_once()
-        kwargs = fake.call_args.kwargs
-        assert kwargs.get("cache_dir") == str(tmp_path)
+        shared.reset_shared_embedders()
+        SimpleEmbedder._instances.clear()
+        try:
+            with patch("fastembed.TextEmbedding", return_value=mock_model) as fake:
+                embedder = SimpleEmbedder("test-model")
+            assert embedder.model is mock_model, "SimpleEmbedder bypassed the shared factory"
+            fake.assert_called_once()
+            assert fake.call_args.kwargs.get("cache_dir") == str(tmp_path)
+        finally:
+            SimpleEmbedder._instances.clear()
+            shared.reset_shared_embedders()
 
     def test_async_encoder_passes_cache_dir(self, monkeypatch, tmp_path):
         """AsyncEmbedder._load_model forwards cache_dir to TextEmbedding."""

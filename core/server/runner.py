@@ -206,6 +206,43 @@ def _set_process_title() -> None:
     pass  # Optional dependency
 
 
+def _host_is_loopback(host: str) -> bool:
+  """True if the resolved bind host is loopback (127.0.0.0/8, ::1) or 'localhost'."""
+  import ipaddress
+  candidate = host.strip().lower()
+  if candidate == "localhost":
+    return True
+  try:
+    return ipaddress.ip_address(candidate).is_loopback
+  except ValueError:
+    return False
+
+
+def _enforce_loopback_bind(host: str) -> None:
+  """WS1-01: loopback is the enforced default, not an assumption.
+
+  A non-loopback bind requires the explicit opt-in NEXE_ALLOW_PUBLIC_BIND
+  (THREAT_MODEL §5.8); without it the server refuses to start rather than
+  silently exposing the API to the network.
+  """
+  if _host_is_loopback(host):
+    return
+  if os.environ.get("NEXE_ALLOW_PUBLIC_BIND", "").strip().lower() in {"1", "true", "yes"}:
+    logger.warning(
+      "⚠️  Binding to NON-LOOPBACK host '%s' — the API will be reachable "
+      "from the network (NEXE_ALLOW_PUBLIC_BIND is set, THREAT_MODEL §5.8).",
+      host
+    )
+    return
+  logger.error(
+    "Refusing to bind to NON-LOOPBACK host '%s'. server-nexe is a "
+    "local-first service (THREAT_MODEL §5.8). Set NEXE_ALLOW_PUBLIC_BIND=1 "
+    "to expose it deliberately, or bind to 127.0.0.1.",
+    host
+  )
+  sys.exit(1)
+
+
 def _setup_file_logging() -> None:
   """Always write logs to storage/logs/server.log so the tray 'Open Logs'
   button works in both dev mode (./nexe go) and production (tray-launched).
@@ -300,6 +337,7 @@ def main():
   port = env_port if env_port is not None else server_config.get('port', DEFAULT_PORT)
   env_host = os.environ.get("NEXE_HOST")
   host = env_host if env_host else server_config.get('host', DEFAULT_HOST)
+  _enforce_loopback_bind(str(host))
   # NOTA: import de get_default_host/get_default_port reservat per a M0-bis
   # (F2) — substituiran els DEFAULT_* constants en el refactor real.
   _ = (get_default_host, get_default_port)  # noqa: F841 — reserved for F2

@@ -12,7 +12,6 @@ Used by:
 - `memory.memory.engines.persistence.PersistenceManager`
 - `memory.memory.storage.vector_index.VectorIndex`
 - `memory.memory.memory_service.MemoryService`
-- `memory.rag.module.get_file_rag`
 - `memory.memory.config.MemoryConfig.qdrant_path` (consumers default)
 
 Anomalia F1 A5 ("NEXE_QDRANT_PATH no respectat") resolta completament

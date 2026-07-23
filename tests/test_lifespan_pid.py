@@ -135,18 +135,18 @@ def test_reset_all_circuit_breakers_resets_to_closed():
     """reset_all_circuit_breakers returns all breakers to CLOSED (N03)."""
     from core.resilience import (
         reset_all_circuit_breakers,
-        ollama_breaker, qdrant_breaker, http_breaker,
+        ollama_breaker,
         CircuitState,
     )
 
-    # Force OPEN state on all three breakers
-    for breaker in (ollama_breaker, qdrant_breaker, http_breaker):
+    # Force OPEN state on every global breaker (WS7-01: only ollama remains)
+    for breaker in (ollama_breaker,):
         breaker._state.state = CircuitState.OPEN
         breaker._state.failure_count = 5
 
     reset_all_circuit_breakers()
 
-    for breaker in (ollama_breaker, qdrant_breaker, http_breaker):
+    for breaker in (ollama_breaker,):
         assert breaker.state == CircuitState.CLOSED, (
             f"Breaker '{breaker.name}' should be CLOSED after reset"
         )

@@ -28,6 +28,9 @@ class ModuleValidator:
 
   def __init__(self, i18n=None, core_root: Optional[Path] = None):
     self.i18n = i18n
+    # Kept for the pending manifest-integrity validation (see TODO below);
+    # stored so the accepted parameter is not dead weight.
+    self.core_root = core_root
 
   def validate_module(self, instance: Any, module_info: ModuleInfo) -> None:
     """

@@ -21,53 +21,39 @@ from unittest.mock import MagicMock, patch, AsyncMock
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestUploadSecurity:
-    """Security tests for file uploads to the RAG."""
+    """Security tests for the REAL file-upload path (/ui/upload → FileHandler).
 
-    def _make_upload_file(self, filename: str, content: bytes = b"test content"):
-        """Helper to create an UploadFile mock."""
-        mock_file = MagicMock()
-        mock_file.filename = filename
-        mock_file.content_type = "text/plain"
-        return mock_file
+    WS6-01/02: the /rag upload surface (and its ALLOWED_UPLOAD_EXTENSIONS)
+    was retired; the live validation is FileHandler.validate_file
+    (plugins/web_ui_module/core/file_handler.py), which these tests now
+    exercise directly instead of asserting membership in a constant set.
+    """
 
-    def test_path_traversal_rejected(self):
-        """Verifies that ../../etc/passwd as filename is rejected."""
-        from memory.rag.routers.endpoints import ALLOWED_UPLOAD_EXTENSIONS
-        filename = "../../etc/passwd"
-        safe_name = Path(filename).name
-        assert safe_name == "passwd"
-        # No extension → blocked by extension check
-        ext = Path(safe_name).suffix.lower()
-        assert ext not in ALLOWED_UPLOAD_EXTENSIONS
+    def _handler(self, tmp_path):
+        from plugins.web_ui_module.core.file_handler import FileHandler
+        return FileHandler(upload_dir=tmp_path)
 
-    def test_path_traversal_with_valid_ext_sanitized(self):
-        """Verifies that ../../secrets.txt is extracted as secrets.txt (no path)."""
-        filename = "../../secrets.txt"
-        safe_name = Path(filename).name
-        assert safe_name == "secrets.txt"
-        assert ".." not in safe_name
+    def test_path_traversal_rejected(self, tmp_path):
+        """A traversal filename with no valid extension is rejected."""
+        valid, msg = self._handler(tmp_path).validate_file("../../etc/passwd", 10)
+        assert valid is False
+        assert "format" in msg.lower()
 
-    def test_invalid_extension_exe_rejected(self):
-        """Verifies that .exe is rejected by the whitelist."""
-        from memory.rag.routers.endpoints import ALLOWED_UPLOAD_EXTENSIONS
-        ext = ".exe"
-        assert ext not in ALLOWED_UPLOAD_EXTENSIONS
+    def test_invalid_extension_exe_rejected(self, tmp_path):
+        valid, _ = self._handler(tmp_path).validate_file("evil.exe", 10)
+        assert valid is False
 
-    def test_invalid_extension_sh_rejected(self):
-        """Verifies that .sh is rejected by the whitelist."""
-        from memory.rag.routers.endpoints import ALLOWED_UPLOAD_EXTENSIONS
-        ext = ".sh"
-        assert ext not in ALLOWED_UPLOAD_EXTENSIONS
+    def test_invalid_extension_sh_rejected(self, tmp_path):
+        valid, _ = self._handler(tmp_path).validate_file("evil.sh", 10)
+        assert valid is False
 
-    def test_valid_extension_txt_allowed(self):
-        """Verifies that .txt is allowed."""
-        from memory.rag.routers.endpoints import ALLOWED_UPLOAD_EXTENSIONS
-        assert ".txt" in ALLOWED_UPLOAD_EXTENSIONS
+    def test_valid_extension_txt_allowed(self, tmp_path):
+        valid, msg = self._handler(tmp_path).validate_file("notes.txt", 10, b"hello utf8")
+        assert valid is True, msg
 
-    def test_valid_extension_pdf_allowed(self):
-        """Verifies that .pdf is allowed."""
-        from memory.rag.routers.endpoints import ALLOWED_UPLOAD_EXTENSIONS
-        assert ".pdf" in ALLOWED_UPLOAD_EXTENSIONS
+    def test_valid_extension_pdf_allowed(self, tmp_path):
+        valid, msg = self._handler(tmp_path).validate_file("doc.pdf", 10, b"%PDF-1.4 ...")
+        assert valid is True, msg
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -429,7 +429,11 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
     info "Verifying final bundle (strict + deep inspect)..."
     codesign --verify --strict --deep --verbose=2 "$APP_BUNDLE" 2>&1 || warn "codesign --verify ha reportat problemes"
 else
-    warn "No signing identity found — app bundle will be unsigned"
+    if [ "${NEXE_RELEASE:-0}" = "1" ]; then
+        error "No signing identity found — aborting release build (B193): a release app bundle must never be unsigned"
+    else
+        warn "No signing identity found — app bundle will be unsigned"
+    fi
 fi
 
 # ── Step 7: Build DMG ────────────────────────────────────────────
@@ -515,10 +519,31 @@ if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
             fi
         fi
     else
-        info "Notarization skipped (--no-notarize). Run without flag for final release."
+        if [ "${NEXE_RELEASE:-0}" = "1" ]; then
+            error "Notarization skipped (--no-notarize) but NEXE_RELEASE=1 — a release DMG must be notarized (B193)"
+        else
+            info "Notarization skipped (--no-notarize). Run without flag for final release."
+        fi
     fi
 else
-    warn "No signing identity found — DMG will be unsigned"
+    if [ "${NEXE_RELEASE:-0}" = "1" ]; then
+        error "No signing identity found — aborting release build (B193): a release DMG must never be unsigned"
+    else
+        warn "No signing identity found — DMG will be unsigned"
+    fi
+fi
+
+# ── Release artifact assertion (belt & suspenders): a NEXE_RELEASE=1 DMG
+# must be BOTH signed (some Developer ID TeamIdentifier) and stapled.
+# The gates above should make this unreachable-on-failure; this is the
+# final honest check on the artifact itself, not on the flow.
+if [ "${NEXE_RELEASE:-0}" = "1" ]; then
+    info "Release assertion: verifying DMG signature + notarization ticket..."
+    codesign -dv "$DMG_PATH" 2>&1 | grep -Eq "TeamIdentifier=[A-Z0-9]{10}" \
+        || error "Release assertion failed: DMG has no real TeamIdentifier (unsigned or ad-hoc)"
+    xcrun stapler validate "$DMG_PATH" \
+        || error "Release assertion failed: DMG has no valid notarization ticket"
+    info "Release assertion OK (signed + stapled)"
 fi
 
 # ── Done ─────────────────────────────────────────────────────────

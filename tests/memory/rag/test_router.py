@@ -34,7 +34,8 @@ class TestRAGRouterFunctions:
         assert "version" in MODULE_METADATA
         assert "description" in MODULE_METADATA
         assert "router" in MODULE_METADATA
-        assert MODULE_METADATA["ui_available"] is True
+        # WS6-01/02: the /rag admin UI was retired with the standalone surface
+        assert MODULE_METADATA["ui_available"] is False
 
 
 class TestRAGRouterEndpoints:

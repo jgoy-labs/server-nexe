@@ -31,7 +31,7 @@ class TestSimpleEmbedderInit:
         mock_model = MagicMock()
         mock_model.embed.return_value = iter([[0.1] * 768])
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", return_value=mock_model):
+        with patch("memory.embeddings.shared.get_text_embedding", return_value=mock_model):
             embedder = SimpleEmbedder("test-model")
 
         assert embedder.model_name == "test-model"
@@ -43,7 +43,7 @@ class TestSimpleEmbedderInit:
 
         mock_model = MagicMock()
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", return_value=mock_model):
+        with patch("memory.embeddings.shared.get_text_embedding", return_value=mock_model):
             e1 = SimpleEmbedder("model-abc")
             e2 = SimpleEmbedder("model-abc")
 
@@ -55,7 +55,7 @@ class TestSimpleEmbedderInit:
 
         mock_model = MagicMock()
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", return_value=mock_model):
+        with patch("memory.embeddings.shared.get_text_embedding", return_value=mock_model):
             e1 = SimpleEmbedder("model-1")
             SimpleEmbedder._instances.pop("model-1")  # Clear first
             e2 = SimpleEmbedder("model-2")
@@ -66,7 +66,7 @@ class TestSimpleEmbedderInit:
         """If there is no local cache, raises RuntimeError (offline-only mode)."""
         from memory.embeddings.simple_embedder import SimpleEmbedder
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", side_effect=OSError("Not cached")):
+        with patch("memory.embeddings.shared.get_text_embedding", side_effect=OSError("Not cached")):
             with pytest.raises(RuntimeError, match="not available locally"):
                 SimpleEmbedder("test-model-nocache", device="cpu")
 
@@ -78,7 +78,7 @@ class TestSimpleEmbedderEncode:
         mock_model = MagicMock()
         mock_model.embed.return_value = iter([np.array([0.1] * dim)])
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", return_value=mock_model):
+        with patch("memory.embeddings.shared.get_text_embedding", return_value=mock_model):
             return SimpleEmbedder("test-model"), mock_model
 
     def test_encode_returns_list(self):
@@ -121,7 +121,7 @@ class TestSimpleEmbedderEncodeBatch:
         mock_model = MagicMock()
         mock_model.embed.return_value = iter([np.array([0.1] * dim), np.array([0.2] * dim)])
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", return_value=mock_model):
+        with patch("memory.embeddings.shared.get_text_embedding", return_value=mock_model):
             return SimpleEmbedder("test-model-batch"), mock_model
 
     def test_encode_batch_returns_list_of_lists(self):
@@ -151,7 +151,7 @@ class TestSimpleEmbedderDimensions:
         from memory.embeddings.simple_embedder import SimpleEmbedder
         mock_model = MagicMock()
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", return_value=mock_model):
+        with patch("memory.embeddings.shared.get_text_embedding", return_value=mock_model):
             embedder = SimpleEmbedder("model-768")
 
         assert embedder.dimensions == 768
@@ -164,7 +164,7 @@ class TestGetEmbedder:
 
         mock_model = MagicMock()
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", return_value=mock_model):
+        with patch("memory.embeddings.shared.get_text_embedding", return_value=mock_model):
             embedder = get_embedder("test-get-model")
 
         assert isinstance(embedder, SimpleEmbedder)
@@ -174,7 +174,7 @@ class TestGetEmbedder:
 
         mock_model = MagicMock()
 
-        with patch("memory.embeddings.simple_embedder.TextEmbedding", return_value=mock_model):
+        with patch("memory.embeddings.shared.get_text_embedding", return_value=mock_model):
             embedder = get_embedder("test-device-model", device="mps")
 
         assert embedder.device == "mps"

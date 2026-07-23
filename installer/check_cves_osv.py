@@ -40,10 +40,41 @@ BUNDLE_PINS: list[tuple[str, str]] = [
     ("mlx-lm", "0.31.3"),
     ("mlx-vlm", "0.4.4"),
     ("llama-cpp-python", "0.3.19"),
-    # transformers is transitive; we audit the version mlx-lm 0.31.3 resolves.
-    # Pinned manually after empirical check (pip show transformers).
-    ("transformers", "5.8.1"),
+    # transformers is transitive via mlx-lm/mlx-vlm but now explicitly pinned in
+    # requirements-macos.txt to ==5.12.1 (unpinned it resolved to 5.13.0, which
+    # breaks mlx-lm 0.31.3 at import — finding 820). Audit the pinned version.
+    ("transformers", "5.12.1"),
 ]
+
+# requirements-windows.txt pins win_arm64-only wheels (pywin32, lingua 2.2.0)
+# that pip-audit cannot resolve on the Linux CI runner, so its pins are audited
+# here by (name, version) instead (WS8-04).
+WINDOWS_REQUIREMENTS_PATH = Path(__file__).parent.parent / "requirements-windows.txt"
+
+
+def _parse_pinned_requirements(path: Path) -> list[tuple[str, str]]:
+    """Extract exact ``name==version`` pins from a requirements file.
+
+    Environment markers are stripped (OSV audits the package regardless of
+    platform). Non-exact specs (ranges) are skipped with a notice — the only
+    one today, huggingface_hub, carries the same range as requirements.txt,
+    which pip-audit already resolves and scans in CI.
+    """
+    pins: list[tuple[str, str]] = []
+    if not path.exists():
+        print(f"NOTICE: {path.name} not found; skipping its pins", file=sys.stderr)
+        return pins
+    for raw in path.read_text().splitlines():
+        line = raw.split("#", 1)[0].split(";", 1)[0].strip()
+        if not line:
+            continue
+        if "==" in line:
+            name, _, version = line.partition("==")
+            pins.append((name.strip(), version.strip()))
+        else:
+            print(f"NOTICE: skipping non-pinned spec (covered by pip-audit): {line}",
+                  file=sys.stderr)
+    return pins
 
 IGNORE_LIST_PATH = Path(__file__).parent / "pip-audit-ignore.txt"
 
@@ -80,6 +111,40 @@ def _query_osv(name: str, version: str) -> list[dict]:
     return data.get("vulns", [])
 
 
+def evaluate_package_vulns(name: str, version: str, vulns: list[dict], ignored: set[str]) -> tuple[int, list[dict]]:
+    """Score one package's OSV vulns → (unexpected_count, result rows).
+
+    Pure (no network) so the dedup + alias-aware ignore logic is testable
+    without hitting OSV. Rules:
+      * a vuln OSV returns under multiple ids (GHSA + PYSEC) is deduped
+        WITHIN the package via the id∪aliases group, so it is neither
+        double-counted nor double-reported;
+      * an ignore-list entry matches the canonical id OR any alias.
+    """
+    unexpected = 0
+    rows: list[dict] = []
+    seen_ids: set[str] = set()
+    for v in vulns:
+        vid = v.get("id", "?")
+        id_group = {vid, *v.get("aliases", [])}
+        if id_group & seen_ids:
+            continue
+        seen_ids |= id_group
+        is_ignored = bool(id_group & ignored)
+        if not is_ignored:
+            unexpected += 1
+        summary = (v.get("summary") or v.get("details", "") or "").split("\n")[0][:200]
+        rows.append({
+            "package": name,
+            "version": version,
+            "id": vid,
+            "aliases": v.get("aliases", []),
+            "ignored": is_ignored,
+            "summary": summary,
+        })
+    return unexpected, rows
+
+
 def main() -> int:
     json_output = "--json" in sys.argv
 
@@ -87,25 +152,15 @@ def main() -> int:
     results: list[dict] = []
     unexpected_count = 0
 
-    for name, version in BUNDLE_PINS:
+    windows_pins = _parse_pinned_requirements(WINDOWS_REQUIREMENTS_PATH)
+    # dedupe: a pin present in both lists is queried once
+    all_pins = list(dict.fromkeys(BUNDLE_PINS + windows_pins))
+
+    for name, version in all_pins:
         vulns = _query_osv(name, version)
-        for v in vulns:
-            vid = v.get("id", "?")
-            is_ignored = vid in ignored
-            if not is_ignored:
-                unexpected_count += 1
-            summary = (v.get("summary") or v.get("details", "") or "").split("\n")[0][:200]
-            aliases = v.get("aliases", [])
-            results.append(
-                {
-                    "package": name,
-                    "version": version,
-                    "id": vid,
-                    "aliases": aliases,
-                    "ignored": is_ignored,
-                    "summary": summary,
-                }
-            )
+        pkg_unexpected, pkg_rows = evaluate_package_vulns(name, version, vulns, ignored)
+        unexpected_count += pkg_unexpected
+        results.extend(pkg_rows)
 
     if json_output:
         print(json.dumps(
@@ -114,7 +169,7 @@ def main() -> int:
             ensure_ascii=False,
         ))
     else:
-        print(f"OSV check — {len(BUNDLE_PINS)} pinned packages, "
+        print(f"OSV check — {len(all_pins)} pinned packages, "
               f"{len(results)} vulnerabilities total, "
               f"{unexpected_count} UNEXPECTED (not in ignore-list)")
         print("-" * 100)

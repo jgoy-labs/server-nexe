@@ -77,6 +77,11 @@ class TestSystemPromptNaturalLanguageDate:
     The try-block import of get_server_state is allowed to fail
     organically (the function falls back to the English Nexe boilerplate,
     which is fine for these substring assertions).
+
+    B007 (2026-07-23): the phrase is now DAY-granular — no time-of-day. The
+    hour poisoned the prefix cache (identity_hash changed every second); the
+    clock is served on demand via _time_context_line. The stability guards
+    live in test_b007_system_prompt_stable.py.
     """
 
     @staticmethod
@@ -110,7 +115,7 @@ class TestSystemPromptNaturalLanguageDate:
             tzinfo=timezone(timedelta(hours=2), name="CEST"),
         )
         prompt, _ = self._build_with_fixed_now(fixed, "ca", monkeypatch)
-        for needle in ("dijous", "21 de maig de 2026", "a les 21:52:22"):
+        for needle in ("dijous", "21 de maig de 2026"):
             assert needle in prompt, (
                 f"Bug B iter-2 regression (ca): missing {needle!r} in {prompt!r}"
             )
@@ -122,7 +127,7 @@ class TestSystemPromptNaturalLanguageDate:
             tzinfo=timezone(timedelta(hours=2), name="CEST"),
         )
         prompt, _ = self._build_with_fixed_now(fixed, "es", monkeypatch)
-        for needle in ("jueves", "21 de mayo de 2026", "a las 21:52:22"):
+        for needle in ("jueves", "21 de mayo de 2026"):
             assert needle in prompt, (
                 f"Bug B iter-2 regression (es): missing {needle!r} in {prompt!r}"
             )
@@ -134,7 +139,7 @@ class TestSystemPromptNaturalLanguageDate:
             tzinfo=timezone(timedelta(hours=2), name="CEST"),
         )
         prompt, _ = self._build_with_fixed_now(fixed, "en", monkeypatch)
-        for needle in ("Today is Thursday", "May 21, 2026", "at 21:52:22"):
+        for needle in ("Today is Thursday", "May 21, 2026"):
             assert needle in prompt, (
                 f"Bug B iter-2 regression (en): missing {needle!r} in {prompt!r}"
             )

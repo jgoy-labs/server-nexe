@@ -33,28 +33,21 @@ class TestRag:
         r = client.get("/rag/info", headers=auth_headers, timeout=10.0)
         assert r.status_code == 200
 
-    def test_rag_files_stats(
+    def test_rag_retired_surface_is_gone(
         self, client: httpx.Client, auth_headers: dict[str, str]
     ) -> None:
-        r = client.get("/rag/files/stats", headers=auth_headers, timeout=10.0)
-        assert r.status_code == 200
-
-    def test_rag_search_returns_list(
-        self, client: httpx.Client, auth_headers: dict[str, str]
-    ) -> None:
-        """Search may return 0 results if KB is empty — that's valid."""
-        r = client.post(
-            "/rag/search",
-            headers=auth_headers,
-            json={"query": "nexe server documentation", "limit": 5},
-            timeout=15.0,
-        )
-        assert r.status_code == 200
-        data = r.json()
-        results = (
-            data if isinstance(data, list)
-            else data.get("results", data.get("documents", []))
-        )
-        assert isinstance(results, list), (
-            f"Expected list of results, got: {type(data)}"
-        )
+        """WS6-01/02: the standalone /rag surface (substring matcher +
+        phantom upload) was retired — these routes must NOT come back."""
+        for method, path in (
+            ("GET", "/rag/files/stats"),
+            ("POST", "/rag/search"),
+            ("POST", "/rag/document"),
+            ("POST", "/rag/upload"),
+            ("GET", "/rag/ui"),
+        ):
+            r = client.request(
+                method, path, headers=auth_headers,
+                json={"query": "x"} if method == "POST" else None,
+                timeout=10.0,
+            )
+            assert r.status_code in (404, 405), f"{method} {path} → {r.status_code}"

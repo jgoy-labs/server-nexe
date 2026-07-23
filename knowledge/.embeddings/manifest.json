@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_utc": "2026-07-04T20:12:50Z",
+  "generated_utc": "2026-07-20T15:35:38Z",
   "prefix_format_version": "1.0",
   "vector_dim": 768,
   "vector_dtype": "float32",
@@ -11,22 +11,22 @@
   "chunker_source_sha256": "f7d3cc436561af6da07385f61263673df0914e4b5b3fbf81d9265a5eefbab053",
   "langs": {
     "ca": {
-      "chunks": 323,
-      "source_sha256": "db11384c2c0455fea9c67b0d02b4ec685edea8c16aeeb44697d1b5d2489a05c8",
-      "vectors_sha256": "f7286b9804fb70e60652e63eb3381aee1dc7ff3328621b6d1e98f9a407d24ece",
-      "metadata_sha256": "b07ed667c8fda43990adefbb3d5fb120e44cc3c90007f5e7a4c6802dffbcbd42"
+      "chunks": 324,
+      "source_sha256": "4b6990254b5c0a97092d22047be8dc564fcc026ec381d77971ce9f658ea552cb",
+      "vectors_sha256": "0f9b52c096cd547a8d1c5cd9f0eeeff6bb7679341f75e7bcb510cbe9e1509327",
+      "metadata_sha256": "8c5ee0baf9e1013a16bb9afa55cd0b8029feb6b5085a3bb0943ad4d3ab45ae9e"
     },
     "en": {
-      "chunks": 310,
-      "source_sha256": "09954e8f71818dfd79126fa68e2d0c60de4e65ebe81b5368fd8d40961372c620",
-      "vectors_sha256": "b03d4dc0b245de41382a8dbb037fc3144f8f750df7d2a6b79d96eb34449f5aef",
-      "metadata_sha256": "17b4d521349702de5e1294430d2c0d7c4898816954216413d871ecc099915c41"
+      "chunks": 311,
+      "source_sha256": "f15c75f0ce892c47727a9cd734669566b5d051a1b173b28765d5a3b7dcc5858b",
+      "vectors_sha256": "39c00ff1e7227928ddf28ce4b87c931d7fb12c6c081e31937501c91f5e6863fa",
+      "metadata_sha256": "c286c0b135867ae2a2e51fb7e04146bf2a0d2588aca23d184471123ac4325990"
     },
     "es": {
-      "chunks": 328,
-      "source_sha256": "8d5df0e3390fa4d8ffc8089c68b44c305c760ee216f944b849e4650d21c93ff6",
-      "vectors_sha256": "212dcca177d60836040847d91c9fee48442a28755680ebad7304638c2910f9ac",
-      "metadata_sha256": "8315763139d900c78befc12197b399bf131a0d1d5439142f10368376d75ebf97"
+      "chunks": 329,
+      "source_sha256": "55dcd9f59d9a53fd626822d7951b95128e71c107fb18845002d87ffabc890f99",
+      "vectors_sha256": "ec5914e557fb24273969e8ae78f5afdffce49845e932d43fd9293a2107d429ec",
+      "metadata_sha256": "e3fc9e11fe0e68e78319d180ccd04fb6fa19b007478b5c40ed5c477a2e0251be"
     }
   }
 }

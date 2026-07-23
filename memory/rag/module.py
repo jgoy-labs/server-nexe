@@ -9,7 +9,6 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import os
 from typing import Optional, Dict, Any, List
 import threading
 import structlog
@@ -376,39 +375,9 @@ class RAGModule:
       "config": self.manifest.get("default_config", {})
     }
 
-_file_rag_instance = None
-_file_rag_lock = threading.Lock()
+# WS6-01: get_file_rag() and its FileRAGSource singleton were retired — the
+# class never existed anywhere in the repo (the import was a permanent
+# ImportError and the upload surface a permanent 501). File uploads go
+# through POST /ui/upload (web_ui_module), which is the real, working path.
 
-def get_file_rag():
-  """
-  Get or create singleton FileRAGSource instance (thread-safe).
-
-  Uses embedded Qdrant (path=) by default. If NEXE_QDRANT_URL is set,
-  uses external Qdrant via HTTP (Docker, cluster, Qdrant Cloud).
-
-  Returns:
-    FileRAGSource: Singleton instance for file uploads
-  """
-  global _file_rag_instance
-
-  with _file_rag_lock:
-    if _file_rag_instance is None:
-      from memory.rag_sources.file.source import FileRAGSource
-      _qdrant_url = os.environ.get("NEXE_QDRANT_URL")
-      if _qdrant_url:
-        _file_rag_instance = FileRAGSource(
-          qdrant_url=_qdrant_url,
-          table_name="uploaded_files"
-        )
-      else:
-        # en sidecar mode usa SidecarConfig.vectors_dir; en standalone manté
-        # comportament previ (NEXE_QDRANT_PATH env var o fallback "storage/vectors")
-        from memory.memory._paths import resolve_qdrant_path
-        _qdrant_path = os.environ.get("NEXE_QDRANT_PATH") or str(resolve_qdrant_path())
-        _file_rag_instance = FileRAGSource(
-          qdrant_path=_qdrant_path,
-          table_name="uploaded_files"
-        )
-  return _file_rag_instance
-
-__all__ = ["RAGModule", "get_file_rag"]
+__all__ = ["RAGModule"]

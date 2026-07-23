@@ -15,6 +15,38 @@ permissions:
   contents: read
 
 jobs:
+  # WS8-01: ruff/bandit/vulture were configured in pyproject.toml but never
+  # invoked by CI — no lint/SAST gate blocked a PR. All three run GREEN on
+  # the current tree (verified locally 2026-07-12), so they gate directly
+  # with no baseline. mypy is advisory-only (lax config, unannotated code).
+  static-analysis:
+    name: Static analysis (ruff+bandit+vulture gates, mypy advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install analysis tools (pinned)
+        run: pip install ruff==0.15.6 bandit==1.9.4 vulture==2.16 mypy==1.19.0
+
+      - name: ruff (gate)
+        run: ruff check .
+
+      - name: bandit (gate)
+        run: bandit -c pyproject.toml -r core memory personality plugins installer scripts -q
+
+      - name: vulture (gate)
+        run: vulture core memory personality plugins installer scripts --min-confidence 80 --exclude "tests/,**/tests/,.venv/,InstallNexe.app/,__pycache__/"
+
+      - name: mypy (advisory — never blocks)
+        continue-on-error: true
+        run: mypy . || true
+
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -35,6 +67,9 @@ jobs:
           pip-audit --requirement requirements.txt
           pip-audit --requirement requirements-macos.txt
           pip-audit --requirement requirements-linux.txt
+          # requirements-windows.txt is NOT pip-audited here: it pins win_arm64-only
+          # wheels (pywin32, lingua 2.2.0) that this runner cannot resolve. Its pins
+          # are CVE-scanned by the OSV gate below instead (WS8-04).
 
       # Bundle-only deps (torch, torchvision, llama-cpp-python, transformers) are
       # installed dynamically and never appear in requirements*.txt, so pip-audit
@@ -90,6 +125,7 @@ jobs:
           --cov=core --cov=memory --cov=personality --cov=plugins
           --cov-report=term
           --cov-report=xml:coverage.xml
+          --cov-fail-under=84
           --tb=short -q
 
       - name: Coverage summary

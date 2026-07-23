@@ -16,8 +16,6 @@ from .circuit_breaker import (
   CircuitState,
   CircuitOpenError,
   ollama_breaker,
-  qdrant_breaker,
-  http_breaker,
   reset_all_circuit_breakers,
 )
 
@@ -28,7 +26,5 @@ __all__ = [
   "CircuitState",
   "CircuitOpenError",
   "ollama_breaker",
-  "qdrant_breaker",
-  "http_breaker",
   "reset_all_circuit_breakers",
 ]

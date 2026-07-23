@@ -355,13 +355,20 @@ async def start_memory_service_v1(app, server_state) -> None:
                 vectors_dir.mkdir(parents=True, exist_ok=True)
                 db_path = vectors_dir / "memory_v1.db"
                 qdrant_path = str(vectors_dir)
+                from core.config import encryption_is_mandatory
+                _require_enc = encryption_is_mandatory(
+                    os.environ.get("NEXE_ENCRYPTION_ENABLED", "auto"))
                 memory_service = MemoryService(
                     db_path=db_path, qdrant_path=qdrant_path,
                     crypto_provider=getattr(server_state, "crypto_provider", None),
+                    require_encryption=_require_enc,
                 )
             else:
+                from core.config import encryption_is_mandatory
                 memory_service = MemoryService(
                     crypto_provider=getattr(server_state, "crypto_provider", None),
+                    require_encryption=encryption_is_mandatory(
+                        os.environ.get("NEXE_ENCRYPTION_ENABLED", "auto")),
                 )
             await memory_service.initialize()
             app.state.memory_service = memory_service

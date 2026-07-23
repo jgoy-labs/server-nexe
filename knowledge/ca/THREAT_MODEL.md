@@ -57,7 +57,7 @@ Avalues server-nexe contra una politica interna (ISO 27001 o similar). Necessite
 
 - El sistema operatiu (macOS 14+ Apple Silicon, Linux ARM64, Windows ARM64 — nou a 1.0.7) no esta compromes. server-nexe no pot protegir contra un adversari a nivell de kernel o una actualitzacio maliciosa del sistema operatiu. A Windows, l'installer NSIS va sense signar (SmartScreen avisa) — vegeu §4.4 i §8.
 - L'usuari te una confiança minima en ell mateix: no enganxa la seva API key a un document compartit, no copia `~/.nexe/` a un USB i se l'oblida, no executa server-nexe com a root en un servidor multi-usuari.
-- La xarxa local es considera no fiable per defecte, pero **no** hostil a nivell LAN. server-nexe fa bind a loopback; l'exposicio LAN requereix un opt-in explicit (whitelist VPN, tunel SSH, reverse proxy que l'usuari monti).
+- La xarxa local es considera no fiable per defecte, pero **no** hostil a nivell LAN. server-nexe fa bind a loopback i es nega a arrencar en un host no-loopback si no es defineix `NEXE_ALLOW_PUBLIC_BIND=1`; `/installer/finalize` nomes serveix la clau API primaria a clients loopback. L'exposicio LAN addicional requereix un opt-in explicit (whitelist VPN, tunel SSH, reverse proxy que l'usuari monti).
 - Les dependencies Python llistades a `requirements.txt` es consideren de confiança despres d'instal·lar. La seva propia cadena de subministrament (PyPI, Hugging Face Hub) s'audita offline abans de construir una release, no a cada arrencada.
 - El navegador de l'usuari respecta la seguretat web estandard (Same-Origin Policy, cookie scoping, enforcement CSP).
 

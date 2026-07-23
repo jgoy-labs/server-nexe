@@ -44,6 +44,7 @@ class MemoryService:
         db_path: Optional[Path] = None,
         qdrant_path: Optional[str] = None,
         crypto_provider=None,
+        require_encryption: bool = False,
     ):
         """Initialize pipeline components and storage backends."""
         # resol path via SidecarConfig en sidecar mode
@@ -69,7 +70,8 @@ class MemoryService:
         # so all callers share the same RLock-protected SQLiteStore. Any
         # future refactor that drops the singleton must also coordinate
         # SQLiteStore access across instances (file lock or per-call conn).
-        self._store = SQLiteStore(self._db_path, crypto_provider=crypto_provider)
+        self._store = SQLiteStore(self._db_path, crypto_provider=crypto_provider,
+                                  require_encryption=require_encryption)
         self._vector_index = None  # Lazy init to avoid Qdrant dependency in tests
         self._embedder = None  # Injected via set_embedder() (lifespan) or lazy
         self._retriever = None  # Cached semantic engine, built on first use

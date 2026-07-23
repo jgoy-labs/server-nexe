@@ -12,7 +12,7 @@
 module_id = "rag"
 name = "rag"
 version = "0.1"
-description = "Sistema RAG (Retrieval-Augmented Generation) amb cerca vectorial, multi-source i circuit breaker per resiliència. top_k=5, threshold=0.7, gestió intel·ligent de fonts de coneixement per augmentar respostes LLM"
+description = "Modul RAG: introspeccio (health/info) i fonts internes per al pipeline de xat. La cerca vectorial real del xat viu a MemoryAPI/Qdrant; la superficie standalone /rag/* (matcher de substrings + upload sense backend) es va retirar (WS6-01/02)"
 author = "Nexe Team (Jordi Goy)"
 category = "memory"
 created = "2025-10-27"
@@ -25,19 +25,19 @@ auto_start = true
 
 [module.capabilities]
 has_api = true
-has_ui = true
+has_ui = false
 has_specialist = true
 has_tests = true
-has_workflow = true
+has_workflow = false
 
 [module.integration]
-workflow_engine = true
+workflow_engine = false
 ui_control_center = false
 
 [module.endpoints]
 router_prefix = "/rag"
-ui_path = "/rag/ui"
-public_routes = ["/", "/health"]
+ui_path = ""
+public_routes = ["/health", "/info"]
 protected_routes = []
 
 # ─────────────────────────────────────────────────────────────
@@ -54,13 +54,11 @@ required = [
 # ─────────────────────────────────────────────────────────────
 
 [capabilities]
+# WS6-01/02: the standalone /rag surface (keyword_search substring matcher,
+# temp_upload_rag, catalog_rag) was retired. Only the internal PersonalityRAG
+# source (chat pipeline fallback) and health/info introspection remain.
 exposed = [
-  "keyword_search",
-  "multi_rag_management",
-  "personality_rag",
-  "temp_upload_rag",
-  "catalog_rag",
-  "circuit_breaker"
+  "personality_rag"
 ]
 
 # ─────────────────────────────────────────────────────────────
@@ -76,10 +74,8 @@ check_interval_seconds = 60
 # ─────────────────────────────────────────────────────────────
 
 [workflow]
-nodes = [
-  "memory.rag.workflow.nodes.search_node",
-  "memory.rag.workflow.nodes.create_rag_node"
-]
+# WS6-01/02: the memory.rag.workflow subtree was deleted with the /rag surface.
+nodes = []
 
 # ─────────────────────────────────────────────────────────────
 # SYSTEM SPECIALISTS
@@ -106,18 +102,18 @@ languages_path = "memory/rag/languages"
 [api]
 router = "memory.rag.manifest:router_public"
 prefix = "/ui-control/rag"
-tags = ["rag", "vector-search", "embeddings"]
+tags = ["rag"]
 
 [api.endpoints]
-add_document = "POST /ui-control/rag/document"
-search = "POST /ui-control/rag/search"
-health = "GET /ui-control/rag/health"
-info = "GET /ui-control/rag/info"
+# WS6-01/02: document/search/upload endpoints retired; only introspection left.
+health = "GET /rag/health"
+info = "GET /rag/info"
 
 [ui]
-enabled = true
-ui_path = "/ui-control/rag/"
-assets_path = "memory/rag/ui"
+# WS6-01/02: the /rag admin UI (memory/rag/ui) was deleted.
+enabled = false
+ui_path = ""
+assets_path = ""
 
 # ─────────────────────────────────────────────────────────────
 # DEFAULT CONFIGURATION
@@ -141,9 +137,8 @@ timeout_seconds = 60
 recovery_timeout = 120
 
 [config.sources]
+# WS6-01/02: only the personality source survives (chat fallback).
 personality = true
-temp_upload = true
-catalog = true
 
 # ─────────────────────────────────────────────────────────────
 # PATHS & RESOURCES

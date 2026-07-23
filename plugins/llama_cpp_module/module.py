@@ -163,6 +163,15 @@ class LlamaCppModule:
             return False
         if self._node.config.model_path == new_config.model_path:
             return False
+        # Deep belt (2026-07-23): validate BEFORE mutating state — symmetric
+        # with MLXModule.switch_model (a ghost path must never become the
+        # module's active config).
+        if hasattr(new_config, "validate") and not new_config.validate():
+            logger.error(
+                "LlamaCppModule.switch_model: refusing invalid config: %s",
+                new_config.model_path,
+            )
+            return False
         self._node.apply_config(new_config)
         logger.info("LlamaCppModule: model switched to %s", new_config.model_path)
         return True

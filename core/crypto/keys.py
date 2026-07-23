@@ -114,8 +114,10 @@ def _try_file_get(path: Path | None = None) -> bytes | None:
     Distinct cases:
     - absent (not path.exists())               → return None (legit first boot)
     - present but read_bytes() raises (OSError) → raise (fail-closed)  [B043]
-    - present, readable, wrong length          → warn + None (corrupt content,
-                                                  separate decision; kept as-is)
+    - present, readable, wrong length          → raise (fail-closed)  [WS3-02]
+                                                  (corrupt/truncated ≠ absent;
+                                                  returning None would generate a
+                                                  new key and quarantine the DB)
     """
     if path is None:
         path = _resolve_key_file_path()
@@ -132,8 +134,18 @@ def _try_file_get(path: Path | None = None) -> bytes | None:
         ) from e
     if len(key) == KEY_SIZE:
         return key
-    logger.warning("Key file %s has wrong length (%d bytes)", path, len(key))
-    return None
+    # WS3-02: wrong length → fail-closed (raise), mirroring the OSError branch
+    # above. Returning None made the caller treat a corrupt/truncated key as
+    # ABSENT, generate a brand-new key, and quarantine the existing encrypted DB
+    # as .unrecoverable-* (silent data loss). A wrong-length file is corruption or
+    # tampering, not a legit first boot, so refuse to continue.
+    raise RuntimeError(
+        f"Master key file {path} has wrong length ({len(key)} bytes, expected "
+        f"{KEY_SIZE}). Refusing to continue: treating it as absent would generate "
+        "a new key and quarantine the existing encrypted database. The file is "
+        "corrupt or truncated — remove it (after backing it up) so the keyring or "
+        "regeneration path can take over, then restart."
+    )
 
 
 def _try_file_set(key: bytes, path: Path | None = None) -> bool:
@@ -251,7 +263,26 @@ def get_or_create_master_key(key_file_path: Path | None = None) -> bytes:
     # 3. Env var (for headless CI / containerised runs)
     key = _try_env_get()
     if key:
-        logger.debug("Master key loaded from %s", ENV_VAR_NAME)
+        # BONUS-04: an env-only key is EPHEMERAL by design (headless CI /
+        # containers). We deliberately do NOT mirror it to master.key nor the
+        # keyring: silently persisting a secret the operator supplied via env
+        # would be a surprising side effect (and on immutable/containerised
+        # runtimes the write is pointless). But the operator must know that if
+        # this key is later removed from the environment on a PERSISTENT host —
+        # with no master.key and no keyring entry present — the next boot will
+        # generate a brand-new key, derive a different SQLCipher DEK, and
+        # quarantine the existing encrypted DB as .unrecoverable-*. So warn
+        # loudly instead of persisting behind the operator's back.
+        logger.warning(
+            "Master key loaded from %s (env-only, NOT persisted). This key is "
+            "ephemeral: with no master.key file and no keyring entry, unsetting "
+            "%s on a persistent host will regenerate a new key on next boot and "
+            "quarantine the existing encrypted database. For durability, write "
+            "the key to %s (permissions 600) or store it in the OS keyring.",
+            ENV_VAR_NAME,
+            ENV_VAR_NAME,
+            _resolve_key_file_path(),
+        )
         return key
 
     # 4. Generate new — dual-write to file + keyring. File is mandatory;

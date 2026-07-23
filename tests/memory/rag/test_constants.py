@@ -84,15 +84,14 @@ class TestManifestDefaultConfig:
 class TestManifestCapabilities:
   """Tests for MANIFEST capabilities."""
 
-  def test_capabilities_include_keyword_search(self):
-    """Verify capabilities advertise keyword_search (B114: PersonalityRAG does
-    token matching, not vector search — the manifest must not over-claim)."""
+  def test_capabilities_reflect_retired_surface(self):
+    """WS6-01/02: the standalone /rag surface (keyword_search substring
+    matcher, temp_upload_rag, catalog_rag) was retired. The manifest must
+    advertise only the surviving PersonalityRAG source and must never
+    over-claim vector_search (B114: it was never vector search)."""
     caps = MANIFEST.get("capabilities", [])
-    assert "keyword_search" in caps
+    assert "personality_rag" in caps
     assert "vector_search" not in caps
-
-  def test_capabilities_include_multi_source(self):
-    """Verify capabilities include multi_rag_management or similar."""
-    caps = MANIFEST.get("capabilities", [])
-    has_multi = any("multi" in cap.lower() or "source" in cap.lower() for cap in caps)
-    assert has_multi or len(caps) > 1
+    # The retired substring/upload/catalog capabilities must be gone.
+    for retired in ("keyword_search", "temp_upload_rag", "catalog_rag"):
+      assert retired not in caps, f"retired capability still advertised: {retired}"

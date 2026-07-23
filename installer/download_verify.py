@@ -138,6 +138,48 @@ def consent_for_unpinned(
     )
 
 
+def consent_for_unpinned_deps(
+    context: str,
+    *,
+    prompt: Optional[Callable[[str], str]] = None,
+    isatty: Optional[bool] = None,
+) -> bool:
+    """Decide whether an OFFLINE dependency install may fall back to unpinned
+    PyPI after the bundle's no-index install failed (WS8-05).
+
+    Same policy and env var as :func:`consent_for_unpinned` — never a silent
+    fail-open: ``NEXE_ALLOW_UNPINNED`` truthy → proceed (WARNING); interactive
+    TTY → ask ``[y/N]``; non-interactive without the opt-in → raise.
+    """
+    if os.environ.get(_ALLOW_UNPINNED_ENV, "").strip().lower() in {"1", "true", "yes"}:
+        logger.warning(
+            "Offline install of %s falls back to UNPINNED PyPI — %s is set; "
+            "the bundle supply-chain guarantee is lost.", context, _ALLOW_UNPINNED_ENV,
+        )
+        return True
+
+    interactive = sys.stdin.isatty() if isatty is None else isatty
+    if interactive:
+        ask = input if prompt is None else prompt
+        answer = ask(
+            f"\n⚠️  Offline install of {context} is incomplete. Fall back to "
+            f"PyPI WITHOUT the bundle's integrity guarantee? [y/N] "
+        ).strip().lower()
+        if answer in {"y", "yes"}:
+            logger.warning("User consented to unpinned PyPI fallback for %s.", context)
+            return True
+        raise UnpinnedModelError(
+            f"User declined the unpinned PyPI fallback for {context}."
+        )
+
+    raise UnpinnedModelError(
+        f"Offline install of {context} failed and there is no interactive "
+        f"terminal to confirm the unpinned PyPI fallback. Re-run with "
+        f"{_ALLOW_UNPINNED_ENV}=1 to allow it explicitly, or repair the "
+        f"offline bundle."
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # Retry text — engine-specific so the UI can paste it verbatim.
 # ═══════════════════════════════════════════════════════════════════════

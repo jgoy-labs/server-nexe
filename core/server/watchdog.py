@@ -14,6 +14,16 @@ to ``TerminateProcess(handle, sig)``, so the POSIX-style poll would *kill the
 Tauri parent* on its first iteration. The Windows path below blocks on
 ``WaitForSingleObject`` over a ``SYNCHRONIZE`` handle instead (instant death
 detection, zero polling, and the open handle anchors the PID against reuse).
+
+PID-reuse note (POSIX): a bare ``os.kill(pid, 0)`` probes the PID *number*,
+not the original process identity. If the parent dies and the OS recycles that
+PID onto an unrelated process within a poll window, the poll would read the
+recycled PID as the still-live parent and never shut the orphan down. To match
+the reuse-safety the Windows SYNCHRONIZE handle already provides, the POSIX
+poll anchors to the parent's OS creation time (``psutil.Process.create_time``)
+captured at start-up and revalidated each iteration — a mismatch means the PID
+was reused, so we fail closed and shut down. When psutil is unavailable the
+poll falls back to the bare signal-0 probe (fail-open: no regression).
 """
 from __future__ import annotations
 
@@ -23,6 +33,11 @@ import signal
 import sys
 import threading
 import time
+
+try:  # Optional: used only to anchor the POSIX poll against PID reuse.
+    import psutil
+except Exception:  # psutil missing / sandboxed → fall back to bare signal-0 poll
+    psutil = None
 
 # Win32 constants + typed kernel32 adapter live in process_utils (shared with
 # the liveness probe); re-exported here so existing references keep working.
@@ -41,8 +56,32 @@ logger = logging.getLogger(__name__)
 _WIN_GRACE_SECONDS = 15.0
 
 
-def _wait_parent_exit_posix(parent_pid: int, poll_interval: float) -> None:
-    """Block until the parent process exits (POSIX poll, signal 0)."""
+def _parent_create_time(pid: int):
+    """Reuse-proof identity token for `pid`: its OS creation time.
+
+    Returns ``None`` when it can't be determined (psutil missing, process
+    already gone, or the platform can't supply it) so callers fail open to the
+    bare signal-0 poll instead of crashing.
+    """
+    if psutil is None:
+        return None
+    try:
+        return psutil.Process(pid).create_time()
+    except Exception:  # NoSuchProcess / AccessDenied / unsupported platform
+        return None
+
+
+def _wait_parent_exit_posix(
+    parent_pid: int, poll_interval: float, identity=None
+) -> None:
+    """Block until the parent process exits (POSIX poll, signal 0).
+
+    `identity` is the parent's OS creation time captured at start-up (see
+    `_parent_create_time`). When provided, each iteration revalidates it so a
+    recycled PID (original parent dead, number reused by an unrelated process)
+    is detected and treated as "parent gone" rather than a false liveness read.
+    When `identity` is None the poll degrades to the bare signal-0 probe.
+    """
     while True:
         # Check immediately on first iteration (no initial sleep window where
         # a parent that died right after spawn would leave us orphaned).
@@ -52,6 +91,12 @@ def _wait_parent_exit_posix(parent_pid: int, poll_interval: float) -> None:
             return
         except PermissionError:
             pass  # Process exists but we can't signal it — still alive
+        # The PID number is live, but on POSIX it can be recycled onto an
+        # unrelated process within a poll window. If we anchored to the parent's
+        # creation time, a mismatch means the original parent died and the PID
+        # was reused → fail closed and shut the orphan down.
+        if identity is not None and _parent_create_time(parent_pid) != identity:
+            return
         time.sleep(poll_interval)
 
 
@@ -148,12 +193,16 @@ def start_parent_watchdog(poll_interval: float = 30.0) -> None:
         logger.warning("Invalid NEXE_TRAY_PID=%r — parent watchdog disabled", tray_pid_str)
         return
 
+    # Capture the parent's creation time up front so the POSIX poll can tell a
+    # recycled PID from the real parent (reuse-safe, mirrors the Windows handle).
+    tray_identity = _parent_create_time(tray_pid)
+
     def _watchdog() -> None:
         if sys.platform == "win32":
             if not _wait_parent_exit_windows(tray_pid):
                 return  # cannot monitor — leave the server running
         else:
-            _wait_parent_exit_posix(tray_pid, poll_interval)
+            _wait_parent_exit_posix(tray_pid, poll_interval, tray_identity)
         logger.info(
             "Tray process (PID %d) no longer running — shutting down server",
             tray_pid,

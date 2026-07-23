@@ -27,7 +27,6 @@ pyyaml==6.0.3
 numpy==2.4.6
 slowapi==0.1.9
 prometheus-client==0.25.0
-tenacity==9.1.4
 psutil==5.9.8
 # huggingface_hub: transitiva mlx-lm/fastembed; transformers 5.x requereix >=1.5.0;
 # F2.A11 va intentar pinar a 1.15.0 però pip-audit detecta conflicte amb typer==0.9.4
@@ -47,7 +46,7 @@ pypdf==6.13.3  # PDF support for knowledge ingestion; GHSA-3crg-w4f6-42mx GHSA-4
 lingua-language-detector==2.1.1
 
 # --- Encryption at rest ---
-cryptography==48.0.1
+cryptography==49.0.0  # bumped from 48.0.1 (2 HIGH advisories); major bump validated at next full build/re-smoke
 keyring==25.7.0
 sqlcipher3==0.6.2
 

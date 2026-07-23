@@ -78,6 +78,17 @@ def _resolve_encryption_enabled(env_value: str, *, sqlcipher_available: bool) ->
     return False  # unknown value → OFF
 
 
+def encryption_is_mandatory(env_value: str) -> bool:
+    """WS3-03: True only when the user EXPLICITLY demanded encryption.
+
+    'auto' tolerates a plaintext fallback (with a loud error log); 'true'
+    must fail closed — a failed SQLCipher migration may never silently
+    open PII in plaintext. Pure function, same normalization as
+    _resolve_encryption_enabled.
+    """
+    return env_value.strip().lower() == 'true'
+
+
 # Default configuration
 DEFAULT_CONFIG = {
     'core': {

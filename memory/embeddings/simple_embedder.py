@@ -11,10 +11,8 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Dict, List
 import logging
-from fastembed import TextEmbedding
 import numpy as np
 
-from memory.embeddings.paths import default_fastembed_cache_dir
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +64,12 @@ class SimpleEmbedder:
 
     logger.info(f"Loading model {model_name} (fastembed/ONNX)")
     try:
-      self.model = TextEmbedding(model_name, cache_dir=str(default_fastembed_cache_dir()))
+      # Shared with MemoryAPI and the ingestion pipeline: the DreamingCycle
+      # builds this one on every boot where onboarding is complete, so its own
+      # ONNX session was costing ~925 MB on top — about 40% of what sharing the
+      # other two saved. Same cache key: embed_threads is None here too.
+      from memory.embeddings.shared import get_text_embedding
+      self.model = get_text_embedding(model_name)
     except Exception as e:
       raise RuntimeError(
           f"Embedding model '{model_name}' not available locally. "

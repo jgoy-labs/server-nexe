@@ -352,6 +352,153 @@ def _detect_vlm_capability(model_path: str) -> bool:
     return _vlm_from_config(config) or _vlm_from_safetensors(root)
 
 
+# Minimum usable KV window for the hard-refusal check (= B004 budget floor
+# rationale: below this a normal conversation degenerates anyway).
+_KV_MIN_TOKENS = 4096
+
+
+def _estimate_required_ram(model_path: str, max_kv_size: int) -> dict:
+    """Estimate the RAM (GB) an MLX load will actually occupy.
+
+    Field-verified formula (M1 8 GB, 2026-07-23): footprint = weights +
+    max_kv_size × kv_bytes_per_token + runtime baseline, and the footprint is
+    FLAT during generation — the cost is the model plus the KV window, not
+    the act of generating. Uses the same helpers as the B004 budget
+    (config.model_kv_bytes_per_token with ``effective=True`` so
+    linear-attention/sliding-window models are not over-estimated 4-6×).
+
+    Returns a dict: ``weights`` (GB or None when not measurable), ``kv``,
+    ``kv_min`` (the smallest usable window), ``required``. The old
+    ``×1.2+0.6`` heuristic came from a budget table never contrasted with a
+    real low-RAM machine — it refused loads that in fact succeeded (guard
+    demanded 3.99 GB available; the machine ran fine at 1.91).
+    """
+    from .config import _RUNTIME_GB, model_kv_bytes_per_token, model_weights_gb
+
+    weights = model_weights_gb(model_path)
+    bpt = model_kv_bytes_per_token(model_path, effective=True)
+    kv = bpt * max_kv_size / (1024 ** 3)
+    kv_min = bpt * min(_KV_MIN_TOKENS, max_kv_size) / (1024 ** 3)
+    required = max(1.5, (weights if weights is not None else 3.5) + kv + _RUNTIME_GB)
+    return {"weights": weights, "kv": kv, "kv_min": kv_min, "required": required}
+
+
+def _ram_guard_mode() -> str:
+    """Read the pre-load RAM guard mode from ``NEXE_MLX_RAM_GUARD``.
+
+    ``warn`` (default since 2026-07-23) logs and loads anyway, ``strict``
+    refuses on the soft threshold, ``off`` loads anyway and stays quiet.
+    Field measurement (M1 8 GB): ``available`` does not predict whether a
+    load will work — macOS compresses and swaps pages the metric ignores
+    (footprint 6.05 GB ran fine with available at 1.91), so refusing by
+    default punished loads that succeed. The physically-impossible case
+    (weights + minimum KV window > TOTAL RAM) still hard-refuses even in
+    ``warn``. ``0``/``false``/``no`` are accepted as synonyms of ``off`` —
+    they are what anyone actually types to disable a guard. Anything else
+    unknown falls back to ``warn``.
+
+    Note: ``off`` does NOT skip the work — the estimate, the psutil read and the
+    diagnostic line still happen (that is the point: the numbers are what a
+    field report needs). Only the refusal is suppressed.
+
+    The escape hatch exists because a refusal was a dead end: there was no way
+    for the user (or for a field measurement) to say "I know, try anyway", so
+    nobody could ever check whether the threshold was refusing loads that would
+    in fact have succeeded.
+    """
+    import os as _os_mode  # noqa: PLC0415
+    raw = _os_mode.environ.get("NEXE_MLX_RAM_GUARD", "warn").strip().lower()
+    if raw in ("0", "false", "no", "disabled"):
+        return "off"
+    return raw if raw in ("strict", "warn", "off") else "warn"
+
+
+def _chunked_prefill_is_broken(model_path: str) -> bool:
+    """True for architectures where mlx_vlm's chunked prefill crashes.
+
+    Reproduced on mlx_vlm 0.4.4 with Qwen3-VL (``Qwen3VLForConditionalGeneration``)
+    and a text-only prompt: as soon as the prompt exceeds the chunk size,
+    ``models/qwen3_vl/language.py`` does ``visual_pos_masks[:, n_to_process:]``
+    with ``visual_pos_masks`` still None and raises TypeError. Verified at
+    645/4.2k/8.8k tokens against step sizes 2048/512/128 — every chunked
+    combination fails, only disabling chunking survives.
+
+    No catalog model uses this architecture, so this is not a shipped bug; the
+    check exists so that lowering the chunk size does not make a user-supplied
+    Qwen3-VL model fail *earlier* (at 512 tokens instead of 2048) than it does
+    today. Their behaviour is left exactly as it was.
+    """
+    if not model_path:
+        return False
+    config = _load_json_safe(Path(model_path) / "config.json")
+    if not config:
+        return False
+    architectures = config.get("architectures") or []
+    if isinstance(architectures, str):
+        architectures = [architectures]
+    blob = " ".join(str(a) for a in architectures) + " " + str(config.get("model_type", ""))
+    return "qwen3vl" in blob.lower().replace("_", "").replace("-", "")
+
+
+def _prefill_step_kwargs(model_path: str = "") -> Dict[str, int]:
+    """Chunk size for the VLM prefill, as kwargs to splat into mlx_vlm calls.
+
+    mlx_vlm's default is 2048 (``generate.py:DEFAULT_PREFILL_STEP_SIZE``), which
+    on a low-RAM machine costs more peak memory than it needs to. Measured on
+    Qwen3.5-4B-MLX-4bit (M4 Max, peak via ``mx.get_peak_memory()``):
+
+        prompt ~8.0k tokens: 2048 -> 5.15 GB / 5.22 s
+                              512 -> 4.06 GB / 5.27 s   <- default here
+                              128 -> 3.66 GB / 6.07 s
+                             None -> 12.43 GB / 6.51 s  (chunking disabled)
+
+    512 takes the memory win at no measurable latency cost; 128 buys another
+    0.4 GB for ~16% more time, so it is opt-in rather than the default. Note
+    that ``None`` disables chunking entirely and is catastrophic on long
+    prompts — ``NEXE_MLX_PREFILL_STEP=default`` therefore means "leave the
+    library default alone", not "disable".
+    """
+    import os as _os_pf  # noqa: PLC0415
+    raw = _os_pf.environ.get("NEXE_MLX_PREFILL_STEP", "").strip().lower()
+    if raw == "default":
+        return {}
+    if _chunked_prefill_is_broken(model_path):
+        # Leave this model exactly as it was: a smaller chunk would only move
+        # the upstream crash to a shorter prompt. See _chunked_prefill_is_broken.
+        logger.warning(
+            "MLX: chunked prefill is broken upstream for this architecture (%s) — "
+            "leaving mlx_vlm's default untouched", model_path,
+        )
+        return {}
+    if raw:
+        try:
+            value = int(raw)
+            if value > 0:
+                return {"prefill_step_size": value}
+        except ValueError:
+            pass
+        logger.warning(
+            "NEXE_MLX_PREFILL_STEP=%r is not a positive integer or 'default' — using 512", raw
+        )
+    return {"prefill_step_size": 512}
+
+
+def _memory_snapshot_gb(vm: Any) -> Dict[str, float]:
+    """Extract a full memory picture (GB) from a psutil vmem tuple, defensively.
+
+    Any missing or non-numeric attribute becomes ``-1.0`` so that the diagnostic
+    log line can never raise from inside the guard (tests and older psutil
+    builds do not necessarily expose every macOS field).
+    """
+    snapshot: Dict[str, float] = {}
+    for field in ("total", "available", "free", "active", "inactive", "wired"):
+        try:
+            snapshot[field] = float(getattr(vm, field)) / (1024 ** 3)
+        except (AttributeError, TypeError, ValueError):
+            snapshot[field] = -1.0
+    return snapshot
+
+
 class MLXChatNode:
     """
     Inference engine for MLX adapted for server-nexe.
@@ -416,14 +563,98 @@ class MLXChatNode:
         if MLXChatNode._model is None:
             try:
                 import psutil
-                avail_gb = psutil.virtual_memory().available / (1024 ** 3)
-                if avail_gb < 1.5:
+                _vm = psutil.virtual_memory()
+                avail_gb = _vm.available / (1024 ** 3)
+                # Field-verified estimate (2026-07-23): weights + KV window +
+                # runtime, via the same B004 helpers as the budget — never a
+                # local copy of the formula.
+                _est = _estimate_required_ram(
+                    self.config.model_path, self.config.max_kv_size
+                )
+                required_gb = _est["required"]
+                _mode = _ram_guard_mode()
+                _below = avail_gb < required_gb
+                # Diagnostic BEFORE the decision. The 1.0.7 threshold was derived
+                # from a budget table and never contrasted with a measurement on
+                # a real low-RAM machine, so the log has to carry the whole
+                # picture and not just `available`: on macOS psutil reports
+                # `available` as inactive+free, which ignores purgeable and
+                # compressor-reclaimable pages the kernel would hand over on
+                # demand. Without these numbers a field report cannot tell a
+                # justified refusal from an over-conservative one.
+                _snap = _memory_snapshot_gb(_vm)
+                logger.log(
+                    logging.WARNING if _below else logging.INFO,
+                    "MLX RAM guard [%s]: need ~%.2f GB (weights %s + kv %.2f + runtime) · "
+                    "available %.2f GB · "
+                    "total %.2f · free %.2f · inactive %.2f · active %.2f · wired %.2f (GB) · model=%s",
+                    _mode, required_gb,
+                    f"{_est['weights']:.2f}" if _est["weights"] is not None else "?",
+                    _est["kv"], avail_gb, _snap["total"], _snap["free"],
+                    _snap["inactive"], _snap["active"], _snap["wired"],
+                    self.config.model_path,
+                )
+                # Hard refusal — the only one the default (warn) mode keeps:
+                # weights + a minimum usable KV window do not fit in TOTAL
+                # RAM. Not "low available" (macOS reclaims pages on demand):
+                # guaranteed thrash/jetsam. Skipped when the weights could
+                # not be measured (a fallback guess must never refuse) or
+                # when total is unknown (defensive psutil / test mocks).
+                _total_known = (
+                    isinstance(_snap["total"], (int, float)) and _snap["total"] > 0
+                )
+                _impossible = (
+                    _est["weights"] is not None
+                    and _total_known
+                    and _est["weights"] + _est["kv_min"] > _snap["total"]
+                )
+                if _impossible and _mode != "off":
+                    import os as _os_oom  # noqa: PLC0415
+                    _lang = _os_oom.environ.get("NEXE_LANG", "en")[:2]
+                    # Contract: routes_chat._is_oom detects OOM by substring
+                    # and _oom_notice keeps the switch-engine advice only when
+                    # "MLX" appears in the text (pinned by contract test).
+                    _hard_msgs = {
+                        "ca": (
+                            "Memòria insuficient: aquest model no cap a la RAM "
+                            f"d'aquest Mac amb MLX (pesos ~{_est['weights']:.1f} GB "
+                            f"+ context mínim ~{_est['kv_min']:.1f} GB > "
+                            f"{_snap['total']:.0f} GB totals). Fes servir Ollama "
+                            "per a aquest model."
+                        ),
+                        "es": (
+                            "Memoria insuficiente: este modelo no cabe en la RAM "
+                            f"de este Mac con MLX (pesos ~{_est['weights']:.1f} GB "
+                            f"+ contexto mínimo ~{_est['kv_min']:.1f} GB > "
+                            f"{_snap['total']:.0f} GB totales). Usa Ollama "
+                            "para este modelo."
+                        ),
+                        "en": (
+                            "Not enough memory: this model cannot fit in this "
+                            f"Mac's RAM with MLX (weights ~{_est['weights']:.1f} GB "
+                            f"+ minimum context ~{_est['kv_min']:.1f} GB > "
+                            f"{_snap['total']:.0f} GB total). Use Ollama "
+                            "for this model."
+                        ),
+                    }
+                    raise RuntimeError(_hard_msgs.get(_lang, _hard_msgs["en"]))
+                elif _below and _mode == "warn":
+                    logger.warning(
+                        "MLX RAM guard: below threshold (need ~%.1f GB, have ~%.1f GB) "
+                        "but mode is warn — loading anyway",
+                        required_gb, avail_gb,
+                    )
+                elif _below and _mode == "strict":
+                    logger.warning(
+                        "MLXChatNode: refusing to load — need ~%.1f GB, have ~%.1f GB available",
+                        required_gb, avail_gb,
+                    )
                     import os as _os_oom  # noqa: PLC0415
                     _lang = _os_oom.environ.get("NEXE_LANG", "en")[:2]
                     _oom_msgs = {
-                        "ca": "Memòria insuficient per carregar el model d'IA. Tanca altres aplicacions per alliberar memòria i torna-ho a provar.",
-                        "es": "Memoria insuficiente para cargar el modelo de IA. Cierra otras aplicaciones para liberar memoria e inténtalo de nuevo.",
-                        "en": "Not enough memory to load the AI model. Close other applications to free up memory and try again.",
+                        "ca": "Memòria insuficient per carregar el model amb MLX. Canvia el motor a Ollama (fa servir molta menys memòria) o tanca altres aplicacions i torna-ho a provar.",
+                        "es": "Memoria insuficiente para cargar el modelo con MLX. Cambia el motor a Ollama (usa mucha menos memoria) o cierra otras aplicaciones e inténtalo de nuevo.",
+                        "en": "Not enough memory to load the model with MLX. Switch the engine to Ollama (it uses far less memory) or close other applications and try again.",
                     }
                     raise RuntimeError(_oom_msgs.get(_lang, _oom_msgs["en"]))
             except ImportError:
@@ -443,10 +674,25 @@ class MLXChatNode:
                 self.config.max_kv_size
             )
 
+            # The lazy imports are wrapped so a broken dependency combo
+            # surfaces as a curated message, not a raw AttributeError deep in
+            # transformers (finding 820: an old bundle shipping
+            # transformers>=5.13 died at mlx_lm's tokenizer registration with
+            # "'str' object has no attribute '__module__'").
+            def _curated_import_error(exc):
+                return RuntimeError(
+                    "MLX engine unavailable: incompatible dependency "
+                    "(transformers/mlx-lm — finding 820). Reinstall "
+                    "server-nexe or switch the engine to Ollama."
+                )
+
             if is_vlm:
                 try:
                     _require_torch()
-                    from mlx_vlm import load
+                    try:
+                        from mlx_vlm import load
+                    except (ImportError, AttributeError) as exc:
+                        raise _curated_import_error(exc) from exc
                     MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
                 except MissingDependencyError:
                     # PyTorch not installed — load vision-capable model in text-only
@@ -456,10 +702,16 @@ class MLXChatNode:
                         self.config.model_path[-40:] if self.config.model_path else "(empty)",
                     )
                     MLXChatNode._is_vlm = False
-                    from mlx_lm import load
+                    try:
+                        from mlx_lm import load
+                    except (ImportError, AttributeError) as exc:
+                        raise _curated_import_error(exc) from exc
                     MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
             else:
-                from mlx_lm import load
+                try:
+                    from mlx_lm import load
+                except (ImportError, AttributeError) as exc:
+                    raise _curated_import_error(exc) from exc
                 MLXChatNode._model, MLXChatNode._tokenizer = load(self.config.model_path)
 
             logger.info("MLXChatNode: model loaded successfully (vlm=%s)", is_vlm)
@@ -497,6 +749,9 @@ class MLXChatNode:
         # HTTP client disconnects so streaming loops can break early instead
         # of running to max_tokens. None disables cancellation (back-compat).
         cancel_event = inputs.get("cancel_event")
+        # FD-S6: resume the LAST assistant message instead of opening a new
+        # turn. Text path only — enforced below.
+        continue_final = bool(inputs.get("continue_final", False))
 
         # Log for debugging
         logger.info(
@@ -516,6 +771,13 @@ class MLXChatNode:
             # the primary source — it is always fresh and does not depend on the _is_vlm
             # singleton which can go stale when switching from VLM → text within the same session.
             is_vlm = _detect_vlm_capability(self.config.model_path)
+            if continue_final and is_vlm:
+                # FD-S6 scope: mlx_vlm does the prefix matching internally on
+                # the real input_ids and has no continue support — phase 1 is
+                # text-only by design (D-C).
+                raise ValueError(
+                    "continue_final is not supported on the VLM path"
+                )
             # Pin MLX calls to the dedicated single-worker executor so all
             # operations share one thread and the per-thread default_stream
                 # stays consistent across turns (see _MLX_EXECUTOR docstring).
@@ -551,6 +813,7 @@ class MLXChatNode:
                         thinking_enabled,
                         cancel_event,
                         top_p=top_p_override,
+                        continue_final=continue_final,
                     ),
                 )
 
@@ -609,6 +872,10 @@ class MLXChatNode:
                 "cached_tokens": cached_tokens,  # Tokens reused from cache
                 "actual_prefill_tokens": actual_prefill,  # Tokens actually processed
                 "identity_hash": result.get("identity_hash", ""),  # System prompt hash
+                # FD-S5: why generation stopped ('length' = cut by the
+                # max_tokens ceiling) and whether a Continue can resume it.
+                "finish_reason": result.get("finish_reason"),
+                "continuable": self._compute_continuable(result, is_vlm),
                 "peak_memory_mb": round(result.get("peak_memory_mb", 0), 1),
                 "prompt_tps": round(prompt_tps, 1),
                 # Timing breakdown
@@ -776,6 +1043,7 @@ class MLXChatNode:
             max_tokens=max_tokens or self.config.max_tokens,
             **cache_kwargs,
             **sampling_kwargs,
+            **_prefill_step_kwargs(self.config.model_path),
         ):
             # Honour client-side cancel: when the HTTP client disconnects,
             # the route handler sets cancel_event so we exit early instead of
@@ -821,6 +1089,7 @@ class MLXChatNode:
             max_tokens=max_tokens or self.config.max_tokens,
             verbose=False,
             **sampling_kwargs,
+            **_prefill_step_kwargs(self.config.model_path),
         )
         text = one.text if hasattr(one, "text") else str(one)
         if _prompt_has_open_think_prefix(formatted_prompt):
@@ -828,6 +1097,21 @@ class MLXChatNode:
             # opener so downstream parsers recognise the reasoning block.
             text = "<think>\n" + text
         return text, one
+
+    def _compute_continuable(self, result: Dict[str, Any], is_vlm: bool) -> bool:
+        """Whether a truncated answer can be resumed with a Continue (FD-S6).
+
+        Only the MLX text path qualifies (VLM has no reliable finish_reason,
+        no continue support and an unbounded KV inside mlx_vlm). The KV gate
+        keeps a Continue chain from crossing the rotating window (which would
+        evict the system prompt and degenerate mid-chain, B004) and from
+        hitting the untrimmable-when-full corner of RotatingKVCache.
+        """
+        if result.get("finish_reason") != "length" or is_vlm:
+            return False
+        used = result.get("prompt_tokens", 0) + result.get("tokens", 0)
+        headroom_needed = used + self.config.max_tokens + 512
+        return headroom_needed < self.config.max_kv_size
 
     def _extract_vlm_metrics(
         self,
@@ -837,6 +1121,7 @@ class MLXChatNode:
         prefix_reused: bool = False,
         cached_tokens: int = 0,
         identity_hash: str = "",
+        max_tokens_used: "Optional[int]" = None,
     ) -> Dict[str, Any]:
         prompt_tokens = getattr(result_obj, "prompt_tokens", 0)
         gen_tokens = getattr(result_obj, "generation_tokens", len(result_text.split()))
@@ -858,6 +1143,15 @@ class MLXChatNode:
             "peak_memory_mb": round(peak_memory, 1),
             "identity_hash": identity_hash,
             "vlm": True,
+            # FD-S5: mlx_vlm's GenerationResult has NO finish_reason —
+            # heuristic: hitting the ceiling exactly. False positive when EOS
+            # lands on the limit; acceptable because the VLM marker is
+            # informative-only (never continuable).
+            "finish_reason": (
+                "length"
+                if (max_tokens_used and gen_tokens >= max_tokens_used)
+                else None
+            ),
         }
 
     def _generate_vlm(
@@ -952,6 +1246,7 @@ class MLXChatNode:
             result_obj, result_text, elapsed_ms,
             prefix_reused=had_cache, cached_tokens=cached_tokens,
             identity_hash=identity_hash,
+            max_tokens_used=max_tokens or self.config.max_tokens,
         )
 
     def _generate_blocking(
@@ -966,6 +1261,7 @@ class MLXChatNode:
         thinking_enabled: bool = True,
         cancel_event: Any = None,
         top_p: Optional[float] = None,
+        continue_final: bool = False,
     ) -> Dict[str, Any]:
         """
         Blocking generation with MLX and PREFIX MATCHING (executed in thread).
@@ -977,6 +1273,7 @@ class MLXChatNode:
                 system, messages, messages_for_cache,
                 stream_callback, session_id, max_tokens, temperature,
                 thinking_enabled, cancel_event, top_p,
+                continue_final=continue_final,
             )
 
     def _generate_blocking_inner(
@@ -991,6 +1288,7 @@ class MLXChatNode:
         thinking_enabled: bool = True,
         cancel_event: Any = None,
         top_p: Optional[float] = None,
+        continue_final: bool = False,
     ) -> Dict[str, Any]:
         """Inner generation logic, called under lock."""
         from mlx_lm.sample_utils import make_sampler
@@ -1018,6 +1316,7 @@ class MLXChatNode:
             system, messages, messages_for_cache, tokenizer,
             thinking_enabled=thinking_enabled,
             model_type=model_type,
+            continue_final=continue_final,
         )
         total_tokens = len(full_tokens)
 
@@ -1057,7 +1356,8 @@ class MLXChatNode:
         # 6. Save cache post-generation (clean messages, without memory context)
         save_cache_post_generation(
             cache_manager, model_key, all_cache_messages,
-            text, tokenizer, cached_kv, len(full_tokens)
+            text, tokenizer, cached_kv, len(full_tokens),
+            continue_final=continue_final,
         )
 
         # 7. Extract and return metrics

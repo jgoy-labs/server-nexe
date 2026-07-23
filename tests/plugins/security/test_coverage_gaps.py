@@ -180,7 +180,15 @@ class MockRequestWithState:
         self.query_params = query_params or {}
         self.client = type('obj', (object,), {'host': '127.0.0.1'})()
         if has_state:
-            security_logger = MagicMock() if has_logger else None
+            if has_logger:
+                # WS5-03: autospec (not bare MagicMock) so calls with wrong
+                # kwargs against the real SecurityEventLogger signatures fail
+                # loudly instead of being silently swallowed.
+                from unittest.mock import create_autospec
+                from plugins.security.security_logger import SecurityEventLogger
+                security_logger = create_autospec(SecurityEventLogger, instance=True)
+            else:
+                security_logger = None
             state = MagicMock()
             state.i18n = None
             state.security_logger = security_logger

@@ -344,3 +344,25 @@ def ollama_available():
         pass
 
     pytest.skip("Ollama not available - skipping test")
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_embedders():
+    """Isolate the process-wide fastembed session cache between tests.
+
+    memory.embeddings.shared keeps one TextEmbedding per (model, cache_dir,
+    threads) so the sidecar does not pay ~1.4 GB twice for the same ONNX
+    session. Like any process-wide singleton it leaks across tests: an instance
+    built while `fastembed` was mocked would be handed to a later test that
+    expects the real model (seen as IndexError on an empty embed result), and a
+    cached instance makes the "model not downloaded" error path unreachable.
+
+    Resetting per test keeps production sharing intact while restoring
+    isolation — rather than disabling sharing under pytest, which would leave
+    the shipped code path untested.
+    """
+    from memory.embeddings.shared import reset_shared_embedders
+
+    reset_shared_embedders()
+    yield
+    reset_shared_embedders()

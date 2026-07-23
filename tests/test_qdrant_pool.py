@@ -120,3 +120,49 @@ def test_close_and_reopen_same_path_releases_lock(tmp_path):
     c2 = QdrantClient(path=path)
     pool._instances[f"path:{path}"] = c2
     pool.close_qdrant_client()
+
+
+# NEXE-SRV-WS3-06 (2026-07-10): the vectors dir holds PII embeddings, so it
+# must be created owner-only (0o700) mirroring sqlite_store — not left to
+# inherit the process umask (0o755 with the default umask 022), which would
+# expose the embeddings to other local accounts on a shared Mac.
+def test_create_client_chmods_vectors_dir_0o700(tmp_path):
+    """_create_client must chmod the vectors dir to 0o700 right after mkdir."""
+    import os
+    import stat
+
+    # Relax the umask so mkdir alone would leave a world-readable dir:
+    # this proves the os.chmod (not the umask) is what enforces 0o700.
+    old_umask = os.umask(0o022)
+    try:
+        path = str(tmp_path / "vectors-perms")
+        client = pool._create_client(path, None)
+        try:
+            mode = stat.S_IMODE(os.stat(path).st_mode)
+            assert mode == 0o700, f"Expected 0o700, got {oct(mode)}"
+        finally:
+            client.close()
+    finally:
+        os.umask(old_umask)
+
+
+def test_create_client_hardens_preexisting_lax_dir(tmp_path):
+    """Even if the dir already exists with lax perms, it is tightened to 0o700."""
+    import os
+    import stat
+
+    old_umask = os.umask(0o022)
+    try:
+        p = tmp_path / "vectors-preexisting"
+        p.mkdir()
+        os.chmod(p, 0o755)  # world-readable/traversable before _create_client
+        assert stat.S_IMODE(os.stat(p).st_mode) == 0o755
+
+        client = pool._create_client(str(p), None)
+        try:
+            mode = stat.S_IMODE(os.stat(p).st_mode)
+            assert mode == 0o700, f"Expected 0o700, got {oct(mode)}"
+        finally:
+            client.close()
+    finally:
+        os.umask(old_umask)

@@ -226,7 +226,7 @@ class BootstrapTokenManager:
 
       if not row:
         if used:
-          return {"token": None, "expires": 0.0, "used": True}
+          return {"token": None, "expires": 0.0, "used": True}  # nosec B105 — purged-token sentinel, not a secret
         return None
 
       expires_ts = row[1]
@@ -236,7 +236,7 @@ class BootstrapTokenManager:
         cursor.execute("DELETE FROM bootstrap_config WHERE key = 'master_token'")
         conn.commit()
         logger.info("Master bootstrap token purged from DB (%s)", "used" if used else "expired")
-        return {"token": None, "expires": expires_ts, "used": used}
+        return {"token": None, "expires": expires_ts, "used": used}  # nosec B105 — purged-token sentinel, not a secret
 
       return {"token": row[0], "expires": expires_ts, "used": used}
     finally:

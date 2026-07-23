@@ -319,7 +319,12 @@ def _scan_mlx_backend(models_dir: "Path") -> "Optional[dict]":
             return None
         mlx_list = []
         for d in models_dir.iterdir():
-            if d.is_dir():
+            # Only REAL MLX models (config.json present). Bare directory
+            # listing served grouping/residual folders as "models" — on
+            # 8 GB M1 (2026-07-23) a ~/models/mlx folder reached the UI
+            # dropdown, the chat sent model="mlx" and the switch chased a
+            # ghost path into a raw FileNotFoundError.
+            if d.is_dir() and (d / "config.json").is_file():
                 size = sum(f.stat().st_size for f in d.rglob("*.safetensors") if f.is_file())
                 mlx_list.append({"name": d.name, "size_gb": round(size / (1024 ** 3), 1) if size else 0})
         if mlx_list:
@@ -597,7 +602,23 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
                     model_name, e,
                 )
                 return True  # cannot verify → accept
-        # MLX / llamacpp / auto: best-effort, accept
+        # MLX / llamacpp: verify locally (cheap, no network) so set_backend
+        # never persists a ghost model to .env — the 8 GB M1 model="mlx"
+        # ghost re-appeared on every app restart precisely because it had
+        # been persisted as NEXE_DEFAULT_MODEL. `auto`: best-effort, accept.
+        if canonical_backend == "mlx":
+            from core.paths.helpers import get_models_dir
+            _p = get_models_dir() / model_name
+            if not (_p / "config.json").is_file():
+                logger.warning(
+                    "set_backend: refusing ghost MLX model %r (no config.json)",
+                    model_name,
+                )
+                return False
+            return True
+        # llamacpp: best-effort accept — its scan discovers GGUFs from several
+        # sources beyond models_dir (env path, bundle), so a local-path check
+        # here would reject legitimate models. `auto` too.
         return True
 
     async def _ensure_ollama_running() -> bool:

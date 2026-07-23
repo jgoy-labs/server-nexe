@@ -67,7 +67,7 @@ exclude = [
 # Pyright type checker.
 # InstallNexe.app/ is Python 3.12 stdlib bundled (tkinter, turtle, pip/_vendor...)
 # and is NOT project code: 9741 of 10932 initial findings belong there.
-include = ["core", "memory", "plugins", "personality", "specialists", "installer"]
+include = ["core", "memory", "plugins", "personality", "installer"]
 exclude = [
     "**/InstallNexe.app",
     "**/Nexe.app",

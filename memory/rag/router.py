@@ -1,46 +1,31 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/rag/router.py
-Description: FastAPI router facade for RAG module.
+Description: FastAPI router facade for RAG module (health/info only).
+
+WS6-01/WS6-02: the standalone /rag/{document,search,upload,files/stats}
+routes and the /rag/ui admin page were retired — the search was an
+ephemeral in-memory substring matcher (not vector search) and the upload
+path depended on a FileRAGSource that never existed. The chat pipeline's
+RAG (MemoryAPI/Qdrant) is a separate, working path; the public contract
+keeps the /v1/rag/* 501 stubs.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from typing import Any, Dict
-
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends
 
 from plugins.security.core.auth import require_api_key
 from .constants import MANIFEST
 from .routers.endpoints import (
-  add_document_endpoint,
-  search_endpoint,
-  upload_file_endpoint,
   health_endpoint,
   info_endpoint,
-  files_stats_endpoint,
 )
-from .routers.ui import serve_ui, serve_assets, serve_js
 
 router_public = APIRouter(prefix="/rag", tags=["rag"])
-
-@router_public.post("/document", dependencies=[Depends(require_api_key)], operation_id="rag_add_document")
-async def _add_document(request: Dict[str, Any]):
-  """Add document to RAG. Delegates to endpoints.add_document_endpoint()."""
-  return await add_document_endpoint(request)
-
-@router_public.post("/search", dependencies=[Depends(require_api_key)], operation_id="rag_search")
-async def _search(request: Dict[str, Any]):
-  """Search relevant documents. Delegates to endpoints.search_endpoint()."""
-  return await search_endpoint(request)
-
-@router_public.post("/upload", dependencies=[Depends(require_api_key)], operation_id="rag_upload_file")
-async def _upload(file: UploadFile = File(...), metadata: str = "{}"):
-  """Upload file to RAG. Delegates to endpoints.upload_file_endpoint()."""
-  return await upload_file_endpoint(file, metadata)
 
 @router_public.get("/health", dependencies=[Depends(require_api_key)], operation_id="rag_health")
 async def _health():
@@ -52,35 +37,14 @@ async def _info():
   """RAG module information. Delegates to endpoints.info_endpoint()."""
   return await info_endpoint()
 
-@router_public.get("/files/stats", dependencies=[Depends(require_api_key)], operation_id="rag_files_stats")
-async def _files_stats():
-  """Uploaded files statistics. Delegates to endpoints.files_stats_endpoint()."""
-  return await files_stats_endpoint()
-
-@router_public.get("/ui", operation_id="rag_serve_ui")
-async def _serve_ui():
-  """Serve RAG main UI. Delegates to ui.serve_ui()."""
-  return await serve_ui()
-
-@router_public.get("/ui/assets/{path:path}", operation_id="rag_serve_assets")
-async def _serve_assets(path: str):
-  """Serve UI static assets. Delegates to ui.serve_assets()."""
-  return await serve_assets(path)
-
-@router_public.get("/ui/js/{path:path}", operation_id="rag_serve_js")
-async def _serve_js(path: str):
-  """Serve UI JavaScript files. Delegates to ui.serve_js()."""
-  return await serve_js(path)
-
 MODULE_METADATA = {
   "name": "rag",
   "version": MANIFEST["version"],
   "description": MANIFEST["description"],
   "router": router_public,
   "prefix": "/ui-control/rag",
-  "tags": ["rag", "vector-search", "embeddings"],
-  "ui_available": True,
-  "ui_path": "/ui-control/rag/"
+  "tags": ["rag"],
+  "ui_available": False,
 }
 
 def get_router():

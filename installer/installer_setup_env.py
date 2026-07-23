@@ -311,6 +311,17 @@ def _setup_offline_bundle(project_root, venv_path):
             print("  📦 Embedding model available offline")
 
 
+def _consent_pypi_fallback(context):
+    """Gate the offline→PyPI fallback behind explicit consent (WS8-05).
+
+    Raises UnpinnedModelError unless NEXE_ALLOW_UNPINNED is set or an
+    interactive user answers yes — the bundle's no-index guarantee is never
+    dropped silently.
+    """
+    from installer.download_verify import consent_for_unpinned_deps
+    consent_for_unpinned_deps(context)
+
+
 def _install_requirements(pip_path, req_file, venv_path):
     """Install requirements.txt with offline→PyPI fallback on failure."""
     if not req_file.exists():
@@ -330,6 +341,7 @@ def _install_requirements(pip_path, req_file, venv_path):
             if e.stderr:
                 for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-10:]:
                     print(f"     {line}")
+            _consent_pypi_fallback("requirements.txt")
             print_warn(
                 "Supply-chain guarantee lost: no-index removed, installing "
                 "from PyPI without hash pins. Verify installed packages manually."
@@ -360,6 +372,7 @@ def _install_macos_deps(pip_path, project_root, venv_path):
             if e.stderr:
                 for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-5:]:
                     print(f"     {line}")
+            _consent_pypi_fallback("requirements-macos.txt")
             print_warn(
                 "Supply-chain guarantee lost: no-index removed for macOS deps, "
                 "installing from PyPI without hash pins."
@@ -384,6 +397,7 @@ def _install_linux_deps(pip_path, project_root, venv_path):
             if e.stderr:
                 for line in e.stderr.decode("utf-8", errors="replace").splitlines()[-5:]:
                     print(f"     {line}")
+            _consent_pypi_fallback("requirements-linux.txt")
             print_warn(
                 "Supply-chain guarantee lost: no-index removed for Linux deps, "
                 "installing from PyPI without hash pins."
@@ -405,6 +419,7 @@ def _install_mlx_engines(pip_path, venv_path):
             pip_conf_path = venv_path / "pip.conf"
             if pip_conf_path.exists():
                 print(f"  ⚠️ Offline install failed for {engine_spec} — fallback to PyPI...")
+                _consent_pypi_fallback(engine_spec)
                 print_warn(
                     f"Supply-chain guarantee lost: no-index removed for {engine_spec}, "
                     "installing from PyPI without hash pins."
@@ -432,6 +447,7 @@ def _install_llama_cpp(pip_path, venv_path):
         pip_conf_path = venv_path / "pip.conf"
         if pip_conf_path.exists():
             print("  ⚠️ Offline install failed for llama-cpp-python — fallback to PyPI...")
+            _consent_pypi_fallback("llama-cpp-python")
             print_warn(
                 "Supply-chain guarantee lost: no-index removed for llama-cpp-python, "
                 "installing from PyPI without hash pins."
