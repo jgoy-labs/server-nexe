@@ -51,7 +51,7 @@ except ImportError:
 from core.log_redact import redact_user_content
 from core.endpoints.chat_sanitization import (
     _sanitize_rag_context,
-    rag_security_rule,
+    append_rag_security_rule,
     untrusted_context_turns,
     wrap_untrusted_context,
 )
@@ -160,6 +160,69 @@ def _collections_prompt_overrides(lang, rag_collections) -> str:
         if c not in rag_collections
     ]
     return ("\n\n" + "\n".join(notes)) if notes else ""
+
+
+# #850: llindar de canvi de l'idioma sticky. Els acks/manlleus curts ("ok
+# thanks"=9, "thanks a lot"=12, "merci!"=6) queden per sota; un canvi genuí és
+# una frase sencera ("can we switch to English?" >= 25). 2.5x el
+# _MIN_DETECT_CHARS de lang_detect: zona on lingua és fiable.
+_STICKY_LANG_MIN_SWITCH_CHARS = 25
+
+from core.lang_detect import (  # noqa: E402
+    detect_user_lang_or_none as _detect_lang_or_none,
+    fallback_lang as _fallback_lang,
+)
+
+
+def _resolve_session_lang(session, user_text: str) -> str:
+    """#850: reply language sticky per sessió (patró thinking_enabled).
+
+    La directiva CRITICAL va AL PRINCIPI del system: cada flip d'idioma
+    invalida el prefix des del token 0 (re-prefill complet; a llama.cpp,
+    recàrrega del GGUF). Política (endurida per la review adversarial):
+    - la 1a detecció REAL sembra l'sticky; el fallback (NEXE_LANG) es retorna
+      però MAI es sembra — un guess no es fixa, la 1a detecció real decidirà.
+    - el llindar del canvi es mesura sobre el TEXT NATURAL (codi/URLs fora):
+      "thanks mate https://…" no és un canvi d'idioma.
+    - histèresi de 2 torns: calen 2 deteccions consecutives del MATEIX idioma
+      nou per flipar. Una enganxada de traça/log en anglès enmig d'una
+      conversa catalana no invalida el prefix; un canvi genuí paga 1 torn.
+    """
+    from core.lang_detect import fallback_lang, natural_text_len
+
+    sticky = getattr(session, "lang", None)
+    detected = _detect_lang_or_none(user_text)
+    if sticky is None:
+        if detected is not None and session is not None:
+            session.lang = detected
+            return detected
+        return fallback_lang()
+    if (
+        detected
+        and detected != sticky
+        and natural_text_len(user_text) >= _STICKY_LANG_MIN_SWITCH_CHARS
+    ):
+        if getattr(session, "lang_pending", None) == detected:
+            session.lang = detected
+            session.lang_pending = None
+            return detected
+        session.lang_pending = detected
+        return sticky
+    if detected == sticky and getattr(session, "lang_pending", None) is not None:
+        session.lang_pending = None  # la conversa reafirma l'sticky → candidat fora
+    return sticky
+
+
+def _finalize_system_prompt(system_prompt: str, lang: str, rag_collections=None) -> str:
+    """Sufixos comuns de TOTS els torns: overrides de col·leccions + regla RAG.
+
+    #851: la regla de seguretat RAG és estàtica i INCONDICIONAL — qualsevol
+    sufix condicional parteix el namespace de la caché de prefix
+    (identity_hash cobreix el system sencer). La branca continue queda
+    coherent de retruc: ja no depèn de si el torn portava context.
+    """
+    system_prompt += _collections_prompt_overrides(lang, rag_collections)
+    return append_rag_security_rule(system_prompt, lang)
 
 
 def _memory_saves_enabled(rag_collections) -> bool:
@@ -1852,7 +1915,9 @@ def _format_now_natural(_now, _lang: str) -> str:
     )
 
 
-def _build_system_prompt_with_time(message: str = "", _now=None) -> tuple[str, str]:
+def _build_system_prompt_with_time(
+    message: str = "", _now=None, lang_hint: Optional[str] = None
+) -> tuple[str, str]:
     """Read system prompt from server.toml, adapt to the user's language and
     inject current datetime.
 
@@ -1871,7 +1936,10 @@ def _build_system_prompt_with_time(message: str = "", _now=None) -> tuple[str, s
         append_language_reminder,
     )
     import os as _os_inner
-    _lang = detect_user_lang(message, fallback=_os_inner.getenv("NEXE_LANG", "en"))
+    # lang_hint (#850): el call-site resol l'idioma sticky de la sessió i el
+    # passa; sense hint el comportament és EXACTAMENT l'anterior (contracte
+    # b007: canvi d'idioma = invalidació legítima).
+    _lang = lang_hint or detect_user_lang(message, fallback=_os_inner.getenv("NEXE_LANG", "en"))
     try:
         from core.lifespan import get_server_state
         from core.endpoints.chat import _get_system_prompt
@@ -1903,7 +1971,7 @@ def _inject_context_into_messages(
 
     Returns (engine_messages, doc_truncated_pct, ctx_injected). ctx_injected
     is True when untrusted retrieved content (document or RAG) was injected —
-    the caller must then append rag_security_rule() to the system prompt (B030).
+    the system-prompt rule is armed unconditionally by _finalize_system_prompt (B030/#851).
 
     B030 layer 2d (turn separation): wrapped context goes in its own user turn
     + assistant data-only ack BEFORE the user message, never inside it.
@@ -2568,11 +2636,30 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             memory_helper, message, body, attached_doc,
                         )
 
-                    # 4. Construct Final System Prompt (reply language follows the message)
-                    system_prompt, _lang = _build_system_prompt_with_time(message)
-                    # Collection toggles: the prompt must not promise sources the
-                    # user switched off (see _COLLECTIONS_OFF_NOTES).
-                    system_prompt += _collections_prompt_overrides(_lang, body.get("rag_collections"))
+                    # 4. Construct Final System Prompt (reply language: sticky per
+                    # session, #850 — an off-language short ack must not flip the
+                    # CRITICAL directive and invalidate the whole prefix cache)
+                    # Review transversal: en mode continue NO s'avança la màquina
+                    # d'estats (el continue re-alimenta _last_user: re-detectar-lo
+                    # confirmaria la histèresi i fliparia a MIG continue, fora del
+                    # prefix que ha de reutilitzar) — resolució només-lectura,
+                    # mirall del tractament de rag_collections de sota.
+                    if _continue:
+                        _lang_sticky = getattr(session, "lang", None) or _fallback_lang()
+                    else:
+                        _lang_sticky = _resolve_session_lang(session, message)
+                    system_prompt, _lang = _build_system_prompt_with_time(message, lang_hint=_lang_sticky)
+                    # Collection toggles + unconditional RAG security rule (#851).
+                    # Review #851: el body de continue NO porta rag_collections —
+                    # reutilitzem els toggles de l'últim torn (persistits a la
+                    # sessió) perquè el continue quedi DINS el prefix que acaba
+                    # de construir (i conservi les notes de col·leccions OFF).
+                    if _continue:
+                        _rag_cols = getattr(session, "rag_collections", None)
+                    else:
+                        _rag_cols = body.get("rag_collections")
+                        session.rag_collections = _rag_cols
+                    system_prompt = _finalize_system_prompt(system_prompt, _lang, _rag_cols)
 
                     # 4. Prepare messages payload for engine
                     engine_messages = [
@@ -2627,10 +2714,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             engine_messages, message, document_context, rag_context,
                             _budget, available_chars, history_chars,
                         )
-                    # B030: when untrusted retrieved content is in the message,
-                    # arm the (static, cache-friendly) data-not-instructions rule.
-                    if _ctx_injected:
-                        system_prompt += "\n\n" + rag_security_rule(_lang)
+                    # B030/#851: the data-not-instructions rule is armed
+                    # UNCONDITIONALLY in _finalize_system_prompt above — a
+                    # conditional suffix here split the prefix-cache namespace
+                    # between RAG and non-RAG turns of the same session.
 
                     # B007/D-A: clock on demand — if the user asks the time,
                     # prefix THIS turn's user message with the system clock.

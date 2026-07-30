@@ -2,7 +2,7 @@
 Tests for personality/module_manager/config_validator.py
 """
 import pytest
-import toml
+import tomli_w
 from pathlib import Path
 from personality.module_manager.config_validator import (
     ConfigValidator,
@@ -43,8 +43,7 @@ def make_valid_config(tmp_path, extra=None):
     if extra:
         config.update(extra)
     config_file = tmp_path / "server.toml"
-    with open(config_file, "w") as f:
-        toml.dump(config, f)
+    config_file.write_bytes(tomli_w.dumps(config).encode())
     return config_file
 
 
@@ -146,8 +145,7 @@ class TestValidateMethod:
             "storage": {"logging": {"level": "INFO"}}
         }
         config_file = tmp_path / "server.toml"
-        with open(config_file, "w") as f:
-            toml.dump(config, f)
+        config_file.write_bytes(tomli_w.dumps(config).encode())
         validator = ConfigValidator()
         result = validator.validate(config_file)
         assert result.valid is False
@@ -162,8 +160,7 @@ class TestValidateMethod:
             "storage": {"logging": {"level": "INFO"}}
         }
         config_file = tmp_path / "server.toml"
-        with open(config_file, "w") as f:
-            toml.dump(config, f)
+        config_file.write_bytes(tomli_w.dumps(config).encode())
         validator = ConfigValidator()
         result = validator.validate(config_file)
         assert result.valid is False
@@ -177,8 +174,7 @@ class TestValidateMethod:
             "storage": {"logging": {"level": "INFO"}}
         }
         config_file = tmp_path / "server.toml"
-        with open(config_file, "w") as f:
-            toml.dump(config, f)
+        config_file.write_bytes(tomli_w.dumps(config).encode())
         validator = ConfigValidator()
         result = validator.validate(config_file)
         assert result.valid is False
@@ -193,8 +189,7 @@ class TestValidateMethod:
             "storage": {"logging": {"level": "VERBOSE"}}  # invàlid
         }
         config_file = tmp_path / "server.toml"
-        with open(config_file, "w") as f:
-            toml.dump(config, f)
+        config_file.write_bytes(tomli_w.dumps(config).encode())
         validator = ConfigValidator()
         result = validator.validate(config_file)
         assert result.valid is False

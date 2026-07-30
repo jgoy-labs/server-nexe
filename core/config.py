@@ -13,6 +13,9 @@ www.jgoy.net · https://server-nexe.org
 import copy
 import logging
 import os
+import shutil
+import stat
+import tempfile
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -20,7 +23,7 @@ from core.env_utils import parse_port
 from core.paths.constants import BASE_CONFIG_RELATIVE
 
 import tomllib
-import toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path (tomllib stdlib is read-only)
+import tomli_w  # write path (tomllib stdlib is read-only); uiri `toml` is banned — it silently truncates multiline strings containing \[ (#834)
 
 try:
     from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -261,9 +264,46 @@ def load_config(
     return _load_multi_file_config(base, i18n)
 
 
+def atomic_toml_write(path: Path, data: Dict[str, Any], *, backup: bool = True) -> None:
+    """
+    Write a TOML file without ever leaving it truncated (#834).
+
+    Order matters: (1) serialise BEFORE touching disk, so a serialisation
+    error can never destroy the existing file; (2) keep a rolling `.bak` of
+    the previous content (per-SAVE semantics — multi-write flows pass
+    backup=False on later writes so the .bak keeps the pre-command state);
+    (3) write to a per-writer temp file in the SAME directory (mkstemp:
+    concurrent writers never promote each other's partial file), fsync it,
+    and (4) swap it in with os.replace (atomic on the same filesystem),
+    preserving the target's permission bits and writing THROUGH symlinks.
+    `.bak`/`.tmp` suffixes deliberately do not end in `.toml` so manifest
+    globs never pick them up.
+    """
+    path = Path(path)
+    if path.exists():
+        path = path.resolve()  # write through symlinks, never replace the link itself
+    payload = tomli_w.dumps(data)
+    if backup and path.exists():
+        shutil.copy2(path, path.with_name(path.name + ".bak"))
+    fd, tmp_name = tempfile.mkstemp(
+        dir=path.parent, prefix=path.name + ".", suffix=".tmp"
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(payload.encode("utf-8"))
+            f.flush()
+            os.fsync(f.fileno())  # survive power loss right after the replace
+        if path.exists():
+            os.chmod(tmp, stat.S_IMODE(os.stat(path).st_mode))  # keep 0600 et al.
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def save_config(config: Dict[str, Any], config_path: Path) -> bool:
     """
-    Save configuration to a TOML file.
+    Save configuration to a TOML file (atomic, with .bak backup).
 
     Args:
         config: Configuration dictionary to save
@@ -273,8 +313,7 @@ def save_config(config: Dict[str, Any], config_path: Path) -> bool:
         True if saved successfully
     """
     try:
-        with open(config_path, 'w', encoding='utf-8') as f:
-            toml.dump(config, f)
+        atomic_toml_write(Path(config_path), config)
         logger.info("Config saved to %s", config_path)
         return True
     except Exception as e:

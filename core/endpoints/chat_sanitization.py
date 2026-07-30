@@ -278,6 +278,19 @@ def rag_security_rule(lang: str) -> str:
     return _RAG_SECURITY_RULE.get(lang, _RAG_SECURITY_RULE["en"])
 
 
+def append_rag_security_rule(system_prompt: str, lang: str) -> str:
+    """#851: arm the STATIC rule UNCONDITIONALLY, shared by both chat routes.
+
+    The rule was appended only on turns that carried retrieved context, which
+    split the prefix-cache namespace: identity_hash covers the WHOLE system,
+    so RAG-on and RAG-off turns of the same session hashed differently (two
+    trie nodes on MLX; a _destroy + GGUF reload on llama.cpp). The rule is
+    static precisely so the cache can hold (see _RAG_SECURITY_RULE design
+    note above) — its fixed ~400-char cost is the price of a stable prefix.
+    """
+    return system_prompt + "\n\n" + rag_security_rule(lang)
+
+
 # B030 layer 2d — TURN SEPARATION. Retrieved content used to be prepended to the
 # user's own message, so injected prose spoke with the USER's authority (the
 # strongest slot in the conversation). Now it travels in its own user turn,

@@ -30,7 +30,7 @@ httpx==0.28.1
 # qdrant-client is installed separately by build-sidecar.sh with --no-deps (grpcio
 # has no win_arm64 wheel; the vendored grpc-shim satisfies qdrant's unconditional
 # `import grpc`). Do NOT list it here or pip would try to resolve grpcio.
-toml==0.10.2
+tomli-w==1.2.0  # TOML writes (reads: stdlib tomllib). uiri toml BANNED: truncates multiline strings with \[ silently (#834)
 structlog==25.5.0
 click==8.4.1
 # rich/typer pinned on purpose (typer 0.9.x API used by the code; bumping breaks the

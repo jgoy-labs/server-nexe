@@ -7,7 +7,6 @@ Covers uncovered lines: 72-80, 87-88, 105, 115-119, 143, 153-157,
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-import toml
 
 from personality.module_manager.config_manager import ConfigManager
 
@@ -162,8 +161,8 @@ class TestLoadManifest:
         assert "module" in result
 
     def test_load_corrupt_manifest_returns_default(self, tmp_path):
-        """B106: a corrupt TOML manifest must not kill the boot. toml.load raises
-        TomlDecodeError (a ValueError subclass) which the broadened except must
+        """B106: a corrupt TOML manifest must not kill the boot. tomllib.load raises
+        TOMLDecodeError (a ValueError subclass) which the broadened except must
         catch and fall back to the default dict instead of propagating."""
         config_file = tmp_path / "server.toml"
         config_file.write_text("")

@@ -14,7 +14,7 @@ python-multipart==0.0.32  # CVE-2026-40347; GHSA-pp6c-gr5w-3c5g fixed in 0.0.27
 starlette-csrf==3.0.0
 httpx==0.28.1
 qdrant-client==1.18.0
-toml==0.10.2
+tomli-w==1.2.0  # TOML writes (reads: stdlib tomllib). uiri toml BANNED: truncates multiline strings with \[ silently (#834)
 structlog==25.5.0
 click==8.4.1
 # rich/typer pinats VOLGUTS: typer 0.9.0 (API antiga usada pel codi; pujar-lo trenca el build,

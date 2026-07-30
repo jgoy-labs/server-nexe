@@ -23,10 +23,10 @@ from plugins.security.core.input_sanitizers import validate_string_input, strip_
 from .chat_schemas import Message, ChatCompletionRequest
 from core.log_redact import redact_user_content
 from .chat_sanitization import (
+    append_rag_security_rule,
     _sanitize_rag_context,
     _sanitize_sse_token,
     _estimate_tokens,
-    rag_security_rule,
     untrusted_context_turns,
     wrap_untrusted_context,
     MAX_RAG_CONTEXT_LENGTH,
@@ -258,8 +258,9 @@ def _inject_rag_context_into_messages(messages: list, context_text: str, server_
         if messages[i]['role'] == 'user':
             messages[i:i] = untrusted_context_turns(wrapped, server_lang)
             break
-    if messages[0]['role'] == 'system':
-        messages[0]['content'] += "\n\n" + rag_security_rule(server_lang)
+    # #851: la regla de seguretat s'arma INCONDICIONALMENT al caller
+    # (_build_rag_and_system_prompt) — aquí només corria amb context i
+    # partia el namespace de la caché de prefix entre torns amb/sense RAG.
 
 
 async def _build_rag_and_system_prompt(
@@ -280,6 +281,12 @@ async def _build_rag_and_system_prompt(
     _ensure_system_message(messages, app_state, server_lang)
 
     _inject_rag_context_into_messages(messages, context_text, server_lang, effective_ctx_window)
+
+    # #851: static data-not-instructions rule, UNCONDITIONAL (parity with the
+    # web UI route via the shared helper) — a conditional suffix split the
+    # prefix-cache namespace between RAG and non-RAG turns.
+    if messages and messages[0]['role'] == 'system':
+        messages[0]['content'] = append_rag_security_rule(messages[0]['content'], server_lang)
 
     return messages, context_text
 

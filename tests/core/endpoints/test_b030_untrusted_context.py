@@ -109,7 +109,7 @@ class TestInjectRagContextIntoMessages:
             {"role": "user", "content": "quin es el meu nom?"},
         ]
 
-    def test_context_in_own_turns_user_message_clean_system_rule_armed(self):
+    def test_context_in_own_turns_user_message_clean_system_untouched(self):
         messages = self._messages()
         _inject_rag_context_into_messages(messages, "fets recuperats", "ca")
         # [system, user(context), assistant(ack), user(question)]
@@ -121,7 +121,10 @@ class TestInjectRagContextIntoMessages:
         assert messages[2]["content"] == _UNTRUSTED_ACK["ca"]
         # The user's question arrives CLEAN as the last word (layer 2d).
         assert messages[-1]["content"] == "quin es el meu nom?"
-        assert messages[0]["content"].endswith(_RAG_SECURITY_RULE["ca"])
+        # #851 (contracte INVERTIT): la injecció ja NO toca el system — la
+        # regla s'arma INCONDICIONALMENT a _build_rag_and_system_prompt,
+        # perquè un sufix condicional partia el namespace de la caché.
+        assert messages[0]["content"] == "You are Nexe."
 
     def test_pair_inserted_before_last_user_turn_with_history(self):
         messages = [

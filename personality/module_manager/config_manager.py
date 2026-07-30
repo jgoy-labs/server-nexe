@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 
 from pathlib import Path
 from typing import Dict, Any, Optional
-import toml  # type: ignore[import-untyped]  # FP: types-toml available but not installed
+import tomllib  # read-only aquí; l'escriptura va per core.config.atomic_toml_write (#834)
 
 from core.config import (
     load_config as core_load_config,
@@ -163,14 +163,14 @@ class ConfigManager:
       Dictionary with manifest data
     """
     try:
-      with open(manifest_path, 'r', encoding='utf-8') as f:
-        return toml.load(f)
+      with open(manifest_path, 'rb') as f:
+        return tomllib.load(f)
     except FileNotFoundError as e:
       logger.debug("Manifest file not found: %s - %s", manifest_path, e)
       pass
-    except (IOError, KeyError, toml.TomlDecodeError) as e:
+    except (IOError, KeyError, tomllib.TOMLDecodeError) as e:
       # B106: a corrupt/unparseable manifest must not crash the boot — fall
-      # back to the default dict below. TomlDecodeError is a ValueError subclass;
+      # back to the default dict below. TOMLDecodeError is a ValueError subclass;
       # we catch it explicitly rather than bare ValueError so genuine
       # programming errors inside the try still surface.
       logger.warning("Error reading manifest: %s - %s", manifest_path, e)

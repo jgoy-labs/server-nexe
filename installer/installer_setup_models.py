@@ -30,6 +30,7 @@ from .installer_display import (
     print_success, print_warn,
 )
 from .installer_i18n import t
+from .ollama_ready import ollama_api_alive, wait_ollama_api_ready
 from .installer_ollama_install import (  # re-exported — see docstring
     _find_ollama,
     ensure_ollama_installed,
@@ -82,23 +83,22 @@ def _ollama_prompt_choice(headless):
 
 
 def _ollama_ensure_running(ollama_bin):
-    """Start ollama serve if not already running and wait up to 15s."""
-    import time
-    import socket
-    result = subprocess.run([ollama_bin, "list"], capture_output=True, text=True, **no_window_kwargs())  # nosec B603: ollama_bin from _find_ollama (whitelisted absolute paths or PATH-resolved); literal subcommand
-    if result.returncode != 0:
-        print(f"{YELLOW}[...]{RESET} {t('starting_ollama')}")
-        # `ollama serve` is a daemon that must outlive this call → detached_kwargs
-        # (no console window on Windows; own session on POSIX).
-        subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **detached_kwargs())  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal `serve` subcommand
-        for _ in range(30):
-            try:
-                with socket.create_connection(("localhost", 11434), timeout=0.5):
-                    break
-            except (ConnectionRefusedError, OSError):
-                time.sleep(0.5)
-        else:
-            print(f"{YELLOW}[WARN]{RESET} Ollama may not be ready yet")
+    """Start ollama serve if needed and block until the API answers (#833).
+
+    "Alive" means GET /api/tags == 200 — `ollama list` returncode and TCP
+    accept both lie during startup. On timeout this RAISES (the caller's
+    existing CalledProcessError handler shows the manual instructions);
+    warn-and-continue used to hand a dead daemon to `ollama pull`.
+    """
+    if ollama_api_alive():
+        return
+    print(f"{YELLOW}[...]{RESET} {t('starting_ollama')}")
+    # `ollama serve` is a daemon that must outlive this call → detached_kwargs
+    # (no console window on Windows; own session on POSIX).
+    subprocess.Popen([ollama_bin, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **detached_kwargs())  # nosec B603: ollama_bin from _find_ollama (whitelisted); literal `serve` subcommand
+    if not wait_ollama_api_ready(timeout=60.0):
+        print(f"{YELLOW}[WARN]{RESET} Ollama API not ready after 60s — aborting model pull")
+        raise subprocess.CalledProcessError(1, "ollama serve (API /api/tags never became ready)")
 
 
 def _ollama_pull_model(ollama_bin, model_id):

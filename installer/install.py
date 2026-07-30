@@ -347,8 +347,9 @@ def _download_embeddings(project_root: Path, python_path: Path) -> None:
 
     _emb_model = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
     try:
-        import toml as _toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path
-        _srv_cfg = _toml.load(project_root / "personality" / "server.toml")
+        import tomllib as _tomllib  # uiri toml perdia [plugins.models] del server.toml real (#834) → mai honorava l'embedding configurat
+        with open(project_root / "personality" / "server.toml", "rb") as _f:
+            _srv_cfg = _tomllib.load(_f)
         _emb_model = _srv_cfg.get("plugins", {}).get("models", {}).get("embedding", _emb_model)
     except Exception:  # nosec B110: best-effort server.toml read; on failure keep default embedding model literal
         pass

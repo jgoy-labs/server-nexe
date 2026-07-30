@@ -73,7 +73,16 @@ class TestBuildRagAndSystemPrompt:
         messages, context = await _build_rag_and_system_prompt(body, app_state, "en")
         system_msgs = [m for m in messages if m["role"] == "system"]
         assert len(system_msgs) == 1
-        assert system_msgs[0]["content"] == "custom"
+        # #851 (contracte actualitzat): el system custom es conserva PERÒ la
+        # regla RAG estàtica s'arma INCONDICIONALMENT (abans només amb context
+        # → el hash del system divergia entre torns i partia la caché de prefix).
+        assert system_msgs[0]["content"].startswith("custom")
+        from core.endpoints.chat_sanitization import _RAG_SECURITY_RULE
+
+        assert system_msgs[0]["content"].endswith(_RAG_SECURITY_RULE["en"])
+        assert system_msgs[0]["content"].count(_RAG_SECURITY_RULE["en"]) == 1, (
+            "la regla no es pot duplicar"
+        )
 
     async def test_rag_disabled_returns_empty_context(self):
         body = _make_body(use_rag=False)

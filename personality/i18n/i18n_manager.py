@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import toml  # type: ignore[import-untyped]  # FP: types-toml available but not installed
+import tomllib  # uiri toml moria abans de [personality.i18n] al server.toml real (#834)
 
 __all__ = ['I18nManager']
 
@@ -50,9 +50,9 @@ class I18nManager:
     """Load language configuration from server.toml"""
     try:
       if self.config_path.exists():
-        with open(self.config_path, 'r', encoding='utf-8') as f:
-          self.config = toml.load(f)
-      
+        with open(self.config_path, 'rb') as f:
+          self.config = tomllib.load(f)
+
       loc_config = self.config.get('personality', {}).get('location', {})
       self.current_language = loc_config.get('idioma_principal', 'ca-ES')
       self.fallback_language = loc_config.get('fallback_idioma', 'ca-ES')

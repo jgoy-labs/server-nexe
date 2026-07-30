@@ -108,7 +108,7 @@ primary = "/path/to/mlx/model"
             mock_abs.exists.return_value = True
 
             # mock toml.load to return our config
-            import toml as toml_mod
+            import tomllib as toml_mod
             with patch.object(toml_mod, "load", return_value={
                 "plugins": {
                     "models": {

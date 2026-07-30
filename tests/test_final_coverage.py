@@ -1736,7 +1736,7 @@ class TestConfigValidatorFinal:
     def test_validate_invalid_environment(self, tmp_path):
         """Line 157: invalid environment."""
         from personality.module_manager.config_validator import ConfigValidator
-        import toml
+        import tomli_w
 
         config = {
             "meta": {"version": "0.8", "environment": "invalid_env"},
@@ -1746,7 +1746,7 @@ class TestConfigValidatorFinal:
             "storage": {"logging": {"level": "INFO"}}
         }
         cfg_path = tmp_path / "server.toml"
-        cfg_path.write_text(toml.dumps(config))
+        cfg_path.write_text(tomli_w.dumps(config))
 
         v = ConfigValidator()
         result = v.validate(cfg_path)
@@ -1755,7 +1755,7 @@ class TestConfigValidatorFinal:
     def test_validate_invalid_port(self, tmp_path):
         """Lines 168-170: port out of range."""
         from personality.module_manager.config_validator import ConfigValidator
-        import toml
+        import tomli_w
 
         config = {
             "meta": {"version": "0.8", "environment": "development"},
@@ -1765,7 +1765,7 @@ class TestConfigValidatorFinal:
             "storage": {"logging": {"level": "INFO"}}
         }
         cfg_path = tmp_path / "server.toml"
-        cfg_path.write_text(toml.dumps(config))
+        cfg_path.write_text(tomli_w.dumps(config))
 
         v = ConfigValidator()
         result = v.validate(cfg_path)
@@ -1774,7 +1774,7 @@ class TestConfigValidatorFinal:
     def test_validate_invalid_workers(self, tmp_path):
         """Line 181: workers < 1."""
         from personality.module_manager.config_validator import ConfigValidator
-        import toml
+        import tomli_w
 
         config = {
             "meta": {"version": "0.8", "environment": "development"},
@@ -1784,7 +1784,7 @@ class TestConfigValidatorFinal:
             "storage": {"logging": {"level": "INFO"}}
         }
         cfg_path = tmp_path / "server.toml"
-        cfg_path.write_text(toml.dumps(config))
+        cfg_path.write_text(tomli_w.dumps(config))
 
         v = ConfigValidator()
         result = v.validate(cfg_path)
@@ -1793,7 +1793,7 @@ class TestConfigValidatorFinal:
     def test_validate_invalid_cors_url(self, tmp_path):
         """Lines 208-213: invalid CORS origin URL."""
         from personality.module_manager.config_validator import ConfigValidator
-        import toml
+        import tomli_w
 
         config = {
             "meta": {"version": "0.8", "environment": "development"},
@@ -1804,7 +1804,7 @@ class TestConfigValidatorFinal:
             "storage": {"logging": {"level": "INFO"}}
         }
         cfg_path = tmp_path / "server.toml"
-        cfg_path.write_text(toml.dumps(config))
+        cfg_path.write_text(tomli_w.dumps(config))
 
         v = ConfigValidator()
         result = v.validate(cfg_path)
@@ -1813,7 +1813,7 @@ class TestConfigValidatorFinal:
     def test_validate_section(self, tmp_path):
         """Lines 326-370: validate_section for specific section."""
         from personality.module_manager.config_validator import ConfigValidator
-        import toml
+        import tomli_w
 
         config = {
             "meta": {"version": "0.8", "environment": "development"},
@@ -1822,7 +1822,7 @@ class TestConfigValidatorFinal:
             "storage": {"logging": {"level": "INFO"}}
         }
         cfg_path = tmp_path / "server.toml"
-        cfg_path.write_text(toml.dumps(config))
+        cfg_path.write_text(tomli_w.dumps(config))
 
         v = ConfigValidator()
         result = v.validate_section(cfg_path, "core")

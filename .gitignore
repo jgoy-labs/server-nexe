@@ -97,3 +97,7 @@ Thumbs.db
 # =====================
 --output
 --help
+
+# Atomic TOML writer residues (server.toml.bak / server.toml.XXXX.tmp)
+*.toml.bak
+*.toml.*.tmp

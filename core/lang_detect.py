@@ -79,26 +79,57 @@ def _strip_noise(text: str) -> str:
     return text.strip()
 
 
+def fallback_lang(explicit: Optional[str] = None) -> str:
+    """Public fallback resolution (explicit → NEXE_LANG → 'en'), normalised.
+
+    Exposed so callers (#850 sticky policy) never re-implement the
+    normalisation — an inline copy once dropped the trailing 'en' guard and
+    seeded an empty language from a degenerate NEXE_LANG.
+    """
+    return _fallback_lang(explicit)
+
+
+def natural_text_len(message: str) -> int:
+    """Length of the natural-language content (code blocks/inline/URLs out).
+
+    This is the text lingua actually judged — switch gates (#850) must
+    measure THIS, not the raw string ("thanks mate https://…" is 34 raw
+    chars but only 11 of language).
+    """
+    return len(_strip_noise(message or ""))
+
+
+def detect_user_lang_or_none(message: str) -> Optional[str]:
+    """Pure detection: ISO 639-1 code only when lingua makes a REAL call.
+
+    ``None`` means "no signal": detector unavailable, empty/short/code-only
+    text, or lingua judged it ambiguous. Callers deciding whether to SWITCH a
+    sticky session language must never treat a fallback as a detection (#850).
+    """
+    if _DETECTOR is None or not message:
+        return None
+
+    cleaned = _strip_noise(message)
+    if len(cleaned) < _MIN_DETECT_CHARS:
+        return None
+
+    # detect_language_of returns the best candidate, or None when lingua judges
+    # the text too ambiguous to call — exactly the no-signal we want.
+    detected = _DETECTOR.detect_language_of(cleaned)
+    if detected is None:
+        return None
+
+    return detected.iso_code_639_1.name.lower()
+
+
 def detect_user_lang(message: str, fallback: Optional[str] = None) -> str:
     """Detect the language of a user message (ISO 639-1, any of lingua's langs).
 
     Falls back to ``fallback`` (else ``NEXE_LANG``, else ``"en"``) when lingua is
     unavailable, the message is too short/ambiguous/code, or confidence is low.
     """
-    if _DETECTOR is None or not message:
-        return _fallback_lang(fallback)
-
-    cleaned = _strip_noise(message)
-    if len(cleaned) < _MIN_DETECT_CHARS:
-        return _fallback_lang(fallback)
-
-    # detect_language_of returns the best candidate, or None when lingua judges
-    # the text too ambiguous to call — exactly the fallback signal we want.
-    detected = _DETECTOR.detect_language_of(cleaned)
-    if detected is None:
-        return _fallback_lang(fallback)
-
-    return detected.iso_code_639_1.name.lower()
+    detected = detect_user_lang_or_none(message)
+    return detected if detected is not None else _fallback_lang(fallback)
 
 
 def language_name_en(lang: str) -> str:

@@ -3,7 +3,7 @@ Tests for core/config.py
 """
 import os
 import pytest
-import toml
+import tomllib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -107,7 +107,8 @@ class TestSaveConfig:
         result = save_config(config, config_file)
         assert result is True
         assert config_file.exists()
-        loaded = toml.load(str(config_file))
+        with open(config_file, 'rb') as _f:
+            loaded = tomllib.load(_f)
         assert loaded["core"]["server"]["host"] == "127.0.0.1"
 
     def test_returns_false_on_error(self, tmp_path):

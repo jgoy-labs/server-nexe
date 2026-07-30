@@ -41,6 +41,9 @@ class ChatSession:
         self.compaction_count: int = 0  # How many times it has been compacted
         self.custom_name: Optional[str] = None  # User-defined session name
         self.thinking_enabled: bool = False  # Per-session thinking toggle (default OFF)
+        self.lang: Optional[str] = None  # #850: sticky reply language (seeded on 1st real detection)
+        self.lang_pending: Optional[str] = None  # #850 hysteresis: candidate awaiting 2nd confirmation (transient)
+        self.rag_collections: Optional[list] = None  # #851: last turn's toggles — continue has no body copy
         self._recently_deleted_facts: list = []  # Transient, not persisted to disk
 
     def add_message(self, role: str, content: str, stats: dict = None,  # type: ignore[assignment]  # no_implicit_optional
@@ -207,6 +210,10 @@ class ChatSession:
         if self.custom_name is not None:
             d["custom_name"] = self.custom_name
         d["thinking_enabled"] = self.thinking_enabled
+        if self.lang is not None:
+            d["lang"] = self.lang
+        if self.rag_collections is not None:
+            d["rag_collections"] = self.rag_collections
         if self.context_summary:
             d["context_summary"] = self.context_summary
             d["compaction_count"] = self.compaction_count
@@ -225,6 +232,8 @@ class ChatSession:
         session.attached_document = data.get("attached_document")
         session.custom_name = data.get("custom_name")
         session.thinking_enabled = data.get("thinking_enabled", False)
+        session.lang = data.get("lang")  # legacy .enc sense lang → None (re-seed al 1r torn)
+        session.rag_collections = data.get("rag_collections")
         session.context_summary = data.get("context_summary")
         session.compaction_count = data.get("compaction_count", 0)
         return session

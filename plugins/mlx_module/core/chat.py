@@ -995,6 +995,60 @@ class MLXChatNode:
             num_images=num_images,
         )
 
+    @staticmethod
+    def _reset_rotated_vlm_state(prompt_cache_state) -> bool:
+        """Review #826 (major): mai reutilitzar un RotatingKVCache ja rotat.
+
+        Amb max_kv_size, mlx_vlm crea RotatingKVCache al 1r torn; el camí de
+        reuse (generate.py) trima amb semàntica de KVCache PLA
+        (`keys[:, :, :prefix_len]` + offset) — un cop el buffer ha rotat,
+        aquest trim conserva brossa entrellaçada com a "prefix" de la
+        conversa. Si detectem rotació, resetegem l'estat: es perd el reuse
+        d'AQUEST torn (re-prefill) però mai es corromp el context. Retorna
+        True si s'ha resetejat.
+        """
+        cache = getattr(prompt_cache_state, "cache", None)
+        if not cache:
+            return False
+        try:
+            rotated = any(
+                type(c).__name__ == "RotatingKVCache"
+                and getattr(c, "offset", 0) >= (getattr(c, "max_size", None) or float("inf"))
+                for c in cache
+            )
+        except TypeError:  # fakes no iterables als tests
+            return False
+        if rotated:
+            prompt_cache_state.cache = None
+            prompt_cache_state.token_ids = None
+            logger.info(
+                "MLX VLM cache: RotatingKVCache rotated — state reset "
+                "(fresh bounded cache this turn; prefix reuse skipped, #826)"
+            )
+        return rotated
+
+    def _log_vlm_kv_request(self, model, prompt_cache_state=None) -> None:
+        """#826/#845 instrumentation, VLM twin of "MLX cache created:" (text path).
+
+        Records whether the requested max_kv_size can actually be enforced:
+        mlx_vlm delegates to language_model.make_cache() when the model
+        defines it (Qwen3.5/gemma…), IGNORING the limit — FD-S7 needs this
+        verdict in the field logs to (re)attribute degeneration.
+        """
+        lang_model = getattr(model, "language_model", None)
+        owned = hasattr(lang_model, "make_cache")
+        # Review #826: INFO només quan mlx_vlm CREARÀ el cache (com el twin
+        # "MLX cache created:" del camí text); en reuse (torns 2+) el veredicte
+        # és el mateix fet per-sessió → DEBUG per no inundar el log.
+        creating = prompt_cache_state is None or getattr(prompt_cache_state, "cache", None) is None
+        logger.log(
+            logging.INFO if creating else logging.DEBUG,
+            "MLX VLM cache request: max_kv_size=%d %s",
+            self.config.max_kv_size,
+            "(model-owned make_cache — NOT enforced inside mlx_vlm, #845)"
+            if owned else "(enforced via mlx_vlm prompt cache)",
+        )
+
     def _run_vlm_streaming(
         self,
         model,
@@ -1026,7 +1080,18 @@ class MLXChatNode:
         # that doesn't accept this kwarg keeps working unchanged (no reuse).
         cache_kwargs = {}
         if prompt_cache_state is not None:
+            # Review #826: un RotatingKVCache rotat no es pot reutilitzar (el
+            # trim de mlx_vlm assumeix KVCache pla) — reset abans de passar-lo.
+            self._reset_rotated_vlm_state(prompt_cache_state)
             cache_kwargs["prompt_cache_state"] = prompt_cache_state
+        # #826: cap the KV on the VLM path too (the text path already does via
+        # make_prompt_cache). mlx_vlm honours max_kv_size when it CREATES the
+        # prompt_cache; with a reused prompt_cache_state (turns 2+) the
+        # existing cache is passed through unchanged. Models whose
+        # language_model defines make_cache() (Qwen3.5 & co.) ignore the limit
+        # inside mlx_vlm (#845, FD-S7) — the log below records the verdict.
+        cache_kwargs["max_kv_size"] = self.config.max_kv_size
+        self._log_vlm_kv_request(model, prompt_cache_state)
         # Sampling params: mlx_vlm >= 0.4 accepts temperature/top_p via **kwargs.
         # Passed only when set so unset values (and older mlx_vlm) keep prior
         # behavior. This also fixes temperature being dropped on the VLM path.
@@ -1081,6 +1146,7 @@ class MLXChatNode:
             sampling_kwargs["temperature"] = temperature
         if top_p is not None:
             sampling_kwargs["top_p"] = top_p
+        self._log_vlm_kv_request(model)
         one = vlm_generate(
             model=model,
             processor=processor,
@@ -1088,6 +1154,7 @@ class MLXChatNode:
             prompt=formatted_prompt,
             max_tokens=max_tokens or self.config.max_tokens,
             verbose=False,
+            max_kv_size=self.config.max_kv_size,  # #826 — see _run_vlm_streaming
             **sampling_kwargs,
             **_prefill_step_kwargs(self.config.model_path),
         )
@@ -1101,8 +1168,9 @@ class MLXChatNode:
     def _compute_continuable(self, result: Dict[str, Any], is_vlm: bool) -> bool:
         """Whether a truncated answer can be resumed with a Continue (FD-S6).
 
-        Only the MLX text path qualifies (VLM has no reliable finish_reason,
-        no continue support and an unbounded KV inside mlx_vlm). The KV gate
+        Only the MLX text path qualifies (VLM has no reliable finish_reason
+        and no continue support; its KV is bounded since #826 except for
+        models with a model-owned make_cache — #845, FD-S7). The KV gate
         keeps a Continue chain from crossing the rotating window (which would
         evict the system prompt and degenerate mid-chain, B004) and from
         hitting the untrimmable-when-full corner of RotatingKVCache.

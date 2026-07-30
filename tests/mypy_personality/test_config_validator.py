@@ -14,7 +14,7 @@ Contract pin: validate() must return ValidationResult(valid=False, errors=[...])
 NOT crash with TypeError.
 """
 import pytest
-import toml
+import tomli_w
 
 
 def test_cluster1_missing_required_key_returns_validation_error(tmp_path):
@@ -33,7 +33,7 @@ def test_cluster1_missing_required_key_returns_validation_error(tmp_path):
         "storage": {"logging": {"level": "INFO"}},
     }
     cfg_path = tmp_path / "server.toml"
-    cfg_path.write_text(toml.dumps(config))
+    cfg_path.write_text(tomli_w.dumps(config))
 
     v = ConfigValidator()
     result = v.validate(cfg_path)
@@ -94,7 +94,7 @@ def test_cluster1_temperature_out_of_range_returns_validation_error(tmp_path):
         "storage": {"logging": {"level": "INFO"}},
     }
     cfg_path = tmp_path / "server.toml"
-    cfg_path.write_text(toml.dumps(config))
+    cfg_path.write_text(tomli_w.dumps(config))
 
     v = ConfigValidator()
     result = v.validate(cfg_path)

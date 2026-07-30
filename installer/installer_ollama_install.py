@@ -28,6 +28,21 @@ from .installer_display import (
     print_step, print_success, print_warn,
 )
 from .installer_i18n import t
+from .ollama_ready import wait_ollama_api_ready
+
+
+def _wait_api_after_install() -> bool:
+    """#833: èxit d'instal·lació = API responent (GET /api/tags == 200).
+
+    Un port TCP obert o el binari CLI present NO garanteixen que el pull
+    posterior funcioni. En timeout retornem False — el "let the pull retry"
+    d'abans era mentida: cap retry existia.
+    """
+    if wait_ollama_api_ready(timeout=30.0):
+        print_success(t('ollama_installed'))
+        return True
+    print_warn("Ollama installed but its API never became ready — start Ollama manually and re-run")
+    return False
 
 
 def _safe_extract_zip(zf: zipfile.ZipFile, dest_dir: str) -> None:
@@ -307,9 +322,19 @@ def _install_ollama_macos() -> bool:
             time.sleep(2)
             ollama_bin = _find_ollama()
             if os.path.isfile(ollama_bin):
-                print_success(t('ollama_installed'))
+                # CLI al lloc; ara exigim l'API responent (#833)
+                if _wait_api_after_install():
+                    return True
+                # Review #833: el primer launch d'Ollama.app pot trigar >30s
+                # (Gatekeeper/first-run). No avortem TOT l'install: el pull
+                # queda gated igualment per _ollama_ensure_running (60s +
+                # spawn headless de recuperació) — l'invariant "mai pull amb
+                # Ollama mort" es manté aigües avall.
+                print_warn("Ollama API slow to start — continuing; the model step re-checks it")
                 return True
 
+        # CLI mai aparegut: mateix criteri soft — el gate del pas de models
+        # (_ollama_ensure_running / gate SSE) és qui decideix si es pot tirar.
         print_warn("Ollama.app installed but CLI not yet available — try again in a moment")
         return True
 
@@ -416,7 +441,6 @@ def _install_ollama_windows() -> bool:
     (opt-in pin, like the macOS/Linux paths); a mismatch aborts the install.
     """
     import hashlib
-    import socket
     import tempfile
 
     # Lazy import: this module is also loaded by the standalone macOS DMG path
@@ -494,18 +518,9 @@ def _install_ollama_windows() -> bool:
         except Exception as e:  # noqa: BLE001 — serve is best-effort; the pull will surface a clear error if it never came up
             print_warn(f"ollama serve did not start: {e}")
 
-        # Wait for the daemon to accept connections so the subsequent
-        # `ollama pull` can reach it (default 127.0.0.1:11434).
-        for _ in range(20):
-            try:
-                with socket.create_connection(("127.0.0.1", 11434), timeout=1):
-                    print_success(t('ollama_installed'))
-                    return True
-            except OSError:
-                time.sleep(1)
-        # Binary is installed even if serve is slow; let the pull retry.
-        print_success(t('ollama_installed'))
-        return True
+        # Wait for the API (not just a TCP accept) so the subsequent
+        # `ollama pull` can actually work (default 127.0.0.1:11434). #833
+        return _wait_api_after_install()
 
     except subprocess.TimeoutExpired:
         print_warn("Ollama download timed out (>10 min)")

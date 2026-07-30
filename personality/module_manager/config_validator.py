@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-import toml  # type: ignore[import-untyped]  # FP: types-toml available but not installed
+import tomllib  # uiri toml trunca multiline amb \[ en silenci (#834) — validar amb el parser bo
 import re
 
 @dataclass
@@ -81,7 +81,8 @@ class ConfigValidator:
     warnings = []
     
     try:
-      config = toml.load(config_path)
+      with open(config_path, 'rb') as _f:
+        config = tomllib.load(_f)
     except Exception as e:
       return ValidationResult(
         valid=False,
@@ -341,7 +342,8 @@ class ConfigValidator:
       ValidationResult for the specific section
     """
     try:
-      config = toml.load(config_path)
+      with open(config_path, 'rb') as _f:
+        config = tomllib.load(_f)
     except Exception as e:
       return ValidationResult(
         valid=False,

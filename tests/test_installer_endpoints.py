@@ -303,8 +303,15 @@ class TestDownloadValidation:
         async def _fake_stream(model_id, request):
             yield {"type": "done", "model_id": model_id}
 
+        async def _no_preflight(engine, model_id):
+            return None
+
         monkeypatch.setattr("core.endpoints.installer._stream_gguf", _fake_stream)
         monkeypatch.setattr("core.endpoints.installer._stream_ollama", _fake_stream)
+        # El preflight HF real fa XARXA: amb connexió viva, "test-model" → 404
+        # → error event i el test flaquejava segons l'estat de HF. El contracte
+        # d'aquest test és el dispatch per engine, no l'accés a HF.
+        monkeypatch.setattr("core.endpoints.installer._preflight_hf_access", _no_preflight)
         resp = client.get(f"/installer/download?engine={engine}&model_id=test-model")
         assert resp.status_code == 200
         body = resp.text

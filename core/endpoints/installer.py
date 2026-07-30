@@ -414,10 +414,22 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
     # server is up (spawn + wait for readiness) before pulling. Idempotent: it
     # returns early when Ollama is already running.
     from plugins.ollama_module.core.client import resolve_base_url
-    from plugins.ollama_module.core.ollama_runtime import ensure_ollama_running
+    from plugins.ollama_module.core.ollama_runtime import (
+        ensure_ollama_running,
+        is_ollama_running,
+    )
 
     yield {"type": "progress", "stage": "Iniciant Ollama...", "percent": 0}
-    await ensure_ollama_running(resolve_base_url(), wait=True)
+    _base = resolve_base_url()
+    await ensure_ollama_running(_base, wait=True)
+    # #833 (review): ensure_ollama_running retorna el Popen encara que el
+    # wait esgoti el pressupost — sense aquest gate, el pull corria igualment
+    # contra un daemon mort i moria amb l'error críptic "ollama pull failed".
+    if not await is_ollama_running(_base):
+        raise RuntimeError(
+            "Ollama API not ready (/api/tags) — cannot pull the model; "
+            "start Ollama and retry the onboarding step"
+        )
 
     proc = await asyncio.create_subprocess_exec(
         ollama, "pull", model_id,

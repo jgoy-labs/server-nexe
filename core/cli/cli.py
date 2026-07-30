@@ -14,6 +14,7 @@ www.jgoy.net · https://server-nexe.org
 # transform). The .command/.group/.add_command accesses and `app(...)` invocation
 # are all valid at runtime — mypy accepts them; pyright is over-strict here.
 
+import os
 import sys
 import click
 from typing import Optional, List
@@ -349,8 +350,9 @@ def setup_models(ctx: click.Context, apply: bool):
     """Detect hardware and configure recommended models."""
     from personality.models import ModelSelector
     from pathlib import Path
-    import toml  # type: ignore[import-untyped]  # toml lacks stubs (deprecated); kept for write path
-    
+    import tomllib  # read; writes go through atomic_toml_write (#834: uiri toml truncated server.toml silently)
+    from core.config import atomic_toml_write
+
     click.echo(t("cli.hardware.analyzing"))
     selector = ModelSelector()
     hw_info = selector.analyze()
@@ -375,12 +377,12 @@ def setup_models(ctx: click.Context, apply: bool):
             return
             
         try:
-            config = toml.load(config_path)
+            with open(config_path, 'rb') as f:
+                config = tomllib.load(f)
             new_config = selector.apply_to_config(config, profile)
-            
-            with open(config_path, 'w') as f:
-                toml.dump(new_config, f)
-            
+
+            atomic_toml_write(config_path, new_config)
+
             click.echo("\n✅ Configuration successfully applied to server.toml")
             
             # --- Auto-Download Logic ---
@@ -396,6 +398,7 @@ def setup_models(ctx: click.Context, apply: bool):
                 # For consistency with mlx_module (which requires a local path), we download to a local repo or use the default path.
                 # For simplicity and robustness: use the mlx_lm library directly if installed for snapshot.
                 
+                _downloaded_dir = None
                 try:
                     # Alternative: Use huggingface_hub snapshot_download
                     from huggingface_hub import snapshot_download
@@ -407,21 +410,24 @@ def setup_models(ctx: click.Context, apply: bool):
                         local_dir=local_dir,
                         local_dir_use_symlinks=False
                     )
-
-                    # Update config with LOCAL absolute path (CRITICAL for mlx_module validation)
-                    # Re-load, update, re-save
-                    new_config['plugins']['models']['primary'] = str(local_dir.absolute())
-                    with open(config_path, 'w') as f:
-                        toml.dump(new_config, f)
-                    click.echo(f"   Local path updated in server.toml: {local_dir}")
-                    
-                    click.echo(f"\n✅ {click.style('Model downloaded and configured!', fg='green')}")
-                    
+                    _downloaded_dir = local_dir
                 except ImportError:
                      click.echo(click.style("   ⚠️ huggingface_hub not installed. Cannot auto-download.", fg="yellow"))
                      click.echo("   Run: pip install huggingface_hub")
                 except Exception as e:
                      click.echo(click.style(f"   ❌ Error downloading model: {e}", fg="red"))
+
+                if _downloaded_dir is not None:
+                    # Update config with LOCAL absolute path (CRITICAL for mlx_module
+                    # validation). OUTSIDE the download try: a config-write error must
+                    # reach the outer handler (exit != 0), never masquerade as a
+                    # download failure with exit 0. backup=False: the .bak keeps the
+                    # PRE-COMMAND state through this second write of the same flow.
+                    new_config['plugins']['models']['primary'] = str(_downloaded_dir.absolute())
+                    atomic_toml_write(config_path, new_config, backup=False)
+                    click.echo(f"   Local path updated in server.toml: {_downloaded_dir}")
+
+                    click.echo(f"\n✅ {click.style('Model downloaded and configured!', fg='green')}")
             
             elif profile.preferred_engine.value == "ollama":
                 click.echo(f"\nℹ️  For Ollama, run manually: ollama pull {profile.primary_model}")
@@ -430,6 +436,7 @@ def setup_models(ctx: click.Context, apply: bool):
             
         except Exception as e:
             click.echo(f"Error saving config: {e}", err=True)
+            ctx.exit(1)
     else:
         click.echo("\n💡 Run with --apply to save changes.")
 
@@ -466,6 +473,33 @@ def list_models():
     click.echo(list_models_table())
     click.echo()
 
+def _cli_ensure_ollama_ready() -> bool:
+    """#833: arrenca Ollama si cal i confirma que l'API respon abans del pull.
+
+    Usa les primitives canòniques de l'app (async httpx, /api/tags == 200) —
+    el CLI viu dins l'app completa, a diferència de l'installer standalone
+    (que duu la seva versió stdlib a installer/ollama_ready.py).
+    """
+    import asyncio
+
+    from plugins.ollama_module.core.client import resolve_base_url
+    from plugins.ollama_module.core.ollama_runtime import (
+        ensure_ollama_running,
+        is_ollama_running,
+    )
+
+    async def _go() -> bool:
+        base = resolve_base_url()
+        await ensure_ollama_running(base, wait=True)
+        return await is_ollama_running(base)
+
+    # Review #833: cap try/except ampli — les primitives ja capturen les
+    # fallades de connectivitat internament (retornen False); una excepció
+    # aquí és un error REAL (import/config) que main() reporta amb traceback,
+    # no un "Ollama no respon" amb remei equivocat.
+    return asyncio.run(_go())
+
+
 @model.command(name="install")
 @click.argument("name")
 @click.option("--engine", "-e", type=click.Choice(['mlx', 'ollama']), default=None, help="Force engine")
@@ -477,8 +511,13 @@ def install_model(name: str, engine: Optional[str]):
     """
     from personality.models.registry import get_model_entry
     from pathlib import Path
-    import toml
-    
+    import tomllib  # read; writes go through atomic_toml_write (#834)
+    from core.config import atomic_toml_write
+
+    def _load_toml(path):
+        with open(path, 'rb') as f:
+            return tomllib.load(f)
+
     # 1. Resolve model
     entry = get_model_entry(name)
     if not entry:
@@ -491,7 +530,7 @@ def install_model(name: str, engine: Optional[str]):
         # Check configure preferred engine
         config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
         if config_path.exists():
-             config = toml.load(config_path)
+             config = _load_toml(config_path)
              engine = config.get("plugins", {}).get("models", {}).get("preferred_engine", "ollama")
              if engine == "auto" or not engine:
                  engine = "ollama"  # Default safe
@@ -502,35 +541,38 @@ def install_model(name: str, engine: Optional[str]):
     
     if engine == "mlx":
         # MLX Download Logic
+        _dl_ok = False
+        local_dir = Path("storage/models") / (entry.mlx_hf_id or "model").split("/")[-1]
         try:
             from huggingface_hub import snapshot_download
             repo_id = entry.mlx_hf_id
-            local_dir = Path("storage/models") / repo_id.split("/")[-1]
-            
+
             click.echo(f"   Source: {repo_id}")
             click.echo(f"   Destination: {local_dir}")
-            
+
             snapshot_download(  # nosec B615: ACCEPT — revision pinning tracked via MODEL_WEIGHT_SHA256 in installer/installer_catalog_data.py (legacy backlog C19); CLI pull path realignment scheduled for v1.0.5
                 repo_id=repo_id,
                 local_dir=local_dir,
                 local_dir_use_symlinks=False
             )
-            
+
             click.echo(f"\n✅ {click.style('Model downloaded!', fg='green')}")
-            
-            # Ask to set as primary
-            if click.confirm("Set as primary model?"):
-                config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
-                config = toml.load(config_path)
-                config['plugins']['models']['primary'] = str(local_dir.absolute())
-                with open(config_path, 'w') as f:
-                    toml.dump(config, f)
-                click.echo("   Configuration updated.")
+            _dl_ok = True
 
         except ImportError:
              click.echo(click.style("⚠️ Error: huggingface_hub not installed.", fg="red"))
         except Exception as e:
              click.echo(click.style(f"❌ Error downloading: {e}", fg="red"))
+
+        # Set-as-primary FORA del try de descàrrega (#834 review): un error
+        # d'escriptura de config ha de sortir amb exit != 0, mai empassat
+        # com si fos un error de descàrrega amb exit 0.
+        if _dl_ok and click.confirm("Set as primary model?"):
+            config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
+            config = _load_toml(config_path)
+            config['plugins']['models']['primary'] = str(local_dir.absolute())
+            atomic_toml_write(config_path, config)
+            click.echo("   Configuration updated.")
 
     elif engine == "ollama":
         # Ollama Pull
@@ -539,22 +581,35 @@ def install_model(name: str, engine: Optional[str]):
         if not tag:
             click.echo(click.style("⚠️ MLX-only model, not available via Ollama.", fg="yellow"))
             return
+        # #833: mai `ollama pull` sense l'API responent — el pull contra un
+        # daemon a mig arrencar falla amb errors críptics de connexió.
+        if not _cli_ensure_ollama_ready():
+            click.echo(click.style(
+                "❌ Ollama API not responding (/api/tags) — start Ollama and retry.",
+                fg="red",
+            ), err=True)
+            raise SystemExit(1)
         click.echo(f"   Running: ollama pull {tag}")
+        _pull_ok = False
         try:
-            subprocess.run(["ollama", "pull", tag], check=True)  # nosec B603 B607: tag from registry catalog (entry.ollama_tag); ollama via PATH (mono-user local)
+            # Review #833: el gate valida resolve_base_url() (NEXE_OLLAMA_HOST >
+            # OLLAMA_HOST) però el CLI d'ollama només honora OLLAMA_HOST —
+            # alineem l'env perquè gate i pull parlin amb el MATEIX daemon.
+            from plugins.ollama_module.core.client import resolve_base_url as _rbu
+            _pull_env = {**os.environ, "OLLAMA_HOST": _rbu()}
+            subprocess.run(["ollama", "pull", tag], check=True, env=_pull_env)  # nosec B603 B607: tag from registry catalog (entry.ollama_tag); ollama via PATH (mono-user local)
             click.echo(f"\n✅ {click.style('Model downloaded to Ollama!', fg='green')}")
-
-             # Ask to set as primary
-            if click.confirm("Set as primary model?"):
-                config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
-                config = toml.load(config_path)
-                config['plugins']['models']['primary'] = tag
-                with open(config_path, 'w') as f:
-                    toml.dump(config, f)
-                click.echo("   Configuration updated.")
-                
+            _pull_ok = True
         except Exception as e:
             click.echo(click.style(f"❌ Error en ollama pull: {e}", fg="red"))
+
+        # Config write outside the pull try (#834 review): write errors exit != 0.
+        if _pull_ok and click.confirm("Set as primary model?"):
+            config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
+            config = _load_toml(config_path)
+            config['plugins']['models']['primary'] = tag
+            atomic_toml_write(config_path, config)
+            click.echo("   Configuration updated.")
 
     else:
         click.echo("Engine not supported for auto-install yet.")
