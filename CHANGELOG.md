@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Security
+
+- Dependency update: pypdf 6.14.2 (4 crafted-PDF DoS CVEs: inline-image infinite loops, xref long runtimes, image memory blow-up).
+
 ## [1.0.7] — 2026-07-04
 
 ### Added

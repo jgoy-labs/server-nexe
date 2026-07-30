@@ -36,7 +36,7 @@ def _resolve_base_url() -> str:
     host_port = rest.split("/")[0]
     host, _, port = host_port.partition(":")
     if host in ("0.0.0.0", "::", "[::]"):  # nosec B104: normalització, no bind
-        host = "127.0.0.1"
+        host = "127.0.0.1"  # nosemgrep: hardcode.ip_address — loopback deliberat (normalització), no config
     return f"{scheme}://{host}:{port or '11434'}"
 
 

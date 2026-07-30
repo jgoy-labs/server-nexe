@@ -8,11 +8,30 @@ export default [
       "venv/**",
       "InstallNexe.app/**",
       "Nexe.app/**",
+      "worktrees/**",
       "**/marked.min.js",
       "**/lucide.min.js"
     ]
   },
   js.configs.recommended,
+  {
+    // Reproduccions de test executades amb Node (tests/frontend/*.mjs)
+    files: ["tests/frontend/**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        URL: "readonly",
+        TextDecoder: "readonly",
+        TextEncoder: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        Buffer: "readonly"
+      }
+    }
+  },
   {
     files: ["plugins/**/ui/**/*.js"],
     languageOptions: {

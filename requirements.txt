@@ -41,7 +41,7 @@ platformdirs==4.10.0  # cross-platform user data dirs (Linux/macOS); used by cor
 
 # --- Memory & RAG ---
 fastembed==0.8.0
-pypdf==6.13.3  # PDF support for knowledge ingestion; GHSA-3crg-w4f6-42mx GHSA-4pxv-j86v-mhcw GHSA-7gw9-cf7v-778f GHSA-jj6c-8h6c-hppx GHSA-x284-j5p8-9c5p fixed in 6.10.0; GHSA-jm82-fx9c-mx94 (stream-length DoS) fixed in 6.13.3
+pypdf==6.14.2  # PDF support for knowledge ingestion; GHSA-3crg-w4f6-42mx GHSA-4pxv-j86v-mhcw GHSA-7gw9-cf7v-778f GHSA-jj6c-8h6c-hppx GHSA-x284-j5p8-9c5p fixed in 6.10.0; GHSA-jm82-fx9c-mx94 (stream-length DoS) fixed in 6.13.3; CVE-2026-59935/59936/59937/59938 (crafted-PDF DoS: inline-image infinite loops, xref long runtimes, image memory blow-up) fixed in 6.14.0-6.14.2
 # lingua-language-detector: Reply-language detection (75 langs); offline (models bundled in wheel), accurate on short text & close languages (ca/es/pt/fr/it), Apache-2.0. Chosen over langdetect (failed short ca/es) and fast-langdetect (downloads 125MB at runtime). ~95MB on disk.
 lingua-language-detector==2.1.1
 

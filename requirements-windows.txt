@@ -56,7 +56,7 @@ pywin32==312
 
 # --- Memory & RAG ---
 fastembed==0.8.0
-pypdf==6.13.3
+pypdf==6.14.2
 # lingua 2.2.0 ships the win_arm64 wheel (2.1.1 did not); validated on the VM.
 lingua-language-detector==2.2.0
 

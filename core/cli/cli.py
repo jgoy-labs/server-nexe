@@ -518,6 +518,18 @@ def install_model(name: str, engine: Optional[str]):
         with open(path, 'rb') as f:
             return tomllib.load(f)
 
+    def _maybe_set_primary(download_ok: bool, primary_value: str) -> None:
+        # Set-as-primary FORA del try de descàrrega (#834 review): un error
+        # d'escriptura de config ha de sortir amb exit != 0, mai empassat
+        # com si fos un error de descàrrega amb exit 0.
+        if not (download_ok and click.confirm("Set as primary model?")):
+            return
+        config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
+        config = _load_toml(config_path)
+        config['plugins']['models']['primary'] = primary_value
+        atomic_toml_write(config_path, config)
+        click.echo("   Configuration updated.")
+
     # 1. Resolve model
     entry = get_model_entry(name)
     if not entry:
@@ -564,15 +576,7 @@ def install_model(name: str, engine: Optional[str]):
         except Exception as e:
              click.echo(click.style(f"❌ Error downloading: {e}", fg="red"))
 
-        # Set-as-primary FORA del try de descàrrega (#834 review): un error
-        # d'escriptura de config ha de sortir amb exit != 0, mai empassat
-        # com si fos un error de descàrrega amb exit 0.
-        if _dl_ok and click.confirm("Set as primary model?"):
-            config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
-            config = _load_toml(config_path)
-            config['plugins']['models']['primary'] = str(local_dir.absolute())
-            atomic_toml_write(config_path, config)
-            click.echo("   Configuration updated.")
+        _maybe_set_primary(_dl_ok, str(local_dir.absolute()))
 
     elif engine == "ollama":
         # Ollama Pull
@@ -603,13 +607,7 @@ def install_model(name: str, engine: Optional[str]):
         except Exception as e:
             click.echo(click.style(f"❌ Error en ollama pull: {e}", fg="red"))
 
-        # Config write outside the pull try (#834 review): write errors exit != 0.
-        if _pull_ok and click.confirm("Set as primary model?"):
-            config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
-            config = _load_toml(config_path)
-            config['plugins']['models']['primary'] = tag
-            atomic_toml_write(config_path, config)
-            click.echo("   Configuration updated.")
+        _maybe_set_primary(_pull_ok, tag)
 
     else:
         click.echo("Engine not supported for auto-install yet.")
