@@ -28,12 +28,12 @@ struct ModelPickerView: View {
 
             // Tabs RAM — only show tiers that have models in the catalog
             Picker("", selection: $selectedTab) {
-                if !engine.catalog.tier8.isEmpty  { Text("8 GB").tag("tier_8") }
-                if !engine.catalog.tier16.isEmpty { Text("16 GB").tag("tier_16") }
-                if !engine.catalog.tier24.isEmpty { Text("24 GB").tag("tier_24") }
-                if !engine.catalog.tier32.isEmpty { Text("32 GB").tag("tier_32") }
-                if !engine.catalog.tier48.isEmpty { Text("48 GB").tag("tier_48") }
-                if !engine.catalog.tier64.isEmpty { Text("64 GB").tag("tier_64") }
+                if !engine.catalog.tier8.isEmpty  { Text(t("model_tab_tier_8")).tag("tier_8") }
+                if !engine.catalog.tier16.isEmpty { Text(t("model_tab_tier_16")).tag("tier_16") }
+                if !engine.catalog.tier24.isEmpty { Text(t("model_tab_tier_24")).tag("tier_24") }
+                if !engine.catalog.tier32.isEmpty { Text(t("model_tab_tier_32")).tag("tier_32") }
+                if !engine.catalog.tier48.isEmpty { Text(t("model_tab_tier_48")).tag("tier_48") }
+                if !engine.catalog.tier64.isEmpty { Text(t("model_tab_tier_64")).tag("tier_64") }
                 Text(t("model_tab_custom")).tag("custom")
             }
             .pickerStyle(.segmented)

@@ -21,7 +21,7 @@ def usable_ram_gb(ram_gb: int) -> int:
     the fraction now comes from the single documented place
     (export_catalog_json.CLI_USABLE_FRACTION) instead of a literal here. The
     wizard uses a different fraction ON PURPOSE and nobody has decided which is
-    right — see that module's comment and dev2_result_f7.md.
+    right — see that module's comment.
 
     Note the truncation is part of the current contract: 24 GB → int(13.2) → 13,
     not 13.2. It is not "fixed" here because that alone would move which models

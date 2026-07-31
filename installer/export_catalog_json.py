@@ -82,7 +82,7 @@ _TIER_MIN_RAM_GB = {"tier_8": 8, "tier_16": 16, "tier_24": 24, "tier_32": 32}
 #   So moving the CLI to 0.75 is not a one-number change: it drags the category
 #   thresholds and the user-facing text with it.
 #
-# See dev2_result_f7.md for the measured verdict-by-verdict divergence.
+# The measured verdict-by-verdict divergence is pinned in tests/test_catalog_sync.py.
 WIZARD_USABLE_FRACTION = 0.75
 CLI_USABLE_FRACTION = 0.55
 

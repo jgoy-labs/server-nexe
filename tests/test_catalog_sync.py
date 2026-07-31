@@ -211,7 +211,8 @@ def test_validate_is_quiet_on_the_real_pair():
 #
 # The Swift package ships no test target (no Tests/, no testTarget in
 # Package.swift), so the picker arithmetic is covered here against a Python
-# replica, simulate_picker(). See "QUÈ QUEDA SENSE COBRIR" in dev2_result_f6.md.
+# replica, simulate_picker(). What the replica cannot prove — that the real
+# GUI paints the same — is covered by the manual smoke in docs/PROVES-WIZARD.md.
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -349,7 +350,7 @@ class TestSimulatedMachines:
 # that has no visual "greyed out" affordance.
 #
 # What is guarded: nobody moves one side without the other noticing.
-# See dev2_result_f7.md for the full diagnosis and the options.
+# Full diagnosis and options: the fraction comment in export_catalog_json.py.
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Verdicts as measured on 31/07 with the real code, both sides. This is a
@@ -383,8 +384,9 @@ class TestCliVsWizardDivergence:
 
     def test_the_divergence_is_exactly_the_documented_one(self):
         """Canary: if this fails, somebody moved a coefficient, a category
-        threshold or a comparator on ONE side. Read dev2_result_f7.md, decide
-        what the other side should do, and update this snapshot on purpose.
+        threshold or a comparator on ONE side. Read the fraction comment in
+        export_catalog_json.py, decide what the other side should do, and
+        update this snapshot on purpose.
 
         Mutation guard: change CLI_USABLE_FRACTION to 0.75 and this goes RED at
         every machine size.
