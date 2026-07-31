@@ -100,3 +100,356 @@ def test_export_catalog_json_validates():
     from installer.export_catalog_json import validate
     errors = validate(str(_json_path()))
     assert not errors, f"Validator errors: {errors}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# #852 follow-up — the RAM numbers must match ACROSS the two files.
+#
+# The #852 fix landed in the Python catalog and did NOT reach models.json, the
+# file the DMG wizard actually reads: alia_40b kept telling users that 42 GB of
+# weights fit in a 24 GB machine. Nothing in the house caught it — the sync
+# guard only ever compared keys and backend presence, and the repo already knew
+# this field lies (B158 cites "ram_gb 10 vs 22"), but only WITHIN one file.
+# ═══════════════════════════════════════════════════════════════════════════
+
+import pytest  # noqa: E402  # after the module's own helpers
+
+from installer.installer_catalog_data import estimate_min_ram_gb  # noqa: E402
+
+_SYNCED_NUMERIC_FIELDS = ("ram_gb", "disk_gb")
+
+
+@pytest.mark.parametrize("field", _SYNCED_NUMERIC_FIELDS)
+def test_numeric_fields_match_between_the_two_catalogs(field):
+    """Same model, same numbers, whichever file the caller reads."""
+    py, js = _py_by_key(), _json_by_key()
+    mismatches = {
+        k: (js[k].get(field), py[k].get(field))
+        for k in js if k in py and js[k].get(field) != py[k].get(field)
+    }
+    assert not mismatches, (
+        f"{field} desincronitzat (JSON vs .py): {mismatches} — "
+        f"el wizard del DMG llegeix el JSON"
+    )
+
+
+def test_json_entries_clear_the_ram_floor():
+    """The wizard's own copy must obey the verified formula too — the gate in
+    tests/test_f852_catalog_ram_formula.py only covers the Python catalog."""
+    offenders = {
+        k: (m.get("ram_gb"), estimate_min_ram_gb(m.get("disk_gb", 0)))
+        for k, m in _json_by_key().items()
+        if m.get("ram_gb", 0) < estimate_min_ram_gb(m.get("disk_gb", 0))
+    }
+    assert not offenders, f"models.json declara menys RAM que pesos+1,15 GB: {offenders}"
+
+
+def test_validate_catches_a_diverging_ram_gb(tmp_path):
+    """The guard itself, driven on a doctored copy — the real models.json is
+    never touched.
+
+    Mutation guard: drop the numeric comparison from validate() and this goes
+    RED. This is the test that would have caught the #852 fix stopping at the
+    Python catalog.
+    """
+    from installer.export_catalog_json import validate
+
+    data = json.loads(_json_path().read_text(encoding="utf-8"))
+    patched = False
+    for models in data.values():
+        for m in models:
+            if m["key"] == "alia_40b":
+                m["ram_gb"] = 24.0  # the historical lie
+                patched = True
+    assert patched, "alia_40b ha desaparegut del JSON — actualitza aquest test"
+
+    doctored = tmp_path / "models.json"
+    doctored.write_text(json.dumps(data), encoding="utf-8")
+
+    errors = validate(str(doctored))
+    assert any("ram_gb" in e and "alia_40b" in e for e in errors), errors
+
+
+def test_validate_catches_a_diverging_disk_gb(tmp_path):
+    """Same guard, the other field: disk_gb feeds the download-size UX and the
+    RAM floor, so a divergence there is not cosmetic either."""
+    from installer.export_catalog_json import validate
+
+    data = json.loads(_json_path().read_text(encoding="utf-8"))
+    for models in data.values():
+        for m in models:
+            if m["key"] == "qwen35_9b":
+                m["disk_gb"] = 99.9
+
+    doctored = tmp_path / "models.json"
+    doctored.write_text(json.dumps(data), encoding="utf-8")
+
+    errors = validate(str(doctored))
+    assert any("disk_gb" in e and "qwen35_9b" in e for e in errors), errors
+
+
+def test_validate_is_quiet_on_the_real_pair():
+    """No false positives: the shipped files must validate clean."""
+    from installer.export_catalog_json import validate
+
+    assert validate(str(_json_path())) == []
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Tier coherence, decisions B + D (Jordi, 31/07).
+#
+# Phase 5 guarded "the first model of a tier must fit", because isRecommended
+# returned models(for: tier).first blindly. Decision B changed the Swift: the
+# recommendation is now the first model that FITS the detected RAM, so a heavy
+# entry at the head of a tier is no longer a defect — and qwen35_27b stops
+# being an offender by construction.
+#
+# What replaces it: a tier may never leave its OWN machine with nothing
+# installable. tier_32 is "32 GB+" and deliberately holds models only a bigger
+# Mac can run (alia_40b, mixtral_8x7b — product decision); that is fine as long
+# as something in it runs on 32 GB.
+#
+# The Swift package ships no test target (no Tests/, no testTarget in
+# Package.swift), so the picker arithmetic is covered here against a Python
+# replica, simulate_picker(). See "QUÈ QUEDA SENSE COBRIR" in dev2_result_f6.md.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_no_tier_is_empty_for_its_own_machine():
+    """The shipped catalog must offer something at every tier's minimum RAM.
+
+    Mutation guard: demonstrated green→red→green on the real file by moving the
+    only light model out of a tier.
+    """
+    from installer.export_catalog_json import tier_consistency_errors
+
+    assert tier_consistency_errors(str(_json_path())) == []
+
+
+def test_tier_guard_reaches_validate_and_therefore_the_ci():
+    """Decision D: the guard must ride the existing CI path, not a new one.
+
+    test_export_catalog_json_validates already calls validate(); this pins that
+    validate() actually consults the tier guard.
+
+    Mutation guard: drop the tier_consistency_errors call from validate() and
+    this goes RED.
+    """
+    from installer.export_catalog_json import validate
+
+    data = json.loads(_json_path().read_text(encoding="utf-8"))
+    # A tier whose only model needs more than 8 × 0.75 = 6 GB.
+    heavy = next(m for ms in data.values() for m in ms if m["key"] == "alia_40b")
+    data["tier_8"] = [heavy]
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+        json.dump(data, fh)
+        doctored = fh.name
+    errors = validate(doctored)
+    assert any("[TIER]" in e and "tier_8" in e for e in errors), errors
+
+
+def test_empty_tier_is_reported(tmp_path):
+    from installer.export_catalog_json import tier_consistency_errors
+
+    data = json.loads(_json_path().read_text(encoding="utf-8"))
+    heavy = next(m for ms in data.values() for m in ms if m["key"] == "mixtral_8x7b")
+    doctored = tmp_path / "models.json"
+    doctored.write_text(json.dumps({"tier_8": [heavy]}), encoding="utf-8")
+
+    errors = tier_consistency_errors(str(doctored))
+    assert any("tier_8" in e and "cap model instal·lable" in e for e in errors), errors
+
+
+def test_tier_thresholds_match_the_swift_wizard():
+    """The mapping is the inverse of HardwareDetector.swift:15-20.
+
+    Mutation guard: change any threshold and this goes RED.
+    """
+    from installer.export_catalog_json import _TIER_MIN_RAM_GB
+
+    assert _TIER_MIN_RAM_GB == {"tier_8": 8, "tier_16": 16, "tier_24": 24, "tier_32": 32}
+
+
+# ── Simulated RAM: the decisions B and C, machine by machine ────────────────
+
+class TestSimulatedMachines:
+    """Every case Jordi asked to see, computed on the shipped catalog."""
+
+    def _view(self, ram_gb):
+        from installer.export_catalog_json import simulate_picker
+        return simulate_picker(str(_json_path()), ram_gb)
+
+    def test_24gb_crowns_mistral_small_and_greys_out_qwen35_27b(self):
+        """Decision C, and it must fall out of B — no reordering of the JSON.
+
+        Mutation guard: revert the recommendation to "first of the tier" and
+        this goes RED (qwen35_27b would be crowned while disabled).
+        """
+        v = self._view(24)
+        assert v["tier"] == "tier_24"
+        assert v["recommended"] == "mistral_small_24b"
+        assert "qwen35_27b" in v["disabled"]
+        assert "gpt_oss_20b" in v["disabled"]
+
+    def test_24gb_recommendation_sits_exactly_on_the_limit(self):
+        """mistral_small_24b needs 18.0 and the limit is 24 × 0.75 = 18.0.
+
+        Strict '>' (B171) is what keeps it selectable. With '>=' this machine
+        would have NO recommendation at all.
+
+        Mutation guard: swap '>' for '>=' in simulate_picker and this goes RED.
+        """
+        v = self._view(24)
+        assert v["usable_gb"] == 18.0
+        assert v["recommended"] == "mistral_small_24b"
+
+    def test_64gb_enables_alia_40b(self):
+        """Decision A: tier_32 is "32 GB+", and the big machine gets the big
+        model without moving it anywhere (43.2 <= 64 × 0.75 = 48)."""
+        v = self._view(64)
+        assert v["tier"] == "tier_32"
+        assert v["disabled"] == []
+        assert "alia_40b" in v["enabled"]
+
+    def test_32gb_disables_alia_40b(self):
+        """Same tier, smaller machine: 43.2 > 32 × 0.75 = 24."""
+        v = self._view(32)
+        assert v["tier"] == "tier_32"
+        assert "alia_40b" in v["disabled"]
+        assert "mixtral_8x7b" in v["disabled"]
+        assert v["recommended"] == "qwen35_35b_moe"
+
+    def test_8gb_and_16gb_have_a_working_recommendation(self):
+        assert self._view(8)["recommended"] == "qwen35_4b"
+        assert self._view(16)["recommended"] == "qwen35_9b"
+
+    def test_every_simulated_machine_can_install_something(self):
+        """The user-facing meaning of decision D."""
+        for ram in (8, 16, 24, 32, 64):
+            v = self._view(ram)
+            assert v["recommended"] is not None, f"{ram} GB: cap model instal·lable ({v})"
+            assert v["recommended"] in v["enabled"]
+
+    def test_the_recommendation_is_never_a_disabled_model(self):
+        """The invariant decision B buys: it cannot crown what it greys out."""
+        for ram in (4, 8, 12, 16, 20, 24, 31, 32, 48, 64, 128):
+            v = self._view(ram)
+            assert v["recommended"] not in v["disabled"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CLI vs wizard — five divergences, measured, none of them decided here.
+#
+# The two paths give different verdicts for the same machine. Phase 7 unified
+# the STRUCTURE (both fractions live in one documented place) and deliberately
+# did NOT unify the VALUE: which coefficient is right is a product decision,
+# and both have written support in the repo. Moving the CLI to 0.75 would make
+# it accept models it refuses today — the permissive direction, on the path
+# that has no visual "greyed out" affordance.
+#
+# What is guarded: nobody moves one side without the other noticing.
+# See dev2_result_f7.md for the full diagnosis and the options.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Verdicts as measured on 31/07 with the real code, both sides. This is a
+# SNAPSHOT of a known, deliberate divergence — not an approval of it. Any change
+# to a coefficient, a category threshold, a comparator or the catalog moves it,
+# which is the point: the diff lands in review instead of in a user's install.
+_KNOWN_DIVERGENCE = {
+    #  RAM: (CLI usable GB, CLI category, wizard tier, wizard recommendation)
+    8:  (4,  "small",  "tier_8",  "qwen35_4b"),
+    16: (8,  "medium", "tier_16", "qwen35_9b"),
+    24: (13, "medium", "tier_24", "mistral_small_24b"),
+    32: (17, "medium", "tier_32", "qwen35_35b_moe"),
+    64: (35, "xlarge", "tier_32", "qwen35_35b_moe"),
+}
+
+
+def _cli_verdict(ram_gb):
+    from installer.installer_catalog import (
+        usable_ram_gb, _determine_recommended_category, _resolve_category,
+    )
+    from installer.installer_catalog_data import MODEL_CATALOG
+
+    usable = usable_ram_gb(ram_gb)
+    choice, _ = _determine_recommended_category(usable)
+    category, _ = _resolve_category(choice, choice)
+    fits = [m["key"] for m in MODEL_CATALOG[category] if usable >= m["ram_gb"]]
+    return usable, category, fits
+
+
+class TestCliVsWizardDivergence:
+
+    def test_the_divergence_is_exactly_the_documented_one(self):
+        """Canary: if this fails, somebody moved a coefficient, a category
+        threshold or a comparator on ONE side. Read dev2_result_f7.md, decide
+        what the other side should do, and update this snapshot on purpose.
+
+        Mutation guard: change CLI_USABLE_FRACTION to 0.75 and this goes RED at
+        every machine size.
+        """
+        from installer.export_catalog_json import simulate_picker
+
+        actual = {}
+        for ram in _KNOWN_DIVERGENCE:
+            usable, category, _ = _cli_verdict(ram)
+            view = simulate_picker(str(_json_path()), ram)
+            actual[ram] = (usable, category, view["tier"], view["recommended"])
+        assert actual == _KNOWN_DIVERGENCE, (
+            f"el veredicte CLI/wizard ha canviat:\n"
+            f"  esperat: {_KNOWN_DIVERGENCE}\n"
+            f"  real:    {actual}"
+        )
+
+    def test_both_fractions_come_from_one_place(self):
+        """The structural half of the fix: the CLI no longer owns a literal.
+
+        Mutation guard: put `int(ram * 0.55)` back in installer_catalog and
+        this goes RED.
+        """
+        from installer.export_catalog_json import (
+            CLI_USABLE_FRACTION, WIZARD_USABLE_FRACTION,
+        )
+        from installer.installer_catalog import usable_ram_gb
+
+        assert (CLI_USABLE_FRACTION, WIZARD_USABLE_FRACTION) == (0.55, 0.75)
+        assert usable_ram_gb(100) == int(100 * CLI_USABLE_FRACTION)
+
+    def test_the_fraction_guard_reaches_validate(self):
+        """It must ride the CI path like the tier guard, not a new one.
+
+        Mutation guard: drop _usable_fraction_errors() from validate() and this
+        goes RED.
+        """
+        import installer.export_catalog_json as ecj
+
+        original = ecj.CLI_USABLE_FRACTION
+        ecj.CLI_USABLE_FRACTION = 0.75  # somebody "unifies" the number alone
+        try:
+            errors = ecj.validate(str(_json_path()))
+        finally:
+            ecj.CLI_USABLE_FRACTION = original
+        assert any("[RAM-FRACTION]" in e for e in errors), errors
+
+    def test_cli_truncates_and_that_is_part_of_the_contract(self):
+        """Divergence #2, pinned so it cannot be "tidied up" by accident:
+        24 × 0.55 = 13.2 and the CLI uses 13, which alone changes which models
+        it accepts."""
+        from installer.installer_catalog import usable_ram_gb
+
+        assert usable_ram_gb(24) == 13
+        assert usable_ram_gb(32) == 17  # 17.6 truncated
+
+    def test_the_two_comparators_are_inverse_and_still_differ(self):
+        """Divergence #3: the CLI asks `usable >= model.ram_gb` (inclusive on
+        the usable side); the wizard asks `model.ramGB > usable` (strict). At
+        the exact boundary they agree by accident, but they are not the same
+        rule — documented here so the next person sees it before unifying."""
+        from installer.export_catalog_json import simulate_picker
+
+        # A 16 GB machine: CLI usable 8, wizard usable 12.0 — same catalog,
+        # different frontier.
+        usable, _, _ = _cli_verdict(16)
+        view = simulate_picker(str(_json_path()), 16)
+        assert usable == 8 and view["usable_gb"] == 12.0

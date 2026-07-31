@@ -787,3 +787,145 @@ class TestAnomaliesTUR20260623:
             assert h.session._pending_partial_delete is None, (
                 f"[{label}] pending armed despite a failed/empty preview"
             )
+
+
+# ═══════════════════════════════════════════════════════════════
+# Section 7 — #856: MEM_SAVE-only turn on the NON-streaming path
+#   The streaming path re-prompts and, if that also yields nothing,
+#   emits a confirmation fallback. The non-stream path stripped the
+#   tag unconditionally → HTTP 200 with an EMPTY body.
+# ═══════════════════════════════════════════════════════════════
+
+class _MemSaveOnlyEngine:
+    """Engine that answers ONLY with a [MEM_SAVE: ...] directive.
+
+    Observed live 31/07 (glm-4.7-flash, /nexe-live sweep): 0.58 s, no
+    conversational text at all. Same content on stream and non-stream so the
+    two paths are compared under identical model behaviour (the streaming
+    re-prompt re-calls chat() and gets the tag again → fallback).
+    """
+
+    _ONLY_TAG = "[MEM_SAVE: l'usuari es diu Aran]"
+
+    def chat(self, model, messages, stream=False, images=None, thinking_enabled=False):
+        if stream:
+            return self._astream()
+        return {"message": {"content": self._ONLY_TAG}, "done": True}
+
+    async def _astream(self):
+        yield {"message": {"content": self._ONLY_TAG}}
+
+    async def is_model_loaded(self, model_name):
+        return True
+
+
+def _visible_stream_text(body: str) -> str:
+    """Text the user ends up seeing from a streamed body.
+
+    Drops the \\x00[...]\\x00 metadata sentinels and the raw [MEM_SAVE: ...]
+    tag: the wire carries the model tokens verbatim (progressive rendering) and
+    the tag is stripped client-side — pre-existing behaviour, out of #856's
+    scope. What must match across paths is the final visible answer.
+    """
+    import re
+    out = re.sub(r"\x00\[[^\x00]*\]\x00", "", body)
+    return re.sub(r"\[MEM_SAVE:[^\]]*\]", "", out).strip()
+
+
+class TestMemSaveFallbackText:
+    """#856: the confirmation text is ONE helper shared by both paths."""
+
+    def test_helper_builds_the_confirmation(self):
+        from plugins.web_ui_module.api.routes_chat import _mem_save_fallback_text
+        assert _mem_save_fallback_text(["l'usuari es diu Aran"]) == (
+            "Memòria desada: l'usuari es diu Aran"
+        )
+
+    def test_helper_joins_multiple_facts(self):
+        from plugins.web_ui_module.api.routes_chat import _mem_save_fallback_text
+        assert _mem_save_fallback_text(["vegetarian", "viu a Girona"]) == (
+            "Memòria desada: vegetarian, viu a Girona"
+        )
+
+    def test_helper_returns_empty_without_usable_facts(self):
+        """No fabricated text when there is nothing to confirm."""
+        from plugins.web_ui_module.api.routes_chat import _mem_save_fallback_text
+        assert _mem_save_fallback_text([]) == ""
+        assert _mem_save_fallback_text(["", "   "]) == ""
+
+
+@pytest.mark.asyncio
+class TestF856NonStreamMemSaveOnly:
+
+    async def test_nonstream_mem_save_only_is_not_an_empty_body(self):
+        """#856: /ui/chat (stream=False) must never answer 200 + empty body
+        when the model emitted ONLY [MEM_SAVE: ...].
+
+        Pre-fix: `_handle_nonstreaming_response` stripped the tag
+        unconditionally and returned "" → the UI showed nothing.
+
+        Mutation guard: delete the fallback block in
+        _handle_nonstreaming_response (or make the tag strip unconditional
+        again) and this goes RED — response == "".
+        """
+        from plugins.web_ui_module.api.routes_chat import _mem_save_fallback_text
+
+        h = _Harness(intent="chat")
+        state = _make_server_state(engine=_MemSaveOnlyEngine())
+        result = await h.call(
+            {"message": "recorda que em dic Aran", "stream": False},
+            server_state=state,
+        )
+
+        assert isinstance(result, dict)
+        assert result["response"], (
+            "#856: MEM_SAVE-only turn returned an empty non-stream body"
+        )
+        assert result["response"] == _mem_save_fallback_text(["l'usuari es diu Aran"])
+        assert "[MEM_SAVE:" not in result["response"]
+        assert result["memory_action"] == "mem_save_inline"
+
+    async def test_nonstream_mem_save_only_persists_a_visible_turn(self):
+        """The persisted assistant turn must carry the confirmation too —
+        an empty assistant message reloads as a blank bubble.
+
+        Mutation guard: same as above (drop the fallback) → content == "".
+        """
+        h = _Harness(intent="chat")
+        state = _make_server_state(engine=_MemSaveOnlyEngine())
+        await h.call(
+            {"message": "recorda que em dic Aran", "stream": False},
+            server_state=state,
+        )
+        assistant = [m for m in h.session.messages if m["role"] == "assistant"]
+        assert assistant, "no assistant turn persisted"
+        assert assistant[-1]["content"], (
+            "#856: empty assistant turn persisted for a MEM_SAVE-only response"
+        )
+
+    async def test_stream_and_nonstream_agree_on_the_same_turn(self):
+        """Parity, measured: same engine behaviour → same visible text on both
+        paths. This is what #856 broke (stream: confirmation, non-stream: "").
+
+        Mutation guard: change the literal in ONE of the two call sites (e.g.
+        hardcode a different string in the non-stream branch) and this goes RED.
+        """
+        h_ns = _Harness(intent="chat")
+        result = await h_ns.call(
+            {"message": "recorda que em dic Aran", "stream": False},
+            server_state=_make_server_state(engine=_MemSaveOnlyEngine()),
+        )
+
+        h_st = _Harness(intent="chat")
+        streamed = await h_st.call(
+            {"message": "recorda que em dic Aran", "stream": True},
+            server_state=_make_server_state(engine=_MemSaveOnlyEngine()),
+        )
+        assert isinstance(streamed, StreamingResponse)
+        body = ""
+        async for chunk in streamed.body_iterator:
+            body += chunk if isinstance(chunk, str) else chunk.decode()
+
+        assert _visible_stream_text(body) == result["response"].strip(), (
+            "#856: streaming and non-streaming disagree on a MEM_SAVE-only turn"
+        )

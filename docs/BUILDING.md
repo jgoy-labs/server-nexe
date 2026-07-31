@@ -96,6 +96,11 @@ These files are created during the build but **never committed**:
 | `Install Nexe.dmg` | ~20 MB | Final distributable DMG |
 | `installer/swift-wizard/.build/` | ~50 MB | Swift compilation cache |
 
+> **Testing the wizard from any Mac:** the model picker's behaviour depends on the
+> machine's RAM, and the deciding case is a 24 GB Mac. `NEXE_WIZARD_RAM_GB` simulates
+> any amount — see [PROVES-WIZARD.md](PROVES-WIZARD.md) (in Catalan) for the exact
+> command and what to expect at each tier. A simulated run shows a loud banner.
+
 ## Build flow
 
 ```

@@ -42,7 +42,10 @@ _env_root = os.environ.get("NEXE_PROJECT_ROOT")
 PROJECT_ROOT = Path(_env_root).resolve() if _env_root else Path(__file__).parent.parent.resolve()
 
 from installer.installer_hardware import detect_hardware  # noqa: E402  # after sys.path setup
-from installer.installer_catalog_data import MODEL_CATALOG  # noqa: E402  # after sys.path setup
+from installer.installer_catalog_data import (  # noqa: E402  # after sys.path setup
+    MODEL_CATALOG,
+    estimate_min_ram_gb,
+)
 from installer.installer_setup_env import setup_environment  # noqa: E402  # after sys.path setup
 from installer.installer_setup_config import generate_env_file  # noqa: E402  # after sys.path setup
 from installer.installer_setup_models import (  # noqa: E402  # after sys.path setup
@@ -231,6 +234,44 @@ def _apply_reinstall_if_needed(project_root, reinstall_mode):
         _log.error(f"Reinstall mode application failed: {e}\n{traceback.format_exc()}")
         print(f"[ERROR] Reinstall mode failed: {e}", flush=True)
         sys.exit(1)
+
+
+def _warn_if_model_exceeds_ram(selected_model, hw):
+    """#852: warn when the chosen model cannot fit this machine's RAM.
+
+    The interactive CLI wizard and the Swift picker both weigh the model
+    against the machine's RAM; headless was the one path that installed
+    whatever it was handed. It WARNS and continues — the guard policy is warn
+    (FD-S3), and headless runs unattended: aborting an install over an estimate
+    would be worse than a loud line in the log.
+
+    RAM is the machine TOTAL (detect_hardware → sysctl hw.memsize), never the
+    momentarily available RAM, which does not predict whether a model runs.
+
+    Returns True when the model fits, or when there is no verdict to give
+    (no model selected, hardware probe failed).
+    """
+    if not selected_model:
+        return True
+    ram_gb = (hw or {}).get("ram") or 0
+    if ram_gb <= 0:
+        return True  # hardware probe failed — no verdict beats a fabricated one
+    declared = float(selected_model.get("ram_gb") or 0)
+    floor = estimate_min_ram_gb(float(selected_model.get("disk_gb") or 0))
+    needed = max(declared, floor)
+    if needed <= ram_gb:
+        return True
+    _log.warning(
+        "Model '%s' needs ~%.1f GB RAM but this machine has %s GB — "
+        "it may fail to load or swap heavily",
+        selected_model.get("key"), needed, ram_gb,
+    )
+    print(
+        f"[WARN] {selected_model.get('name', selected_model.get('key'))} "
+        f"needs ~{needed:.1f} GB RAM, machine has {ram_gb} GB",
+        flush=True,
+    )
+    return False
 
 
 def _configure_i18n(lang):
@@ -668,6 +709,9 @@ def _run_headless_inner(config):
 
     # Detect hardware (quiet — prints are captured by GUI log)
     hw = detect_hardware()
+    # #852: headless was the only recommender that never weighed the model
+    # against the machine. Warn, never block (FD-S3 guard policy).
+    _warn_if_model_exceeds_ram(selected_model, hw)
 
     # Create storage folders
     for folder in ("storage/cache", "storage/logs", "storage/models", "storage/vectors"):

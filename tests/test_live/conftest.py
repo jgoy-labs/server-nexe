@@ -254,6 +254,61 @@ def _rate_limit_guard(request: pytest.FixtureRequest) -> "Generator[None, None, 
         time.sleep(delay)
 
 
+# ─── Rate-limit retry ─────────────────────────────────────────────────────────
+
+# Upper bound on a single Retry-After wait. The limits these tests hit are
+# per-minute, so a server asking for more than this is misconfigured and we
+# would rather see the 429 than block the suite for minutes.
+_MAX_RETRY_AFTER = 75.0
+_RETRY_AFTER_FALLBACK = 60.0
+
+
+def _retry_after_delay(response: httpx.Response) -> float:
+    """Seconds to wait before retrying, from the server's `Retry-After`.
+
+    Falls back to a full minute when the header is missing or unparseable: the
+    limits in play are per-minute, so waiting one out is always enough.
+    """
+    raw = response.headers.get("Retry-After", "")
+    try:
+        delay = float(raw)
+    except ValueError:
+        return _RETRY_AFTER_FALLBACK
+    if delay <= 0:
+        return _RETRY_AFTER_FALLBACK
+    return min(delay, _MAX_RETRY_AFTER)
+
+
+def post_with_retry(
+    client: httpx.Client, path: str, *, retries: int = 2, **kwargs
+) -> httpx.Response:
+    """POST that waits out a 429 instead of surrendering the assertion.
+
+    The rate-limited endpoints (`/ui/upload` and `/ui/files/cleanup`, 5/minute)
+    are exercised by security tests. Skipping on 429 — the previous behaviour —
+    turned "the server throttled us" into "this protection was never checked",
+    silently and in the suite's own green output. Waiting for the window the
+    server itself advertises keeps the assertion.
+
+    Detecting a broken limiter is NOT this helper's job: that is
+    `test_security.py::test_rate_limit_health_endpoint`, which hammers /health
+    and demands a 429. Here a 429 is expected traffic control, so the last
+    response is returned after the final attempt and the caller asserts on it.
+    """
+    response = client.post(path, **kwargs)
+    for attempt in range(1, retries + 1):
+        if response.status_code != 429:
+            return response
+        delay = _retry_after_delay(response)
+        print(
+            f"\nrate-limited on {path} — waiting {delay:.0f}s "
+            f"(retry {attempt}/{retries})"
+        )
+        time.sleep(delay)
+        response = client.post(path, **kwargs)
+    return response
+
+
 # ─── Test ordering — slow tests last ──────────────────────────────────────────
 
 def pytest_collection_modifyitems(
@@ -319,16 +374,50 @@ def _model_size_gb(name: str) -> float:
     return 0.0
 
 
-@pytest.fixture(scope="session")
-def ollama_models(nexe_server: str) -> list[str]:  # noqa: ARG001
-    """List of Ollama model names available locally. Empty if Ollama is down."""
+def _ollama_capabilities(name: str) -> list[str]:
+    """Capabilities Ollama reports for a model ('completion', 'embedding'…).
+
+    Empty list when Ollama can't answer: the caller then treats the model as
+    chat-capable. Losing coverage silently is worse than one noisy failure.
+    """
     try:
-        r = httpx.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
+        r = httpx.post(f"{OLLAMA_HOST}/api/show", json={"model": name}, timeout=5)
         if r.status_code == 200:
-            return [m["name"] for m in r.json().get("models", [])]
+            return r.json().get("capabilities") or []
     except Exception:
         pass
     return []
+
+
+@pytest.fixture(scope="session")
+def ollama_models(nexe_server: str) -> list[str]:  # noqa: ARG001
+    """Chat-capable Ollama models available locally. Empty if Ollama is down.
+
+    Embedding-only models (nomic-embed-text…) are filtered out: /ui/chat
+    rightly refuses them (the model validation answers 404), so leaving them
+    in made correct behaviour look like a sweep failure.
+    """
+    try:
+        r = httpx.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
+        if r.status_code != 200:
+            return []
+        names = [m["name"] for m in r.json().get("models", [])]
+    except Exception:
+        return []
+
+    chat_models: list[str] = []
+    embedding_only: list[str] = []
+    for name in names:
+        if "embedding" in _ollama_capabilities(name):
+            embedding_only.append(name)
+        else:
+            chat_models.append(name)
+    if embedding_only:
+        print(
+            f"\nOllama: {len(embedding_only)} embedding-only model(s) excluded "
+            f"from chat tests: {', '.join(embedding_only)}"
+        )
+    return chat_models
 
 
 @pytest.fixture(scope="session")

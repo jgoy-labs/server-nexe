@@ -25,6 +25,38 @@ from typing import Optional, cast
 _logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════
+# RAM footprint — the formula every recommender must agree on (#852)
+#
+#     footprint = weights + kv_size × kv_per_tok + RUNTIME_FLOOR_GB
+#
+# Verified 23/07. The floor covers what runs alongside the weights (runtime,
+# tokenizer, framework buffers). The catalog carries no kv_per_tok, so callers
+# that don't know it get the floor: weights + 1.15 GB, which is a MINIMUM the
+# model can never undercut, not an estimate of what it will really use.
+#
+# This exists because four catalog entries used to declare less RAM than their
+# own weights — ALIA-40B advertised 24 GB for 42 GB of weights, i.e. a machine
+# that cannot possibly load it was told it fits.
+# ═══════════════════════════════════════════════════════════════════════════
+RUNTIME_FLOOR_GB = 1.15
+
+
+def estimate_min_ram_gb(
+    weights_gb: float,
+    kv_tokens: int = 0,
+    kv_bytes_per_token: int = 0,
+) -> float:
+    """Minimum RAM (GB) a model needs, per the verified 23/07 formula.
+
+    ``kv_tokens``/``kv_bytes_per_token`` are opt-in: with either at 0 the KV
+    term drops out and the result is the floor. Never guess the KV size — an
+    invented number here would read as measured.
+    """
+    kv_gb = (kv_tokens * kv_bytes_per_token) / (1024 ** 3)
+    return weights_gb + kv_gb + RUNTIME_FLOOR_GB
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # MODEL CATALOG - 14 models across 4 RAM tiers
 # Engines: mlx (Apple Silicon), ollama (universal), llama.cpp (GGUF)
 #
@@ -50,7 +82,8 @@ MODEL_CATALOG = {
             "lang": {"ca": "Multilingüe (excel·lent català)", "es": "Multilingüe (excelente catalán)", "en": "Multilingual (excellent Catalan)"},
             "params": "4B",
             "disk_gb": 2.9,
-            "ram_gb": 3.0,
+            # #852: 2.9 GB of weights cannot run in 3.0 GB — floor is 4.05 (disk + 1.15).
+            "ram_gb": 4.1,
             "description": {"ca": "👁 🧠 Multimodal, thinking, visió. MLX Apple Silicon.", "es": "👁 🧠 Multimodal, thinking, visión. MLX Apple Silicon.", "en": "👁 🧠 Multimodal, thinking, vision. MLX Apple Silicon."},
             "mlx": "mlx-community/Qwen3.5-4B-MLX-4bit",
             "ollama": "qwen3.5:4b",
@@ -140,7 +173,8 @@ MODEL_CATALOG = {
             "lang": {"ca": "Català, Castellà, Euskera, Gallec", "es": "Catalán, Castellano, Euskera, Gallego", "en": "Catalan, Spanish, Basque, Galician"},
             "params": "7B",
             "disk_gb": 4.9,
-            "ram_gb": 6.0,
+            # #852: floor is 6.05 (disk + 1.15) — 6.0 was under it.
+            "ram_gb": 6.1,
             "description": {"ca": "El millor per català i llengües ibèriques. Entrenat al MareNostrum 5.", "es": "El mejor para catalán y lenguas ibéricas. Entrenado en MareNostrum 5.", "en": "Best for Catalan and Iberian languages. Trained on MareNostrum 5."},
             "mlx": None,
             "ollama": "hdnh2006/salamandra-7b-instruct:q4_K_M",
@@ -196,7 +230,8 @@ MODEL_CATALOG = {
             "lang": {"ca": "Multilingüe", "es": "Multilingüe", "en": "Multilingual"},
             "params": "21B (MoE, 3.6B actius)",
             "disk_gb": 22.2,
-            "ram_gb": 16.0,
+            # #852: 22.2 GB of weights advertised as 16 GB of RAM. Floor is 23.35.
+            "ram_gb": 23.4,
             "description": {"ca": "🧠 Model obert d'OpenAI, MoE eficient. Thinking. Apache 2.0.", "es": "🧠 Modelo abierto de OpenAI, MoE eficiente. Thinking. Apache 2.0.", "en": "🧠 OpenAI open model, efficient MoE. Thinking. Apache 2.0."},
             "mlx": "lmstudio-community/gpt-oss-20b-MLX-8bit",
             "ollama": "gpt-oss:20b",
@@ -286,7 +321,8 @@ MODEL_CATALOG = {
             "lang": {"ca": "Llengües ibèriques (9 idiomes)", "es": "Lenguas ibéricas (9 idiomas)", "en": "Iberian languages (9)"},
             "params": "40B",
             "disk_gb": 42.0,
-            "ram_gb": 24.0,
+            # #852: 42 GB of weights advertised as 24 GB of RAM — off by 19 GB.
+            "ram_gb": 43.2,
             "description": {"ca": "Model públic multilingüe avançat fet a Europa. 9 idiomes ibèrics.", "es": "Modelo público multilingüe avanzado hecho en Europa. 9 idiomas ibéricos.", "en": "Advanced public multilingual model made in Europe. 9 Iberian languages."},
             "mlx": None,
             "ollama": "csala/ALIA-40B:Q8_0",

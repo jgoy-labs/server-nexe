@@ -13,6 +13,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 import os
 import time
+from collections import OrderedDict
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
@@ -60,12 +61,83 @@ from .chat_engines.ollama import (
 )
 from .chat_engines.mlx import _forward_to_mlx, _mlx_stream_generator
 from .chat_engines.llama_cpp import _forward_to_llama_cpp, _llama_cpp_stream_generator
+from .chat_engines._common import derive_session_id
 from core.dependencies import limiter
-from core.lang_detect import detect_user_lang, prepend_language_directive, append_language_reminder
+from core.lang_detect import (
+    detect_user_lang_or_none as _detect_lang_or_none,
+    fallback_lang as _fallback_lang,
+    natural_text_len,
+    prepend_language_directive,
+    append_language_reminder,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
+
+
+# --- #854: sticky reply language (same policy as #850 on the web UI route) ---
+# The language decides the CRITICAL directive that OPENS the system prompt, so
+# recomputing it per request rewrote the prompt from token 0 mid-conversation:
+# a new trie node on MLX, _destroy + GGUF reload on llama.cpp — for the same
+# session_id the engines key their prefix cache by. Policy (commit 8f67d6a6,
+# #850): the fallback is returned but NEVER seeded, the switch gate measures
+# the NATURAL text (code/URLs out), and a switch needs two consecutive
+# detections of the same new language.
+#
+# This route has no ChatSession to hang the state on, so it keeps an LRU keyed
+# by the very session_id the engines use (derive_session_id) — stickiness and
+# prefix cache then share one scope by construction. The policy is duplicated
+# rather than imported because core must not depend on a plugin; the parity
+# test in tests/core/endpoints/test_f854_sticky_lang_openai.py fails if either
+# copy drifts (the shared home would be core.lang_detect — see the finding).
+_STICKY_LANG_MIN_SWITCH_CHARS = 25
+_SESSION_LANG_MAX = 256
+_SESSION_LANG: "OrderedDict[str, dict]" = OrderedDict()
+
+
+def _reset_session_lang_state() -> None:
+    """Drop every remembered session language — test isolation only.
+
+    The map is process-local state with no lifecycle of its own; nothing in the
+    server calls this. Tests that drive the route must, or a session language
+    seeded by one test decides the system prompt of the next.
+    """
+    _SESSION_LANG.clear()
+
+
+def _resolve_request_lang(session_key: str, user_text: str) -> str:
+    """Reply language for this turn: sticky per session_key (#854).
+
+    Mirrors plugins/web_ui_module/api/routes_chat._resolve_session_lang.
+    """
+    detected = _detect_lang_or_none(user_text)
+    state = _SESSION_LANG.get(session_key)
+    if state is None:
+        # A guess never locks the session — the first REAL detection decides.
+        if detected is None:
+            return _fallback_lang(None)
+        _SESSION_LANG[session_key] = {"lang": detected, "pending": None}
+        while len(_SESSION_LANG) > _SESSION_LANG_MAX:
+            _SESSION_LANG.popitem(last=False)
+        return detected
+
+    _SESSION_LANG.move_to_end(session_key)
+    sticky = state["lang"]
+    if (
+        detected
+        and detected != sticky
+        and natural_text_len(user_text) >= _STICKY_LANG_MIN_SWITCH_CHARS
+    ):
+        if state["pending"] == detected:
+            state["lang"] = detected
+            state["pending"] = None
+            return detected
+        state["pending"] = detected
+        return sticky
+    if detected == sticky and state["pending"] is not None:
+        state["pending"] = None  # the conversation reaffirms the sticky language
+    return sticky
 
 
 # --- System Prompt ---
@@ -382,8 +454,10 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
 
     last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
 
-    # Reply language follows the user's message (not just the install language).
-    _server_lang = detect_user_lang(last_user_msg or "", fallback=os.getenv("NEXE_LANG", "en"))
+    # Reply language follows the user's message (not just the install language),
+    # sticky per session so a short ack cannot rewrite the system prompt from
+    # token 0 halfway through a conversation (#854).
+    _server_lang = _resolve_request_lang(derive_session_id(request), last_user_msg or "")
 
     # MC-090: size the RAG budget to the engine's real context window (Ollama).
     _effective_ctx = get_effective_context_window(engine)

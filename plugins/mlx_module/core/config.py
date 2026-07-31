@@ -42,6 +42,26 @@ _RUNTIME_GB = 1.15   # measured runtime baseline (Python + Metal, 2026-07-23)
 _OS_RESERVE_GB = 1.5
 
 
+def _positive_int_env(name: str, default: int) -> int:
+    """Read a positive int from the env; anything unusable falls back.
+
+    A typo must not disable a cache (0) or crash the engine at import time —
+    the same tolerance the other MLX knobs already apply.
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("%s=%r is not an integer — using %d", name, raw, default)
+        return default
+    if value < 1:
+        logger.warning("%s=%d is below 1 — using %d", name, value, default)
+        return default
+    return value
+
+
 def _read_model_config_json(model_path: str):
     """Return the model's config.json as a dict, or None if unreadable."""
     if not model_path:
@@ -169,6 +189,11 @@ class MLXConfig:
     temperature: float = 0.7
     top_p: float = 0.9
     max_session_caches: int = 4  # Same as ModelPool.max_sessions
+    # VLM KV caches are far heavier than the text ones, and #843 is an 8 GB
+    # machine: this gets its own knob and its own default of 1, so raising
+    # NEXE_MLX_MAX_SESSION_CACHES for the text path cannot quietly multiply
+    # the VLM memory too.
+    max_vlm_session_caches: int = 1  # NEXE_MLX_VLM_MAX_SESSION_CACHES
 
     def __post_init__(self):
         """Validate configuration after creation."""
@@ -251,6 +276,7 @@ class MLXConfig:
             temperature=float(os.getenv("NEXE_MLX_TEMPERATURE", "0.7")),
             top_p=float(os.getenv("NEXE_MLX_TOP_P", "0.9")),
             max_session_caches=int(os.getenv("NEXE_MLX_MAX_SESSION_CACHES", "4")),
+            max_vlm_session_caches=_positive_int_env("NEXE_MLX_VLM_MAX_SESSION_CACHES", 1),
         )
         # B004: max_kv_size AFTER construction (__post_init__ has normalised
         # ~/relative paths) and derived from the model actually being loaded.

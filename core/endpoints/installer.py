@@ -1202,6 +1202,14 @@ async def set_hf_token(body: HfTokenBody) -> JSONResponse:
     return JSONResponse({"ok": True, "persisted": persisted})
 
 
+# #855: WebKit (the Tauri WebView on macOS) drops EventSource/fetch streams
+# that go silent for >~30 s. The install waits on real work — since #833 an
+# API probe of 30-60 s — so the SSE body must not stay mute until done/error.
+# Same reason as the model-download keepalive above, tighter period because
+# here a single silent stretch already crosses the WebKit threshold.
+_OLLAMA_INSTALL_KEEPALIVE_S = 10.0
+
+
 @router.post("/ollama", operation_id="installer_ollama_install")
 async def install_ollama_endpoint(request: Request) -> StreamingResponse:
     """Install Ollama if not present, streaming status as SSE.
@@ -1229,7 +1237,16 @@ async def install_ollama_endpoint(request: Request) -> StreamingResponse:
             # MC-031: share the install→locate machine with
             # _install_ollama_if_needed so the bundle fallback (CLI installed
             # but not yet on PATH) can never diverge between the two paths.
-            binary = await _install_ollama_and_locate()
+            # #855: run it as a task so the stream can breathe while it works.
+            _install = asyncio.ensure_future(_install_ollama_and_locate())
+            while True:
+                _finished, _ = await asyncio.wait(
+                    {_install}, timeout=_OLLAMA_INSTALL_KEEPALIVE_S
+                )
+                if _finished:
+                    break
+                yield await _sse({"type": "keepalive", "ts": time.monotonic()})
+            binary = _install.result()
         except RuntimeError as exc:
             yield await _sse({"type": "error", "message": str(exc)})
             return

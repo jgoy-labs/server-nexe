@@ -237,3 +237,216 @@ def test_vlm_kv_instrumentation_logs_enforcement_verdict(caplog):
             )
     enforced = [r for r in caplog.records if "MLX VLM cache request" in r.getMessage()]
     assert enforced and "enforced via mlx_vlm" in enforced[0].getMessage()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# #843 — the 8 GB M1 field log read "new cache state → evicted cache state for
+# the SAME key immediately". Measured 31/07: the two lines show the same
+# text because the log truncated the key at 30 chars, which is still
+# inside the model path. The keys were DIFFERENT (identity_hash/session
+# live past char 30) — the eviction was key churn against max_sessions=1,
+# not a manager that evicts what it just created.
+# ═══════════════════════════════════════════════════════════════════════
+
+_MODEL = "storage/models/Qwen3.5-9B-MLX-4bit"
+
+
+def _key(identity="aaaaaaaaaaaaaaaa", session="sess1234"):
+    return f"{_MODEL}:{identity}:{session}"
+
+
+class TestF843KeyIsLegibleInTheLog:
+
+    def test_two_different_keys_are_distinguishable_in_the_log(self, caplog):
+        """The evidence a field capture depends on: two lines for two keys must
+        not be byte-identical.
+
+        Mutation guard: log ``model_key[:30]`` again and this goes RED — both
+        lines collapse to the model path.
+        """
+        m = VLMPromptCacheManager(max_sessions=1)
+        with caplog.at_level("INFO"):
+            m.get_or_create(_key(identity="a" * 16))
+            m.get_or_create(_key(identity="b" * 16))
+        lines = [r.getMessage() for r in caplog.records]
+        news = [ln for ln in lines if "new cache state" in ln]
+        assert len(news) == 2, lines
+        assert news[0] != news[1], f"log cannot tell two keys apart: {news}"
+
+    def test_the_eviction_line_names_the_key_that_died(self, caplog):
+        m = VLMPromptCacheManager(max_sessions=1)
+        with caplog.at_level("INFO"):
+            m.get_or_create(_key(identity="a" * 16))
+            m.get_or_create(_key(identity="b" * 16))
+        evicted = [r.getMessage() for r in caplog.records if "evicted" in r.getMessage()]
+        assert len(evicted) == 1, evicted
+        assert "aaaaaaaa" in evicted[0], evicted
+        assert "bbbbbbbb" not in evicted[0], "evicted the wrong key in the log"
+
+    def test_session_is_visible_so_two_sessions_are_told_apart(self, caplog):
+        """Same system prompt, two conversations: the log must show which."""
+        m = VLMPromptCacheManager(max_sessions=2)
+        with caplog.at_level("INFO"):
+            m.get_or_create(_key(session="sessAAAA"))
+            m.get_or_create(_key(session="sessBBBB"))
+        lines = " ".join(r.getMessage() for r in caplog.records)
+        assert "sessAAAA" in lines and "sessBBBB" in lines, lines
+
+
+class TestF843ReuseIsVisible:
+    """A field log that only reports creations and evictions cannot prove
+    reuse — which is exactly what #843 needed and did not have."""
+
+    def test_reuse_of_the_same_key_is_logged(self, caplog):
+        """Mutation guard: drop the reuse log line and this goes RED."""
+        m = VLMPromptCacheManager(max_sessions=1)
+        m.get_or_create(_key())
+        with caplog.at_level("INFO"):
+            m.get_or_create(_key())
+        lines = [r.getMessage() for r in caplog.records]
+        assert any("reuse" in ln.lower() for ln in lines), lines
+        assert not any("new cache state" in ln for ln in lines), lines
+        assert not any("evicted" in ln for ln in lines), lines
+
+    def test_stable_key_across_turns_never_evicts(self, caplog):
+        """The post-FD-S1 shape: identity_hash stable within the day and
+        session_id in the key → three turns, one state, zero evictions."""
+        m = VLMPromptCacheManager(max_sessions=1)
+        with caplog.at_level("INFO"):
+            states = [m.get_or_create(_key()) for _ in range(3)]
+        assert states[0] is states[1] is states[2]
+        assert not [r for r in caplog.records if "evicted" in r.getMessage()]
+
+    def test_churning_key_evicts_every_turn(self, caplog):
+        """The pre-FD-S1 shape, reproduced: a key that changes per turn (the
+        clock in the system prompt) evicts the previous state every time —
+        cached=0 forever, with max_sessions=1."""
+        m = VLMPromptCacheManager(max_sessions=1)
+        with caplog.at_level("INFO"):
+            for turn in range(3):
+                m.get_or_create(_key(identity=f"hash{turn:012d}"))
+        evictions = [r.getMessage() for r in caplog.records if "evicted" in r.getMessage()]
+        assert len(evictions) == 2, evictions
+        assert m.get_stats()["total"] == 1
+
+
+def test_stats_sessions_are_discriminating_too():
+    """The MLX status endpoint showed k[:20] — even shorter than the log, so
+    two live sessions of the same model were indistinguishable there as well.
+
+    Mutation guard: back to ``k[:20]`` and this goes RED.
+    """
+    m = VLMPromptCacheManager(max_sessions=2)
+    m.get_or_create(_key(session="sessAAAA"))
+    m.get_or_create(_key(session="sessBBBB"))
+    sessions = m.get_stats()["sessions"]
+    assert len(set(sessions)) == 2, sessions
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# max_sessions was configurable on paper only: the singleton applied the
+# argument on its FIRST call and chat.py never passed one, so the VLM path
+# was permanently pinned at 1 while the text path read
+# config.max_session_caches (4, NEXE_MLX_MAX_SESSION_CACHES).
+#
+# The default STAYS 1: VLM KV caches are heavy and #843 is an 8 GB machine.
+# What changes is that a configured value now actually lands.
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.fixture()
+def _fresh_singleton():
+    """The manager is a process-wide singleton — isolate it per test."""
+    import plugins.mlx_module.core.vlm_cache_manager as vcm
+    saved = vcm._vlm_cache_manager
+    vcm._vlm_cache_manager = None
+    yield vcm
+    vcm._vlm_cache_manager = saved
+
+
+class TestVLMMaxSessionsIsConfigurable:
+
+    def test_default_stays_one(self, _fresh_singleton):
+        """Prudence first: no env, no argument → the 8 GB behaviour is intact."""
+        assert get_vlm_cache_manager().max_sessions == 1
+
+    def test_configured_value_reaches_an_existing_singleton(self, _fresh_singleton):
+        """The bug: the first caller froze the limit forever.
+
+        Mutation guard: drop the set_max_sessions call from
+        get_vlm_cache_manager and this goes RED — the manager stays at 1.
+        """
+        assert get_vlm_cache_manager().max_sessions == 1
+        assert get_vlm_cache_manager(3).max_sessions == 3
+
+    def test_lowering_the_limit_evicts_the_excess_now(self, _fresh_singleton, caplog):
+        """Shrinking must free memory immediately, not on the next turn — the
+        whole point on a machine that is short of RAM.
+
+        Mutation guard: make set_max_sessions only assign the attribute and
+        this goes RED.
+        """
+        m = get_vlm_cache_manager(3)
+        for i in range(3):
+            m.get_or_create(_key(session=f"sess{i:04d}"))
+        assert m.get_stats()["total"] == 3
+        with caplog.at_level("INFO"):
+            get_vlm_cache_manager(1)
+        assert m.get_stats()["total"] == 1
+        assert m.max_sessions == 1
+        assert [r for r in caplog.records if "evicted" in r.getMessage()]
+
+    def test_floor_of_one_survives_a_bad_value(self, _fresh_singleton):
+        """0 or negative must not disable caching outright."""
+        assert get_vlm_cache_manager(0).max_sessions == 1
+
+    def test_none_leaves_the_current_limit_alone(self, _fresh_singleton):
+        """Call sites that do not care (clear()) must not reset the limit."""
+        get_vlm_cache_manager(3)
+        assert get_vlm_cache_manager().max_sessions == 3
+
+
+class TestVLMMaxSessionsConfig:
+
+    def test_config_default_is_one(self, monkeypatch):
+        from plugins.mlx_module.core.config import MLXConfig
+        monkeypatch.delenv("NEXE_MLX_VLM_MAX_SESSION_CACHES", raising=False)
+        monkeypatch.setenv("NEXE_MLX_MODEL", "/tmp/fake-model")
+        assert MLXConfig.from_env().max_vlm_session_caches == 1
+
+    def test_config_reads_its_own_env(self, monkeypatch):
+        """A separate knob from the text path: the VLM cache is far heavier,
+        so NEXE_MLX_MAX_SESSION_CACHES=4 must not silently apply here.
+
+        Mutation guard: read NEXE_MLX_MAX_SESSION_CACHES instead and this goes
+        RED.
+        """
+        from plugins.mlx_module.core.config import MLXConfig
+        monkeypatch.setenv("NEXE_MLX_MODEL", "/tmp/fake-model")
+        monkeypatch.setenv("NEXE_MLX_MAX_SESSION_CACHES", "4")
+        monkeypatch.setenv("NEXE_MLX_VLM_MAX_SESSION_CACHES", "2")
+        cfg = MLXConfig.from_env()
+        assert cfg.max_session_caches == 4
+        assert cfg.max_vlm_session_caches == 2
+
+    def test_invalid_env_falls_back_to_one(self, monkeypatch):
+        from plugins.mlx_module.core.config import MLXConfig
+        monkeypatch.setenv("NEXE_MLX_MODEL", "/tmp/fake-model")
+        monkeypatch.setenv("NEXE_MLX_VLM_MAX_SESSION_CACHES", "moltes")
+        assert MLXConfig.from_env().max_vlm_session_caches == 1
+
+
+def test_vlm_path_passes_the_configured_limit():
+    """Anti-theatre: the knob above is worthless if _generate_vlm keeps calling
+    get_vlm_cache_manager() bare. Source guard — driving _generate_vlm needs a
+    loaded VLM model.
+
+    Mutation guard: drop the argument at the call site and this goes RED.
+    """
+    import inspect
+    from plugins.mlx_module.core import chat as chat_mod
+
+    # Whitespace-normalised: the call is wrapped across lines, and a formatter
+    # rewrapping it must not fail the guard.
+    src = " ".join(inspect.getsource(chat_mod).split())
+    assert "get_vlm_cache_manager( self.config.max_vlm_session_caches )" in src \
+        or "get_vlm_cache_manager(self.config.max_vlm_session_caches)" in src

@@ -210,10 +210,15 @@ def lookup_prefix_cache(
     # If there is no cache, create a new one
     if cached_kv is None:
         cached_kv = make_prompt_cache(model, max_kv_size=max_kv_size)
-        # B004 instrumentation: mlx-lm delegates to model.make_cache() when
-        # the model defines it (Qwen3.5/gemma4/gpt-oss do), IGNORING
-        # max_kv_size — so the "rotating safety net" only exists for models
-        # without it (qwen3/llama/mistral-style). Log which world we're in:
+        # B004 instrumentation: mlx-lm delegates to model.make_cache() when the
+        # model defines it, IGNORING max_kv_size (cache.py:31-32). Measured on
+        # mlx-lm 0.31.3 (#845, 31/07): qwen3_5, qwen3_5_moe, gemma4, gpt_oss,
+        # llama and gemma3 all define it — the earlier note here claimed the
+        # safety net still covered "llama/mistral-style" models, and for llama
+        # that is false. Of the families we ship, only qwen3-style models get a
+        # RotatingKVCache. What the limit does reach: Qwen3.5 builds plain
+        # unbounded KVCache on its attention layers, gpt-oss its own 128-token
+        # window — neither is the configured number. Log which world we're in:
         # this is the field data that re-attributes degeneration reports.
         try:
             from collections import Counter
@@ -369,9 +374,16 @@ def run_streaming_generation(
 
         # SAVE CACHE POST-PREFILL (before the rest times out!)
         cache_manager.insert_cache(model_key, cache_lookup_tokens, cached_kv)
+        # #843 (text path): this used to log model_key[:30]. A key is
+        # "storage/models/<model>:<identity_hash>:<session>" and
+        # len("storage/models/") == 15, so 30 chars never left the model path —
+        # two conversations logged identically. That is exactly how the VLM
+        # capture was misread as "created and evicted the SAME key". One
+        # digest, shared with the VLM manager, so both paths stay readable.
+        from .vlm_cache_manager import _key_digest
         logger.info(  # nosemgrep: python-logger-credential-disclosure
             "MLXChatNode: cache saved post-prefill (%d tokens, key=%s)",
-            len(cache_lookup_tokens), model_key[:30]
+            len(cache_lookup_tokens), _key_digest(model_key)
         )
     except StopIteration:
         logger.warning("MLXChatNode: generator empty, no prefill cache saved")

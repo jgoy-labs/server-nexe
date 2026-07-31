@@ -112,6 +112,22 @@ _REPROMPT_OVERRIDE = {
     "en": "\n\nIMPORTANT: Memory has been saved successfully. Now respond naturally to the user's message. Do NOT emit [MEM_SAVE:] tags — already done. Just have a normal conversation.",
 }
 
+
+def _mem_save_fallback_text(mem_saves: list) -> str:
+    """Confirmation shown when a turn cleans down to ONLY [MEM_SAVE: ...].
+
+    #856: both chat paths need the exact same text — the streaming path
+    (re-prompt → this fallback) and the non-streaming one, which used to strip
+    the tag unconditionally and answer 200 with an EMPTY body. Single source so
+    the two can never drift again.
+
+    Returns "" when there is nothing to confirm: no facts, no fabricated text.
+    """
+    facts = [f.strip() for f in mem_saves if f and f.strip()]
+    if not facts:
+        return ""
+    return "Memòria desada: " + ", ".join(facts)
+
 # ─── Collection-toggle prompt overrides (2026-07-04) ──────────────────────────
 # The RAG layer honours the UI collection toggles (rag_collections in the body),
 # but the static system prompt kept promising documentation/memories — so models
@@ -1445,6 +1461,15 @@ async def _handle_nonstreaming_response(
     # Last pass (parity with _clean_full_response): invented [MEM_*] variants
     # must never reach the client.
     response_text = _strip_unknown_mem_tags(response_text)
+    # #856: a turn that cleans down to ONLY the MEM_SAVE tag left the client
+    # with 200 + empty body here, while the streaming path re-prompted and,
+    # failing that, emitted a confirmation. Seen live 31/07 (glm-4.7-flash
+    # answered a bare hallucinated directive in 0.58 s). The re-prompt itself
+    # needs engine/sig/system_prompt/messages, which stay local to
+    # _handle_chat_engine — so this path lands on the same fallback text the
+    # streaming one uses when its re-prompt yields nothing.
+    if not response_text:
+        response_text = _mem_save_fallback_text(_mem_saves_ns)
     return response_text, memory_action, mem_deleted_delta
 
 
@@ -2350,10 +2375,10 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
                 yield _chunk
             if _rp_out:
                 clean_response = _rp_out[0]
-            elif _mem_saves:
-                _fallback_facts = [f.strip() for f in _mem_saves if f and f.strip()]
-                if _fallback_facts:
-                    clean_response = "Memòria desada: " + ", ".join(_fallback_facts)
+            else:
+                _fallback = _mem_save_fallback_text(_mem_saves)
+                if _fallback:
+                    clean_response = _fallback
                     yield clean_response
                     logger.info("Re-prompt fallback: confirmation message")
 

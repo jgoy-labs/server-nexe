@@ -14,6 +14,23 @@ from .installer_i18n import t, get_lang
 from .installer_catalog_data import MODEL_CATALOG  # noqa: F401 (re-exported)
 
 
+def usable_ram_gb(ram_gb: int) -> int:
+    """RAM the CLI considers usable for a model, in whole GB.
+
+    Behaviour unchanged (``int(ram × 0.55)``, truncating): what changes is that
+    the fraction now comes from the single documented place
+    (export_catalog_json.CLI_USABLE_FRACTION) instead of a literal here. The
+    wizard uses a different fraction ON PURPOSE and nobody has decided which is
+    right — see that module's comment and dev2_result_f7.md.
+
+    Note the truncation is part of the current contract: 24 GB → int(13.2) → 13,
+    not 13.2. It is not "fixed" here because that alone would move which models
+    the CLI accepts.
+    """
+    from .export_catalog_json import CLI_USABLE_FRACTION
+    return int(ram_gb * CLI_USABLE_FRACTION)
+
+
 def _determine_recommended_category(usable_ram: int) -> tuple:
     """Return (rec_choice, rec_label) based on available RAM."""
     if usable_ram < 5:
@@ -203,7 +220,7 @@ def select_model(hw):
 
     lang = get_lang()
     ram = hw["ram"]
-    usable_ram = int(ram * 0.55)
+    usable_ram = usable_ram_gb(ram)
     has_metal = hw["has_metal"]
     disk_free_gb = hw.get("disk_free_gb", 0)
 

@@ -1264,7 +1264,9 @@ class MLXChatNode:
         identity_hash = compute_system_hash(system)
         session_key = session_id[:8] if session_id else "default"
         model_key = f"{self.config.model_path}:{identity_hash}:{session_key}"
-        cache_state = get_vlm_cache_manager().get_or_create(model_key)
+        cache_state = get_vlm_cache_manager(
+            self.config.max_vlm_session_caches
+        ).get_or_create(model_key)
         had_cache = cache_state is not None and getattr(cache_state, "cache", None) is not None
         # Best-effort reuse count for the log/metrics (text-only prompts tokenize
         # cleanly; with images the count is approximate). The real saving is

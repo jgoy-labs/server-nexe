@@ -63,8 +63,7 @@ struct ModelPickerView: View {
                             Spacer(minLength: 0)
                             LazyVStack(spacing: 10) {
                                 ForEach(engine.catalog.models(for: selectedTab)) { model in
-                                    // B171: strict '>' so a model at its exact tier (ramGB == 75% of RAM) stays selectable.
-                                    let tooLarge = model.ramGB > Double(engine.hardware.ramGB) * 0.75
+                                    let tooLarge = isTooLarge(model)
                                     ModelCard(
                                         model: model,
                                         isSelected: engine.selectedModel?.key == model.key,
@@ -137,9 +136,32 @@ struct ModelPickerView: View {
         }
     }
 
+    /// RAM a model may use on this machine — the picker's single source of truth.
+    ///
+    /// The 0.75 coefficient is a product decision (Jordi, 31/07) and lives HERE,
+    /// once: `tooLarge` and `isRecommended` must never be able to drift apart,
+    /// which is exactly how a tier ended up recommending nothing at all.
+    private var usableRamGB: Double {
+        Double(engine.hardware.ramGB) * 0.75
+    }
+
+    /// B171: strict `>` so a model sitting exactly on the limit stays
+    /// selectable. Not cosmetic — mistral_small_24b needs 18.0 GB and a 24 GB
+    /// machine's limit is exactly 18.0. With `>=` that Mac would have nothing.
+    private func isTooLarge(_ model: AIModel) -> Bool {
+        model.ramGB > usableRamGB
+    }
+
+    /// The first model of the machine's tier that actually FITS (decision B,
+    /// 31/07). It used to be `models(for: tier).first` regardless of RAM, so on
+    /// a 24 GB Mac the crown fell on qwen35_27b (20.0 GB) — which the picker
+    /// greys out, and `ModelCard` only draws the badge when
+    /// `isRecommended && !isDisabled`, so that machine got NO recommendation at
+    /// all. Now the crown goes to the first installable model, or to none.
     private func isRecommended(_ model: AIModel) -> Bool {
         let tier = engine.hardware.ramTier
-        return engine.catalog.models(for: tier).first?.key == model.key
+        let firstThatFits = engine.catalog.models(for: tier).first { !isTooLarge($0) }
+        return firstThatFits?.key == model.key
     }
 
     private func t(_ key: String) -> String {
@@ -154,13 +176,34 @@ struct HardwareBar: View {
     let lang: Lang
 
     var body: some View {
-        HStack(spacing: 20) {
+        VStack(spacing: 10) {
+            // Simulated-RAM banner. Deliberately loud: this installer picks
+            // models by RAM, so a test run mistaken for a real one can install
+            // a model the machine cannot hold. Never hidden behind #if DEBUG —
+            // a release build run with the variable set must say so too.
+            if let realRAM = hardware.simulatedFromRealGB {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text(String(format: T.get("model_test_mode", lang: lang),
+                                "\(hardware.ramGB)", "\(realRAM)"))
+                        .fontWeight(.semibold)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundColor(.black)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange)
+                .cornerRadius(8)
+            }
+            HStack(spacing: 20) {
             HWChip(icon: "memorychip", label: t("model_hw_ram"), value: "\(hardware.ramGB) GB")
             HWChip(icon: "cpu", label: t("model_hw_chip"), value: hardware.chipModel)
             if hardware.hasMetal {
                 HWChip(icon: "bolt.fill", label: t("model_hw_metal"), value: "Yes")
             }
             HWChip(icon: "internaldrive", label: t("model_hw_disk"), value: "\(hardware.diskFreeGB) GB")
+            }
         }
         .padding(10)
         .background(Color(nsColor: .controlBackgroundColor))

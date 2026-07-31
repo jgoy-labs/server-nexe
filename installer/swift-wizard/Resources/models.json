@@ -7,7 +7,7 @@
       "year": 2026,
       "role": "general",
       "params": "4B",
-      "ram_gb": 3.0,
+      "ram_gb": 4.1,
       "disk_gb": 2.9,
       "backends": [
         "ollama",
@@ -124,7 +124,7 @@
       "year": 2025,
       "role": "iberic",
       "params": "7B",
-      "ram_gb": 6.0,
+      "ram_gb": 6.1,
       "disk_gb": 4.9,
       "backends": [
         "ollama",
@@ -195,7 +195,7 @@
       "year": 2025,
       "role": "reasoning",
       "params": "21B (MoE, 3.6B actius)",
-      "ram_gb": 16.0,
+      "ram_gb": 23.4,
       "disk_gb": 22.2,
       "backends": [
         "ollama",
@@ -312,7 +312,7 @@
       "year": 2026,
       "role": "iberic",
       "params": "40B",
-      "ram_gb": 24.0,
+      "ram_gb": 43.2,
       "disk_gb": 42.0,
       "backends": [
         "ollama",

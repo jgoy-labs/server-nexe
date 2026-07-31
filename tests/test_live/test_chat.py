@@ -82,12 +82,6 @@ class TestChatOllama:
             f"Last 500 chars: {raw[-500:]}"
         )
 
-    @pytest.mark.xfail(
-        reason="Server falls back to RAG/context and returns 200 instead of "
-               "rejecting unknown model with 4xx. Known bug: model validation "
-               "should happen before pipeline execution.",
-        strict=True,
-    )
     def test_ollama_unknown_model_error(
         self,
         client: httpx.Client,
