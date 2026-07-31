@@ -63,28 +63,29 @@ def _flatten_json(path):
 # CHANGELOG "Installer wizard tier mismatch on 48+ GB machines").
 _TIER_MIN_RAM_GB = {"tier_8": 8, "tier_16": 16, "tier_24": 24, "tier_32": 32}
 
-# ── The two usable-RAM fractions, side by side and ON PURPOSE ──────────────
+# ── The usable-RAM fraction, shared by both paths ──────────────────────────
 #
-# They are DIFFERENT, and as of 31/07 nobody has decided which one is right —
-# so they live here together instead of hand-written at each call site, which
-# is how they drifted apart in the first place. Changing either is a product
-# decision; changing one WITHOUT the other is a bug, and the guards below say so.
+# UNIFIED at 0.75 (product decision, 31/07 — measured first: a model holding
+# ~75% of physical RAM generates sustainably on an 8 GB M1, footprint 6.05 of
+# 8.0 GB with zero jetsam; 8 GB is the worst case, absolute headroom grows
+# with RAM). History: the CLI shipped 0.55 with "(50-60%)" printed to the user
+# and thresholds calibrated on it, the wizard shipped 0.75, and the two drifted
+# apart as hand-written literals. The structure was unified first (both
+# constants here); this change unified the VALUE, moved the CLI category
+# thresholds with it (5/20/28 → 7/27/38), and dropped the CLI's int()
+# truncation so both sides compare the same float — the alignment tests in
+# tests/test_catalog_sync.py pin all of it.
 #
-# WIZARD (0.75) — ModelPickerView.swift:141-146. A model is greyed out when
+# WIZARD — ModelPickerView.swift:141-146. A model is greyed out when
 #   `model.ramGB > hardware.ramGB * 0.75`, strict `>` (B171) so a model exactly
-#   on the boundary stays selectable. Explicit product decision (Jordi, 31/07).
+#   on the boundary stays selectable.
+# CLI — installer_catalog.usable_ram_gb(): same fraction, same float, and
+#   `usable >= need` ≡ NOT(need > usable), so the verdicts match everywhere.
 #
-# CLI (0.55) — installer_catalog.py. It has its own written support: the wizard
-#   prints "~N GB (50-60%)" to the user (installer_catalog.py:212) and
-#   `ram_reserved_note` promises the rest goes to macOS and other apps, in all
-#   three languages. Its category thresholds (5/20/28) are calibrated on it too
-#   — see the B159 comment: ">=28GB usable ~ 52GB+ RAM" only works out at 0.55.
-#   So moving the CLI to 0.75 is not a one-number change: it drags the category
-#   thresholds and the user-facing text with it.
-#
-# The measured verdict-by-verdict divergence is pinned in tests/test_catalog_sync.py.
+# The two constants stay SEPARATE on purpose: the guards below scream if either
+# moves without the other — a lone literal is how they drifted the first time.
 WIZARD_USABLE_FRACTION = 0.75
-CLI_USABLE_FRACTION = 0.55
+CLI_USABLE_FRACTION = 0.75
 
 # Backwards-compatible alias (the tier guards below were written against it).
 _PICKER_USABLE_FRACTION = WIZARD_USABLE_FRACTION
@@ -216,14 +217,14 @@ def _duplicate_key_errors(label: str, catalog: dict) -> list[str]:
 
 # What each side is EXPECTED to use. A change here is a deliberate act; a change
 # at a call site without one here is the drift this guard exists to catch.
-_EXPECTED_FRACTIONS = {"wizard": 0.75, "cli": 0.55}
+_EXPECTED_FRACTIONS = {"wizard": 0.75, "cli": 0.75}
 
 
 def _usable_fraction_errors() -> list[str]:
     """Both usable-RAM fractions must be the documented ones AND come from here.
 
-    Not "both must be equal": today they are not, deliberately, and deciding
-    which one wins is a product call. What is guarded is that neither moves
+    Since 31/07 they are unified at 0.75; a difference between them is a
+    regression, not a decision. What is guarded is that neither moves
     unnoticed and that the CLI reads the shared constant instead of a literal
     of its own — a literal is exactly how the two drifted apart.
     """
@@ -241,8 +242,8 @@ def _usable_fraction_errors() -> list[str]:
     except ImportError as exc:  # pragma: no cover - the CLI must be importable
         errors.append(f"[RAM-FRACTION] no puc importar el CLI per verificar-lo: {exc}")
         return errors
-    # 100 GB keeps the truncation out of the way: 100 × 0.55 = 55.0 exactly.
-    if usable_ram_gb(100) != int(100 * CLI_USABLE_FRACTION):
+    # Float against float, no truncation anymore: 100 × 0.75 = 75.0 exactly.
+    if usable_ram_gb(100) != 100 * CLI_USABLE_FRACTION:
         errors.append(
             "[RAM-FRACTION] el CLI no calcula la RAM utilitzable amb "
             "CLI_USABLE_FRACTION — torna a tenir un literal propi"

@@ -14,33 +14,34 @@ from .installer_i18n import t, get_lang
 from .installer_catalog_data import MODEL_CATALOG  # noqa: F401 (re-exported)
 
 
-def usable_ram_gb(ram_gb: int) -> int:
-    """RAM the CLI considers usable for a model, in whole GB.
+def usable_ram_gb(ram_gb: int) -> float:
+    """RAM the CLI considers usable for a model, in GB.
 
-    Behaviour unchanged (``int(ram × 0.55)``, truncating): what changes is that
-    the fraction now comes from the single documented place
-    (export_catalog_json.CLI_USABLE_FRACTION) instead of a literal here. The
-    wizard uses a different fraction ON PURPOSE and nobody has decided which is
-    right — see that module's comment.
-
-    Note the truncation is part of the current contract: 24 GB → int(13.2) → 13,
-    not 13.2. It is not "fixed" here because that alone would move which models
-    the CLI accepts.
+    Unified with the wizard (product decision, 31/07): same fraction
+    (export_catalog_json.CLI_USABLE_FRACTION = 0.75) and compared as a FLOAT —
+    the old ``int()`` truncation is gone. It made the CLI diverge from the
+    wizard on machines whose RAM is not a multiple of 4 (18 GB: 13.5 → 13) and
+    kept the 6 GB case dead (int(4.5) = 4 < the 4.1 of the smallest model).
+    Both sides now run the same arithmetic; the alignment tests in
+    tests/test_catalog_sync.py pin it.
     """
     from .export_catalog_json import CLI_USABLE_FRACTION
-    return int(ram_gb * CLI_USABLE_FRACTION)
+    return ram_gb * CLI_USABLE_FRACTION
 
 
 def _determine_recommended_category(usable_ram: int) -> tuple:
     """Return (rec_choice, rec_label) based on available RAM."""
-    if usable_ram < 5:
+    if usable_ram < 7:
         return "1", t('size_small')
-    elif usable_ram < 20:
+    elif usable_ram < 27:
         return "2", t('size_medium')
-    elif usable_ram < 28:
+    elif usable_ram < 38:
         return "3", t('size_large')
     else:
-        # B159: large machines (>=28GB usable ≈ 52GB+ RAM) can handle the xlarge tier.
+        # B159 recalibrated for 0.75: >=38 GB usable ≈ 51 GB+ physical RAM
+        # (38 / 0.75 = 50.7). Anchors carried over from the 0.55 era (5/20/28);
+        # the only integer RAM that changes category is 36 GB (medium → large,
+        # deliberate: the old 36/37 boundary is not representable at 0.75).
         return "4", t('size_xlarge')
 
 
@@ -85,7 +86,7 @@ def _localize(field: "str | dict[str, str]", lang: str) -> str:
 
 
 def _print_model_entry(
-    i: int, model: dict, usable_ram: int, disk_free_gb: float, lang: str
+    i: int, model: dict, usable_ram: float, disk_free_gb: float, lang: str
 ) -> None:
     """Print a model entry in the selection list."""
     fits_ram = usable_ram >= model["ram_gb"]
@@ -111,7 +112,7 @@ def _print_model_entry(
 
 
 def _print_model_list(
-    models: list, usable_ram: int, disk_free_gb: float, lang: str
+    models: list, usable_ram: float, disk_free_gb: float, lang: str
 ) -> None:
     """Print the full list of models for a category."""
     for i, model in enumerate(models, 1):
@@ -226,7 +227,7 @@ def select_model(hw):
 
     print(f"\n{BOLD}🤖 {t('model_selection_title')}{RESET}\n")
     print(f"  {CYAN}{t('your_ram')}:{RESET} {ram} GB")
-    print(f"  {CYAN}{t('ram_for_ai')}:{RESET} ~{usable_ram} GB {DIM}(50-60%){RESET}")
+    print(f"  {CYAN}{t('ram_for_ai')}:{RESET} ~{usable_ram:g} GB {DIM}(75%){RESET}")
     print(f"  {DIM}{t('ram_reserved_note')}{RESET}")
 
     recommended, rec_label = _determine_recommended_category(usable_ram)

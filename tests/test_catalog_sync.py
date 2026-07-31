@@ -340,31 +340,15 @@ class TestSimulatedMachines:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# CLI vs wizard — five divergences, measured, none of them decided here.
+# CLI ≡ wizard — unified at 0.75 (product decision, 31/07), truncation removed.
 #
-# The two paths give different verdicts for the same machine. Phase 7 unified
-# the STRUCTURE (both fractions live in one documented place) and deliberately
-# did NOT unify the VALUE: which coefficient is right is a product decision,
-# and both have written support in the repo. Moving the CLI to 0.75 would make
-# it accept models it refuses today — the permissive direction, on the path
-# that has no visual "greyed out" affordance.
-#
-# What is guarded: nobody moves one side without the other noticing.
-# Full diagnosis and options: the fraction comment in export_catalog_json.py.
+# The two paths used to give different verdicts for the same machine (0.55 vs
+# 0.75, int vs float). Both are gone: one fraction, one float comparison, and
+# the CLI category thresholds recalibrated with it (5/20/28 → 7/27/38). What is
+# guarded now is ALIGNMENT: any reintroduced literal, truncation or comparator
+# drift must land in review, not in a user's install.
+# Full history: the fraction comment in export_catalog_json.py.
 # ═══════════════════════════════════════════════════════════════════════════
-
-# Verdicts as measured on 31/07 with the real code, both sides. This is a
-# SNAPSHOT of a known, deliberate divergence — not an approval of it. Any change
-# to a coefficient, a category threshold, a comparator or the catalog moves it,
-# which is the point: the diff lands in review instead of in a user's install.
-_KNOWN_DIVERGENCE = {
-    #  RAM: (CLI usable GB, CLI category, wizard tier, wizard recommendation)
-    8:  (4,  "small",  "tier_8",  "qwen35_4b"),
-    16: (8,  "medium", "tier_16", "qwen35_9b"),
-    24: (13, "medium", "tier_24", "mistral_small_24b"),
-    32: (17, "medium", "tier_32", "qwen35_35b_moe"),
-    64: (35, "xlarge", "tier_32", "qwen35_35b_moe"),
-}
 
 
 def _cli_verdict(ram_gb):
@@ -380,78 +364,97 @@ def _cli_verdict(ram_gb):
     return usable, category, fits
 
 
-class TestCliVsWizardDivergence:
+class TestCliWizardAlignment:
 
-    def test_the_divergence_is_exactly_the_documented_one(self):
-        """Canary: if this fails, somebody moved a coefficient, a category
-        threshold or a comparator on ONE side. Read the fraction comment in
-        export_catalog_json.py, decide what the other side should do, and
-        update this snapshot on purpose.
-
-        Mutation guard: change CLI_USABLE_FRACTION to 0.75 and this goes RED at
-        every machine size.
-        """
-        from installer.export_catalog_json import simulate_picker
-
-        actual = {}
-        for ram in _KNOWN_DIVERGENCE:
-            usable, category, _ = _cli_verdict(ram)
-            view = simulate_picker(str(_json_path()), ram)
-            actual[ram] = (usable, category, view["tier"], view["recommended"])
-        assert actual == _KNOWN_DIVERGENCE, (
-            f"el veredicte CLI/wizard ha canviat:\n"
-            f"  esperat: {_KNOWN_DIVERGENCE}\n"
-            f"  real:    {actual}"
-        )
-
-    def test_both_fractions_come_from_one_place(self):
-        """The structural half of the fix: the CLI no longer owns a literal.
-
-        Mutation guard: put `int(ram * 0.55)` back in installer_catalog and
-        this goes RED.
-        """
+    def test_fractions_unified_and_shared(self):
+        """One value, one source. Mutation guard: put `int(ram * 0.55)` back in
+        installer_catalog (or move either constant alone) and this goes RED."""
         from installer.export_catalog_json import (
             CLI_USABLE_FRACTION, WIZARD_USABLE_FRACTION,
         )
         from installer.installer_catalog import usable_ram_gb
 
-        assert (CLI_USABLE_FRACTION, WIZARD_USABLE_FRACTION) == (0.55, 0.75)
-        assert usable_ram_gb(100) == int(100 * CLI_USABLE_FRACTION)
+        assert (CLI_USABLE_FRACTION, WIZARD_USABLE_FRACTION) == (0.75, 0.75)
+        assert usable_ram_gb(100) == 100 * CLI_USABLE_FRACTION == 75.0
+
+    def test_cli_no_longer_truncates(self):
+        """The int() was the last divergence: it starved non-multiple-of-4
+        machines (18 GB lost half a GB) and kept 6 GB dead (int(4.5)=4 < 4.1)."""
+        from installer.installer_catalog import usable_ram_gb
+
+        assert usable_ram_gb(24) == 18.0
+        assert usable_ram_gb(32) == 24.0
+        assert usable_ram_gb(18) == 13.5
+        assert usable_ram_gb(6) == 4.5
+
+    def test_cli_and_wizard_agree_on_every_model_at_every_ram(self):
+        """The alignment tripwire, model by model over 2-256 GB: the CLI accepts
+        a model iff the wizard would enable it. The CLI side goes through the
+        real usable_ram_gb(); the wizard side through simulate_picker()'s own
+        arithmetic — fraction drift, truncation or a comparator flip on either
+        side breaks the equivalence somewhere in the sweep."""
+        import json as _json
+        from installer.export_catalog_json import simulate_picker
+        from installer.installer_catalog import usable_ram_gb
+
+        path = str(_json_path())
+        data = _json.loads(_json_path().read_text(encoding="utf-8"))
+        for ram in range(2, 257):
+            view = simulate_picker(path, ram)
+            usable = usable_ram_gb(ram)
+            assert usable == view["usable_gb"], f"ram={ram}: fraccions divergents"
+            for m in data.get(view["tier"], []):
+                cli_accepts = usable >= m["ram_gb"]
+                wizard_enables = m["key"] in view["enabled"]
+                assert cli_accepts == wizard_enables, (
+                    f"ram={ram} model={m['key']}: CLI={cli_accepts} "
+                    f"wizard={wizard_enables}"
+                )
 
     def test_the_fraction_guard_reaches_validate(self):
         """It must ride the CI path like the tier guard, not a new one.
 
         Mutation guard: drop _usable_fraction_errors() from validate() and this
-        goes RED.
-        """
+        goes RED. (0.55 is the historical value someone could "restore".)"""
         import installer.export_catalog_json as ecj
 
         original = ecj.CLI_USABLE_FRACTION
-        ecj.CLI_USABLE_FRACTION = 0.75  # somebody "unifies" the number alone
+        ecj.CLI_USABLE_FRACTION = 0.55  # somebody splits the two paths again
         try:
             errors = ecj.validate(str(_json_path()))
         finally:
             ecj.CLI_USABLE_FRACTION = original
         assert any("[RAM-FRACTION]" in e for e in errors), errors
 
-    def test_cli_truncates_and_that_is_part_of_the_contract(self):
-        """Divergence #2, pinned so it cannot be "tidied up" by accident:
-        24 × 0.55 = 13.2 and the CLI uses 13, which alone changes which models
-        it accepts."""
+    def test_no_machine_from_6gb_up_is_left_without_a_cli_model(self):
+        """The dead range (a machine the wizard served but the CLI refused) is
+        closed: at 6 GB, 6 × 0.75 = 4.5 ≥ 4.1. Swept over the dead range and
+        every real Mac size. Below 6 GB the emptiness is physical (the smallest
+        model needs 4.1 GB), not arithmetic — pinned as deliberate."""
+        for ram in (6, 7, 8, 9, 16, 18, 24, 32, 36, 48, 64, 96, 128):
+            _, category, fits = _cli_verdict(ram)
+            assert fits, f"ram={ram} (categoria {category}): el CLI no ofereix cap model"
+        for ram in (2, 3, 4, 5):
+            _, _, fits = _cli_verdict(ram)
+            assert not fits, f"ram={ram}: hauria de ser buit (cap model hi cap)"
+
+    def test_exact_boundary_model_selectable_on_both_sides(self):
+        """The zero-margin property, now shared: the CLI's `usable >= need`
+        (inclusive) is the exact inverse of the wizard's strict `need > usable`
+        (B171), so a model sitting exactly on the limit is selectable on BOTH
+        paths. mistral_small_24b needs 18.0 on a 24 GB machine — 18.0 == 18.0."""
+        from installer.export_catalog_json import simulate_picker
         from installer.installer_catalog import usable_ram_gb
 
-        assert usable_ram_gb(24) == 13
-        assert usable_ram_gb(32) == 17  # 17.6 truncated
+        from installer.installer_catalog_data import MODEL_CATALOG
 
-    def test_the_two_comparators_are_inverse_and_still_differ(self):
-        """Divergence #3: the CLI asks `usable >= model.ram_gb` (inclusive on
-        the usable side); the wizard asks `model.ramGB > usable` (strict). At
-        the exact boundary they agree by accident, but they are not the same
-        rule — documented here so the next person sees it before unifying."""
-        from installer.export_catalog_json import simulate_picker
-
-        # A 16 GB machine: CLI usable 8, wizard usable 12.0 — same catalog,
-        # different frontier.
-        usable, _, _ = _cli_verdict(16)
-        view = simulate_picker(str(_json_path()), 16)
-        assert usable == 8 and view["usable_gb"] == 12.0
+        assert usable_ram_gb(24) == 18.0
+        view = simulate_picker(str(_json_path()), 24)
+        assert "mistral_small_24b" in view["enabled"]
+        # CLI side: the model lives in "large" (a category the user can pick
+        # explicitly at any RAM); at exactly 18.0 usable it must fit.
+        large_fits = [
+            m["key"] for m in MODEL_CATALOG["large"]
+            if usable_ram_gb(24) >= m["ram_gb"]
+        ]
+        assert "mistral_small_24b" in large_fits

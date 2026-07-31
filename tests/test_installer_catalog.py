@@ -135,25 +135,27 @@ from installer.installer_catalog import (  # noqa: E402
 
 
 class TestDetermineRecommendedCategory:
-    def test_small_when_ram_below_5(self):
-        rec, _ = _determine_recommended_category(4)
+    # Llindars recalibrats per a la fracció 0,75 (31/07): 5/20/28 → 7/27/38.
+    # Ancoratges físics conservats de l'era 0,55; les entrades són GB USABLES.
+    def test_small_when_usable_below_7(self):
+        rec, _ = _determine_recommended_category(4.5)  # màquina de 6 GB
         assert rec == "1"
 
-    def test_medium_when_ram_5_to_19(self):
-        rec, _ = _determine_recommended_category(10)
+    def test_medium_when_usable_7_to_26(self):
+        rec, _ = _determine_recommended_category(12)  # màquina de 16 GB
         assert rec == "2"
 
-    def test_large_when_ram_20_to_27(self):
-        # B159: amb el tier xlarge (>=28), large queda 20..27.
-        rec, _ = _determine_recommended_category(27)
+    def test_large_when_usable_27_to_37(self):
+        # B159 recalibrat: amb el tier xlarge (>=38), large queda 27..37.
+        rec, _ = _determine_recommended_category(27)  # màquina de 36 GB
         assert rec == "3"
 
-    def test_boundary_5_is_medium(self):
-        rec, _ = _determine_recommended_category(5)
+    def test_boundary_7_is_medium(self):
+        rec, _ = _determine_recommended_category(7)
         assert rec == "2"
 
-    def test_boundary_20_is_large(self):
-        rec, _ = _determine_recommended_category(20)
+    def test_boundary_27_is_large(self):
+        rec, _ = _determine_recommended_category(27)
         assert rec == "3"
 
 
@@ -161,12 +163,13 @@ class TestXlargeCategoryReachable:
     """B159: el tier xlarge ha de ser recomanable i seleccionable des del wizard."""
 
     def test_high_ram_machine_recommends_xlarge(self):
-        rec, _ = _determine_recommended_category(35)
+        rec, _ = _determine_recommended_category(48)  # màquina de 64 GB
         assert rec == "4"
 
-    def test_xlarge_starts_at_28(self):
-        assert _determine_recommended_category(28)[0] == "4"
-        assert _determine_recommended_category(27)[0] == "3"
+    def test_xlarge_starts_at_38(self):
+        # 38 usables ≈ 51 GB+ físics (38 / 0.75 = 50.7).
+        assert _determine_recommended_category(38)[0] == "4"
+        assert _determine_recommended_category(37)[0] == "3"
 
     def test_choice_4_resolves_to_xlarge(self, monkeypatch):
         import installer.installer_catalog as ic
