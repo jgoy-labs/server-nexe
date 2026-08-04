@@ -180,6 +180,173 @@ def test_rotated_rotating_cache_state_is_reset_before_reuse():
     assert MLXChatNode._reset_rotated_vlm_state(object()) is False
 
 
+def _hybrid_cache():
+    """El layout REAL mesurat amb Qwen3.5-4B-4bit (cache poblat, 02/08/2026).
+
+    8 KVCache (full_attention, amb .keys → mlx_vlm SÍ les retalla) + 24
+    ArraysCache (linear_attention, sense .keys → NO es retallen). Aquest és el
+    layout que corromp: el retall parcial desalinea unes capes contra altres.
+    """
+    KVCache = type("KVCache", (), {})
+    ArraysCache = type("ArraysCache", (), {})
+
+    cache = []
+    for i in range(32):
+        if i % 4 == 3:  # full_attention_interval = 4
+            c = KVCache()
+            c.keys, c.offset = object(), 146
+        else:
+            c = ArraysCache()  # sense .keys: estat recurrent, no retallable
+        cache.append(c)
+    return cache
+
+
+def test_untrimmable_hybrid_cache_state_is_reset_before_reuse():
+    """#849 (P1): un cache amb capes NO retallables no es pot reutilitzar quan
+    cal retallar-lo — mlx_vlm retalla els input_ids sempre i el KV només on hi
+    ha .keys, i el model acaba generant amb dues històries alhora."""
+    pytest.importorskip("mlx_vlm", reason="mlx-vlm Apple-Silicon-only, absent al CI Linux")
+    from plugins.mlx_module.core.chat import MLXChatNode
+
+    cache = _hybrid_cache()
+    trimmables = sum(1 for c in cache if hasattr(c, "keys"))
+    assert (trimmables, len(cache)) == (8, 32), "el fixture ha de ser el layout mesurat"
+
+    # Prefix comú 24 < 146 desats: el cas mesurat (els 122 sobrants són <think>).
+    state = SimpleNamespace(cache=cache, token_ids=list(range(146)))
+    state.find_prefix_length = lambda ids: 24
+
+    assert MLXChatNode._reset_untrimmable_vlm_state(state, [0, 1, 2]) is True
+    assert state.cache is None and state.token_ids is None, (
+        "amb capes no retallables el reuse s'ha de descartar SENCER"
+    )
+
+
+def test_exact_prefix_keeps_reuse_even_with_untrimmable_layers():
+    """Si el cache és prefix EXACTE del prompt nou no cal cap retall, i llavors
+    el reuse de mlx_vlm és correcte fins i tot amb capes recurrents."""
+    pytest.importorskip("mlx_vlm", reason="mlx-vlm Apple-Silicon-only, absent al CI Linux")
+    from plugins.mlx_module.core.chat import MLXChatNode
+
+    state = SimpleNamespace(cache=_hybrid_cache(), token_ids=list(range(146)))
+    state.find_prefix_length = lambda ids: 146  # cobreix TOT el cache
+
+    assert MLXChatNode._reset_untrimmable_vlm_state(state, list(range(200))) is False
+    assert state.cache is not None, "sense retall pendent el reuse es conserva"
+
+
+def test_all_trimmable_cache_is_never_reset():
+    """Un model de KV pur (totes les capes amb .keys) no ha de perdre el reuse:
+    allà el trim de mlx_vlm és correcte i el prefill 4× es conserva."""
+    pytest.importorskip("mlx_vlm", reason="mlx-vlm Apple-Silicon-only, absent al CI Linux")
+    from plugins.mlx_module.core.chat import MLXChatNode
+
+    KVCache = type("KVCache", (), {})
+    cache = []
+    for _ in range(32):
+        c = KVCache()
+        c.keys, c.offset = object(), 146
+        cache.append(c)
+
+    state = SimpleNamespace(cache=cache, token_ids=list(range(146)))
+    state.find_prefix_length = lambda ids: 24  # cal retallar, i es pot
+
+    assert MLXChatNode._reset_untrimmable_vlm_state(state, [1, 2]) is False
+    assert state.cache is not None
+
+    # Degeneracions: mai peta, mai reseteja el que no toca.
+    assert MLXChatNode._reset_untrimmable_vlm_state(SimpleNamespace(cache=None), [1]) is False
+    assert MLXChatNode._reset_untrimmable_vlm_state(object(), [1]) is False
+    assert (
+        MLXChatNode._reset_untrimmable_vlm_state(
+            SimpleNamespace(cache=_hybrid_cache(), token_ids=None), [1]
+        )
+        is False
+    )
+
+
+def test_untrimmable_guard_fails_closed_when_the_prefix_cannot_be_checked():
+    """#849: sense poder comprovar l'alineació, el guard ha de resetejar.
+
+    Si no hi ha ids (o el tokenitzador peta) no sabem si el cache és prefix
+    exacte; amb capes no retallables l'única sortida segura és re-prefillar.
+    Una mètrica pot fallar oberta; una guarda de correcció, no.
+    """
+    pytest.importorskip("mlx_vlm", reason="mlx-vlm Apple-Silicon-only, absent al CI Linux")
+    from plugins.mlx_module.core.chat import MLXChatNode
+
+    state = SimpleNamespace(cache=_hybrid_cache(), token_ids=list(range(146)))
+    state.find_prefix_length = lambda ids: 24
+    assert MLXChatNode._reset_untrimmable_vlm_state(state, None) is True
+
+    def _explota(ids):
+        raise RuntimeError("tokenitzador no disponible")
+
+    state2 = SimpleNamespace(cache=_hybrid_cache(), token_ids=list(range(146)))
+    state2.find_prefix_length = _explota
+    assert MLXChatNode._reset_untrimmable_vlm_state(state2, [1, 2]) is True
+
+    # Però un cache de KV pur no es toca ni sense ids: allà el trim funciona.
+    KVCache = type("KVCache", (), {})
+    pur = []
+    for _ in range(4):
+        c = KVCache()
+        c.keys, c.offset = object(), 146
+        pur.append(c)
+    state3 = SimpleNamespace(cache=pur, token_ids=list(range(146)))
+    assert MLXChatNode._reset_untrimmable_vlm_state(state3, None) is False
+
+
+def test_generate_vlm_actually_applies_the_untrimmable_guard():
+    """#849: el guard ha de disparar-se DES DEL CAMÍ REAL, no només existir.
+
+    Un guard que ningú crida és el mode de fallada que ja ens ha mossegat (el
+    test frontend del #858 que cap runner executava). Aquí s'exercita
+    ``_generate_vlm`` sencer amb un estat híbrid i es comprova que (a) el
+    ``prompt_cache_state`` que arriba a la generació ja NO porta cache i (b) les
+    mètriques diuen la veritat: ``prefix_reused=False`` i ``cached_tokens=0``.
+    """
+    pytest.importorskip("mlx_vlm", reason="mlx-vlm Apple-Silicon-only, absent al CI Linux")
+    from plugins.mlx_module.core.chat import MLXChatNode
+
+    state = SimpleNamespace(cache=_hybrid_cache(), token_ids=list(range(146)))
+    state.find_prefix_length = lambda ids: 24  # cal retallar, i no es pot
+
+    node = MLXChatNode.__new__(MLXChatNode)
+    node.config = SimpleNamespace(
+        max_tokens=64, model_path="dummy", max_kv_size=4096, max_vlm_session_caches=1
+    )
+
+    seen = {}
+
+    def fake_streaming(*args, **kwargs):
+        cs = kwargs.get("prompt_cache_state")
+        seen["cache_at_generation"] = getattr(cs, "cache", "absent")
+        return "resposta", SimpleNamespace(prompt_tokens=171, generation_tokens=10)
+
+    with patch.object(MLXChatNode, "_get_model", return_value=(object(), object())), \
+         patch.object(MLXChatNode, "_prepare_vlm_prompt", return_value="prompt nou"), \
+         patch.object(MLXChatNode, "_run_vlm_streaming", side_effect=fake_streaming), \
+         patch(
+             "plugins.mlx_module.core.vlm_cache_manager.get_vlm_cache_manager"
+         ) as fake_mgr:
+        fake_mgr.return_value = SimpleNamespace(get_or_create=lambda key: state)
+        result = node._generate_vlm(
+            system="sys",
+            messages=[{"role": "user", "content": "hola"}],
+            images=[],
+            stream_callback=lambda t: None,
+            session_id="sess1234",
+        )
+
+    assert seen["cache_at_generation"] is None, (
+        "el guard no s'ha aplicat al camí real: la generació ha rebut el cache desalineat"
+    )
+    assert result["prefix_reused"] is False
+    assert result["cached_tokens"] == 0
+    assert result["actual_prefill_tokens"] == 171, "re-prefill sencer, i el log ho ha de dir"
+
+
 def test_vlm_kv_instrumentation_logs_enforcement_verdict(caplog):
     """#826/#845: el log ha de dir si el límit és enforced o si el model l'ignora.
 

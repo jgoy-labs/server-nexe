@@ -41,6 +41,32 @@ Els models locals son menys capacos que els models al nuvol (GPT-4, Claude, etc.
 - **Models grans (32B+):** Bona qualitat, pero requereixen 32+ GB de RAM i carrega lenta.
 - **Catala:** Els models Salamandra (BSC/AINA) son els millors per al catala. Altres models tenen suport limitat de catala.
 
+### Repeticio en respostes llargues encadenades (models petits)
+
+En generacions llargues encadenades — demanar un text molt detallat i despres
+dir "continua" un parell de cops — **els models petits es repeteixen**: reemeten
+el mateix paragraf o el mateix element de llista diverses vegades seguides, i de
+vegades tornen enrere a una seccio ja escrita.
+
+Mesurat amb el mateix patro de conversa (4 torns, 2048 tokens per resposta,
+3 repeticions) sobre la familia Qwen3.5, comptant elements de llista identics
+repetits dins d'una resposta:
+
+| Model | Torns amb repeticio literal |
+|---|---|
+| 2B | 8 de 12 |
+| 4B | 3 de 12 |
+| 9B | **0 de 12** |
+| 27B | **0 de 12** |
+
+- **No es un defecte de server-nexe.** Es reprodueix igual amb el motor pelat,
+  sense RAG, sense memoria, sense compactacio de context i sense reus de cache.
+- **No es arregla amb `repetition_penalty`:** mesurat a 1,05 i 1,10 sense cap
+  diferencia.
+- **Que fer:** per a textos llargs encadenats, fer servir **9B o superior**. Amb
+  models de 2-4B, val mes demanar seccions curtes en preguntes separades que un
+  text llarg amb "continua".
+
 ## Models multimodal (VLM)
 
 El backend MLX suporta models de visio (imatge + text) a traves de `mlx-vlm 0.4.4`. Llista d'arquitectures detectades: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (tots), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama i mes. Des de **v0.9.8** el detector "any-of" de 3 senyals (architectures + vision_config al `config.json` + weight_map al `model.safetensors.index.json`) cobreix arquitectures noves sense keys clàssiques.

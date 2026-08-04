@@ -476,6 +476,71 @@ class TestChatLLM:
         result = await h.call({"message": "Hola", "stream": True}, server_state=state)
         assert isinstance(result, StreamingResponse)
 
+    async def test_streaming_tells_the_client_which_session_it_used(self):
+        """The stream must carry the session id, like the JSON path does.
+
+        Field-measured 01/08: a client that had lost its id kept chatting
+        without one and the server minted a fresh session for it every time —
+        the screen still showed the old conversation while the history it was
+        appending to had nothing in it. The JSON path returns session_id in the
+        body; streaming returned it nowhere, so this header is the client's
+        only way to reconcile.
+
+        Mutation guard: drop the X-Session-Id header and this goes RED.
+        """
+        engine = _MockOllamaEngine()
+        h = _Harness(intent="chat")
+        state = _make_server_state(engine=engine)
+        result = await h.call({"message": "Hola", "stream": True}, server_state=state)
+        assert isinstance(result, StreamingResponse)
+        served = result.headers.get("X-Session-Id")
+        assert served, "streaming response carries no session id"
+        assert served == h.session.id
+
+    async def test_streaming_warns_when_the_next_turn_will_compact(self):
+        """#859: the turn that fills the window must warn about the next one.
+
+        Compaction is a full LLM summarisation run INSIDE the critical path
+        (~100 s measured on 8 GB) before a single token of the answer, and it
+        happens before that request has produced response headers — there is no
+        stream to speak on while it runs. So the warning has to travel one turn
+        early: the client remembers it and says it the moment the user sends.
+
+        Mutation guard: drop the WILL_COMPACT yield and this goes RED.
+        """
+        engine = _MockOllamaEngine()
+        session = _make_session()
+        # One short of the threshold: the turn about to be added crosses it.
+        for i in range(ChatSession.COMPACT_EVERY - 1):
+            session.add_message("user" if i % 2 == 0 else "assistant", f"msg {i}")
+        h = _Harness(intent="chat", session=session)
+        state = _make_server_state(engine=engine)
+        result = await h.call({"message": "Hola", "stream": True}, server_state=state)
+
+        body = "".join([c async for c in result.body_iterator])  # type: ignore[union-attr]
+        assert "\x00[WILL_COMPACT:1]\x00" in body, (
+            "#859: the session crossed the compaction threshold and the stream "
+            "said nothing — the next turn will freeze for ~100 s with an empty "
+            "screen, which is exactly what was measured in the field."
+        )
+
+    async def test_streaming_stays_quiet_when_no_compaction_is_coming(self):
+        """The warning must not cry wolf on a short conversation.
+
+        A notice that shows up on every turn is a notice users learn to ignore,
+        and it would be indistinguishable from the real 100-second wait.
+        """
+        engine = _MockOllamaEngine()
+        h = _Harness(intent="chat")  # fresh session, two messages after this turn
+        state = _make_server_state(engine=engine)
+        result = await h.call({"message": "Hola", "stream": True}, server_state=state)
+
+        body = "".join([c async for c in result.body_iterator])  # type: ignore[union-attr]
+        assert "WILL_COMPACT" not in body, (
+            "#859: a two-message session is nowhere near the compaction "
+            "threshold and must not warn about it."
+        )
+
     async def test_cap_engine_disponible_retorna_error_text(self):
         """No engine available → response contains error message."""
         h = _Harness(intent="chat")

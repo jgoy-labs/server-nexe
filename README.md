@@ -403,6 +403,7 @@ Honest disclosure of what server Nexe **does not** do or does not do well:
 - **RAG is not perfect** — Homonymy, negations, cold start (empty memory), and contradictory information across time periods.
 - **Partially OpenAI-compatible API** — `/v1/chat/completions` works. Missing: `/v1/embeddings`, `/v1/models`, and function calling.
 - **Single user** — Mono-user by design. No multi-device sync, no accounts.
+- **Repetition in long answers (small models)** — With 2-4B, asking for a very detailed text and saying "continue" makes the model re-emit the same paragraph or list item. Measured: 8/12 turns on 2B, 3/12 on 4B, **0/12 from 9B up**. Not a server-nexe defect (same on the bare engine) and `repetition_penalty` does not fix it. For long chained text: 9B or larger.
 - **No fine-tuning** — You cannot train or fine-tune models.
 - **New encryption** — Added in v0.9.0 (default `auto` since v0.9.2; strict fail-closed only when `NEXE_ENCRYPTION_ENABLED=true`). Not battle-tested. If you lose the master key, data cannot be recovered (see MEK fallback: file → keyring → env → generate).
 - **Single developer, single real user** — Personal open-source project, not an enterprise product.

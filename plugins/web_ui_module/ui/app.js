@@ -191,8 +191,21 @@ class NexeUI {
         });
     }
 
+    /** #859: drop the "compacting" notice once there is something else to look at. */
+    _removeCompactNotice() {
+        if (this._compactNotice) {
+            this._compactNotice.remove();
+            this._compactNotice = null;
+        }
+    }
+
     setAiState(state) {
         document.documentElement.setAttribute('data-ai-state', state);
+        // The wait the notice announced is over the moment anything else happens —
+        // tokens arriving, the turn finishing, or the turn failing.
+        if (state !== 'thinking') {
+            this._removeCompactNotice();
+        }
         const badge = document.getElementById('thinkingBadge');
         if (badge) {
             badge.classList.toggle('active', state === 'thinking' || state === 'streaming');
@@ -707,7 +720,7 @@ class NexeUI {
         // Load sessions and model info
         this.loadSessions();
         this.loadServerInfo();
-        this.showWelcome();
+        this._restoreLastSession();
 
         // Setup drag and drop
         this.setupDragAndDrop();
@@ -977,7 +990,7 @@ class NexeUI {
 
             if (response.ok) {
                 const data = await response.json();
-                this.currentSessionId = data.session_id;
+                this._setCurrentSession(data.session_id);
                 this.clearChat();
                 this.removeFilePreview();
                 // Reset thinking toggle for new session (default OFF)
@@ -1120,7 +1133,7 @@ class NexeUI {
             if (response.ok) {
                 // If we deleted the current session, clear the chat
                 if (sessionId === this.currentSessionId) {
-                    this.currentSessionId = null;
+                    this._setCurrentSession(null);
                     this.showWelcome();
                 }
                 // Reload sessions list
@@ -1133,6 +1146,39 @@ class NexeUI {
         }
     }
 
+    /// Single writer for the active session id, mirrored to localStorage.
+    ///
+    /// The id used to live only in memory, so ANY page reload silently started
+    /// a new conversation while the screen still showed the old bubbles: the
+    /// next message opened a fresh backend session and everything before it —
+    /// including what the user was reading — was orphaned on disk. In the
+    /// desktop app the webview can be reloaded by the system (a memory-pressure
+    /// kill of the web content process reloads the page), so this is not a
+    /// hypothetical.
+    _setCurrentSession(sessionId) {
+        this.currentSessionId = sessionId || null;
+        try {
+            if (this.currentSessionId) {
+                localStorage.setItem('nexe_session_id', this.currentSessionId);
+            } else {
+                localStorage.removeItem('nexe_session_id');
+            }
+        } catch { /* private mode / storage disabled: memory-only, as before */ }
+    }
+
+    /// Re-open the conversation the user was in, or fall back to the welcome
+    /// screen if it no longer exists (deleted elsewhere, storage wiped).
+    async _restoreLastSession() {
+        let saved = null;
+        try { saved = localStorage.getItem('nexe_session_id'); } catch { /* ignore */ }
+        if (!saved) { this.showWelcome(); return; }
+        const restored = await this.loadSession(saved);
+        if (!restored) {
+            this._setCurrentSession(null);
+            this.showWelcome();
+        }
+    }
+
     async loadSession(sessionId) {
         this._abortIfGenerating();
         this._clearTruncState();  // FD-S6: a session switch kills any pending Continue
@@ -1141,7 +1187,7 @@ class NexeUI {
             const response = await this.fetchWithCsrf(`/ui/session/${sessionId}`);
             if (response.ok) {
                 const data = await response.json();
-                this.currentSessionId = sessionId;
+                this._setCurrentSession(sessionId);
                 this.clearChat();
                 // Local UI clear only — do NOT call removeFilePreview() because it
                 // POSTs to /clear-document and would wipe the backend attachment
@@ -1163,9 +1209,12 @@ class NexeUI {
                 this._restoreThinkingToggle(data);
 
                 this.renderSessions();
+                return true;
             }
+            return false;
         } catch (error) {
             console.error('Error loading session:', error);
+            return false;
         }
     }
 
@@ -1230,6 +1279,21 @@ class NexeUI {
         this.isGenerating = true;
         this.setAiState('thinking');
 
+        // #859: the previous turn told us this one compacts first. That is a full
+        // LLM summarisation before a single token of the answer (~100 s on 8 GB),
+        // and until now it looked like the app had frozen. Say it up front; the
+        // notice is removed as soon as the answer starts arriving.
+        this._removeCompactNotice();
+        if (this._willCompactNext) {
+            this._willCompactNext = false;
+            const notice = document.createElement('div');
+            notice.className = 'trunc-notice compact-notice';
+            notice.textContent = this.t('compacting_notice');
+            this.chatMessages.appendChild(notice);
+            this._compactNotice = notice;
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        }
+
         // Create AbortController for this request
         this.abortController = new AbortController();
 
@@ -1281,6 +1345,15 @@ class NexeUI {
             }
 
             if (response.ok) {
+                // Adopt the session the server actually stored this turn in.
+                // It is normally the one we sent, but if our id was lost or the
+                // server minted one for us, this is the only way to learn it —
+                // without it the next message opens yet another conversation.
+                const servedSession = response.headers.get('X-Session-Id');
+                if (servedSession && servedSession !== this.currentSessionId) {
+                    this._setCurrentSession(servedSession);
+                    this.loadSessions();
+                }
                 let assistantMessageDiv = null;
                 let fullResponse = "";
                 let memorySaved = false;
@@ -1589,6 +1662,17 @@ class NexeUI {
                         compactMatch = chunk.match(/\x00\[COMPACT:(\d+)\]\x00/); // eslint-disable-line no-control-regex
                         if (compactMatch) {
                             chunk = chunk.replace(/\x00\[COMPACT:\d+\]\x00/, ''); // eslint-disable-line no-control-regex
+                        }
+
+                        // #859: the server tells us this session will be compacted
+                        // before the NEXT turn generates anything. Compaction is a
+                        // full summarisation inside the critical path (~100 s on
+                        // 8 GB) and it runs before that response has headers, so
+                        // this is the last chance to warn: remember it and say it
+                        // when the user sends, not when the wait is already over.
+                        if (chunk.match(/\x00\[WILL_COMPACT:1\]\x00/)) { // eslint-disable-line no-control-regex
+                            chunk = chunk.replace(/\x00\[WILL_COMPACT:1\]\x00/g, ''); // eslint-disable-line no-control-regex
+                            this._willCompactNext = true;
                         }
 
                         // Detect DOC_TRUNCATED (document too large for context)
@@ -2491,7 +2575,7 @@ class NexeUI {
                 const data = await response.json();
 
                 if (data.session_id && !this.currentSessionId) {
-                    this.currentSessionId = data.session_id;
+                    this._setCurrentSession(data.session_id);
                     this.loadSessions();
                 }
 

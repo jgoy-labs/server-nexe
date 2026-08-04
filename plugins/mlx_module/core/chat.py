@@ -1027,6 +1027,88 @@ class MLXChatNode:
             )
         return rotated
 
+    @staticmethod
+    def _reset_untrimmable_vlm_state(prompt_cache_state, new_token_ids) -> bool:
+        """#849 (P1): mai reutilitzar un cache que mlx_vlm no pot retallar.
+
+        Germà del guard del #826, però mirant el que realment decideix la
+        corrupció: **si les capes es poden retallar**, no si han rotat.
+
+        A ``mlx_vlm/generate.py`` (0.4.4) el camí de reuse retalla els
+        ``input_ids`` al prefix comú de forma INCONDICIONAL, mentre que el
+        retall del KV va dins ``if hasattr(c, "keys") and c.keys is not None``.
+        Per a un model híbrid això no és tot-o-res: mesurat amb
+        ``Qwen3.5-4B-4bit`` i el cache POBLAT, ``make_cache()`` dóna **8
+        KVCache + 24 ArraysCache** (``layer_types`` = 8 full_attention + 24
+        linear_attention) → **8 capes es retallen al prefix i 24 es queden amb
+        el torn anterior sencer**. No és "context sobrer": és desalineament
+        ENTRE capes, i el model genera amb dues històries alhora.
+
+        Tampoc es pot arreglar retallant per l'altra banda: ``ArraysCache`` és
+        estat recurrent (linear attention), ``is_trimmable()`` és False i
+        ``mlx_lm.trim_prompt_cache`` el refusa. Un estat comprimit no es pot
+        tallar en un token arbitrari — no és un bug d'implementació.
+        Upstream ho tracta a mlx-vlm 0.6.x amb un mode ``exact`` (snapshot de
+        prefix sencer per a layouts mixtos); nosaltres estem pinnats a 0.4.4
+        (mlx-lm/transformers) i el forat és conegut i OBERT a mlx-lm #980.
+
+        Mesurada també l'alternativa barata al reset (reusar només quan el
+        prefix cobreix TOT el cache, sense retall): en un xat de 3 torns els
+        tokens sobrants són **122 a cada torn** i són el bloc ``<think>`` —
+        la cadena de raonament es desa al cache i el prompt següent no la
+        re-serialitza. O sigui que el cas "no cal retallar" **no arriba mai**
+        amb thinking actiu, i el reuse condicional equivaldria a aquest reset
+        amb més codi. La condició hi és igualment perquè quan SÍ es dóna
+        (prefix exacte) el reuse és correcte i val la pena conservar-lo.
+
+        Cost assumit: per als models híbrids es torna al ``cached=0`` i el
+        prefill puja. Es perd velocitat produint text bo, en comptes de
+        guanyar-ne produint-ne de dolent.
+
+        Returns:
+            True si s'ha resetejat l'estat (aquest torn re-prefilla sencer).
+        """
+        cache = getattr(prompt_cache_state, "cache", None)
+        token_ids = getattr(prompt_cache_state, "token_ids", None)
+        if not cache or not token_ids:
+            return False
+        try:
+            all_trimmable = all(
+                hasattr(c, "keys") and getattr(c, "keys", None) is not None for c in cache
+            )
+        except TypeError:  # fakes no iterables als tests
+            return False
+        # Totes retallables (KV pur) → el trim de mlx_vlm és correcte i el
+        # prefill 4× es conserva. Aquest guard no hi té res a dir.
+        if all_trimmable:
+            return False
+        # Hi ha capes no retallables. L'ÚNIC cas en què el reuse segueix sent
+        # segur és que el cache sigui prefix EXACTE del prompt nou (cap retall
+        # pendent). Si no podem comprovar-ho — sense ids, o el tokenitzador
+        # peta — el guard falla TANCAT: una mètrica pot fallar oberta, una
+        # guarda de correcció no. (Ho va caçar el test de wiring: amb un
+        # processor sense `.encode` la versió anterior deixava passar el cache
+        # desalineat justament pel camí que havia de protegir.)
+        if new_token_ids is None:
+            prefix_len = -1
+        else:
+            try:
+                prefix_len = prompt_cache_state.find_prefix_length(new_token_ids)
+            except Exception:  # nosec B110: fakes als tests / tokenitzador rar
+                prefix_len = -1
+        if prefix_len >= len(token_ids):
+            return False
+        prompt_cache_state.cache = None
+        prompt_cache_state.token_ids = None
+        logger.info(
+            "MLX VLM cache: untrimmable layers (hybrid model), prefix %s < cached %d "
+            "— state reset; this turn re-prefills instead of reusing a misaligned "
+            "context (#849)",
+            prefix_len if prefix_len >= 0 else "unknown",
+            len(token_ids),
+        )
+        return True
+
     def _log_vlm_kv_request(self, model, prompt_cache_state=None) -> None:
         """#826/#845 instrumentation, VLM twin of "MLX cache created:" (text path).
 
@@ -1275,9 +1357,21 @@ class MLXChatNode:
         if had_cache:
             try:
                 _tok = getattr(processor, "tokenizer", processor)
-                cached_tokens = cache_state.find_prefix_length(_tok.encode(formatted_prompt))
+                _new_ids = _tok.encode(formatted_prompt)
             except Exception:  # nosec B110: metric estimate only — never blocks generation
-                cached_tokens = 0
+                _new_ids = None
+            # #849: el guard va ABANS de comptar i es crida SEMPRE (també amb
+            # _new_ids None: allà decideix pel tipus de capa i falla tancat).
+            # Quan dispara, les mètriques han de dir la veritat
+            # (prefix_reused=False, cached=0) — si no, el log torna a prometre
+            # un reuse que no hi ha hagut, que és el que va fer illegible el #843.
+            if self._reset_untrimmable_vlm_state(cache_state, _new_ids):
+                had_cache = False
+            elif _new_ids is not None:
+                try:
+                    cached_tokens = cache_state.find_prefix_length(_new_ids)
+                except Exception:  # nosec B110: metric estimate only
+                    cached_tokens = 0
 
         tmp_path = None
         try:

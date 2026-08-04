@@ -83,6 +83,9 @@ class InstallerEngine: ObservableObject {
 
     // Catalog
     @Published var catalog: ModelCatalog = ModelCatalog(tier8: [], tier16: [], tier24: [], tier32: [], tier48: [], tier64: [])
+    /// Set when the catalog could not be loaded, so the picker can say so instead of
+    /// showing an empty list that looks like "no models for your machine".
+    @Published var catalogError: String?
 
     private var process: Process?
     /// PID of the headless Python process, to be able to kill the process group (B191)
@@ -98,7 +101,20 @@ class InstallerEngine: ObservableObject {
     }
 
     func loadCatalog() {
-        catalog = ModelCatalog.load()
+        switch ModelCatalog.loadOrFail() {
+        case .success(let loaded):
+            catalog = loaded
+            catalogError = nil
+        case .failure(let failure):
+            // Never leave the user in front of an empty picker with no reason given.
+            catalog = ModelCatalog()
+            catalogError = failure.summary
+            FileHandle.standardError.write(Data("[catalog] \(failure.summary)\n".utf8))
+            appendLog("[catalog] \(failure.summary)")
+            // In development this is a broken checkout or a broken bundle: say it loudly
+            // rather than let a smoke test read the empty picker as a real result.
+            assertionFailure("Model catalog failed to load: \(failure.summary)")
+        }
     }
 
     // MARK: - Installation

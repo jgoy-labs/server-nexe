@@ -2444,6 +2444,16 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
             ctx.session_mgr._save_session_to_disk(ctx.session)
             _assistant_saved = True  # MC-116
 
+            # #859: the NEXT turn will compact before it generates anything, and
+            # compaction is a full LLM summarisation inside the critical path
+            # (~100 s measured on 8 GB) with an empty screen in front of it.
+            # We cannot warn while it runs: it happens before that request has
+            # even produced response headers, so there is no stream to speak on.
+            # The turn that fills the window warns about the one after it, and
+            # the client can say so the instant the user hits send.
+            if ctx.session.needs_compaction():
+                yield "\x00[WILL_COMPACT:1]\x00"
+
         # Stream finished cleanly — release the disconnect
         # monitor so it doesn't keep polling forever.
         if not ctx.disconnect_monitor_task.done():
@@ -2912,6 +2922,13 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 "Cache-Control": "no-cache, no-store",
                                 "X-Accel-Buffering": "no",
                                 "X-Content-Type-Options": "nosniff",
+                                # The session this turn was stored in. The JSON
+                                # path already returns it; streaming did not, so
+                                # a client that lost its id (or never learned the
+                                # one the server minted for it) had no way back
+                                # and silently started a new conversation on the
+                                # next message, orphaning everything before it.
+                                "X-Session-Id": session.id,
                             }
                         )
 

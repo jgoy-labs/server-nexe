@@ -133,34 +133,83 @@ struct ModelCatalog: Codable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        tier8  = (try? c.decode([AIModel].self, forKey: .tier8))  ?? []
-        tier16 = (try? c.decode([AIModel].self, forKey: .tier16)) ?? []
-        tier24 = (try? c.decode([AIModel].self, forKey: .tier24)) ?? []
-        tier32 = (try? c.decode([AIModel].self, forKey: .tier32)) ?? []
-        tier48 = (try? c.decode([AIModel].self, forKey: .tier48)) ?? []
-        tier64 = (try? c.decode([AIModel].self, forKey: .tier64)) ?? []
+
+        // A tier that is ABSENT from the JSON is legitimate — not every build ships
+        // every tier. A tier that is PRESENT but does not decode is corruption, and
+        // swallowing it would drop models from the picker with nothing to show for it.
+        func tier(_ key: CodingKeys) throws -> [AIModel] {
+            guard c.contains(key) else { return [] }
+            return try c.decode([AIModel].self, forKey: key)
+        }
+
+        tier8  = try tier(.tier8)
+        tier16 = try tier(.tier16)
+        tier24 = try tier(.tier24)
+        tier32 = try tier(.tier32)
+        tier48 = try tier(.tier48)
+        tier64 = try tier(.tier64)
     }
 
-    /// Loads the catalog from the JSON in the bundle Resources
-    static func load() -> ModelCatalog {
-        let empty = ModelCatalog(tier8: [], tier16: [], tier24: [], tier32: [], tier48: [], tier64: [])
+    /// Why the catalog could not be loaded. An empty picker with no explanation is a
+    /// bug, not a state: whoever loads the catalog has to say which of these happened.
+    enum LoadFailure: Error {
+        /// models.json is in neither of the two places we look.
+        case notFound(searched: [String])
+        /// The file is there but unreadable (permissions, truncated read).
+        case unreadable(path: String, underlying: Error)
+        /// The file is there and readable but is not a valid catalog.
+        case corrupt(path: String, underlying: Error)
 
-        // Look for models.json in the bundle Resources
-        if let url = Bundle.main.url(forResource: "models", withExtension: "json"),
-           let data = try? Data(contentsOf: url),
-           let catalog = try? JSONDecoder().decode(ModelCatalog.self, from: data) {
-            return catalog
+        /// One line, meant for both the log and the wizard banner.
+        var summary: String {
+            switch self {
+            case .notFound(let searched):
+                return "models.json not found (looked in: \(searched.joined(separator: ", ")))"
+            case .unreadable(let path, let underlying):
+                return "models.json unreadable at \(path): \(underlying)"
+            case .corrupt(let path, let underlying):
+                return "models.json is not a valid catalog at \(path): \(underlying)"
+            }
         }
+    }
 
-        // Look next to the binary (for development)
+    /// Loads the catalog, reporting WHY it failed instead of returning an empty one.
+    ///
+    /// Two sources are tried in order — the bundle Resources, then next to the binary
+    /// for `swift run` during development. "Missing in both" and "present but broken"
+    /// are different problems and used to look identical: an empty picker.
+    static func loadOrFail() -> Result<ModelCatalog, LoadFailure> {
+        var searched: [String] = []
+
+        // The bundle Resources (the shipped installer).
+        if let url = Bundle.main.url(forResource: "models", withExtension: "json") {
+            return decodeCatalog(at: url)
+        }
+        searched.append("bundle Resources")
+
+        // Next to the binary (development).
         let binaryDir = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
         let devPath = binaryDir.appendingPathComponent("models.json")
-        if let data = try? Data(contentsOf: devPath),
-           let catalog = try? JSONDecoder().decode(ModelCatalog.self, from: data) {
-            return catalog
+        if FileManager.default.fileExists(atPath: devPath.path) {
+            return decodeCatalog(at: devPath)
         }
+        searched.append(devPath.path)
 
-        return empty
+        return .failure(.notFound(searched: searched))
+    }
+
+    private static func decodeCatalog(at url: URL) -> Result<ModelCatalog, LoadFailure> {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            return .failure(.unreadable(path: url.path, underlying: error))
+        }
+        do {
+            return .success(try JSONDecoder().decode(ModelCatalog.self, from: data))
+        } catch {
+            return .failure(.corrupt(path: url.path, underlying: error))
+        }
     }
 
     /// All models in a flat array

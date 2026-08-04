@@ -26,6 +26,24 @@ struct ModelPickerView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
+            // The catalog failed to load: an empty list would read as "no models fit
+            // your machine", which is a different — and wrong — message.
+            if let catalogError = engine.catalogError {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(t("model_catalog_error"))
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(catalogError)
+                        .font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(Color.red.opacity(0.12))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.red.opacity(0.5)))
+                .cornerRadius(6)
+                .padding(.horizontal, 24)
+            }
+
             // Tabs RAM — only show tiers that have models in the catalog
             Picker("", selection: $selectedTab) {
                 if !engine.catalog.tier8.isEmpty  { Text(t("model_tab_tier_8")).tag("tier_8") }

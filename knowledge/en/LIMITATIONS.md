@@ -41,6 +41,32 @@ Local models are less capable than cloud models (GPT-4, Claude, etc.). This is t
 - **Large models (32B+):** Good quality, but require 32+ GB RAM and slow loading.
 - **Catalan:** Salamandra models (BSC/AINA) are best for Catalan. Other models have limited Catalan support.
 
+### Repetition in long chained answers (small models)
+
+In long chained generations — asking for a very detailed text and then saying
+"continue" a couple of times — **small models repeat themselves**: they re-emit
+the same paragraph or the same list item several times in a row, and sometimes
+go back to a section they already wrote.
+
+Measured with the same conversation pattern (4 turns, 2048 tokens per answer,
+3 repetitions) on the Qwen3.5 family, counting identical list items repeated
+within one answer:
+
+| Model | Turns with literal repetition |
+|---|---|
+| 2B | 8 of 12 |
+| 4B | 3 of 12 |
+| 9B | **0 of 12** |
+| 27B | **0 of 12** |
+
+- **Not a server-nexe defect.** It reproduces identically on the bare engine,
+  with no RAG, no memory, no context compaction and no cache reuse.
+- **`repetition_penalty` does not fix it:** measured at 1.05 and 1.10 with no
+  difference.
+- **What to do:** for long chained text, use **9B or larger**. With 2-4B models,
+  prefer asking for short sections in separate questions over a long text driven
+  by "continue".
+
 ## Multimodal models (VLM)
 
 The MLX backend supports vision models (image + text) via `mlx-vlm 0.4.4`. Detected architectures: Qwen2-VL, Qwen2.5-VL, Qwen3-VL, Llava (all), Gemma-3/4, PaliGemma, InternVL, MiniCPMV, Idefics2/3, Mllama and more. Since **v0.9.8** the 3-signal "any-of" detector (architectures + vision_config in `config.json` + weight_map in `model.safetensors.index.json`) covers new architectures that lack the classical keys.
