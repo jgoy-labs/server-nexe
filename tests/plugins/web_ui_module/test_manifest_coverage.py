@@ -201,7 +201,7 @@ class TestChatEngineBranches:
         return mm
 
     def test_engine_no_get_module_instance(self, client, auth):
-        """Lines 481-483: engine has no get_module_instance."""
+        """Engine has no get_module_instance → skipped → no engine → 503 (#884)."""
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
@@ -218,10 +218,10 @@ class TestChatEngineBranches:
             state.module_manager = mm
             mock_state.return_value = state
             r = client.post("/ui/chat", headers=auth, json={"message": "Hi", "session_id": sid})
-        assert r.status_code == 200
+        assert r.status_code == 503
 
     def test_engine_get_module_instance_returns_none(self, client, auth):
-        """Lines 486-488: get_module_instance returns None."""
+        """get_module_instance returns None → skipped → no engine → 503 (#884)."""
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
@@ -238,7 +238,7 @@ class TestChatEngineBranches:
             state.module_manager = mm
             mock_state.return_value = state
             r = client.post("/ui/chat", headers=auth, json={"message": "Hi", "session_id": sid})
-        assert r.status_code == 200
+        assert r.status_code == 503
 
     def test_preferred_engine_mlx(self, client, auth, monkeypatch):
         """Lines 463-464: preferred_engine=mlx reorders engine list."""
@@ -306,11 +306,16 @@ class TestChatStreamEngineIntegration:
         return mm
 
     def test_stream_with_ollama_engine(self, client, auth):
-        """Lines 605-610: streaming with ollama-style engine (has 'model' param)."""
+        """Streaming with ollama-style engine (has 'model' param).
+
+        **kwargs: the real call passes images/thinking_enabled/sampling —
+        without it the mock raised and the test only "passed" through the
+        old 200 + error-string fallback (#884 removed it).
+        """
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        async def mock_chat(model, messages, stream):
+        async def mock_chat(model, messages, stream, **kwargs):
             yield {"message": {"content": "Hello "}}
             yield {"message": {"content": "world"}}
 
@@ -514,7 +519,7 @@ class TestChatRecallIntent:
 
 
 class TestChatNoEngineAvailable:
-    """Lines 747-748: no engine available."""
+    """No engine available → 503, not 200 + error string (#884)."""
 
     def test_no_engine(self, client, auth):
         r1 = client.post("/ui/session/new", headers=auth)
@@ -535,11 +540,11 @@ class TestChatNoEngineAvailable:
             state.module_manager = mm
             mock_state.return_value = state
             r = client.post("/ui/chat", headers=auth, json={"message": "Hi", "session_id": sid})
-        assert r.status_code == 200
+        assert r.status_code == 503
 
 
 class TestChatEngineNoChat:
-    """Lines 489-491: engine without chat."""
+    """Engine without chat → skipped → no engine → 503 (#884)."""
 
     def test_engine_no_chat(self, client, auth):
         r1 = client.post("/ui/session/new", headers=auth)
@@ -565,7 +570,7 @@ class TestChatEngineNoChat:
             state.module_manager = mm
             mock_state.return_value = state
             r = client.post("/ui/chat", headers=auth, json={"message": "Hi", "session_id": sid})
-        assert r.status_code == 200
+        assert r.status_code == 503
 
 
 class TestChatRagContext:
@@ -639,7 +644,7 @@ class TestChatNonStreamingAsyncGen:
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        async def mock_chat(model, messages, stream):
+        async def mock_chat(model, messages, stream, **kwargs):
             yield {"message": {"content": "c1 "}}
             yield {"content": "c2 "}
             yield "c3"
@@ -677,7 +682,7 @@ class TestChatCoroutineResult:
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        async def mock_chat(model, messages, stream):
+        async def mock_chat(model, messages, stream, **kwargs):
             return {"message": {"content": "coroutine result"}}
 
         engine = MagicMock()
@@ -739,7 +744,7 @@ class TestChatAutoSaveWithDocId:
 
 
 class TestChatEngineException:
-    """Lines 742-745: engine fails, tries next."""
+    """Every engine fails → cascade exhausted → 503 (#884)."""
 
     def test_engine_exception(self, client, auth):
         r1 = client.post("/ui/session/new", headers=auth)
@@ -766,7 +771,7 @@ class TestChatEngineException:
             state.module_manager = mm
             mock_state.return_value = state
             r = client.post("/ui/chat", headers=auth, json={"message": "Hi", "session_id": sid})
-        assert r.status_code == 200
+        assert r.status_code == 503
 
 
 class TestGenerateRagMetadataAsyncGen:

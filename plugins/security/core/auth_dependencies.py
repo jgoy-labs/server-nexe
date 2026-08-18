@@ -17,8 +17,6 @@ import ipaddress
 from datetime import datetime, timezone
 import secrets
 
-_log = logging.getLogger(__name__)
-
 from .auth_models import KeyStatus
 from .auth_config import load_api_keys, is_dev_mode, get_admin_api_key
 from .auth_rate_limit import (
@@ -27,6 +25,8 @@ from .auth_rate_limit import (
   client_ip,
 )
 from .messages import get_message
+
+_log = logging.getLogger(__name__)
 
 # Auth metrics hooks. These are no-ops: server-nexe has no Prometheus auth
 # instrumentation module yet (the old `plugins.observability.prometheus_metrics`

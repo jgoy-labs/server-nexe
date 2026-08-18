@@ -222,6 +222,43 @@ def mock_ollama(monkeypatch):
 # OLLAMA AUTO-START FIXTURE
 # ═══════════════════════════════════════════════════════════════════════════
 
+@pytest.fixture(autouse=True)
+def _reset_auth_failure_window():
+    """Clear the shared per-IP failed-auth window between tests.
+
+    plugins.security.core.auth_rate_limit keeps a process-wide dict fed by
+    BOTH conversation paths (D-I / #883). Without this reset, the hundreds
+    of deliberately-unauthenticated requests the suite makes burn the
+    20-failures/60s window and unrelated tests start seeing 429s.
+    """
+    def _clear_windows():
+        try:
+            from plugins.security.core.auth_rate_limit import auth_failures
+            auth_failures.clear()
+        except Exception:
+            pass
+        # Same class of state: the slowapi limiter on /ui/chat (B030,
+        # 20/minute) is a process-wide singleton too — the suite's many
+        # direct endpoint calls burn its window and unrelated tests 429.
+        try:
+            from core.dependencies import limiter
+            limiter.reset()
+            # Each register_chat_routes() re-decorates the same function and
+            # slowapi APPENDS its "20/minute" to the same _route_limits key.
+            # Tests that build the router repeatedly amplify one request into
+            # N hits — the first call after ~20 registrations 429s with an
+            # EMPTY window. Production registers once; keep one limit per key.
+            for _k, _v in list(limiter._route_limits.items()):
+                if len(_v) > 1:
+                    limiter._route_limits[_k] = _v[:1]
+        except Exception:
+            pass
+
+    _clear_windows()
+    yield
+    _clear_windows()
+
+
 _ollama_process = None
 
 @pytest.fixture(scope="session", autouse=True)

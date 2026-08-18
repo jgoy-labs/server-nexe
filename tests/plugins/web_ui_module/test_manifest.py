@@ -460,9 +460,9 @@ class TestChatEndpoint:
                 "/ui/chat", headers=auth,
                 json={"message": "Hola com estàs?", "session_id": sid}
             )
-        assert r.status_code == 200
-        # Should return error message about no engine available
-        assert "response" in r.json()
+        # #884: a failed request is 503, never 200 + error string in the bubble
+        assert r.status_code == 503
+        assert "detail" in r.json()
 
     def test_chat_engine_returns_string(self, client, auth):
         r1 = client.post("/ui/session/new", headers=auth)
@@ -510,7 +510,7 @@ class TestChatEndpoint:
                 "/ui/chat", headers=auth,
                 json={"message": "Test error", "session_id": sid}
             )
-        assert r.status_code == 200
+        assert r.status_code == 503  # #884: cascade exhausted
 
     def test_chat_rag_context_used(self, client, auth):
         """Verifies that RAG results are injected into the context."""
