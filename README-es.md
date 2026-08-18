@@ -385,7 +385,7 @@ Server Nexe está en desarrollo activo. Próximamente:
 - [x] Embeddings `fastembed` ONNX — PyTorch eliminado (v0.9.3)
 - [x] Soporte multimodal VLM — imágenes vía backends Ollama, llama.cpp y MLX (v0.9.7)
 - [x] VLM detector 3-signal + streaming + mlx-vlm 0.4.4 (v0.9.8)
-- [x] Precomputed KB embeddings — arranque 10.7× más rápido (v0.9.8)
+- [x] Precomputed KB embeddings — si los hashes coinciden, no se recalcula en el arranque (v0.9.8)
 - [x] RAG injection sanitization + CLEAR_ALL 2-turn confirm (v0.9.9)
 - [x] Instalación offline 100% — DMG ~1.2 GB con wheels + embedding bundled (v0.9.9+)
 - [x] Thinking toggle por sesión — endpoint `PATCH /ui/session/{id}/thinking` (v0.9.9+)

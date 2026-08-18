@@ -256,11 +256,20 @@ def test_trusted_hosts_default(clean_env):
 
 
 def test_trusted_hosts_custom_via_env(clean_env):
-    """NEXE_LOCALHOST_ALIASES parsed as comma-separated tuple."""
+    """NEXE_LOCALHOST_ALIASES is parsed as CSV and ADDED to the defaults."""
     os.environ["NEXE_LOCALHOST_ALIASES"] = "127.0.0.1,mylocal,foo.local"
     reset_sidecar_config()
     config = SidecarConfig.from_env()
-    assert config.trusted_hosts == ("127.0.0.1", "mylocal", "foo.local")
+    assert config.trusted_hosts == DEFAULT_TRUSTED_HOSTS + ("mylocal", "foo.local")
+
+
+def test_trusted_hosts_custom_never_drops_the_defaults(clean_env):
+    """Adding an alias must not evict 127.0.0.1/::1/localhost (self-lockout)."""
+    os.environ["NEXE_LOCALHOST_ALIASES"] = "mylocal"
+    reset_sidecar_config()
+    config = SidecarConfig.from_env()
+    for default in DEFAULT_TRUSTED_HOSTS:
+        assert default in config.trusted_hosts, f"{default} lost after setting an alias"
 
 
 def test_trusted_hosts_strips_whitespace(clean_env):
@@ -268,7 +277,7 @@ def test_trusted_hosts_strips_whitespace(clean_env):
     os.environ["NEXE_LOCALHOST_ALIASES"] = " 127.0.0.1 , localhost , foo "
     reset_sidecar_config()
     config = SidecarConfig.from_env()
-    assert config.trusted_hosts == ("127.0.0.1", "localhost", "foo")
+    assert config.trusted_hosts == DEFAULT_TRUSTED_HOSTS + ("foo",)
 
 
 def test_trusted_hosts_ignores_empty_entries(clean_env):

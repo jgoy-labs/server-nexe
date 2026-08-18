@@ -106,7 +106,7 @@ Tot el text viu a SQLite (opcionalment encriptat via SQLCipher). Aixo significa 
 
 **Model opcional (via Ollama):** `nomic-embed-text` — 768 dimensions. Configurable via `NEXE_OLLAMA_EMBED_MODEL`. Només s'usa si l'usuari ho activa explícitament; **no és el camí principal**.
 
-**KB embeddings precomputats** (v0.9.8+): els fitxers de `knowledge/` tenen embeddings pre-calculats a `knowledge/.embeddings/`. A l'arrencada, si els hashes coincideixen, el sistema salta el càlcul i carrega directament (10.7× speedup a cold boot). Els embeddings es regeneren automàticament si canvia el contingut.
+**KB embeddings precomputats** (v0.9.8+): els fitxers de `knowledge/` tenen embeddings pre-calculats a `knowledge/.embeddings/`. A l'arrencada, si els hashes coincideixen, el sistema salta el càlcul i carrega els vectors directament. Els embeddings es regeneren automàticament si canvia el contingut.
 
 Tots els vectors s'emmagatzemen amb 768 dimensions. Aquest valor esta centralitzat a `memory/embeddings/constants.py` com `DEFAULT_VECTOR_SIZE = 768` (re-exportat via `memory/memory/constants.py`).
 

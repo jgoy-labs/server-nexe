@@ -136,27 +136,92 @@ def _collect_files_to_ingest(knowledge_path) -> list:
     return [f for f in files_to_ingest if not f.name.startswith('.')]
 
 
-async def _check_needs_reingest(ingested_marker) -> bool:
-    """Return True if re-ingest is needed despite marker existing (BUG #20).
+def _embedding_model_name() -> str:
+    """Model id that, if it changes, must invalidate the ingested KB.
 
-    Verifies Qdrant has sufficient content; clears the marker if re-ingest is needed.
+    Matches knowledge/ARCHITECTURE.md: regenerate when the embedding model
+    changes. The primary path is DEFAULT_EMBEDDING_MODEL; NEXE_EMBED_MODEL
+    is the explicit override.
     """
+    override = os.getenv("NEXE_EMBED_MODEL")
+    if override:
+        return override
+    try:
+        from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
+        return DEFAULT_EMBEDDING_MODEL
+    except Exception:
+        return "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+
+
+def knowledge_source_fingerprint(knowledge_path: Path, model_name: str) -> str:
+    """Deterministic fingerprint of the knowledge tree + embedding model.
+
+    Same file filter as ``sha256_of_source_dir`` (skip basename-dot files,
+    ignore mtime). Used as the marker payload so a content or model change
+    forces a re-ingest — what the knowledge docs already promise.
+    """
+    from core.integrity.hashing import sha256_of_dir
+    source = sha256_of_dir(
+        knowledge_path,
+        include_filter=lambda rel: not Path(rel).name.startswith("."),
+    )
+    return f"{source}:{model_name}"
+
+
+def _read_marker_fingerprint(ingested_marker: Path) -> str | None:
+    """Return the stored fingerprint, or None for missing/legacy-empty markers."""
+    if not ingested_marker.is_file():
+        return None
+    text = ingested_marker.read_text(encoding="utf-8").strip()
+    return text or None
+
+
+def _write_ingest_marker(ingested_marker: Path, fingerprint: str) -> None:
+    ingested_marker.parent.mkdir(parents=True, exist_ok=True)
+    ingested_marker.write_text(fingerprint + "\n", encoding="utf-8")
+
+
+async def _check_needs_reingest(
+    ingested_marker,
+    knowledge_path: Path,
+    model_name: str,
+) -> bool:
+    """Return True if knowledge must be ingested again.
+
+    The docs say embeddings regenerate when ``knowledge/`` content or the
+    embedding model changes. The old gate (``doc_count >= 10``) ignored
+    both and left stale vectors in place.
+    """
+    current = knowledge_source_fingerprint(knowledge_path, model_name)
+    stored = _read_marker_fingerprint(ingested_marker)
+    if stored != current:
+        logger.info(
+            "Knowledge: fingerprint changed (stored=%s current=%s) — re-ingesting",
+            stored or "(empty/legacy)",
+            current,
+        )
+        ingested_marker.unlink(missing_ok=True)
+        return True
+
     try:
         from memory.memory.api.v1 import get_memory_api as _get_v1_api
         _api = await _get_v1_api()
-        if await _api.collection_exists("nexe_documentation"):
-            doc_count = await _api.count("nexe_documentation")
-            if doc_count >= 10:
-                logger.debug("Knowledge: Already ingested (%d docs). Skipping.", doc_count)
-                return False
-            logger.warning("Knowledge: Marker exists but only %d docs in Qdrant — re-ingesting", doc_count)
-        else:
-            logger.warning("Knowledge: Marker exists but collection missing — re-ingesting")
+        if not await _api.collection_exists("nexe_documentation"):
+            logger.warning("Knowledge: fingerprint matches but collection missing — re-ingesting")
+            ingested_marker.unlink(missing_ok=True)
+            return True
+        doc_count = await _api.count("nexe_documentation")
+        if doc_count == 0:
+            logger.warning("Knowledge: fingerprint matches but collection empty — re-ingesting")
+            ingested_marker.unlink(missing_ok=True)
+            return True
     except Exception as e:
         logger.warning("Knowledge: Could not verify Qdrant state (%s) — re-ingesting", e)
+        ingested_marker.unlink(missing_ok=True)
+        return True
 
-    ingested_marker.unlink(missing_ok=True)
-    return True
+    logger.debug("Knowledge: fingerprint matches, collection present — skip ingest")
+    return False
 
 
 async def auto_ingest_knowledge(server_state):
@@ -212,25 +277,28 @@ async def auto_ingest_knowledge(server_state):
             logger.debug("Knowledge: No documents to ingest (folder empty or only README)")
             return
 
-        # BUG #20: Check marker AND verify Qdrant has content.
+        model_name = _embedding_model_name()
         if ingested_marker.exists():
-            needs_reingest = await _check_needs_reingest(ingested_marker)
+            needs_reingest = await _check_needs_reingest(
+                ingested_marker, knowledge_path, model_name,
+            )
             if not needs_reingest:
                 return
 
-        # First run or re-ingest needed — ingest knowledge
+        # First run or content/model changed — ingest and REPLACE the
+        # collection. Point ids are a hash of the chunk text, so a
+        # re-ingest without wipe would stack old + new chunks.
         logger.info("Knowledge: Auto-ingesting %d document(s)...", len(files_to_ingest))
-        # F7: explicit target_collection — auto-ingest at startup
-        # writes corporate know-how to nexe_documentation, never
-        # to the user_knowledge collection.
         success = await ingest_knowledge(
             knowledge_path,
             quiet=True,
             target_collection="nexe_documentation",
+            replace_existing=True,
         )
         if success:
+            fingerprint = knowledge_source_fingerprint(knowledge_path, model_name)
+            _write_ingest_marker(ingested_marker, fingerprint)
             logger.info("Knowledge: Ingestion completed successfully")
-            ingested_marker.touch()
         else:
             logger.warning("Knowledge: Ingestion had some errors")
     except Exception as e:

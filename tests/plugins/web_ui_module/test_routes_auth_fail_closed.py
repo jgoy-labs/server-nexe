@@ -12,7 +12,16 @@ from unittest.mock import patch, MagicMock
 import pytest
 from fastapi import HTTPException
 
+from plugins.security.core.auth_models import ApiKeyConfig, ApiKeyData
 from plugins.web_ui_module.api.routes_auth import make_require_ui_auth
+
+_LOAD = "plugins.security.core.auth_dependencies.load_api_keys"
+
+
+def _cfg(primary=None):
+    return ApiKeyConfig(
+        primary=ApiKeyData(key=primary) if primary else None,
+    )
 
 
 def _mock_request():
@@ -27,10 +36,7 @@ class TestMakeRequireUiAuthFailClosed:
     async def test_no_key_configured_fails_closed_503(self):
         """When no admin API key is set, ANY request must be rejected with 503."""
         require = make_require_ui_auth()
-        with patch(
-            "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
-            return_value="",
-        ):
+        with patch(_LOAD, return_value=_cfg()):
             with pytest.raises(HTTPException) as exc_info:
                 await require(_mock_request(), x_api_key="some_key")
             assert exc_info.value.status_code == 503
@@ -39,10 +45,7 @@ class TestMakeRequireUiAuthFailClosed:
     async def test_no_key_configured_none_fails_closed_503(self):
         """When get_admin_api_key returns None, also FAIL CLOSED."""
         require = make_require_ui_auth()
-        with patch(
-            "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
-            return_value=None,
-        ):
+        with patch(_LOAD, return_value=_cfg()):
             with pytest.raises(HTTPException) as exc_info:
                 await require(_mock_request(), x_api_key=None)
             assert exc_info.value.status_code == 503
@@ -50,10 +53,7 @@ class TestMakeRequireUiAuthFailClosed:
     async def test_no_key_configured_no_header_fails_closed_503(self):
         """When no key configured AND no header, still 503 (not 401)."""
         require = make_require_ui_auth()
-        with patch(
-            "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
-            return_value="",
-        ):
+        with patch(_LOAD, return_value=_cfg()):
             with pytest.raises(HTTPException) as exc_info:
                 await require(_mock_request(), x_api_key=None)
             assert exc_info.value.status_code == 503
@@ -62,8 +62,8 @@ class TestMakeRequireUiAuthFailClosed:
         """When key is set, invalid header returns 401 (normal behavior)."""
         require = make_require_ui_auth()
         with patch(
-            "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
-            return_value="real_key_123",
+            _LOAD,
+            return_value=_cfg("real_key_123"),
         ):
             with pytest.raises(HTTPException) as exc_info:
                 await require(_mock_request(), x_api_key="wrong_key")
@@ -73,8 +73,8 @@ class TestMakeRequireUiAuthFailClosed:
         """When key is set, missing header returns 401."""
         require = make_require_ui_auth()
         with patch(
-            "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
-            return_value="real_key_123",
+            _LOAD,
+            return_value=_cfg("real_key_123"),
         ):
             with pytest.raises(HTTPException) as exc_info:
                 await require(_mock_request(), x_api_key=None)
@@ -84,8 +84,8 @@ class TestMakeRequireUiAuthFailClosed:
         """When key is set and header matches, no exception raised."""
         require = make_require_ui_auth()
         with patch(
-            "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
-            return_value="real_key_123",
+            _LOAD,
+            return_value=_cfg("real_key_123"),
         ):
             # Should not raise
             result = await require(_mock_request(), x_api_key="real_key_123")

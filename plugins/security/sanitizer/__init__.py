@@ -9,13 +9,14 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from .module import SanitizerModule, SanitizeResult, get_sanitizer
+from .module import SanitizerModule, SanitizeResult, get_sanitizer, apply_user_text_sanitizer
 from .health import get_health
 
 __all__ = [
   "SanitizerModule",
   "SanitizeResult",
   "get_sanitizer",
+  "apply_user_text_sanitizer",
   "get_health",
 ]
 

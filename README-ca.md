@@ -385,7 +385,7 @@ Server Nexe està en desenvolupament actiu. Pròximament:
 - [x] Embeddings `fastembed` ONNX — PyTorch eliminat (v0.9.3)
 - [x] Suport multimodal VLM — imatges via backends Ollama, llama.cpp i MLX (v0.9.7)
 - [x] VLM detector 3-signal + streaming + mlx-vlm 0.4.4 (v0.9.8)
-- [x] Precomputed KB embeddings — arrencada 10.7× més ràpida (v0.9.8)
+- [x] Precomputed KB embeddings — si els hashes casen, no es recalcula a l'arrencada (v0.9.8)
 - [x] RAG injection sanitization + CLEAR_ALL 2-turn confirm (v0.9.9)
 - [x] Instal·lació offline 100% — DMG ~1.2 GB amb wheels + embedding bundled (v0.9.9+)
 - [x] Thinking toggle per sessió — endpoint `PATCH /ui/session/{id}/thinking` (v0.9.9+)

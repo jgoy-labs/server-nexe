@@ -458,23 +458,34 @@ def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[se
 
 
 # Localhost aliases — single source of truth (AI audit hardcode fix)
-# Default: 127.0.0.1, ::1, localhost. Override via NEXE_LOCALHOST_ALIASES env
-# (comma-separated). Used by bootstrap IP allowlist + middleware host checks.
+# Always includes 127.0.0.1, ::1, localhost. NEXE_LOCALHOST_ALIASES adds extra
+# entries (comma-separated). Used by bootstrap IP allowlist + middleware host checks.
+#
+# ::1 is here for the CLIENT IP comparison in core/endpoints/bootstrap.py, where
+# request.client.host is the bare "::1". It can never match a Host header:
+# TrustedHostMiddleware splits on ":" so any IPv6 Host is rejected — which is why
+# core/server/runner.py refuses to bind to an IPv6 host in the first place.
 DEFAULT_LOCALHOST_ALIASES = ["127.0.0.1", "::1", "localhost"]  # nosemgrep
 
 
 def get_localhost_aliases() -> list:
     """Return list of IPs/hostnames considered localhost.
 
-    Reads NEXE_LOCALHOST_ALIASES env var (comma-separated) if set,
-    otherwise returns DEFAULT_LOCALHOST_ALIASES. Used to centralize
-    the previously-hardcoded ['127.0.0.1', '::1', 'localhost'] lists  # nosemgrep
-    spread across bootstrap.py and middleware.py (AI audit finding).
+    The defaults are ALWAYS included; NEXE_LOCALHOST_ALIASES (comma-separated)
+    only ADDS to them. It used to replace them, which meant that setting a
+    single alias evicted 127.0.0.1/::1/localhost from both the TrustedHost
+    allow-list and the bootstrap IP allow-list — locking the machine running
+    the server out of its own service, with no hint as to why.
+
+    Duplicates are dropped and the order is deterministic (defaults first).
     """
-    custom = os.getenv("NEXE_LOCALHOST_ALIASES", "").strip()
-    if custom:
-        return [s.strip() for s in custom.split(",") if s.strip()]
-    return list(DEFAULT_LOCALHOST_ALIASES)
+    aliases = list(DEFAULT_LOCALHOST_ALIASES)
+    custom = os.getenv("NEXE_LOCALHOST_ALIASES", "")
+    for entry in custom.split(","):
+        entry = entry.strip()
+        if entry and entry not in aliases:
+            aliases.append(entry)
+    return aliases
 
 
 # Network defaults — single source of truth (AI audit hardcode fix Q4)

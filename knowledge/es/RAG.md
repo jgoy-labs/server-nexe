@@ -106,7 +106,7 @@ Todo el texto reside en SQLite (opcionalmente encriptado via SQLCipher). Esto si
 
 **Modelo opcional (via Ollama):** `nomic-embed-text` — 768 dimensiones. Configurable via `NEXE_OLLAMA_EMBED_MODEL`. Solo se usa si el usuario lo activa explicitamente; **no es el camino principal**.
 
-**KB embeddings precomputados** (v0.9.8+): los ficheros de `knowledge/` tienen embeddings pre-calculados en `knowledge/.embeddings/`. En el arranque, si los hashes coinciden, el sistema salta el calculo y carga directamente (10.7× speedup en cold boot). Los embeddings se regeneran automaticamente si cambia el contenido.
+**KB embeddings precomputados** (v0.9.8+): los ficheros de `knowledge/` tienen embeddings pre-calculados en `knowledge/.embeddings/`. En el arranque, si los hashes coinciden, el sistema salta el calculo y carga los vectores directamente. Los embeddings se regeneran automaticamente si cambia el contenido.
 
 Todos los vectores se almacenan con 768 dimensiones. Este valor esta centralizado en `memory/embeddings/constants.py` como `DEFAULT_VECTOR_SIZE = 768` (re-exportado via `memory/memory/constants.py`).
 

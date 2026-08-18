@@ -971,6 +971,12 @@ def _validate_chat_input(body: dict, request: FastAPIRequest) -> tuple[Optional[
     # Security: strip [MEM_SAVE:] tags from user input to prevent memory injection (SEC-002)
     message = strip_memory_tags(message)
 
+    # D-I phase 1: same SanitizerModule gate as /chat/completions (ADR-005).
+    # High/critical → 400. The regex speed-bump below stays as extra UX
+    # for matches the module treats as non-blocking.
+    from plugins.security.sanitizer import apply_user_text_sanitizer
+    message = apply_user_text_sanitizer(message)
+
     # Security: validate input (XSS, SQL injection, path traversal)
     message = validate_string_input(message, max_length=8000, context="chat", allow_html=True)
 
@@ -1474,15 +1480,21 @@ async def _handle_nonstreaming_response(
 
 
 def _resolve_engines(preferred_engine: str) -> list:
-    """Return engine priority list for the requested backend."""
-    _all = ["ollama_module", "mlx_module", "llama_cpp_module"]
+    """Return engine priority list for the requested backend.
+
+    D-I phase 2 / B260: ``auto`` follows the core cascade
+    mlx → llama_cpp → ollama. Callers skip engines that are not loaded,
+    so MLX first is a no-op when the module is absent (non-Mac).
+    An explicit pick keeps that engine first.
+    """
+    _cascade = ["mlx_module", "llama_cpp_module", "ollama_module"]
     _map = {
-        "auto": _all,
-        "ollama": _all,
+        "auto": _cascade,
+        "ollama": ["ollama_module", "mlx_module", "llama_cpp_module"],
         "mlx": ["mlx_module", "ollama_module", "llama_cpp_module"],
         "llamacpp": ["llama_cpp_module", "ollama_module", "mlx_module"],
     }
-    return _map.get(preferred_engine, _all)
+    return _map.get(preferred_engine, _cascade)
 
 
 def _switch_mlx_model(engine, local_path) -> None:
@@ -2954,7 +2966,13 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     continue
 
             if not response_text:
-                response_text = "Error: No AI engine available (try starting Ollama with 'ollama serve')"
+                # D-I phase 2 / #884: this is a failed request, not an
+                # assistant turn. 200 + error-string painted the phrase
+                # inside the chat bubble (app.js only errors when not ok).
+                raise HTTPException(
+                    status_code=503,
+                    detail="No AI engine available",
+                )
         except HTTPException:
             # Make sure the disconnect monitor doesn't outlive a 4xx/5xx exit.
             if not _disconnect_monitor_task.done():

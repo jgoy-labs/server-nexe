@@ -218,13 +218,52 @@ def _host_is_loopback(host: str) -> bool:
     return False
 
 
+def _reject_ipv6_bind(host: str) -> None:
+  """Refuse an IPv6 bind: it would produce a server that answers 400 to everything.
+
+  TrustedHostMiddleware (the outermost middleware) resolves the Host header with
+  `headers["host"].split(":")[0]`, so a request carrying `Host: [::1]:9119`
+  yields "[" and matches nothing in the allow-list — every request is rejected
+  with "Invalid host header". The allow-list cannot be fixed either: the split
+  of a bare "::1" is the empty string, and "" must never be allow-listed
+  (tests/test_middleware.py guards exactly that, it would accept any request
+  with no Host at all).
+
+  server-nexe is a local-first, single-user service: 127.0.0.1 covers every
+  supported use. So IPv6 is refused up front, with an explanation, instead of
+  starting a server that logs a healthy banner and then rejects all traffic.
+
+  Not gated behind NEXE_ALLOW_PUBLIC_BIND: that opt-in is about network
+  exposure, and an exposed IPv6 socket is just as broken as a local one.
+  """
+  import ipaddress
+  candidate = host.strip().strip("[]")
+  try:
+    if ipaddress.ip_address(candidate).version != 6:
+      return
+  except ValueError:
+    return  # hostname (localhost, example.com…) — handled by the loopback check
+  logger.error(
+    "Refusing to bind to the IPv6 host '%s': server-nexe does not support "
+    "IPv6 binds. The Host-header filter would reject every request with "
+    "HTTP 400 (Starlette's TrustedHostMiddleware cannot match bracketed IPv6 "
+    "authorities). Bind to 127.0.0.1 instead.",
+    host
+  )
+  sys.exit(1)
+
+
 def _enforce_loopback_bind(host: str) -> None:
   """WS1-01: loopback is the enforced default, not an assumption.
 
   A non-loopback bind requires the explicit opt-in NEXE_ALLOW_PUBLIC_BIND
   (THREAT_MODEL §5.8); without it the server refuses to start rather than
   silently exposing the API to the network.
+
+  IPv6 binds are refused first (see _reject_ipv6_bind) — including ::1, which
+  *is* loopback but would still yield a server that answers 400 to everything.
   """
+  _reject_ipv6_bind(host)
   if _host_is_loopback(host):
     return
   if os.environ.get("NEXE_ALLOW_PUBLIC_BIND", "").strip().lower() in {"1", "true", "yes"}:

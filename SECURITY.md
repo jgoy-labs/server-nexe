@@ -156,7 +156,8 @@ If that option is not available, open a minimal issue that says "security report
 | `NEXE_PRIMARY_API_KEY` | _required_ | API authentication | `.env` |
 | `NEXE_ENCRYPTION_ENABLED` | `auto` | Enable encryption at rest (`auto` = on if `sqlcipher3` present, else plaintext with warning; `true` = required, fail-closed; `false` = plaintext, no warning) | `.env` or environment |
 | `NEXE_MASTER_KEY` | _unset_ | Overrides the MEK source (env slot in the file → keyring → env → generate chain) | `.env` or environment |
-| `NEXE_TRUSTED_HOSTS` | _unset_ | Allowed host headers | `.env` |
+| `NEXE_LOCALHOST_ALIASES` | `127.0.0.1,::1,localhost` | Extra names accepted in the `Host` header (anti-DNS-rebinding allow-list) and as client IPs for bootstrap regeneration. Comma-separated; entries are **added** to the defaults, which are never dropped | `.env` |
+| `NEXE_ALLOW_PUBLIC_BIND` | _unset_ | Opt-in required to bind to a non-loopback host; without it the server refuses to start. IPv6 binds are refused either way (the `Host` filter cannot match a bracketed IPv6 authority) | `.env` or environment |
 
 ## Dependencies
 

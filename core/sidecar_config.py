@@ -219,11 +219,18 @@ def _resolve_cors_origins(is_sidecar: bool, port: int) -> tuple[str, ...]:
 
 
 def _resolve_trusted_hosts() -> tuple[str, ...]:
-    """Parse NEXE_LOCALHOST_ALIASES CSV, fallback to DEFAULT_TRUSTED_HOSTS."""
+    """Return DEFAULT_TRUSTED_HOSTS plus any NEXE_LOCALHOST_ALIASES CSV entries.
+
+    Mirrors core.config.get_localhost_aliases(): the defaults are never dropped,
+    so adding an alias cannot lock the local machine out of its own server.
+    """
+    hosts = list(DEFAULT_TRUSTED_HOSTS)
     raw = os.environ.get("NEXE_LOCALHOST_ALIASES", "")
-    if not raw.strip():
-        return DEFAULT_TRUSTED_HOSTS
-    return tuple(h.strip() for h in raw.split(",") if h.strip())
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if entry and entry not in hosts:
+            hosts.append(entry)
+    return tuple(hosts)
 
 
 def _resolve_parent_pid() -> Optional[int]:

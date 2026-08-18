@@ -26,8 +26,12 @@ try:
         make_require_ui_auth,
     )
     from fastapi import HTTPException
+    from plugins.security.core.auth_models import ApiKeyConfig, ApiKeyData
 except ImportError as e:
     pytest.skip(f"Rate limit helpers not available: {e}", allow_module_level=True)
+
+_LOAD = "plugins.security.core.auth_dependencies.load_api_keys"
+_KEYS = ApiKeyConfig(primary=ApiKeyData(key="real_key"))
 
 
 # ─── Fixtures ──────────────────────────────────────────────────────────────────
@@ -97,10 +101,7 @@ class TestRateLimitIntegration:
     async def test_21_failures_last_returns_429(self):
         """21 invalid attempts from the same IP → the last returns 429."""
         require = make_require_ui_auth()
-        with patch(
-            "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
-            return_value="real_key",
-        ):
+        with patch(_LOAD, return_value=_KEYS):
             # First 20 → 401
             for _ in range(_UI_RATE_LIMIT):
                 with pytest.raises(HTTPException) as exc_info:
@@ -115,10 +116,7 @@ class TestRateLimitIntegration:
     async def test_valid_key_not_counted(self):
         """Valid key must not be counted as a failure."""
         require = make_require_ui_auth()
-        with patch(
-            "plugins.web_ui_module.api.routes_auth.get_admin_api_key",
-            return_value="real_key",
-        ):
+        with patch(_LOAD, return_value=_KEYS):
             # 19 invalid
             for _ in range(_UI_RATE_LIMIT - 1):
                 with pytest.raises(HTTPException):

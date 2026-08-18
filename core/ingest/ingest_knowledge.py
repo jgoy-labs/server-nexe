@@ -374,6 +374,24 @@ async def _ensure_collection(memory, target_collection, log) -> bool:
         return False
 
 
+async def _replace_collection(memory, target_collection, log) -> bool:
+    """Drop and recreate ``target_collection`` so a re-ingest does not stack.
+
+    Knowledge point ids are a SHA256 of the chunk text. Editing a file
+    therefore creates NEW ids and leaves the old ones behind unless the
+    collection is replaced first.
+    """
+    try:
+        if await memory.collection_exists(target_collection):
+            await memory.delete_collection(target_collection)
+        await memory.create_collection(target_collection, vector_size=DEFAULT_VECTOR_SIZE)
+        log(f"[INFO] collection '{target_collection}' replaced (fresh ingest)")
+        return True
+    except Exception as e:
+        log(_t("col_error", e=e))
+        return False
+
+
 async def _try_precomputed_kb(memory, default_root, lang, log) -> bool:
     """Attempt to load a precomputed knowledge base, returning True on success."""
     try:
@@ -517,6 +535,7 @@ async def ingest_knowledge(
     folder: Optional[Path] = None,
     quiet: bool = False,
     target_collection: str = DOCUMENTATION_COLLECTION,
+    replace_existing: bool = False,
 ):
     """Ingest user documents from knowledge/ folder into Qdrant.
 
@@ -526,6 +545,9 @@ async def ingest_knowledge(
         target_collection: Destination collection (default: nexe_documentation,
             i.e. corporate know-how). Use "user_knowledge" only for ad-hoc docs
             uploaded by end users from the chat UI.
+        replace_existing: If True, drop and recreate ``target_collection``
+            before writing. Required for auto-reingest so edited files do
+            not stack with their previous chunks.
     """
     def log(msg):
         if not quiet:
@@ -568,6 +590,11 @@ async def ingest_knowledge(
         # otherwise lost behind an opaque False returned to the caller.
         logger.error("Ingest init failed: %s", e, exc_info=True)
         return False
+
+    if replace_existing:
+        if not await _replace_collection(memory, target_collection, log):
+            await memory.close()
+            return False
 
     _default_root = PROJECT_ROOT / "knowledge"
     _custom_folder = folder is not None and not str(knowledge_path).startswith(str(_default_root))

@@ -46,7 +46,7 @@ pypdf==6.14.2  # PDF support for knowledge ingestion; GHSA-3crg-w4f6-42mx GHSA-4
 lingua-language-detector==2.1.1
 
 # --- Encryption at rest ---
-cryptography==49.0.0  # bumped from 48.0.1 (2 HIGH advisories); major bump validated at next full build/re-smoke
+cryptography==50.0.0  # 49.0.0: GHSA-g6cj-pr64-35w5 / PYSEC-2026-3552 (PKCS#7 Bleichenbacher). 50.0.0 OSV=0 (verified 2026-08-18). Windows ARM64 stays on 46.0.3 — no win_arm64 wheel (ADR-004).
 keyring==25.7.0
 sqlcipher3==0.6.2
 

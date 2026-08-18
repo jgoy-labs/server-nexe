@@ -8,9 +8,9 @@ Description: B127 — a non-streaming engine error ("Error: ...") must NOT be
             feeds the error back as an assistant turn and pollutes the context
             of the next request. The HTTP response must still surface the error.
 
-            The error is produced naturally (server_state with no usable engine →
-            routes_chat returns "Error: No AI engine available"), so the test
-            exercises the real production path, not a mocked return value.
+            D-I phase 2: no usable engine raises HTTP 503 (not 200 +
+            "Error: No AI engine available" in the body). The test still
+            exercises the real production path.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -94,22 +94,21 @@ async def _call(session):
 @pytest.mark.asyncio
 class TestErrorMessagePersistence:
     async def test_error_response_not_persisted_but_returned(self):
-        """An 'Error: ...' engine response is surfaced via HTTP but NOT stored."""
+        """No engine → HTTP 503, and nothing stored as an assistant turn."""
+        from fastapi import HTTPException
+
         session = ChatSession(session_id="b127")
-        result = await _call(session)
+        with pytest.raises(HTTPException) as ei:
+            await _call(session)
 
-        # 1. The HTTP response still surfaces the error to the user.
-        assert result["response"].startswith("Error:"), result
+        assert ei.value.status_code == 503
+        assert ei.value.detail == "No AI engine available"
 
-        # 2. It must NOT be persisted as an assistant message.
         assistant_errors = [
             m for m in session.messages
-            if m["role"] == "assistant" and m["content"].startswith("Error:")
+            if m["role"] == "assistant"
         ]
         assert not assistant_errors, f"Error leaked into session history: {assistant_errors}"
 
-        # 3. It must not pollute the context of the next request.
         ctx = session.get_context_messages()
-        assert not any(
-            m["role"] == "assistant" and m["content"].startswith("Error:") for m in ctx
-        )
+        assert not any(m["role"] == "assistant" for m in ctx)

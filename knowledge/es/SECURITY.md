@@ -25,6 +25,7 @@ expires: null
 - [Rate Limiting](#rate-limiting)
   - [Endpoints API (límites fijados en el código)](#endpoints-api-limites-fijados-en-el-codigo)
   - [Endpoints Web UI (fijos por endpoint)](#endpoints-web-ui-fijos-por-endpoint)
+- [Frontera de red](#frontera-de-red)
 - [Cabeceras de seguridad (OWASP)](#cabeceras-de-seguridad-owasp)
 - [Validacion de entrada](#validacion-de-entrada)
   - [Pipeline API (/v1/*)](#pipeline-api-v1)
@@ -93,6 +94,17 @@ El rate limiting se aplica a **todos los endpoints** — tanto la API (`/v1/*`) 
 | PATCH /ui/session/{id}/thinking | 10/minuto |
 
 Implementacion: `slowapi` con decorador `@limiter.limit()` en cada endpoint. `RateLimitTracker` en `plugins/security/core/rate_limiting.py`.
+
+## Frontera de red
+
+server-nexe escucha solo en loopback. Dos comprobaciones independientes lo sostienen:
+
+- **Bind del socket.** Arrancar con un host fuera de loopback exige `NEXE_ALLOW_PUBLIC_BIND=1`; sin ese opt-in el servidor se niega a arrancar (`core/server/runner.py`). Los binds **IPv6 se rechazan siempre**, tambien `::1`: el filtro de la cabecera `Host` no puede casar una direccion IPv6 entre corchetes y el servidor responderia HTTP 400 a todo. Usa `127.0.0.1`.
+- **Cabecera `Host`.** `TrustedHostMiddleware` responde 400 a cualquier peticion cuyo `Host` no este en la lista (defensa contra DNS rebinding). Por defecto la lista es `127.0.0.1`, `::1` y `localhost`.
+
+`NEXE_LOCALHOST_ALIASES` (separada por comas) **anade** nombres a esa lista y a la de IPs de cliente autorizadas a regenerar el bootstrap token. Los tres valores por defecto nunca se pierden: poner un alias no puede dejarte fuera de tu propia maquina. Nota: `::1` solo es efectivo en la comprobacion de IP de cliente — nunca puede casar una cabecera `Host`.
+
+Esta variable no abre nada por si sola: para llegar al servidor desde fuera hace falta ademas el bind publico.
 
 ## Cabeceras de seguridad (OWASP)
 

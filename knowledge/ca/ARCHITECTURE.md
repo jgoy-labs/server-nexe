@@ -245,7 +245,7 @@ server-nexe/
 │   └── win/                      # Installer Windows ARM64 (NSIS, grpc_shim) — nou a v1.0.7
 │
 ├── knowledge/                    # Docs per a ingestio RAG (ca/es/en x 15 fitxers)
-│   └── .embeddings/              # KB embeddings precomputats (ONNX, 10.7× speedup a l'arrencada)
+│   └── .embeddings/              # KB embeddings precomputats (ONNX; es fan servir si el hash casa)
 ├── storage/                      # Dades en temps d'execucio (no a git)
 ├── tests/                        # ~7700 funcions de test col·lectades
 └── nexe                          # Executable CLI
@@ -513,7 +513,7 @@ A partir de v0.9.8, el backend MLX usa un **detector VLM "any-of" amb 3 senyals*
 
 Els fitxers de `knowledge/` poden tenir **embeddings precomputats** guardats a `knowledge/.embeddings/` (post-v0.9.8). A l'arrencada, si els hashes coincideixen amb els fitxers `.md` actuals, el sistema salta el càlcul d'embeddings (fastembed ONNX, ~700ms per fitxer) i carrega directament els vectors ja calculats.
 
-**Speedup mesurat:** 10.7× a l'arrencada en fred (cold boot). Útil especialment al DMG offline, on els embeddings venen ja dins el bundle per cada idioma (ca/es/en × 15 fitxers).
+Útil especialment al DMG offline, on els embeddings venen ja dins el bundle per cada idioma (ca/es/en × 15 fitxers). No hi ha cap xifra de speedup reproduïble publicada.
 
 Els embeddings es regeneren automàticament si canvia el contingut dels `.md` o el model d'embeddings.
 

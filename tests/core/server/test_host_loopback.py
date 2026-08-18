@@ -56,3 +56,40 @@ class TestEnforceLoopbackBind:
         monkeypatch.setenv("NEXE_ALLOW_PUBLIC_BIND", value)
         with pytest.raises(SystemExit):
             _enforce_loopback_bind("192.168.1.10")
+
+
+class TestRejectIPv6Bind:
+    """An IPv6 bind starts a server that answers 400 to everything.
+
+    TrustedHostMiddleware does `headers["host"].split(":")[0]`, so a request to
+    `Host: [::1]:9119` yields "[" and never matches the allow-list. Refusing the
+    bind is the honest outcome: better than a server that logs a happy banner
+    and then rejects every single request with no explanation.
+    """
+
+    @pytest.mark.parametrize("host", ["::1", "[::1]", "fe80::1", "2001:db8::1", "::"])
+    def test_ipv6_bind_refuses_to_start(self, monkeypatch, host):
+        monkeypatch.delenv("NEXE_ALLOW_PUBLIC_BIND", raising=False)
+        with pytest.raises(SystemExit) as exc:
+            _enforce_loopback_bind(host)
+        assert exc.value.code == 1
+
+    @pytest.mark.parametrize("host", ["::1", "2001:db8::1"])
+    def test_public_bind_opt_in_does_not_unlock_ipv6(self, monkeypatch, host):
+        """NEXE_ALLOW_PUBLIC_BIND is about exposure, not about IPv6 support."""
+        monkeypatch.setenv("NEXE_ALLOW_PUBLIC_BIND", "1")
+        with pytest.raises(SystemExit):
+            _enforce_loopback_bind(host)
+
+    def test_refusal_says_what_to_do_instead(self, monkeypatch, caplog):
+        monkeypatch.delenv("NEXE_ALLOW_PUBLIC_BIND", raising=False)
+        with caplog.at_level("ERROR"), pytest.raises(SystemExit):
+            _enforce_loopback_bind("::1")
+        logged = " ".join(r.message for r in caplog.records)
+        assert "IPv6" in logged
+        assert "127.0.0.1" in logged
+
+    @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "127.0.0.2"])
+    def test_ipv4_and_hostnames_are_untouched(self, monkeypatch, host):
+        monkeypatch.delenv("NEXE_ALLOW_PUBLIC_BIND", raising=False)
+        _enforce_loopback_bind(host)  # must not raise/exit

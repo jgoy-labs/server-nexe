@@ -13,7 +13,11 @@ from unittest.mock import patch, MagicMock
 import pytest
 from fastapi import HTTPException
 
+from plugins.security.core.auth_models import ApiKeyConfig, ApiKeyData
 from plugins.web_ui_module.api.routes_auth import make_require_ui_auth
+
+_LOAD = "plugins.security.core.auth_dependencies.load_api_keys"
+_KEYS = ApiKeyConfig(primary=ApiKeyData(key="real_key"))
 
 
 def _mock_request(host="1.2.3.4", path="/ui/chat"):
@@ -31,7 +35,7 @@ class TestP1BAuthLogging:
         """Invalid key → log_auth_failure() is called on the security logger."""
         require = make_require_ui_auth()
         mock_sec_logger = MagicMock()
-        with patch("plugins.web_ui_module.api.routes_auth.get_admin_api_key", return_value="real_key"):
+        with patch(_LOAD, return_value=_KEYS):
             with patch(
                 "plugins.security.security_logger.get_security_logger",
                 return_value=mock_sec_logger,
@@ -49,7 +53,7 @@ class TestP1BAuthLogging:
         """Without key (None header) → log_auth_failure() is called."""
         require = make_require_ui_auth()
         mock_sec_logger = MagicMock()
-        with patch("plugins.web_ui_module.api.routes_auth.get_admin_api_key", return_value="real_key"):
+        with patch(_LOAD, return_value=_KEYS):
             with patch(
                 "plugins.security.security_logger.get_security_logger",
                 return_value=mock_sec_logger,
@@ -63,7 +67,7 @@ class TestP1BAuthLogging:
         """Valid key → log_auth_failure() must NOT be called."""
         require = make_require_ui_auth()
         mock_sec_logger = MagicMock()
-        with patch("plugins.web_ui_module.api.routes_auth.get_admin_api_key", return_value="real_key"):
+        with patch(_LOAD, return_value=_KEYS):
             with patch(
                 "plugins.security.security_logger.get_security_logger",
                 return_value=mock_sec_logger,

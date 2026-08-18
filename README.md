@@ -385,7 +385,7 @@ Server Nexe is actively developed. Here's what's coming:
 - [x] Encryption default `auto`; strict fail-closed via `NEXE_ENCRYPTION_ENABLED=true` (v0.9.2)
 - [x] Embeddings on ONNX (`fastembed`), PyTorch removed (v0.9.3)
 - [x] Multimodal VLM — 4 backends (Ollama, MLX, llama.cpp, Web UI) (v0.9.7)
-- [x] Precomputed KB embeddings (~10.7x faster startup) (v0.9.8)
+- [x] Precomputed KB embeddings — skip recalc at startup if hashes match (v0.9.8)
 - [x] RAG injection sanitization (MEM tags neutralized at ingest and retrieval) (v0.9.9)
 - [x] Offline install bundle — all wheels + embedding model in DMG (~1.2 GB, post-v0.9.9)
 - [x] Thinking toggle endpoint — `PATCH /session/{id}/thinking` (post-v0.9.9)

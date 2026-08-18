@@ -65,8 +65,11 @@ jobs:
       - name: Run pip-audit (CVE scan)
         run: |
           pip-audit --requirement requirements.txt
-          pip-audit --requirement requirements-macos.txt
           pip-audit --requirement requirements-linux.txt
+          # requirements-macos.txt is NOT pip-audited here: it pins Apple-only
+          # wheels (pyobjc, mlx-lm) that this ubuntu runner cannot resolve
+          # (pyobjc wants /usr/bin/sw_vers). Same reason windows is excluded.
+          # mlx/transformers of the macos file are covered by the OSV gate below.
           # requirements-windows.txt is NOT pip-audited here: it pins win_arm64-only
           # wheels (pywin32, lingua 2.2.0) that this runner cannot resolve. Its pins
           # are CVE-scanned by the OSV gate below instead (WS8-04).
@@ -96,7 +99,10 @@ jobs:
   tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    needs: security-audit
+    # D-J / #867: do NOT `needs: security-audit`. That job pip-audits
+    # platform files this ubuntu runner cannot resolve and was skipping
+    # Unit Tests + Layering on every push (23/07→04/08). Audit stays a
+    # parallel gate; a red audit must not hide a red (or green) suite.
     # contents: read only — badge commit is handled by the separate 'badge' job
     permissions:
       contents: read
@@ -166,7 +172,6 @@ jobs:
   precompute-check:
     name: Precomputed KB Manifest
     runs-on: ubuntu-latest
-    needs: security-audit
     permissions:
       contents: read
     steps:
@@ -206,7 +211,6 @@ jobs:
   layering:
     name: Layering Gate (#471)
     runs-on: ubuntu-latest
-    needs: security-audit
     permissions:
       contents: read
     steps:

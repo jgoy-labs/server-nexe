@@ -22,7 +22,7 @@ class SanitizeResult:
   Result of sanitizing an input.
 
   Attributes:
-    clean_text: Cleaned text (or original if safe)
+    clean_text: Text returned to the caller (today: the original; this module detects, it does not rewrite)
     is_safe: True if the input is safe to process
     threats_detected: List of detected threats
     severity: "none" | "low" | "medium" | "high" | "critical"
@@ -62,7 +62,7 @@ class SanitizerModule:
 
   def sanitize(self, text: str) -> SanitizeResult:
     """
-    Sanitizes the input and detects threats.
+    Detects jailbreaks and prompt injections. Does not rewrite the text.
 
     Args:
       text: User input text
@@ -179,3 +179,48 @@ def get_sanitizer() -> SanitizerModule:
   if _sanitizer_instance is None:
     _sanitizer_instance = SanitizerModule()
   return _sanitizer_instance
+
+
+def apply_user_text_sanitizer(text: str) -> str:
+  """Shared gate for /chat/completions AND /ui/chat (D-I / D-G).
+
+  The module is a detector, not a rewriter (D-B): high/critical → HTTP 400.
+  If it cannot load or sanitize() raises, the text is returned unchanged
+  and that fact is logged at WARNING — never as a rewrite, never at debug.
+  """
+  from fastapi import HTTPException
+  import logging
+  _log = logging.getLogger(__name__)
+  try:
+    sanitizer = get_sanitizer()
+  except Exception as exc:
+    # D-G / #872: this used to be debug (invisible in normal operation).
+    _log.warning("SanitizerModule unavailable, skipping: %s", exc)
+    return text
+  try:
+    result = sanitizer.sanitize(text)
+  except Exception as exc:
+    _log.warning("SanitizerModule.sanitize raised, keeping original text: %s", exc)
+    return text
+  if result.severity in ("high", "critical"):
+    _log.warning(
+      "SanitizerModule blocked %s-severity input (threats=%s, patterns=%s)",
+      result.severity,
+      result.threats_detected,
+      result.patterns_matched,
+    )
+    raise HTTPException(
+      status_code=400,
+      detail={
+        "error": "input_rejected_by_sanitizer",
+        "severity": result.severity,
+        "threats": result.threats_detected,
+      },
+    )
+  if not result.is_safe:
+    _log.info(
+      "SanitizerModule flagged user input (severity=%s, threats=%s)",
+      result.severity,
+      result.threats_detected,
+    )
+  return result.clean_text

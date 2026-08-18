@@ -90,6 +90,19 @@ class ApiKeyConfig:
       return True
     return False
 
+  @property
+  def has_any_key_material(self) -> bool:
+    """True if a primary or secondary key string exists (even if expired).
+
+    Distinct from has_any_valid_key: an expired primary is still "configured"
+    so the UI can 401 instead of lying with 503 "no key".
+    """
+    if self.primary and self.primary.key:
+      return True
+    if self.secondary and self.secondary.key:
+      return True
+    return False
+
 __all__ = [
   'KeyStatus',
   'ApiKeyData',

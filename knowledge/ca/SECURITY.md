@@ -25,6 +25,7 @@ expires: null
 - [Rate Limiting](#rate-limiting)
   - [Endpoints de l'API (límits fixats al codi)](#endpoints-de-lapi-limits-fixats-al-codi)
   - [Endpoints de la Web UI (fixats per endpoint)](#endpoints-de-la-web-ui-fixats-per-endpoint)
+- [Frontera de xarxa](#frontera-de-xarxa)
 - [Capcaleres de seguretat (OWASP)](#capcaleres-de-seguretat-owasp)
 - [Validacio d'input](#validacio-dinput)
   - [Pipeline de l'API (/v1/*)](#pipeline-de-lapi-v1)
@@ -93,6 +94,17 @@ El rate limiting s'aplica a **tots els endpoints** — tant a l'API (`/v1/*`) co
 | PATCH /ui/session/{id}/thinking | 10/minut |
 
 Implementacio: `slowapi` amb decorador `@limiter.limit()` a cada endpoint. `RateLimitTracker` a `plugins/security/core/rate_limiting.py`.
+
+## Frontera de xarxa
+
+server-nexe escolta nomes a loopback. Dues comprovacions independents ho sostenen:
+
+- **Bind del socket.** Arrencar amb un host fora de loopback exigeix `NEXE_ALLOW_PUBLIC_BIND=1`; sense aquest opt-in el servidor es nega a arrencar (`core/server/runner.py`). Els binds **IPv6 es refusen sempre**, tambe `::1`: el filtre de la capcalera `Host` no pot casar una adreca IPv6 entre claudators i el servidor respondria HTTP 400 a tot. Feu servir `127.0.0.1`.
+- **Capcalera `Host`.** `TrustedHostMiddleware` respon 400 a qualsevol peticio amb un `Host` que no sigui de la llista (defensa contra DNS rebinding). Per defecte la llista es `127.0.0.1`, `::1` i `localhost`.
+
+`NEXE_LOCALHOST_ALIASES` (coma-separada) **afegeix** noms a aquesta llista i a la d'IPs de client autoritzades a regenerar el bootstrap token. Els tres valors per defecte no es perden mai: posar un alies no us pot deixar fora de la vostra propia maquina. Nota: `::1` nomes es efectiu a la comprovacio d'IP de client — no pot casar mai una capcalera `Host`.
+
+Aquesta variable no obre res per si sola: per arribar al servidor des de fora cal, a mes, el bind public.
 
 ## Capcaleres de seguretat (OWASP)
 

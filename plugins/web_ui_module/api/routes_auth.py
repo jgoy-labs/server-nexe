@@ -13,8 +13,6 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import os as _os
 import logging
-import secrets
-import time as _time
 from fastapi import APIRouter, HTTPException, Depends, Header, Request
 
 # Runtime override singleton (replaces os.environ writes).
@@ -26,12 +24,29 @@ from core.runtime_state import get_with_env_fallback  # noqa: E402
 # below — they return 503, never 200 without auth.
 try:
     from plugins.security.core.auth_config import get_admin_api_key
+    from plugins.security.core.auth_rate_limit import (
+        auth_failures as _ui_auth_failures,
+        AUTH_FAILURE_LIMIT as _UI_RATE_LIMIT,
+        AUTH_FAILURE_WINDOW as _UI_RATE_WINDOW,
+        check_auth_failure_rate_limit as _check_ui_rate_limit,
+        record_auth_failure_attempt as _record_ui_auth_failure,
+    )
     _SECURITY_AVAILABLE = True
 except ImportError:
     _SECURITY_AVAILABLE = False
 
     def get_admin_api_key() -> Optional[str]:  # type: ignore[misc, no-redef]
         """Stub: degraded mode — protected endpoints return 503 via require_ui_auth."""
+        return None
+
+    _ui_auth_failures: dict = {}
+    _UI_RATE_LIMIT = 20
+    _UI_RATE_WINDOW = 60.0
+
+    def _check_ui_rate_limit(ip: str) -> bool:
+        return False
+
+    def _record_ui_auth_failure(ip: str) -> None:
         return None
 
 from plugins.web_ui_module.messages import get_message, get_i18n
@@ -80,32 +95,6 @@ def get_server_lang() -> str:
     return _server_lang
 
 
-# P1-A: Rate limit for authentication failures per IP.
-# In-memory dict: {ip: [monotonic timestamps of failures within the window]}.
-# server-nexe is single-worker (uvicorn workers=1) — no lock needed.
-_ui_auth_failures: dict[str, list[float]] = {}
-_UI_RATE_LIMIT: int = int(_os.getenv("NEXE_UI_RATE_LIMIT", "20"))   # maximum failed attempts within the window
-_UI_RATE_WINDOW: float = float(_os.getenv("NEXE_UI_RATE_WINDOW", "60.0"))  # window in seconds
-
-
-def _check_ui_rate_limit(ip: str) -> bool:
-    """Returns True if the IP has exceeded the auth failure limit."""
-    now = _time.monotonic()
-    cutoff = now - _UI_RATE_WINDOW
-    timestamps = [t for t in _ui_auth_failures.get(ip, []) if t > cutoff]
-    _ui_auth_failures[ip] = timestamps
-    return len(timestamps) >= _UI_RATE_LIMIT
-
-
-def _record_ui_auth_failure(ip: str) -> None:
-    """Records an authentication failure for the given IP."""
-    now = _time.monotonic()
-    cutoff = now - _UI_RATE_WINDOW
-    timestamps = [t for t in _ui_auth_failures.get(ip, []) if t > cutoff]
-    timestamps.append(now)
-    _ui_auth_failures[ip] = timestamps
-
-
 def make_require_ui_auth():
     """Creates the FastAPI authentication dependency for the Web UI.
 
@@ -114,12 +103,16 @@ def make_require_ui_auth():
     the original bug: if NEXE_PRIMARY_API_KEY/NEXE_ADMIN_API_KEY were
     empty, the UI routes were open to everyone).
 
+    D-I / #883: key check is authenticate_ui_request (same dual-key, expiry,
+    Bearer and 429 window as /chat/completions).
+
     R6-15 v1.0.4: same FAIL CLOSED behaviour applies when the security plugin
     itself is absent — protected endpoints return 503, never 200 unauthorized.
     """
     async def _require_ui_auth(
         request: Request,
         x_api_key: Optional[str] = Header(None),
+        authorization: Optional[str] = Header(None),
     ):
         """Validates API key for Web UI endpoints (FAIL CLOSED)"""
         if not _SECURITY_AVAILABLE:
@@ -130,39 +123,8 @@ def make_require_ui_auth():
                 status_code=503,
                 detail="security plugin missing — protected endpoints unavailable",
             )
-        expected = get_admin_api_key()
-        if not expected:
-            # FAIL CLOSED: no key configured = no UI access
-            logger.error("UI auth requested but no admin API key configured (FAIL CLOSED)")
-            raise HTTPException(
-                status_code=503,
-                detail=get_message(get_i18n(request), "webui.auth.no_key_configured")
-            )
-        # P1-A: Rate limit check — BEFORE compare_digest to avoid timing side-channel
-        _client_ip = str(request.client.host) if request.client else "unknown"
-        if _check_ui_rate_limit(_client_ip):
-            raise HTTPException(
-                status_code=429,
-                detail="Too many authentication failures. Try again later.",
-            )
-        if not secrets.compare_digest(x_api_key or "", expected):
-            # P1-A: Record the failure for rate limiting
-            _record_ui_auth_failure(_client_ip)
-            # P1-B: Log auth failure to the security log (pattern from auth_dependencies.py:185-195)
-            try:
-                from plugins.security.security_logger import get_security_logger
-                _sec_log = get_security_logger()
-                _sec_log.log_auth_failure(
-                    reason="invalid_ui_api_key",
-                    ip_address=_client_ip,
-                    endpoint=str(request.url.path),
-                )
-            except ImportError:
-                pass
-            raise HTTPException(
-                status_code=401,
-                detail=get_message(get_i18n(request), "webui.auth.invalid_key"),
-            )
+        from plugins.security.core.auth_dependencies import authenticate_ui_request
+        await authenticate_ui_request(request, x_api_key, authorization)
     return _require_ui_auth
 
 
@@ -413,10 +375,31 @@ def _collect_llamacpp_gguf_paths(models_dir: "Path") -> "list[dict]":
     return gguf_list
 
 
+# Same cascade as core B260 / routes_chat._resolve_engines("auto").
+# Backend ids (dropdown), not module names.
+_AUTO_BACKEND_CASCADE = ("mlx", "llamacpp", "ollama")
+
+
 def _mark_active_backend(backends: list, current_backend: str) -> str:
-    """Mark the active backend in-place; falls back to first connected backend. Returns effective current_backend."""
+    """Mark the active backend in-place; falls back to first connected backend.
+
+    ``auto`` follows the core cascade (mlx → llama.cpp → ollama) and only
+    marks a backend that is actually listed. MLX is skipped when the scan
+    found no models (typical non-Mac). Does not rewrite NEXE_MODEL_ENGINE:
+    auto stays auto.
+    """
+    if current_backend == "auto":
+        by_id = {b["id"]: b for b in backends}
+        for bid in _AUTO_BACKEND_CASCADE:
+            b = by_id.get(bid)
+            if b and b.get("connected", True) and b.get("models"):
+                b["active"] = True
+                return current_backend
+        return current_backend
+
+    requested = "ollama" if current_backend == "ollama_module" else current_backend
     for b in backends:
-        if current_backend == b["id"] or (current_backend in ("auto", "ollama_module") and b["id"] == "ollama"):
+        if requested == b["id"]:
             if b.get("connected", True):
                 b["active"] = True
                 return current_backend

@@ -11,13 +11,21 @@ www.jgoy.net · https://server-nexe.org
 
 from fastapi import HTTPException, Header, Request
 from typing import Optional
+import logging
 import os
 import ipaddress
 from datetime import datetime, timezone
 import secrets
 
+_log = logging.getLogger(__name__)
+
 from .auth_models import KeyStatus
 from .auth_config import load_api_keys, is_dev_mode, get_admin_api_key
+from .auth_rate_limit import (
+  check_auth_failure_rate_limit,
+  record_auth_failure_attempt,
+  client_ip,
+)
 from .messages import get_message
 
 # Auth metrics hooks. These are no-ops: server-nexe has no Prometheus auth
@@ -137,6 +145,91 @@ def _authenticate_secondary(x_api_key: str, keys_config, request: Request) -> Op
   return None
 
 
+def presented_api_key(
+  x_api_key: Optional[str],
+  authorization: Optional[str],
+) -> Optional[str]:
+  """X-API-Key wins; otherwise Authorization: Bearer (sidecar C25)."""
+  if isinstance(x_api_key, str) and x_api_key:
+    return x_api_key
+  if isinstance(authorization, str) and authorization:
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and token:
+      return token
+  return None
+
+
+def enforce_failed_auth_rate_limit(request: Request) -> None:
+  """429 if this IP already burned the failure window. Call BEFORE compare."""
+  ip = client_ip(request)
+  if check_auth_failure_rate_limit(ip):
+    raise HTTPException(
+      status_code=429,
+      detail="Too many authentication failures. Try again later.",
+    )
+
+
+def _accept_or_reject_presented_key(
+  request: Request,
+  presented: Optional[str],
+  keys_config,
+) -> str:
+  """Shared dual-key + expiry check. Counts failures toward the 429 window."""
+  enforce_failed_auth_rate_limit(request)
+  if not presented:
+    record_auth_failure("missing_key")
+    record_auth_failure_attempt(client_ip(request))
+    _log_failure(request, keys_config)
+    _i18n = getattr(request.app.state, "i18n", None)
+    raise HTTPException(
+      status_code=401,
+      detail=get_message(_i18n, "security.auth.missing_key"),
+      headers={"WWW-Authenticate": "ApiKey"},
+    )
+  result = _authenticate_primary(presented, keys_config, request)
+  if result:
+    return result
+  result = _authenticate_secondary(presented, keys_config, request)
+  if result:
+    return result
+  record_auth_failure_attempt(client_ip(request))
+  _log_failure(request, keys_config)
+  raise HTTPException(
+    status_code=401,
+    detail="Invalid or expired API key",
+    headers={"WWW-Authenticate": "ApiKey"},
+  )
+
+
+async def authenticate_ui_request(
+  request: Request,
+  x_api_key: Optional[str],
+  authorization: Optional[str] = None,
+) -> None:
+  """Product-path auth (D-I / #883). Same keys as the core, UI fail-closed.
+
+  No key material configured → 503 (never open).
+  Configured but expired / wrong → 401.
+  Bearer and secondary are accepted. Failures share the core 429 window.
+  """
+  keys_config = load_api_keys()
+  if not keys_config.has_any_key_material:
+    _log.error("UI auth requested but no API key configured (FAIL CLOSED)")
+    state = getattr(getattr(request, "app", None), "state", None)
+    i18n = getattr(state, "i18n", None) if state is not None else None
+    raise HTTPException(
+      status_code=503,
+      detail=get_message(i18n, "webui.auth.no_key_configured")
+      if i18n is not None
+      else "API key not configured (FAIL CLOSED)",
+    )
+  _accept_or_reject_presented_key(
+    request,
+    presented_api_key(x_api_key, authorization),
+    keys_config,
+  )
+
+
 def _log_failure(request: Request, keys_config) -> None:
   """Record an authentication failure to metrics and the IRONCLAD security log."""
   failure_reason = "invalid_api_key"
@@ -152,9 +245,9 @@ def _log_failure(request: Request, keys_config) -> None:
     security_logger = get_security_logger()
     security_logger.log_auth_failure(
       reason=failure_reason,
-      ip_address=request.client.host if request.client else "unknown"
+      ip_address=client_ip(request),
     )
-  except ImportError:
+  except Exception:
     pass
 
 
@@ -194,39 +287,11 @@ async def require_api_key(
   if not keys_config.has_any_valid_key:
     return _check_dev_mode(request, dev_mode)
 
-  # Sidecar fallback (by design): nexe-app Tauri sidecar injects the API key as
-  # "Authorization: Bearer <key>" rather than "X-API-Key" to avoid exposing the
-  # raw key to the webview (security C25). When X-API-Key is absent but a valid
-  # Bearer token is present, treat it as the API key. This is intentional and
-  # audited — not a bypass. Logging/auditing systems should expect either header.
-  if not x_api_key and authorization:
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() == "bearer" and token:
-      x_api_key = token
-
-  if not x_api_key:
-    record_auth_failure('missing_key')
-    # Q3.1 fix: read i18n from app.state instead of None (security fix)
-    _i18n = getattr(request.app.state, 'i18n', None)
-    raise HTTPException(
-      status_code=401,
-      detail=get_message(_i18n, "security.auth.missing_key"),
-      headers={"WWW-Authenticate": "ApiKey"}
-    )
-
-  result = _authenticate_primary(x_api_key, keys_config, request)
-  if result:
-    return result
-
-  result = _authenticate_secondary(x_api_key, keys_config, request)
-  if result:
-    return result
-
-  _log_failure(request, keys_config)
-  raise HTTPException(
-    status_code=401,
-    detail="Invalid or expired API key",
-    headers={"WWW-Authenticate": "ApiKey"}
+  # D-I / #883: same presented-key + 429 window as /ui/chat.
+  return _accept_or_reject_presented_key(
+    request,
+    presented_api_key(x_api_key, authorization),
+    keys_config,
   )
 
 async def optional_api_key(
@@ -278,4 +343,6 @@ async def optional_api_key(
 __all__ = [
   'require_api_key',
   'optional_api_key',
+  'authenticate_ui_request',
+  'presented_api_key',
 ]
