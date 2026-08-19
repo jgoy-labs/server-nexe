@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Routine dependency updates: click 8.4.2, slowapi 0.1.10, filelock 3.32.3, platformdirs 4.11.3, pypdf 6.16.1, pydantic 2.13.4, pydantic-settings 2.15.0, python-dotenv 1.2.3, structlog 26.1.0, and pytest 9.1.1 (test tooling). structlog uses CalVer, so 25.5.0 → 26.1.0 is one release, not a breaking major. pydantic 2.10.6 → 2.13.4 is 22 releases (Mar 2025–May 2026); the package itself is pure-python and its pinned `pydantic-core==2.46.4` publishes a `win_arm64` wheel, so the Windows pin set moves with the base one. All other listed packages ship pure-python wheels.
 - Dependabot no longer auto-updates cryptography, transformers 5.13+, or mlx-vlm 0.5+, and no longer groups FastAPI/Starlette into safe-patches. Those bumps have to be reviewed on their own: cryptography 47+ has no win_arm64 wheel, and transformers 5.13+ breaks mlx-lm 0.31.3 at import.
 
+### Fixed
+
+- The installer's post-install guide advertised `nexe knowledge list`, a command that has never existed. It now points to `nexe knowledge status`, which is the one that reports what the collection holds.
+
 ### Security
 
 - Dependency update: pypdf 6.16.1 (PYSEC-2026-3655/3656 — ToUnicode token-length DoS and CID font width-range DoS — fixed in 6.15.0; 6.14.2 still covers the four crafted-PDF DoS CVEs from July).

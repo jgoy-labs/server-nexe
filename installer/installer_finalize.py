@@ -126,7 +126,7 @@ def _write_commands_file(project_root, nexe_cmd, model_config):
 
 ```bash
 {nexe_cmd} knowledge ingest        # Processar documents / Process documents
-{nexe_cmd} knowledge list          # Llistar documents / List documents
+{nexe_cmd} knowledge status        # Estat de la col·lecció / Collection status
 ```
 
 ## ⚙️ Configuració / Configuration
