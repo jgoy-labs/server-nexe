@@ -28,6 +28,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytest.importorskip("mlx_lm", reason="mlx-lm is Apple-Silicon only")
 
 # Module under test (string path reused by the lazy patches below).
 _MOD = "plugins.mlx_module.core.chat"

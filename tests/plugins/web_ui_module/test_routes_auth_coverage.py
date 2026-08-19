@@ -16,9 +16,3 @@ class TestMakeRequireUiAuth:
         dep = make_require_ui_auth()
         assert callable(dep)
 
-
-class TestModuleLevelConstants:
-    def test_ui_rate_limit(self):
-        from plugins.web_ui_module.api.routes_auth import _UI_RATE_LIMIT, _UI_RATE_WINDOW
-        assert _UI_RATE_LIMIT > 0
-        assert _UI_RATE_WINDOW > 0

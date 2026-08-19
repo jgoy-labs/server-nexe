@@ -518,3 +518,18 @@ class TestLogFailure:
         with patch("plugins.security.core.auth_dependencies.record_auth_failure") as mock_fail:
             _log_failure(mock_request, config)
             mock_fail.assert_called_once_with("secondary_key_expired")
+
+    def test_logger_exception_does_not_raise(self):
+        """#909: a broken IRONCLAD logger must not turn a 401 into a 500."""
+        from plugins.security.core.auth_models import ApiKeyConfig
+        from plugins.security.core.auth_dependencies import _log_failure
+
+        config = ApiKeyConfig()
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+
+        with patch(
+            "plugins.security.security_logger.get_security_logger",
+            side_effect=RuntimeError("logger down"),
+        ):
+            _log_failure(mock_request, config)

@@ -422,6 +422,10 @@ def _key(identity="aaaaaaaaaaaaaaaa", session="sess1234"):
     return f"{_MODEL}:{identity}:{session}"
 
 
+@pytest.mark.skipif(
+    not VLMPromptCacheManager(max_sessions=1).available,
+    reason="mlx_vlm without PromptCacheState",
+)
 class TestF843KeyIsLegibleInTheLog:
 
     def test_two_different_keys_are_distinguishable_in_the_log(self, caplog):
@@ -460,6 +464,10 @@ class TestF843KeyIsLegibleInTheLog:
         assert "sessAAAA" in lines and "sessBBBB" in lines, lines
 
 
+@pytest.mark.skipif(
+    not VLMPromptCacheManager(max_sessions=1).available,
+    reason="mlx_vlm without PromptCacheState",
+)
 class TestF843ReuseIsVisible:
     """A field log that only reports creations and evictions cannot prove
     reuse — which is exactly what #843 needed and did not have."""
@@ -504,6 +512,8 @@ def test_stats_sessions_are_discriminating_too():
     Mutation guard: back to ``k[:20]`` and this goes RED.
     """
     m = VLMPromptCacheManager(max_sessions=2)
+    if not m.available:
+        pytest.skip("mlx_vlm without PromptCacheState")
     m.get_or_create(_key(session="sessAAAA"))
     m.get_or_create(_key(session="sessBBBB"))
     sessions = m.get_stats()["sessions"]
@@ -553,6 +563,8 @@ class TestVLMMaxSessionsIsConfigurable:
         this goes RED.
         """
         m = get_vlm_cache_manager(3)
+        if not m.available:
+            pytest.skip("mlx_vlm without PromptCacheState")
         for i in range(3):
             m.get_or_create(_key(session=f"sess{i:04d}"))
         assert m.get_stats()["total"] == 3

@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
-- Dependency update: pypdf 6.14.2 (4 crafted-PDF DoS CVEs: inline-image infinite loops, xref long runtimes, image memory blow-up).
+- Dependency update: pypdf 6.15.0 (PYSEC-2026-3655/3656: ToUnicode token-length DoS and CID font width-range DoS; 6.14.2 still covers the four crafted-PDF DoS CVEs from July).
+- Three new cryptography advisories (PKCS#7 Bleichenbacher oracle, x509 path building, x509 wildcard name constraints) are accepted for the Windows ARM64 pin only: 46.0.3 is still the newest release with a win_arm64 wheel, and the product uses cryptography for at-rest AESGCM/HKDF alone — no PKCS#7, no x509. macOS and Linux already ship 50.0.0.
 
 ## [1.0.7] — 2026-07-04
 

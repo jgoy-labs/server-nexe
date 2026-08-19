@@ -247,8 +247,9 @@ def _log_failure(request: Request, keys_config) -> None:
       reason=failure_reason,
       ip_address=client_ip(request),
     )
-  except Exception:
-    pass
+  except Exception as exc:
+    # Best-effort: IRONCLAD logger must never turn a 401 into a 500 (B110).
+    _log.debug("security logger unavailable for auth failure: %s", exc)
 
 
 async def require_api_key(

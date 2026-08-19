@@ -24,29 +24,12 @@ from core.runtime_state import get_with_env_fallback  # noqa: E402
 # below — they return 503, never 200 without auth.
 try:
     from plugins.security.core.auth_config import get_admin_api_key
-    from plugins.security.core.auth_rate_limit import (
-        auth_failures as _ui_auth_failures,
-        AUTH_FAILURE_LIMIT as _UI_RATE_LIMIT,
-        AUTH_FAILURE_WINDOW as _UI_RATE_WINDOW,
-        check_auth_failure_rate_limit as _check_ui_rate_limit,
-        record_auth_failure_attempt as _record_ui_auth_failure,
-    )
     _SECURITY_AVAILABLE = True
 except ImportError:
     _SECURITY_AVAILABLE = False
 
     def get_admin_api_key() -> Optional[str]:  # type: ignore[misc, no-redef]
         """Stub: degraded mode — protected endpoints return 503 via require_ui_auth."""
-        return None
-
-    _ui_auth_failures: dict = {}
-    _UI_RATE_LIMIT = 20
-    _UI_RATE_WINDOW = 60.0
-
-    def _check_ui_rate_limit(ip: str) -> bool:
-        return False
-
-    def _record_ui_auth_failure(ip: str) -> None:
         return None
 
 from plugins.web_ui_module.messages import get_message, get_i18n

@@ -4,11 +4,12 @@ Tests P1-A — Rate limit for authentication failures in the Web UI per IP.
 Problem: make_require_ui_auth() had no rate limiting.
 25 requests with invalid keys → 25 × 401, no 429. Invisible brute force.
 
-Fix: in-memory dict _ui_auth_failures per IP, 60s window, maximum 20 attempts.
+Fix: in-memory dict per IP, 60s window, maximum 20 attempts.
 Past the limit: 429 Too Many Requests.
 
-Test pattern: helper functions (_check_ui_rate_limit, _record_ui_auth_failure)
-tested directly + make_require_ui_auth() via mock, same as P1-B.
+D-I / #883 moved the window into plugins.security.core.auth_rate_limit so both
+chat paths share it; the helpers are imported from there, and the UI path is
+still exercised end to end through make_require_ui_auth().
 
 www.jgoy.net · https://server-nexe.org
 """
@@ -17,14 +18,14 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 try:
-    from plugins.web_ui_module.api.routes_auth import (
-        _check_ui_rate_limit,
-        _record_ui_auth_failure,
-        _ui_auth_failures,
-        _UI_RATE_LIMIT,
-        _UI_RATE_WINDOW,
-        make_require_ui_auth,
+    from plugins.security.core.auth_rate_limit import (
+        check_auth_failure_rate_limit as _check_ui_rate_limit,
+        record_auth_failure_attempt as _record_ui_auth_failure,
+        auth_failures as _ui_auth_failures,
+        AUTH_FAILURE_LIMIT as _UI_RATE_LIMIT,
+        AUTH_FAILURE_WINDOW as _UI_RATE_WINDOW,
     )
+    from plugins.web_ui_module.api.routes_auth import make_require_ui_auth
     from fastapi import HTTPException
     from plugins.security.core.auth_models import ApiKeyConfig, ApiKeyData
 except ImportError as e:

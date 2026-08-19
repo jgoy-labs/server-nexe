@@ -25,6 +25,8 @@ import pytest
 
 from plugins.mlx_module.core.generate_helpers import lookup_prefix_cache
 
+pytest.importorskip("mlx_lm", reason="mlx-lm is Apple-Silicon only")
+
 
 class _FakeCacheManager:
     """Empty manager: every lookup misses, so a cache is always created."""

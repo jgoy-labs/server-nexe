@@ -17,6 +17,8 @@ import pytest
 
 from plugins.mlx_module.core.chat import MLXChatNode
 
+pytest.importorskip("mlx_lm", reason="mlx-lm is Apple-Silicon only")
+
 
 class _Stop(Exception):
     """Sentinel: stop _generate_blocking_inner right after the cache call."""

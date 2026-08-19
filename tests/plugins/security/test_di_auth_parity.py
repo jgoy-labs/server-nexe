@@ -98,3 +98,16 @@ def test_presented_api_key_bearer_and_precedence():
     assert presented_api_key(None, "Bearer b") == "b"
     assert presented_api_key(None, "Basic abc") is None
     assert presented_api_key(None, None) is None
+
+
+class TestSharedWindowConstants:
+    """The window both paths read must be usable: a limit of 0 would 429 the
+    first request, a window of 0 would never rate-limit at all."""
+
+    def test_limit_and_window_are_positive(self):
+        from plugins.security.core.auth_rate_limit import (
+            AUTH_FAILURE_LIMIT,
+            AUTH_FAILURE_WINDOW,
+        )
+        assert AUTH_FAILURE_LIMIT > 0
+        assert AUTH_FAILURE_WINDOW > 0
