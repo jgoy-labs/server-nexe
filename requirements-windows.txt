@@ -23,7 +23,7 @@ starlette==1.3.1
 # POSIX-only). Plain uvicorn (asyncio + h11) is fully functional on Windows.
 uvicorn==0.34.3
 pydantic==2.10.6
-pydantic-settings==2.14.2
+pydantic-settings==2.15.0
 python-multipart==0.0.32
 starlette-csrf==3.0.0
 httpx==0.28.1
