@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Dependabot no longer auto-updates cryptography, transformers 5.13+, or mlx-vlm 0.5+, and no longer groups FastAPI/Starlette into safe-patches. Those bumps have to be reviewed on their own: cryptography 47+ has no win_arm64 wheel, and transformers 5.13+ breaks mlx-lm 0.31.3 at import.
+
 ### Security
 
 - Dependency update: pypdf 6.15.0 (PYSEC-2026-3655/3656: ToUnicode token-length DoS and CID font width-range DoS; 6.14.2 still covers the four crafted-PDF DoS CVEs from July).
