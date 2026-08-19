@@ -8,11 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Routine dependency patches: click 8.4.2, slowapi 0.1.10, filelock 3.32.3, platformdirs 4.11.3, pypdf 6.16.1. All five are pure-python wheels, so the Windows ARM64 pin set moves with the base one.
 - Dependabot no longer auto-updates cryptography, transformers 5.13+, or mlx-vlm 0.5+, and no longer groups FastAPI/Starlette into safe-patches. Those bumps have to be reviewed on their own: cryptography 47+ has no win_arm64 wheel, and transformers 5.13+ breaks mlx-lm 0.31.3 at import.
 
 ### Security
 
-- Dependency update: pypdf 6.15.0 (PYSEC-2026-3655/3656: ToUnicode token-length DoS and CID font width-range DoS; 6.14.2 still covers the four crafted-PDF DoS CVEs from July).
+- Dependency update: pypdf 6.16.1 (PYSEC-2026-3655/3656 — ToUnicode token-length DoS and CID font width-range DoS — fixed in 6.15.0; 6.14.2 still covers the four crafted-PDF DoS CVEs from July).
 - Three new cryptography advisories (PKCS#7 Bleichenbacher oracle, x509 path building, x509 wildcard name constraints) are accepted for the Windows ARM64 pin only: 46.0.3 is still the newest release with a win_arm64 wheel, and the product uses cryptography for at-rest AESGCM/HKDF alone — no PKCS#7, no x509. macOS and Linux already ship 50.0.0.
 
 ## [1.0.7] — 2026-07-04
