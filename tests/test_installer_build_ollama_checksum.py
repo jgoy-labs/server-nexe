@@ -21,8 +21,6 @@ Description: Smoke tests for the SHA256 pinning of the Ollama bundle download
              These are auditor-grade adversarial checks, not just smoke. The
              cost of catching a regression here is far smaller than the cost
              of shipping a Trojanized Ollama binary inside the DMG.
-
-             B8 r4 / Auditoria r4.
 ────────────────────────────────────
 """
 
