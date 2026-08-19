@@ -37,7 +37,7 @@ click==8.4.2
 # build and forces hf>=1.14). Keep in sync with requirements.txt.
 rich==13.9.4
 typer==0.9.4
-python-dotenv==1.2.2
+python-dotenv==1.2.3
 pyyaml==6.0.3
 numpy==2.4.6
 slowapi==0.1.10
