@@ -32,7 +32,7 @@ httpx==0.28.1
 # `import grpc`). Do NOT list it here or pip would try to resolve grpcio.
 tomli-w==1.2.0  # TOML writes (reads: stdlib tomllib). uiri toml BANNED: truncates multiline strings with \[ silently (#834)
 structlog==25.5.0
-click==8.4.1
+click==8.4.2
 # rich/typer pinned on purpose (typer 0.9.x API used by the code; bumping breaks the
 # build and forces hf>=1.14). Keep in sync with requirements.txt.
 rich==13.9.4
@@ -40,13 +40,13 @@ typer==0.9.4
 python-dotenv==1.2.2
 pyyaml==6.0.3
 numpy==2.4.6
-slowapi==0.1.9
+slowapi==0.1.10
 prometheus-client==0.25.0
 # psutil 5.9.8 has no win_arm64 wheel; 7.2.2 ships one (validated on the ARM64 VM).
 psutil==7.2.2
 huggingface_hub>=1.13.0,<1.14
-filelock==3.29.3
-platformdirs==4.10.0
+filelock==3.32.3
+platformdirs==4.11.3
 
 # --- Windows platform ---
 # pywin32: portalocker's Win32Locker needs it (qdrant local uses portalocker.lock for its
@@ -56,7 +56,7 @@ pywin32==312
 
 # --- Memory & RAG ---
 fastembed==0.8.0
-pypdf==6.15.0
+pypdf==6.16.1
 # lingua 2.2.0 ships the win_arm64 wheel (2.1.1 did not); validated on the VM.
 lingua-language-detector==2.2.0
 
