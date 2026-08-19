@@ -64,3 +64,32 @@ def test_base_cryptography_is_50_windows_stays_46():
         "requirements-windows.txt must stay on 46.0.3 — no win_arm64 wheel "
         "after that (ADR-004). Do not copy the base pin."
     )
+
+
+def test_uvicorn_windows_has_no_standard_extra():
+    """Windows must pin uvicorn without [standard].
+
+    httptools 0.8.0 (pulled by uvicorn[standard]) has no win_arm64 wheel,
+    only sdist. Unifying the two requirements files would break the ARM64
+    sidecar the same way cryptography 48.x did. The version may move with
+    the base (uvicorn is py3-none-any); the extra must not.
+    """
+    base = (REPO / "requirements.txt").read_text(encoding="utf-8")
+    win = (REPO / "requirements-windows.txt").read_text(encoding="utf-8")
+    base_m = re.search(r"^uvicorn\[standard\]==(0\.\d+\.\d+)\b", base, re.M)
+    win_m = re.search(r"^uvicorn==(0\.\d+\.\d+)\b", win, re.M)
+    assert base_m, "requirements.txt must pin uvicorn[standard]==X.Y.Z"
+    assert win_m, (
+        "requirements-windows.txt must pin uvicorn==X.Y.Z without [standard]"
+    )
+    pin_lines = [
+        ln for ln in win.splitlines() if ln.strip() and not ln.lstrip().startswith("#")
+    ]
+    assert not any("uvicorn[standard]" in ln for ln in pin_lines), (
+        "do not put [standard] on the Windows pin — httptools 0.8.0 has "
+        "no win_arm64 wheel"
+    )
+    assert base_m.group(1) == win_m.group(1), (
+        f"uvicorn version must match across pins (base {base_m.group(1)} "
+        f"vs windows {win_m.group(1)}); the package is py3-none-any"
+    )
