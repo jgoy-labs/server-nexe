@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Routine dependency updates: click 8.4.2, slowapi 0.1.10, filelock 3.32.3, platformdirs 4.11.3, pypdf 6.16.1, pydantic-settings 2.15.0, and pytest 9.1.1 (test tooling). All ship pure-python wheels, so the Windows ARM64 pin set moves with the base one.
+- Routine dependency updates: click 8.4.2, slowapi 0.1.10, filelock 3.32.3, platformdirs 4.11.3, pypdf 6.16.1, pydantic-settings 2.15.0, python-dotenv 1.2.3, structlog 26.1.0, and pytest 9.1.1 (test tooling). structlog uses CalVer, so 25.5.0 → 26.1.0 is one release, not a breaking major. All ship pure-python wheels, so the Windows ARM64 pin set moves with the base one.
 - Dependabot no longer auto-updates cryptography, transformers 5.13+, or mlx-vlm 0.5+, and no longer groups FastAPI/Starlette into safe-patches. Those bumps have to be reviewed on their own: cryptography 47+ has no win_arm64 wheel, and transformers 5.13+ breaks mlx-lm 0.31.3 at import.
 
 ### Security

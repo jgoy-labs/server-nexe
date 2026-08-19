@@ -15,13 +15,13 @@ starlette-csrf==3.0.0
 httpx==0.28.1
 qdrant-client==1.18.0
 tomli-w==1.2.0  # TOML writes (reads: stdlib tomllib). uiri toml BANNED: truncates multiline strings with \[ silently (#834)
-structlog==25.5.0
+structlog==26.1.0
 click==8.4.2
 # rich/typer pinats VOLGUTS: typer 0.9.0 (API antiga usada pel codi; pujar-lo trenca el build,
 # veure L30-34) imposa rich<14. NO pujar rich a 14/15 ni typer a >=0.10 (Dependabot els ignora).
 rich==13.9.4
 typer==0.9.4
-python-dotenv==1.2.2  # GHSA-mf9w-mj56-hr94 symlink attack fixed in 1.2.2
+python-dotenv==1.2.3  # GHSA-mf9w-mj56-hr94 symlink attack fixed in 1.2.2
 pyyaml==6.0.3
 # numpy: transitiva MLX/opencv; >=2 requerit per mlx-vlm>=0.4.4 via opencv-python>=4.12 [refresh 2026-05-16]
 numpy==2.4.6
