@@ -37,13 +37,20 @@ jobs:
       - name: ruff (gate)
         run: ruff check .
 
+      # #914: a job stops at its first red step, so a run only ever showed the
+      # first broken gate (bandit hid vulture; pip-audit hid OSV and gitleaks).
+      # `!cancelled()` lets every gate report in the SAME run; a red one still
+      # fails the job, we just stop losing the rest of the map to it.
       - name: bandit (gate)
+        if: ${{ !cancelled() }}
         run: bandit -c pyproject.toml -r core memory personality plugins installer scripts -q
 
       - name: vulture (gate)
+        if: ${{ !cancelled() }}
         run: vulture core memory personality plugins installer scripts --min-confidence 80 --exclude "tests/,**/tests/,.venv/,InstallNexe.app/,__pycache__/"
 
       - name: mypy (advisory — never blocks)
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: mypy . || true
 
@@ -52,6 +59,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # gitleaks scans the range <sha>^..<sha>. On pull_request the default
+          # shallow clone (depth 1) has no parent commit, so the scan died with
+          # "fatal: ambiguous argument '<sha>^..<sha>': unknown revision" and
+          # took Security Audit red on EVERY Dependabot PR — a failure that had
+          # nothing to do with secrets. Full history is what the range needs.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -78,6 +92,7 @@ jobs:
       # installed dynamically and never appear in requirements*.txt, so pip-audit
       # above cannot see them. This gate queries OSV for those pinned versions.
       - name: Run OSV CVE gate for bundled deps (B070)
+        if: ${{ !cancelled() }}  # #914 — do not let a red pip-audit hide this gate
         run: |
           set +e
           python installer/check_cves_osv.py
@@ -92,6 +107,7 @@ jobs:
           fi
 
       - name: Run gitleaks (secret scan)
+        if: ${{ !cancelled() }}  # #914 — do not let a red CVE gate hide the secret scan
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
