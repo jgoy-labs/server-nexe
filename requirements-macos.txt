@@ -15,7 +15,7 @@ mlx-vlm==0.4.4
 # AttributeError. 5.12.1 és l'últim tag ABANS d'aquest canvi (cos antic de _LazyAutoMapping.
 # register, sense la línia __module__). NO al requirements.txt base: transformers només
 # entra a la ruta MLX/VLM (Apple-only); fastembed NO el declara. Ref: finding 820 (nexe-8gb).
-transformers==5.12.1
+transformers==5.15.0
 
 # Tray app (macOS menu bar)
 rumps==0.4.0  # macOS menu bar tray app (requires PyObjC)
