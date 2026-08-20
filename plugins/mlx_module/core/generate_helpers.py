@@ -8,6 +8,12 @@ import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from .qwen35_directive import (
+    QWEN35_THINKING_DIRECTIVE,
+    _inject_thinking_directive_into_messages,
+    _qwen35_needs_thinking_directive,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -132,7 +138,7 @@ def prepare_tokens(
         thinking_enabled: If False, suppress thinking tokens (Qwen3 enable_thinking=False)
         model_type: ``config.json.model_type`` of the loaded model. Used to
             decide whether to inject the Qwen3.5 thinking-force directive
-            (see ``chat._qwen35_needs_thinking_directive``).
+            (see ``qwen35_directive._qwen35_needs_thinking_directive``).
 
     Returns:
         Tuple: (full_tokens, cache_lookup_tokens, all_messages, all_cache_messages)
@@ -146,12 +152,6 @@ def prepare_tokens(
     all_cache_messages = [{"role": "system", "content": system}] + sanitized_cache_messages
 
     # Qwen3.5-only: when Raonament=ON, reinforce thinking in the system prompt.
-    # Imported lazily to avoid a circular import (chat → generate_helpers).
-    from .chat import (
-        _qwen35_needs_thinking_directive,
-        _inject_thinking_directive_into_messages,
-        QWEN35_THINKING_DIRECTIVE,
-    )
     if _qwen35_needs_thinking_directive(model_type, thinking_enabled):
         all_messages = _inject_thinking_directive_into_messages(
             all_messages, QWEN35_THINKING_DIRECTIVE

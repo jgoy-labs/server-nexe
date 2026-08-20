@@ -6,10 +6,10 @@ Scope (per Jordi's explicit instruction):
 - Qwen3.5 family only (``model_type`` startswith ``qwen3_5``).
 - gpt-oss / gemma-4 / other Qwen versions MUST NOT be touched.
 
-Background: see ``plugins/mlx_module/core/chat.py::_qwen35_needs_thinking_directive``
+Background: see ``plugins/mlx_module/core/qwen35_directive.py``
 for the empirical root cause.
 """
-from plugins.mlx_module.core.chat import (
+from plugins.mlx_module.core.qwen35_directive import (
     QWEN35_THINKING_DIRECTIVE,
     _inject_thinking_directive_into_messages,
     _qwen35_needs_thinking_directive,
@@ -138,3 +138,52 @@ class TestDirectiveText:
         # a long system prompt — empirically required for Qwen3.5 to obey.
         assert "[CRITICAL INSTRUCTION]" in QWEN35_THINKING_DIRECTIVE
         assert "[/CRITICAL INSTRUCTION]" in QWEN35_THINKING_DIRECTIVE
+
+
+class TestModuleStaysALeaf:
+    """The reason this module exists: it must not import its consumers.
+
+    ``qwen35_directive`` was split out of ``chat.py`` on 2026-08-20 to break
+    the ``chat -> generate_helpers -> chat`` import cycle. Both consumers
+    import it; if it ever imports either of them back, the cycle returns and
+    ``generate_helpers`` needs its function-body import again.
+    """
+
+    def test_module_imports_neither_consumer(self) -> None:
+        import ast
+        from pathlib import Path
+
+        from plugins.mlx_module.core import qwen35_directive
+
+        # Located through the imported module, not a path relative to the
+        # working directory, so the test survives being run from anywhere.
+        source = Path(qwen35_directive.__file__).read_text(encoding="utf-8")
+        # Every import in the module, at any depth — a deferred import inside
+        # a function body closes the cycle just as well as a top-level one.
+        imported: list[str] = []
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.ImportFrom):
+                imported.append(node.module or "")
+            elif isinstance(node, ast.Import):
+                imported.extend(alias.name for alias in node.names)
+
+        assert imported, "expected at least the typing import"
+        for module in imported:
+            leaf = module.rsplit(".", 1)[-1]
+            assert leaf not in {"chat", "generate_helpers"}, (
+                f"qwen35_directive imports {module!r} — this restores the "
+                "import cycle it was created to remove"
+            )
+
+    def test_consumers_re_export_the_symbols(self) -> None:
+        # chat.py keeps them importable under its own namespace: anything
+        # that used to do `from ...core.chat import QWEN35_THINKING_DIRECTIVE`
+        # still works after the move.
+        from plugins.mlx_module.core import chat
+
+        assert chat.QWEN35_THINKING_DIRECTIVE is QWEN35_THINKING_DIRECTIVE
+        assert chat._qwen35_needs_thinking_directive is _qwen35_needs_thinking_directive
+        assert (
+            chat._inject_thinking_directive_into_messages
+            is _inject_thinking_directive_into_messages
+        )

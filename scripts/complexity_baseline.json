@@ -1,0 +1,15 @@
+{
+ "core/cli/cli.py::install_model": 15,
+ "core/endpoints/chat_engines/routing.py::_resolve_engine": 15,
+ "core/endpoints/installer.py::_stream_gguf": 19,
+ "core/lifespan.py::_startup_init": 15,
+ "installer/installer_ollama_install.py::_install_ollama_windows": 15,
+ "memory/memory/api/text_store.py::TextStore._migrate_to_encrypted": 20,
+ "memory/memory/engines/persistence_sqlite.py::SqliteStorageMixin._migrate_to_encrypted": 19,
+ "plugins/mlx_module/core/chat.py::MLXChatNode._get_model": 22,
+ "plugins/mlx_module/core/config.py::model_kv_bytes_per_token": 17,
+ "plugins/web_ui_module/api/routes_chat.py::_atomize_fact_llm": 17,
+ "plugins/web_ui_module/api/routes_chat.py::_generate_streaming_response": 66,
+ "plugins/web_ui_module/api/routes_chat.py::register_chat_routes._chat_inner": 28,
+ "plugins/web_ui_module/api/routes_chat.py::register_chat_routes._handle_chat_engine": 38
+}

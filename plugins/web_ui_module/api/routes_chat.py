@@ -2495,6 +2495,200 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
                 logger.warning("MC-116: could not persist partial assistant on stream interruption", exc_info=True)
 
 
+@dataclass
+class TurnContext:
+    """What a turn takes from the session before the prompt exists.
+
+    Split out of `_handle_chat_engine` on 2026-08-20 (see MC-026/MC-027): the
+    handler had grown to CCN 58 with ~130 lines of pure data assembly sitting
+    in the middle of the engine loop. The bodies below are unchanged — only
+    their indentation and the way the values travel.
+    """
+
+    context_messages: list
+    document_context: str
+    rag_context: str
+    rag_count: int
+    rag_items: list
+
+
+async def _build_turn_context(
+    body: dict, session, session_mgr, memory_helper, engine, message: str, _continue: bool
+) -> TurnContext:
+    """Compaction + conversation history + attached document + RAG.
+
+    `_continue` keeps the name it has in the caller on purpose: this code moved
+    here verbatim, and every FD-S6 branch below reads the way it always did.
+    """
+    # --- Context Compacting ---
+    # If the session has too many messages, compact with LLM summary.
+    # FD-S6: skipped on continue — compaction rewrites the
+    # history (an extra LLM generation between cut and resume)
+    # and would invalidate the prefix the resume relies on.
+    if not _continue:
+        await _compact_session(session, engine, session_mgr)
+
+    # --- Build Context ---
+    # 1. Get recent conversation history with summary context
+    context_messages_full = session.get_context_messages()
+    # Exclude the very last message (just added) to avoid duplication.
+    # FD-S6: on continue there is NO just-added user message —
+    # the last message is the truncated assistant turn we are
+    # about to resume, and it must stay.
+    if _continue:
+        context_messages = list(context_messages_full)
+    else:
+        context_messages = context_messages_full[:-1] if context_messages_full else []
+
+    # 2. Check for attached document (takes priority over RAG)
+    # FD-S6: none of this on continue — a doc/RAG turn injected
+    # between the cut and the resume would both derail the
+    # answer and shatter the prefix the resume reuses.
+    if _continue:
+        attached_doc = None
+        document_context = ""
+        rag_context, rag_count, _rag_items = "", 0, []
+    else:
+        attached_doc = session.get_and_clear_attached_document()
+        session_mgr._save_session_to_disk(session)
+
+        document_context = ""
+        if attached_doc:
+            document_context, _shown, _total_chunks = _build_document_context(attached_doc)
+
+        # 3. Get Memory Context (RAG) - ALWAYS search, not just with patterns
+        rag_context, rag_count, _rag_items = await _build_rag_context(
+            memory_helper, message, body, attached_doc,
+        )
+
+    return TurnContext(
+        context_messages=context_messages,
+        document_context=document_context,
+        rag_context=rag_context,
+        rag_count=rag_count,
+        rag_items=_rag_items,
+    )
+
+
+def _build_turn_system_prompt(
+    body: dict, session, message: str, _continue: bool
+) -> tuple[str, str]:
+    """Sticky reply language (#850) + system prompt + collection toggles (#851).
+
+    Returns (system_prompt, lang).
+    """
+    # 4. Construct Final System Prompt (reply language: sticky per
+    # session, #850 — an off-language short ack must not flip the
+    # CRITICAL directive and invalidate the whole prefix cache)
+    # Review transversal: en mode continue NO s'avança la màquina
+    # d'estats (el continue re-alimenta _last_user: re-detectar-lo
+    # confirmaria la histèresi i fliparia a MIG continue, fora del
+    # prefix que ha de reutilitzar) — resolució només-lectura,
+    # mirall del tractament de rag_collections de sota.
+    if _continue:
+        _lang_sticky = getattr(session, "lang", None) or _fallback_lang()
+    else:
+        _lang_sticky = _resolve_session_lang(session, message)
+    system_prompt, _lang = _build_system_prompt_with_time(message, lang_hint=_lang_sticky)
+    # Collection toggles + unconditional RAG security rule (#851).
+    # Review #851: el body de continue NO porta rag_collections —
+    # reutilitzem els toggles de l'últim torn (persistits a la
+    # sessió) perquè el continue quedi DINS el prefix que acaba
+    # de construir (i conservi les notes de col·leccions OFF).
+    if _continue:
+        _rag_cols = getattr(session, "rag_collections", None)
+    else:
+        _rag_cols = body.get("rag_collections")
+        session.rag_collections = _rag_cols
+    system_prompt = _finalize_system_prompt(system_prompt, _lang, _rag_cols)
+
+    return system_prompt, _lang
+
+
+def _assemble_engine_messages(
+    turn: TurnContext, system_prompt: str, _lang: str, message: str, session, _continue: bool
+) -> tuple[list, int]:
+    """Engine payload: history, context budget, injection, on-demand clock.
+
+    Returns (messages, doc_truncated_pct).
+    """
+    context_messages = turn.context_messages
+    document_context = turn.document_context
+    rag_context = turn.rag_context
+    # 4. Prepare messages payload for engine
+    engine_messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in context_messages
+    ]
+
+    # ── Bug 32: Dynamic context budget ─────────────────────────────────
+    # Reserve a minimum slice of the model context for conversation history
+    # so that a huge attached document never wipes out previous turns.
+    # Configurable via NEXE_HISTORY_CONTEXT_RATIO (default 0.30 = 30%).
+    MAX_CONTEXT_CHARS = int(_os.environ.get("NEXE_MAX_CONTEXT_CHARS", "24000"))
+    try:
+        _history_ratio = float(_os.environ.get("NEXE_HISTORY_CONTEXT_RATIO", "0.30"))
+    except ValueError:
+        _history_ratio = 0.30
+
+    system_chars = len(system_prompt)
+    history_chars = sum(len(m.get("content", "")) for m in context_messages)
+    message_chars = len(message)
+
+    _budget = compute_context_budget(
+        max_context_chars=MAX_CONTEXT_CHARS,
+        system_chars=system_chars,
+        history_chars=history_chars,
+        message_chars=message_chars,
+        document_chars=len(document_context) if document_context else 0,
+        history_ratio=_history_ratio,
+        response_buffer=500,
+    )
+    available_chars = _budget["available_chars"]
+
+    # Inject context into messages (not system prompt -> MLX can cache the prefix)
+    if _continue:
+        # FD-S6: no new user turn — the prompt must END at the
+        # truncated assistant message. Swap its content for the
+        # RAW generation (gen_raw) when present: with thinking
+        # ON the persisted content is CLEAN (think stripped)
+        # and its re-render diverges token-wise from the KV
+        # that was just built — gen_raw makes the continue
+        # prompt an exact token prefix of the cache entry
+        # (prefill ~0 instead of the full 50s re-prefill).
+        _doc_truncated_pct, _ctx_injected = 0, False
+        _raw = (
+            session.messages[-1].get("gen_raw")
+            if session.messages else None
+        )
+        if _raw and engine_messages and engine_messages[-1]["role"] == "assistant":
+            engine_messages[-1]["content"] = _raw
+    else:
+        engine_messages, _doc_truncated_pct, _ctx_injected = _inject_context_into_messages(
+            engine_messages, message, document_context, rag_context,
+            _budget, available_chars, history_chars,
+        )
+    # B030/#851: the data-not-instructions rule is armed
+    # UNCONDITIONALLY by _finalize_system_prompt, which runs in
+    # _build_turn_system_prompt before this — a conditional suffix
+    # here split the prefix-cache namespace between RAG and
+    # non-RAG turns of the same session.
+
+    # B007/D-A: clock on demand — if the user asks the time,
+    # prefix THIS turn's user message with the system clock.
+    # Never the system prompt (it would poison the prefix cache
+    # for the whole conversation); the session keeps the raw
+    # message, so only this turn diverges in the cache.
+    _time_line = _time_context_line(message, _lang)
+    if _time_line and engine_messages and engine_messages[-1]["role"] == "user":
+        engine_messages[-1]["content"] = (
+            f"{_time_line}\n\n{engine_messages[-1]['content']}"
+        )
+
+    messages = engine_messages
+    return messages, _doc_truncated_pct
+
+
 def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     """Registers endpoint: POST /chat"""
 
@@ -2642,142 +2836,20 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
                     logger.info(f"Calling {engine_name}.chat with model={model_name} thinking={thinking_enabled}")
 
-                    # --- Context Compacting ---
-                    # If the session has too many messages, compact with LLM summary.
-                    # FD-S6: skipped on continue — compaction rewrites the
-                    # history (an extra LLM generation between cut and resume)
-                    # and would invalidate the prefix the resume relies on.
-                    if not _continue:
-                        await _compact_session(session, engine, session_mgr)
-
-                    # --- Build Context ---
-                    # 1. Get recent conversation history with summary context
-                    context_messages_full = session.get_context_messages()
-                    # Exclude the very last message (just added) to avoid duplication.
-                    # FD-S6: on continue there is NO just-added user message —
-                    # the last message is the truncated assistant turn we are
-                    # about to resume, and it must stay.
-                    if _continue:
-                        context_messages = list(context_messages_full)
-                    else:
-                        context_messages = context_messages_full[:-1] if context_messages_full else []
-
-                    # 2. Check for attached document (takes priority over RAG)
-                    # FD-S6: none of this on continue — a doc/RAG turn injected
-                    # between the cut and the resume would both derail the
-                    # answer and shatter the prefix the resume reuses.
-                    if _continue:
-                        attached_doc = None
-                        document_context = ""
-                        rag_context, rag_count, _rag_items = "", 0, []
-                    else:
-                        attached_doc = session.get_and_clear_attached_document()
-                        session_mgr._save_session_to_disk(session)
-
-                        document_context = ""
-                        if attached_doc:
-                            document_context, _shown, _total_chunks = _build_document_context(attached_doc)
-
-                        # 3. Get Memory Context (RAG) - ALWAYS search, not just with patterns
-                        rag_context, rag_count, _rag_items = await _build_rag_context(
-                            memory_helper, message, body, attached_doc,
-                        )
-
-                    # 4. Construct Final System Prompt (reply language: sticky per
-                    # session, #850 — an off-language short ack must not flip the
-                    # CRITICAL directive and invalidate the whole prefix cache)
-                    # Review transversal: en mode continue NO s'avança la màquina
-                    # d'estats (el continue re-alimenta _last_user: re-detectar-lo
-                    # confirmaria la histèresi i fliparia a MIG continue, fora del
-                    # prefix que ha de reutilitzar) — resolució només-lectura,
-                    # mirall del tractament de rag_collections de sota.
-                    if _continue:
-                        _lang_sticky = getattr(session, "lang", None) or _fallback_lang()
-                    else:
-                        _lang_sticky = _resolve_session_lang(session, message)
-                    system_prompt, _lang = _build_system_prompt_with_time(message, lang_hint=_lang_sticky)
-                    # Collection toggles + unconditional RAG security rule (#851).
-                    # Review #851: el body de continue NO porta rag_collections —
-                    # reutilitzem els toggles de l'últim torn (persistits a la
-                    # sessió) perquè el continue quedi DINS el prefix que acaba
-                    # de construir (i conservi les notes de col·leccions OFF).
-                    if _continue:
-                        _rag_cols = getattr(session, "rag_collections", None)
-                    else:
-                        _rag_cols = body.get("rag_collections")
-                        session.rag_collections = _rag_cols
-                    system_prompt = _finalize_system_prompt(system_prompt, _lang, _rag_cols)
-
-                    # 4. Prepare messages payload for engine
-                    engine_messages = [
-                        {"role": m["role"], "content": m["content"]}
-                        for m in context_messages
-                    ]
-
-                    # ── Bug 32: Dynamic context budget ─────────────────────────────────
-                    # Reserve a minimum slice of the model context for conversation history
-                    # so that a huge attached document never wipes out previous turns.
-                    # Configurable via NEXE_HISTORY_CONTEXT_RATIO (default 0.30 = 30%).
-                    MAX_CONTEXT_CHARS = int(_os.environ.get("NEXE_MAX_CONTEXT_CHARS", "24000"))
-                    try:
-                        _history_ratio = float(_os.environ.get("NEXE_HISTORY_CONTEXT_RATIO", "0.30"))
-                    except ValueError:
-                        _history_ratio = 0.30
-
-                    system_chars = len(system_prompt)
-                    history_chars = sum(len(m.get("content", "")) for m in context_messages)
-                    message_chars = len(message)
-
-                    _budget = compute_context_budget(
-                        max_context_chars=MAX_CONTEXT_CHARS,
-                        system_chars=system_chars,
-                        history_chars=history_chars,
-                        message_chars=message_chars,
-                        document_chars=len(document_context) if document_context else 0,
-                        history_ratio=_history_ratio,
-                        response_buffer=500,
+                    # --- Context Compacting + Build Context ---
+                    # Three helpers (MC-026/MC-027). Still inside the engine
+                    # loop, exactly as before — what moved out of this function
+                    # is ~130 lines of pure data preparation with no response
+                    # I/O in them, which is what took it to CCN 58.
+                    _turn = await _build_turn_context(
+                        body, session, session_mgr, memory_helper, engine, message, _continue,
                     )
-                    available_chars = _budget["available_chars"]
-
-                    # Inject context into messages (not system prompt -> MLX can cache the prefix)
-                    if _continue:
-                        # FD-S6: no new user turn — the prompt must END at the
-                        # truncated assistant message. Swap its content for the
-                        # RAW generation (gen_raw) when present: with thinking
-                        # ON the persisted content is CLEAN (think stripped)
-                        # and its re-render diverges token-wise from the KV
-                        # that was just built — gen_raw makes the continue
-                        # prompt an exact token prefix of the cache entry
-                        # (prefill ~0 instead of the full 50s re-prefill).
-                        _doc_truncated_pct, _ctx_injected = 0, False
-                        _raw = (
-                            session.messages[-1].get("gen_raw")
-                            if session.messages else None
-                        )
-                        if _raw and engine_messages and engine_messages[-1]["role"] == "assistant":
-                            engine_messages[-1]["content"] = _raw
-                    else:
-                        engine_messages, _doc_truncated_pct, _ctx_injected = _inject_context_into_messages(
-                            engine_messages, message, document_context, rag_context,
-                            _budget, available_chars, history_chars,
-                        )
-                    # B030/#851: the data-not-instructions rule is armed
-                    # UNCONDITIONALLY in _finalize_system_prompt above — a
-                    # conditional suffix here split the prefix-cache namespace
-                    # between RAG and non-RAG turns of the same session.
-
-                    # B007/D-A: clock on demand — if the user asks the time,
-                    # prefix THIS turn's user message with the system clock.
-                    # Never the system prompt (it would poison the prefix cache
-                    # for the whole conversation); the session keeps the raw
-                    # message, so only this turn diverges in the cache.
-                    _time_line = _time_context_line(message, _lang)
-                    if _time_line and engine_messages and engine_messages[-1]["role"] == "user":
-                        engine_messages[-1]["content"] = (
-                            f"{_time_line}\n\n{engine_messages[-1]['content']}"
-                        )
-
-                    messages = engine_messages
+                    system_prompt, _lang = _build_turn_system_prompt(
+                        body, session, message, _continue,
+                    )
+                    messages, _doc_truncated_pct = _assemble_engine_messages(
+                        _turn, system_prompt, _lang, message, session, _continue,
+                    )
                     response_chunks: list[str] = []
 
                     # When an image is attached, wrap with context block (same pattern as documents)
@@ -2906,8 +2978,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     if stream:
                         _stream_ctx = StreamingChatContext(
                             model_name=model_name,
-                            rag_count=rag_count,
-                            rag_items=_rag_items,
+                            rag_count=_turn.rag_count,
+                            rag_items=_turn.rag_items,
                             compacted=_compacted,
                             doc_truncated_pct=_doc_truncated_pct,
                             session=session,
