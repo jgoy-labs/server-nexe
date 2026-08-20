@@ -43,6 +43,16 @@ class SecurityEventLogger(SecurityLoggerHelpers):
     if log_dir is None:
       log_dir = Path("storage/system-logs/security")
 
+    # Deferred import on purpose: the layering gate (scripts/check_layering.py)
+    # freezes import-time plugins->core edges, and function-local imports are the
+    # sanctioned escape hatch. Same pattern as
+    # plugins/web_ui_module/api/routes_static.py.
+    from core.version import __version__ as nexe_version
+
+    # SIEM events must carry the PRODUCT version (what /health serves), not the
+    # plugin manifest version this field was copied from back in 0.9.1.
+    self.version = nexe_version
+
     self.log_dir = log_dir
     self.log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -97,7 +107,7 @@ class SecurityEventLogger(SecurityLoggerHelpers):
       "timestamp": datetime.now(timezone.utc).isoformat(),
       "hostname": "server-nexe",
       "appname": "Nexe",
-      "version": "0.9.1",
+      "version": self.version,
 
       "event_type": event_type.value,
       "severity": severity.value,

@@ -195,3 +195,39 @@ class TestLoggerHelpers:
 
     assert event["event_type"] == "validation.command_injection"
     assert event["severity"] == "critical"
+
+class TestEventVersion:
+  """The SIEM `version` field must track the product version (finding #916)."""
+
+  def test_version_is_the_product_version(self, logger, temp_log_dir):
+    """Every event carries what core.version reports, not a frozen literal."""
+    from core.version import __version__ as product_version
+
+    logger.log_event(
+      event_type=SecurityEventType.AUTH_FAILURE,
+      severity=SecuritySeverity.WARNING,
+      message="version check",
+    )
+
+    log_file = list(temp_log_dir.glob("security_*.log"))[0]
+    event = json.loads(log_file.read_text().strip())
+
+    assert event["version"] == product_version
+
+  def test_version_is_read_from_core_not_hardcoded(self, temp_log_dir, monkeypatch):
+    """Moving core.version moves the field: proves it is not a literal."""
+    import core.version
+
+    monkeypatch.setattr(core.version, "__version__", "9.9.9-probe")
+
+    probe_logger = SecurityEventLogger(log_dir=temp_log_dir)
+    probe_logger.log_event(
+      event_type=SecurityEventType.AUTH_FAILURE,
+      severity=SecuritySeverity.WARNING,
+      message="version probe",
+    )
+
+    log_file = list(temp_log_dir.glob("security_*.log"))[0]
+    event = json.loads(log_file.read_text().strip())
+
+    assert event["version"] == "9.9.9-probe"

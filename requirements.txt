@@ -37,6 +37,7 @@ psutil==5.9.8
 # hf>=1.14; treure sostre+ignore quan es migri typer. [refresh 2026-06-11]
 huggingface_hub>=1.13.0,<1.14
 filelock==3.32.3  # GHSA-qmgc-5h2g-mvrw GHSA-w853-jp5j-5j7f TOCTOU fixed in 3.20.3 (dep transitiva explicitada)
+idna==3.18  # PYSEC-2026-215 / GHSA-65pc-fj4g-8rjx (crafted-domain DoS) fixed in 3.15; transitive of anyio/httpx/requests/yarl, explicitly pinned for reproducibility (py3-none-any wheel -> identical pin on Windows ARM64)
 platformdirs==4.11.3  # cross-platform user data dirs (Linux/macOS); used by core.onboarding_state and installer.install_headless
 
 # --- Memory & RAG ---

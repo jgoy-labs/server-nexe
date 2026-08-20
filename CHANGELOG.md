@@ -14,11 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - The installer's post-install guide advertised `nexe knowledge list`, a command that has never existed. It now points to `nexe knowledge status`, which is the one that reports what the collection holds.
+- Security log events reported `"version": "0.9.1"` on every entry — the security plugin's manifest version, frozen into the SIEM payload — while the same process served 1.0.7 on `/health`. Events now carry the product version, so a SIEM can correlate them with the release that emitted them.
 
 ### Security
 
 - Dependency update: pypdf 6.16.1 (PYSEC-2026-3655/3656 — ToUnicode token-length DoS and CID font width-range DoS — fixed in 6.15.0; 6.14.2 still covers the four crafted-PDF DoS CVEs from July).
 - Three new cryptography advisories (PKCS#7 Bleichenbacher oracle, x509 path building, x509 wildcard name constraints) are accepted for the Windows ARM64 pin only: 46.0.3 is still the newest release with a win_arm64 wheel, and the product uses cryptography for at-rest AESGCM/HKDF alone — no PKCS#7, no x509. macOS and Linux already ship 50.0.0.
+- `idna` is now pinned (3.18) instead of floating as an unpinned transitive of anyio/httpx/requests/yarl. No exposure was open — every environment already resolved 3.15 or later, and PYSEC-2026-215 / GHSA-65pc-fj4g-8rjx is fixed in 3.15 — but the resolved version differed between the dev environment (3.15) and the shipped sidecar (3.18). The wheel is `py3-none-any`, so Windows ARM64 takes the same pin.
 
 ## [1.0.7] — 2026-07-04
 
