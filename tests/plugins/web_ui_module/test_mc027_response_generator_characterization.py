@@ -13,6 +13,7 @@ Invariant coverage (see ref/informes/refactor-god-objects-analisi + the 2-lineag
   - INV-CRIT-04                NUL wire protocol: MODEL_READY once, strict order, no [DONE]
   - INV-HIGH-07                <think> wrapping + full_response carries raw, wire carries visible
   - INV-CRIT-03 (MC-116)       client interrupt persists a partial assistant turn
+  - INV-CRIT-03 (#859)         a disconnect AT the [WILL_COMPACT] yield persists once
   - INV-MED-13 (B125)          think-only turn persists the placeholder, behaviourally
   - INV-EXTRA-A                mid-stream error: partial persisted, [Error:] shown not saved
   - INV-EXTRA-D                the SECOND streaming generator (_chat_inner generate(), memory intent)
@@ -335,6 +336,50 @@ class TestInterruptPartialPersist:
         assert len(msgs) == 1, "interruption must persist exactly one partial assistant turn"
         assert msgs[0]["content"].startswith("Hola")
         assert msgs[0].get("stats", {}).get("interrupted") is True
+
+    async def test_disconnect_at_will_compact_does_not_persist_twice(self):
+        """Tearing the stream down AT the [WILL_COMPACT] yield must not persist twice.
+
+        The last thing a completed turn can emit is the #859 compaction warning, and
+        it goes out AFTER the answer has already been saved. If `_assistant_saved`
+        were set below that yield instead of above it, a client that stops right
+        there would leave the flag False and the MC-116 `finally` would save the very
+        same answer again — two assistant messages for one turn (INV-CRIT-03).
+
+        This is the gap the 2026-08-20 split found: the mid-stream interrupt test
+        above never reaches the persist point, so nothing was watching the ordering
+        of that assignment.
+
+        Mutation: move `_assistant_saved = True` below the [WILL_COMPACT] yield in
+        `_generate_streaming_response` -> RED (2 assistant messages).
+        """
+        engine = _ChunkStreamEngine(["Hola ", "amic"])
+        h = _Harness(intent="chat")
+        h.session.needs_compaction = lambda: True  # force the #859 warning
+        state = _make_server_state(engine=engine)
+
+        result = await h.call({"message": "Hola", "stream": True}, server_state=state)
+        assert isinstance(result, StreamingResponse)
+
+        it = result.body_iterator
+        acc = ""
+        for _ in range(50):
+            try:
+                chunk = await asyncio.wait_for(it.__anext__(), timeout=1.0)
+            except (asyncio.TimeoutError, StopAsyncIteration):
+                break
+            acc += chunk if isinstance(chunk, str) else chunk.decode()
+            if "[WILL_COMPACT:1]" in acc:
+                break
+        assert "[WILL_COMPACT:1]" in acc, "the turn must warn about the next compaction"
+        await it.aclose()  # GeneratorExit exactly at that yield
+
+        msgs = _assistant_messages(h.session)
+        assert len(msgs) == 1, (
+            "the answer was persisted before the warning; the finally must not "
+            "save it a second time"
+        )
+        assert msgs[0].get("stats", {}).get("interrupted") is not True
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -892,7 +892,8 @@ async def _yield_reprompt(
 
     Yields filtered chunks (no think, no MEM_SAVE).
     If the response is OK, rp_out[0] = accumulated clean_response.
-    The fallback (yield 'Memory saved: ...') remains with the caller.
+    The fallback (yield 'Memory saved: ...') lives one level up, in
+    `_yield_reprompt_when_only_mem_saves`.
     """
     _fallback_facts = [f.strip() for f in mem_saves if f and f.strip()]
     if not _fallback_facts:
@@ -2191,6 +2192,23 @@ class StreamingChatContext:
     continue_mode: bool = False
 
 
+@dataclass
+class _StreamFlags:
+    """Per-request flags the engine loop hands back to the streaming body.
+
+    `_yield_engine_chunks` cannot return values while it is yielding, so the
+    three flags it discovers travel on this object instead. `full_response`
+    deliberately does NOT live here: it stays a bare local of
+    `_generate_streaming_response`, accumulated at the yield site, so a client
+    disconnect finds the partial text exactly where MC-116 expects it.
+    """
+    # FD-S5: truncation marker state. Set by the in-band sentinel (MLX
+    # via queue_generator) or by an Ollama done_reason=='length' chunk.
+    trunc: bool = False
+    trunc_continuable: bool = False
+    has_any_thinking: bool = False
+
+
 def _oom_notice(err_msg: str, lang: str) -> str:
     """Curated out-of-memory notice for the chat body, by originating engine.
 
@@ -2218,6 +2236,289 @@ def _oom_notice(err_msg: str, lang: str) -> str:
     return table.get(lang, table["en"])
 
 
+def _apply_trunc_sentinels(chunk: Any, flags: _StreamFlags) -> bool:
+    """Read the FD-S5 truncation sentinels off a chunk. True = skip the chunk.
+
+    Two shapes, and only the first one is skippable:
+      - the in-band `__nexe_trunc__` sentinel (MLX, via queue_generator), which
+        carries no text and must never be mixed with a content yield;
+      - an Ollama passthrough `done` chunk with done_reason == 'length', which
+        may still carry content for `_parse_chunk` — so it is NOT skipped.
+    """
+    if isinstance(chunk, dict) and chunk.get("__nexe_trunc__"):
+        flags.trunc = True
+        flags.trunc_continuable = bool(chunk.get("continuable"))
+        return True
+    if (
+        isinstance(chunk, dict)
+        and chunk.get("done")
+        and chunk.get("done_reason") == "length"
+    ):
+        flags.trunc = True
+    return False
+
+
+def _stream_error_notice(exc: Exception, lang: "str | None") -> str:
+    """Chat-body text for an exception raised mid-generation (MC-133).
+
+    Logs the full detail (with traceback) locally and returns ONLY the curated,
+    localized notice: the raw exception text can carry internal paths or state
+    and must never reach the wire. OOM keeps its own message (`_oom_notice`).
+    """
+    err_msg = repr(exc) if not str(exc) else str(exc)
+    # MC-133: the full detail (with traceback) belongs in the local log,
+    # never in the chat body. exc_info=True keeps diagnostics; the user
+    # sees a curated message below.
+    logger.error("Streaming error: %s", err_msg, exc_info=True)
+    _is_oom = any(k in err_msg for k in (
+        "Insufficient Memory", "OutOfMemory",
+        "Memòria insuficient", "Memoria insuficiente",
+        "Not enough memory",
+    ))
+    _lk = lang[:2] if lang else "ca"
+    if _is_oom:
+        return f"\n⚠️ {_oom_notice(err_msg, _lk)}"
+    # MC-133: do not echo the raw exception text (err_msg) — it can
+    # carry internal paths/state. Surface a generic, localized notice.
+    _err = {
+        "ca": "S'ha produït un error en generar la resposta. Torna-ho a provar.",
+        "es": "Se ha producido un error al generar la respuesta. Inténtalo de nuevo.",
+        "en": "An error occurred while generating the response. Please try again.",
+    }
+    return f"\n⚠️ {_err.get(_lk, _err['en'])}"
+
+
+def _gen_truncated_token(
+    trunc: bool, trunc_continuable: bool, clean_response: str
+) -> "str | None":
+    """FD-S5 marker for an answer cut by the token ceiling, or None.
+
+    A silent cut mid-sentence reads as the model going mute. The caller emits
+    this as its OWN yield (a marker split across reads would not be parsed).
+    Degrades to :0 (informative, no Continue) when the visible text is empty or
+    the think-only placeholder — there is nothing to resume.
+    """
+    if not trunc:
+        return None
+    _cont_flag = 1 if (
+        trunc_continuable and clean_response and clean_response != "…"
+    ) else 0
+    return f"\x00[GEN_TRUNCATED:{_cont_flag}]\x00"
+
+
+async def _yield_engine_chunks(ctx: "StreamingChatContext", flags: _StreamFlags):
+    """Consume the engine's stream, yielding `(wire_token, full_delta)` pairs.
+
+    The caller owns `full_response`: each pair carries either a token for the
+    wire or text to accumulate (never both), so the caller can do
+    `full_response += delta` at the same point the inline loop did — before the
+    wire tokens of that chunk go out — and a disconnect leaves the partial text
+    where MC-116 expects it. A pair whose token is None is accumulation only.
+
+    The `except Exception` stays with the loop it guards. GeneratorExit is a
+    BaseException, so a client disconnect still tears this generator down
+    instead of being turned into an error notice.
+    """
+    try:
+        # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
+        if inspect.isasyncgen(ctx.chat_result) or hasattr(ctx.chat_result, '__aiter__'):
+            _first_chunk = True
+            # MC-027 F1: the per-request think/content-think/harmony/latex FSM
+            # lives in _StreamThinkParser. feed() returns (wire_tokens, full_delta):
+            # the wire gets the visible/buffered form, full_response keeps the raw
+            # text so _clean_full_response can strip tags at persist (INV-HIGH-07).
+            _think_parser = _StreamThinkParser(ctx.model_name)
+            async for chunk in ctx.chat_result:
+                if _apply_trunc_sentinels(chunk, flags):
+                    continue
+                content, thinking = _parse_chunk(chunk)
+
+                # Model loaded — any chunk = model is responding
+                if _first_chunk:
+                    _first_chunk = False
+                    yield "\x00[MODEL_READY]\x00", ""
+
+                _wire, _full_delta = _think_parser.feed(content, thinking)
+                yield None, _full_delta
+                for _tok in _wire:
+                    yield _tok, ""
+                flags.has_any_thinking = _think_parser.has_any_thinking
+            # Flush harmony leftovers (closes an open <think>) +
+            # any buffered LaTeX pending at end of stream
+            _wire, _full_delta = _think_parser.flush()
+            yield None, _full_delta
+            for _tok in _wire:
+                yield _tok, ""
+        else:
+            # Fallback for non-streaming engines
+            yield "\x00[MODEL_READY]\x00", ""
+            result = await ctx.chat_result if inspect.iscoroutine(ctx.chat_result) else ctx.chat_result
+            content = _extract_nonstreaming_content(result)
+            if content:
+                yield latex_to_unicode(content), content
+    except Exception as e:
+        yield _stream_error_notice(e, ctx.lang), ""
+
+
+async def _yield_mem_delete_prompts(ctx: "StreamingChatContext", mem_deletes: list):
+    """Arm each MEM_DELETE and yield its confirm-dialog token (MC-117).
+
+    Body moved verbatim out of `_generate_streaming_response` (MC-027 F3): same
+    arming order, same entries=[:1], same TUR-PHANTOM-DEL rule that the token
+    only surfaces for a fact that actually armed a pending delete.
+    """
+    for _del_fact in mem_deletes:
+        _encoded = _del_fact.replace('|', '\\|')
+        # MC-117: arm the 2-turn TEXT confirmation (a typed "sí" next
+        # turn), not only the UI dialog. Mirrors the non-stream arming
+        # (_handle_delete_intent) so the documented behaviour holds.
+        # Arm BEFORE emitting the UI token so a typed "sí" / dialog
+        # click never races a not-yet-set flag, and a failed preview
+        # never leaves a dead confirm button visible. entries=[:1] is
+        # intentional (B028/RT-04: best global match only, no cross-
+        # collection collateral — identical to the non-stream path).
+        _df = _del_fact.strip()
+        _armed = False
+        if _df and not getattr(ctx.session, "_pending_partial_delete", None):
+            try:
+                _preview = await ctx.memory_helper.preview_delete_from_memory(_df)
+                _cands = _preview.get("candidates", [])
+                if _preview.get("success") and _cands:
+                    ctx.session._pending_partial_delete = {"content": _df, "entries": _cands[:1]}
+                    _armed = True
+            except Exception:
+                logger.debug("MC-117: preview_delete_from_memory failed in stream", exc_info=True)
+        # TUR-PHANTOM-DEL: surface the confirm-dialog token ONLY when THIS
+        # fact actually armed a pending delete. A failed/empty/raising
+        # preview (Memory API down, or the common "forget X not stored"
+        # case → success but candidates=[]) must NOT leave a dead confirm
+        # button — parity with the non-stream _arm_mem_deletes_nonstreaming,
+        # which only emits the token on success+candidates. This is the
+        # invariant the MC-117 comment above already declares.
+        if _armed:
+            yield f"\x00[PENDING_DELETE:{_encoded}]\x00"
+
+
+async def _yield_reprompt_when_only_mem_saves(
+    ctx: "StreamingChatContext", clean_response: str, mem_saves: list, rp_out: list,
+):
+    """Re-prompt (or fall back) when the turn produced only [MEM_SAVE: ...].
+
+    No-op unless the visible response is empty AND there are mem_saves. On the
+    fallback path the confirmation text is BOTH yielded and appended to
+    `rp_out`, so the caller assigns `clean_response = rp_out[0]` for either
+    outcome — the split the inline `if/else` used to make.
+    """
+    if clean_response or not mem_saves:
+        return
+    async for _chunk in _yield_reprompt(
+        ctx.engine, ctx.model_name, ctx.sig, ctx.lang,
+        ctx.system_prompt, ctx.messages, mem_saves,
+        ctx.thinking_enabled, rp_out,
+    ):
+        yield _chunk
+    if not rp_out:
+        _fallback = _mem_save_fallback_text(mem_saves)
+        if _fallback:
+            rp_out.append(_fallback)
+            yield _fallback
+            logger.info("Re-prompt fallback: confirmation message")
+
+
+async def _yield_persist_mem_saves(
+    ctx: "StreamingChatContext", mem_saves: list, count_out: list,
+):
+    """Atomize + save the turn's MEM_SAVE facts, yielding the SAVING/MEM tokens.
+
+    `count_out[0]` is set to the number of facts actually persisted (absent =
+    nothing saved). When the user has personal memory switched off, the facts
+    are dropped IN PLACE (`mem_saves.clear()`) so the caller's stats see the
+    same empty list the inline `_mem_saves = []` used to leave behind.
+    """
+    if mem_saves and not _memory_saves_enabled(ctx.rag_collections):
+        # Collection toggle belt-and-braces: the prompt already tells the
+        # model not to emit MEM_SAVE with memory off, but if it does,
+        # nothing may be persisted (and the drop must be visible).
+        logger.info(
+            "MEM_SAVE skip (personal memory disabled by user): %d fact(s) dropped",
+            len(mem_saves),
+        )
+        mem_saves.clear()
+    if mem_saves:
+        async for _tok in _yield_atomize_and_save_mem_saves(
+            mem_saves, ctx.engine, ctx.model_name, ctx.sig, ctx.lang,
+            ctx.memory_helper, ctx.session, count_out,
+        ):
+            yield _tok
+
+
+def _persist_assistant_turn(
+    ctx: "StreamingChatContext",
+    clean_response: str,
+    full_response: str,
+    stats: dict,
+    trunc: bool,
+    trunc_continuable: bool,
+) -> None:
+    """Write the assistant turn into the session (FD-S6 merge or add_message).
+
+    Sync on purpose: it is called from the streaming body between
+    `_save_session_to_disk` and the `_assistant_saved` flag, and that ordering
+    is what keeps the single-persist contract (INV-CRIT-03) intact — an `await`
+    here would open a cancellation point in the middle of it.
+    """
+    if ctx.continue_mode and ctx.session.messages \
+            and ctx.session.messages[-1].get("role") == "assistant":
+        # FD-S6: MERGE the tail into the truncated turn — direct
+        # concatenation, no separator (the tail resumes mid-sentence).
+        # Never add_message: get_context_messages dedupes consecutive
+        # assistant turns keeping only the LATEST, which would erase
+        # the first half of the answer.
+        _last = ctx.session.messages[-1]
+        _last["content"] += clean_response
+        if trunc and trunc_continuable:
+            # Chained continue (truncated again): extend the raw so
+            # the NEXT continue prompt stays an exact token prefix.
+            if _last.get("gen_raw"):
+                _last["gen_raw"] += full_response
+            else:
+                _last["gen_raw"] = _last["content"]
+        else:
+            _last.pop("gen_raw", None)  # completed: drop the raw
+    else:
+        ctx.session.add_message("assistant", clean_response, stats=stats)
+        if trunc and trunc_continuable and ctx.session.messages:
+            # FD-S6: persist the RAW generation next to the clean
+            # content. With thinking ON the clean text's re-render
+            # diverges token-wise from the KV cache entry — gen_raw is
+            # what makes the future continue prompt an exact prefix.
+            ctx.session.messages[-1]["gen_raw"] = full_response
+
+
+def _persist_partial_assistant(ctx: "StreamingChatContext", full_response: str) -> None:
+    """Best-effort persist of an interrupted turn (MC-116), for the `finally`.
+
+    Sync on purpose: the caller runs this while unwinding a GeneratorExit, where
+    awaiting is not an option. Never raises — a failure to save a partial turn
+    must not replace the original teardown.
+    """
+    try:
+        _partial_clean, _, _ = _clean_full_response(full_response, ctx.message)
+        _partial_clean = _think_only_placeholder(_partial_clean, full_response)
+        if _partial_clean and ctx.continue_mode and ctx.session.messages \
+                and ctx.session.messages[-1].get("role") == "assistant":
+            # FD-S6 (MC-116): interrupted continue → merge the partial
+            # tail in-place, same no-separator contract as the clean
+            # path (add_message would trip the consecutive-role dedupe).
+            ctx.session.messages[-1]["content"] += _partial_clean
+            ctx.session.messages[-1].pop("gen_raw", None)
+        elif _partial_clean:
+            ctx.session.add_message("assistant", _partial_clean, stats={"interrupted": True})
+            ctx.session_mgr._save_session_to_disk(ctx.session)
+    except Exception:
+        logger.warning("MC-116: could not persist partial assistant on stream interruption", exc_info=True)
+
+
 async def _generate_streaming_response(ctx: StreamingChatContext):
     """Streaming response body, flattened out of `_handle_chat_engine` (MC-027 F2).
 
@@ -2228,6 +2529,12 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
     `_returning_stream` before returning the StreamingResponse); this generator only
     cancels the monitor on a clean finish (INV-CRIT-01). Behaviour is byte-equivalent
     to the inline closure it replaces.
+
+    The phases live in `_yield_*` / `_persist_*` helpers (2026-08-20, CCN 66 -> 20);
+    what stays here is the sequence, the three bare locals, and the accumulation of
+    `full_response` at the yield site. The engine loop reports its truncation and
+    thinking flags back on a `_StreamFlags`, since a generator cannot return while
+    it yields.
     """
     _assistant_saved = False  # MC-116
     try:
@@ -2245,154 +2552,43 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
 
         import time as _time_mod
         _stream_start_t = _time_mod.time()
-        _has_any_thinking = False
-        # FD-S5: truncation marker state. Set by the in-band sentinel (MLX
-        # via queue_generator) or by an Ollama done_reason=='length' chunk.
-        _trunc = False
-        _trunc_continuable = False
-        try:
-            # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
-            if inspect.isasyncgen(ctx.chat_result) or hasattr(ctx.chat_result, '__aiter__'):
-                _first_chunk = True
-                # MC-027 F1: the per-request think/content-think/harmony/latex FSM
-                # lives in _StreamThinkParser. feed() returns (wire_tokens, full_delta):
-                # the wire gets the visible/buffered form, full_response keeps the raw
-                # text so _clean_full_response can strip tags at persist (INV-HIGH-07).
-                _think_parser = _StreamThinkParser(ctx.model_name)
-                async for chunk in ctx.chat_result:
-                    # FD-S5 sentinel (own yield, never mixed with text): the
-                    # engine hit the max_tokens ceiling.
-                    if isinstance(chunk, dict) and chunk.get("__nexe_trunc__"):
-                        _trunc = True
-                        _trunc_continuable = bool(chunk.get("continuable"))
-                        continue
-                    # Ollama passthrough chunks: the final one carries
-                    # done_reason ('length' = truncated). No continue — the
-                    # done chunk may still carry content for _parse_chunk.
-                    if (
-                        isinstance(chunk, dict)
-                        and chunk.get("done")
-                        and chunk.get("done_reason") == "length"
-                    ):
-                        _trunc = True
-                    content, thinking = _parse_chunk(chunk)
+        _flags = _StreamFlags()
+        # The pairs are (wire token | None, text to accumulate). `full_response`
+        # grows HERE, at the same point the inline loop grew it — before the
+        # chunk's wire tokens go out — so a disconnect mid-stream leaves the
+        # partial text for the MC-116 persist in the `finally`.
+        async for _tok, _full_delta in _yield_engine_chunks(ctx, _flags):
+            full_response += _full_delta
+            if _tok is not None:
+                yield _tok
 
-                    # Model loaded — any chunk = model is responding
-                    if _first_chunk:
-                        _first_chunk = False
-                        yield "\x00[MODEL_READY]\x00"
-
-                    _wire, _full_delta = _think_parser.feed(content, thinking)
-                    full_response += _full_delta
-                    for _tok in _wire:
-                        yield _tok
-                    _has_any_thinking = _think_parser.has_any_thinking
-                # Flush harmony leftovers (closes an open <think>) +
-                # any buffered LaTeX pending at end of stream
-                _wire, _full_delta = _think_parser.flush()
-                full_response += _full_delta
-                for _tok in _wire:
-                    yield _tok
-            else:
-                # Fallback for non-streaming engines
-                yield "\x00[MODEL_READY]\x00"
-                result = await ctx.chat_result if inspect.iscoroutine(ctx.chat_result) else ctx.chat_result
-                content = _extract_nonstreaming_content(result)
-                if content:
-                    full_response += content
-                    yield latex_to_unicode(content)
-
-        except Exception as e:
-            err_msg = repr(e) if not str(e) else str(e)
-            # MC-133: the full detail (with traceback) belongs in the local log,
-            # never in the chat body. exc_info=True keeps diagnostics; the user
-            # sees a curated message below.
-            logger.error("Streaming error: %s", err_msg, exc_info=True)
-            _is_oom = any(k in err_msg for k in (
-                "Insufficient Memory", "OutOfMemory",
-                "Memòria insuficient", "Memoria insuficiente",
-                "Not enough memory",
-            ))
-            _lk = ctx.lang[:2] if ctx.lang else "ca"
-            if _is_oom:
-                yield f"\n⚠️ {_oom_notice(err_msg, _lk)}"
-            else:
-                # MC-133: do not echo the raw exception text (err_msg) — it can
-                # carry internal paths/state. Surface a generic, localized notice.
-                _err = {
-                    "ca": "S'ha produït un error en generar la resposta. Torna-ho a provar.",
-                    "es": "Se ha producido un error al generar la respuesta. Inténtalo de nuevo.",
-                    "en": "An error occurred while generating the response. Please try again.",
-                }
-                yield f"\n⚠️ {_err.get(_lk, _err['en'])}"
-
-        if not _has_any_thinking:
+        if not _flags.has_any_thinking:
             logger.info("Model did not produce thinking tokens (model decides when to think)")
 
         # Save clean response (no think/GPT-OSS tags) to session/disk
         clean_response, _mem_saves, _mem_deletes = _clean_full_response(full_response, ctx.message)
 
-        # FD-S5: tell the client the answer was cut by the token ceiling —
-        # a silent cut mid-sentence reads as the model going mute. Emitted as
-        # its OWN yield (a marker split across reads would not be parsed).
-        # Degrades to :0 (informative, no Continue) when the visible text is
-        # empty or the think-only placeholder — there is nothing to resume.
-        if _trunc:
-            _cont_flag = 1 if (
-                _trunc_continuable and clean_response and clean_response != "…"
-            ) else 0
-            yield f"\x00[GEN_TRUNCATED:{_cont_flag}]\x00"
+        # FD-S5: tell the client the answer was cut by the token ceiling.
+        # Its OWN yield (a marker split across reads would not be parsed).
+        _trunc_tok = _gen_truncated_token(
+            _flags.trunc, _flags.trunc_continuable, clean_response,
+        )
+        if _trunc_tok:
+            yield _trunc_tok
 
-        for _del_fact in _mem_deletes:
-            _encoded = _del_fact.replace('|', '\\|')
-            # MC-117: arm the 2-turn TEXT confirmation (a typed "sí" next
-            # turn), not only the UI dialog. Mirrors the non-stream arming
-            # (_handle_delete_intent) so the documented behaviour holds.
-            # Arm BEFORE emitting the UI token so a typed "sí" / dialog
-            # click never races a not-yet-set flag, and a failed preview
-            # never leaves a dead confirm button visible. entries=[:1] is
-            # intentional (B028/RT-04: best global match only, no cross-
-            # collection collateral — identical to the non-stream path).
-            _df = _del_fact.strip()
-            _armed = False
-            if _df and not getattr(ctx.session, "_pending_partial_delete", None):
-                try:
-                    _preview = await ctx.memory_helper.preview_delete_from_memory(_df)
-                    _cands = _preview.get("candidates", [])
-                    if _preview.get("success") and _cands:
-                        ctx.session._pending_partial_delete = {"content": _df, "entries": _cands[:1]}
-                        _armed = True
-                except Exception:
-                    logger.debug("MC-117: preview_delete_from_memory failed in stream", exc_info=True)
-            # TUR-PHANTOM-DEL: surface the confirm-dialog token ONLY when THIS
-            # fact actually armed a pending delete. A failed/empty/raising
-            # preview (Memory API down, or the common "forget X not stored"
-            # case → success but candidates=[]) must NOT leave a dead confirm
-            # button — parity with the non-stream _arm_mem_deletes_nonstreaming,
-            # which only emits the token on success+candidates. This is the
-            # invariant the MC-117 comment above already declares.
-            if _armed:
-                yield f"\x00[PENDING_DELETE:{_encoded}]\x00"
+        async for _del_tok in _yield_mem_delete_prompts(ctx, _mem_deletes):
+            yield _del_tok
 
         # Re-prompt: if the model emitted ONLY [MEM_SAVE: ...] without
         # a conversational response, resend with system prompt without
         # MEM_SAVE instructions so it generates a natural response.
-        if not clean_response and _mem_saves:
-            _rp_out = []
-            async for _chunk in _yield_reprompt(
-                ctx.engine, ctx.model_name, ctx.sig, ctx.lang,
-                ctx.system_prompt, ctx.messages, _mem_saves,
-                ctx.thinking_enabled, _rp_out,
-            ):
-                yield _chunk
-            if _rp_out:
-                clean_response = _rp_out[0]
-            else:
-                _fallback = _mem_save_fallback_text(_mem_saves)
-                if _fallback:
-                    clean_response = _fallback
-                    yield clean_response
-                    logger.info("Re-prompt fallback: confirmation message")
+        _rp_out = []
+        async for _chunk in _yield_reprompt_when_only_mem_saves(
+            ctx, clean_response, _mem_saves, _rp_out,
+        ):
+            yield _chunk
+        if _rp_out:
+            clean_response = _rp_out[0]
 
         # B125: persist a placeholder for a think-only turn so
         # the next user message is not dropped as a duplicate role.
@@ -2402,24 +2598,10 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
 
         if clean_response:
             # Atomize + save LLM-extracted facts to memory
-            _mem_saved_count = 0
-            if _mem_saves and not _memory_saves_enabled(ctx.rag_collections):
-                # Collection toggle belt-and-braces: the prompt already tells the
-                # model not to emit MEM_SAVE with memory off, but if it does,
-                # nothing may be persisted (and the drop must be visible).
-                logger.info(
-                    "MEM_SAVE skip (personal memory disabled by user): %d fact(s) dropped",
-                    len(_mem_saves),
-                )
-                _mem_saves = []
-            if _mem_saves:
-                _count_out = []
-                async for _tok in _yield_atomize_and_save_mem_saves(
-                    _mem_saves, ctx.engine, ctx.model_name, ctx.sig, ctx.lang,
-                    ctx.memory_helper, ctx.session, _count_out,
-                ):
-                    yield _tok
-                _mem_saved_count = _count_out[0] if _count_out else 0
+            _count_out = []
+            async for _tok in _yield_persist_mem_saves(ctx, _mem_saves, _count_out):
+                yield _tok
+            _mem_saved_count = _count_out[0] if _count_out else 0
 
             # Save message with stats for persistence
             _elapsed = round(_time_mod.time() - _stream_start_t, 1)
@@ -2427,32 +2609,10 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
                 ctx.session, ctx.rag_count, ctx.rag_items, ctx.model_name,
                 _elapsed, len(full_response), _mem_saved_count, _mem_saves,
             )
-            if ctx.continue_mode and ctx.session.messages \
-                    and ctx.session.messages[-1].get("role") == "assistant":
-                # FD-S6: MERGE the tail into the truncated turn — direct
-                # concatenation, no separator (the tail resumes mid-sentence).
-                # Never add_message: get_context_messages dedupes consecutive
-                # assistant turns keeping only the LATEST, which would erase
-                # the first half of the answer.
-                _last = ctx.session.messages[-1]
-                _last["content"] += clean_response
-                if _trunc and _trunc_continuable:
-                    # Chained continue (truncated again): extend the raw so
-                    # the NEXT continue prompt stays an exact token prefix.
-                    if _last.get("gen_raw"):
-                        _last["gen_raw"] += full_response
-                    else:
-                        _last["gen_raw"] = _last["content"]
-                else:
-                    _last.pop("gen_raw", None)  # completed: drop the raw
-            else:
-                ctx.session.add_message("assistant", clean_response, stats=_stats)
-                if _trunc and _trunc_continuable and ctx.session.messages:
-                    # FD-S6: persist the RAW generation next to the clean
-                    # content. With thinking ON the clean text's re-render
-                    # diverges token-wise from the KV cache entry — gen_raw is
-                    # what makes the future continue prompt an exact prefix.
-                    ctx.session.messages[-1]["gen_raw"] = full_response
+            _persist_assistant_turn(
+                ctx, clean_response, full_response, _stats,
+                _flags.trunc, _flags.trunc_continuable,
+            )
             ctx.session_mgr._save_session_to_disk(ctx.session)
             _assistant_saved = True  # MC-116
 
@@ -2478,21 +2638,7 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
         # where cancel_event is not wired). Persist a best-effort assistant
         # turn so the session isn't left with an orphan 'user' message.
         if not _assistant_saved and full_response:
-            try:
-                _partial_clean, _, _ = _clean_full_response(full_response, ctx.message)
-                _partial_clean = _think_only_placeholder(_partial_clean, full_response)
-                if _partial_clean and ctx.continue_mode and ctx.session.messages \
-                        and ctx.session.messages[-1].get("role") == "assistant":
-                    # FD-S6 (MC-116): interrupted continue → merge the partial
-                    # tail in-place, same no-separator contract as the clean
-                    # path (add_message would trip the consecutive-role dedupe).
-                    ctx.session.messages[-1]["content"] += _partial_clean
-                    ctx.session.messages[-1].pop("gen_raw", None)
-                elif _partial_clean:
-                    ctx.session.add_message("assistant", _partial_clean, stats={"interrupted": True})
-                    ctx.session_mgr._save_session_to_disk(ctx.session)
-            except Exception:
-                logger.warning("MC-116: could not persist partial assistant on stream interruption", exc_info=True)
+            _persist_partial_assistant(ctx, full_response)
 
 
 @dataclass
