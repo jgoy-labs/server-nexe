@@ -72,15 +72,16 @@ class TestExistingCollectionsArePreserved:
         fake_qdrant.get_collection.return_value.config.params.vectors.size = 999
         mock_api._qdrant = fake_qdrant
 
-        # Mock the v1 singleton reuse to force the creation path
+        from core.memory_access import MemoryView
+        view = MemoryView(mock_api, plugin_id="web_ui_module")
         with patch(
-            "memory.memory.api.v1.get_memory_api",
-            side_effect=RuntimeError("skip v1"),
-        ), patch("memory.memory.api.MemoryAPI", return_value=mock_api):
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(return_value=view),
+        ):
             helper = memory_helper.MemoryHelper()
             api = await helper.get_memory_api()
 
-        assert api is mock_api
+        assert api is view
         assert not mock_api.delete_collection.called, (
             "delete_collection should NEVER have been called during init"
         )
@@ -96,10 +97,12 @@ class TestExistingCollectionsArePreserved:
         mock_api.delete_collection = AsyncMock()
         mock_api.create_collection = AsyncMock()
 
+        from core.memory_access import MemoryView
+        view = MemoryView(mock_api, plugin_id="web_ui_module")
         with patch(
-            "memory.memory.api.v1.get_memory_api",
-            side_effect=RuntimeError("skip v1"),
-        ), patch("memory.memory.api.MemoryAPI", return_value=mock_api):
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(return_value=view),
+        ):
             helper = memory_helper.MemoryHelper()
             await helper.get_memory_api()
 

@@ -9,11 +9,17 @@ the existing coupling; it FREEZES it: any NEW import-time (module-level) cross-
 package import that is not already in the baseline fails CI, so the debt cannot
 silently grow.
 
-Only IMPORT-TIME imports are considered: imports at module scope (incl. top-level
-try/if blocks), NOT imports nested inside functions/methods. Deferred (function-
-local) imports are the legitimate escape hatch and are intentionally ignored.
-`if TYPE_CHECKING:` blocks are also ignored — they never execute at runtime, so a
-type-only import there is not runtime coupling (MC-102).
+Only IMPORT-TIME imports are considered for the freeze: imports at module scope
+(incl. top-level try/if blocks), NOT imports nested inside functions/methods.
+Deferred (function-local) imports are the legitimate escape hatch between core,
+memory and personality, and are ignored by the freeze.
+
+Exception (D-M / #875): plugins/ must not import memory/ at all — import-time
+OR deferred. The porter is `core.memory_access.get_memory_view`. A function-local
+`from memory...` inside a plugin is the shortcut this gate exists to close.
+
+`if TYPE_CHECKING:` blocks are ignored in both checks — they never execute at
+runtime, so a type-only import there is not runtime coupling (MC-102).
 
 Usage:
     python scripts/check_layering.py            # check against baseline (CI)
@@ -77,15 +83,59 @@ class _ImportTimeCollector(ast.NodeVisitor):
         )
 
 
+class _AllImportsCollector(ast.NodeVisitor):
+    """Collect every import, including function-local; skip TYPE_CHECKING."""
+
+    def __init__(self) -> None:
+        self.modules: list[str] = []
+
+    def visit_Import(self, node: ast.Import) -> None:
+        for alias in node.names:
+            self.modules.append(alias.name)
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        if node.level == 0 and node.module:
+            self.modules.append(node.module)
+        self.generic_visit(node)
+
+    def visit_If(self, node: ast.If) -> None:
+        if _ImportTimeCollector._is_type_checking(node.test):
+            return
+        self.generic_visit(node)
+
+
+def _iter_package_py(pkg: str):
+    base = ROOT / pkg
+    if not base.is_dir():
+        return
+    for path in base.rglob("*.py"):
+        if EXCLUDE_PARTS & set(path.relative_to(ROOT).parts):
+            continue
+        yield path
+
+
+def _plugin_memory_edges() -> list[str]:
+    """Every plugins/ → memory/ import, including deferred (D-M)."""
+    hits: list[str] = []
+    for path in _iter_package_py("plugins"):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        collector = _AllImportsCollector()
+        collector.visit(tree)
+        src_rel = path.relative_to(ROOT).as_posix()
+        for mod in collector.modules:
+            if _top_pkg(mod) == "memory":
+                hits.append(f"{src_rel} -> {mod}")
+    return sorted(set(hits))
+
+
 def _edges() -> set[str]:
     edges: set[str] = set()
     for pkg in PACKAGES:
-        base = ROOT / pkg
-        if not base.is_dir():
-            continue
-        for path in base.rglob("*.py"):
-            if EXCLUDE_PARTS & set(path.relative_to(ROOT).parts):
-                continue
+        for path in _iter_package_py(pkg):
             try:
                 tree = ast.parse(path.read_text(encoding="utf-8"))
             except (SyntaxError, UnicodeDecodeError):
@@ -101,6 +151,14 @@ def _edges() -> set[str]:
 
 
 def main() -> int:
+    leaks = _plugin_memory_edges()
+    if leaks:
+        print("LAYERING GATE FAILED (D-M / #875): plugins/ must not import memory/ "
+              "(including deferred imports). Go through core.memory_access:")
+        for e in leaks:
+            print(f"  + {e}")
+        return 1
+
     current = _edges()
     if "--update" in sys.argv:
         BASELINE.write_text(json.dumps(sorted(current), indent=1) + "\n", encoding="utf-8")

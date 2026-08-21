@@ -224,7 +224,11 @@ El ModuleManager escaneja `plugins/`, `memory/`, `personality/` per a fitxers `m
 Import dinamic de Python: `from plugins.my_plugin.module import MyPluginModule`. Valida el Protocol NexeModule.
 
 ### 3. Initialization
-Crida `await module.initialize(context)`. El context te **quatre claus**: `config` (la config sencera del TOML), `services` (els serveis realment disponibles a l'arrencada: `i18n` i `crypto_provider`; les claus buides s'ometen), `modules` (registre de moduls carregats) i `project_root`. **Els moduls de `memory/` reben exactament el mateix dict** — abans rebien `initialize(config=<seccio>)`, un segon contracte que ja no existeix. Per llegir els teus overrides des del context: `module_config_from_context(context, "<nom>")` a `core/loader/protocol.py`.
+Crida `await module.initialize(context)`. El context te **quatre claus**: `config` (la config sencera del TOML), `services` (els serveis realment disponibles a l'arrencada: `i18n`, `crypto_provider` i la porta de memoria `memory`; les claus buides s'ometen, excepte `memory` que hi es sempre), `modules` (registre de moduls carregats) i `project_root`. **Els moduls de `memory/` reben exactament el mateix dict** — abans rebien `initialize(config=<seccio>)`, un segon contracte que ja no existeix. Per llegir els teus overrides des del context: `module_config_from_context(context, "<nom>")` a `core/loader/protocol.py` — espera `config[<nom>]`, la mateixa forma que el TOML. El catàleg de claus viu a `core/config_catalog.py`: declara origen, default per mode i si es sensible; no hi ha valors secrets.
+
+### Porteria de la memoria
+
+Els plugins **no importen `memory/`**. La porta es `core.memory_access.get_memory_view(plugin_id)` (tambe a `context["services"]["memory"]`). Lliura una **vista**, no `MemoryAPI` cru: per defecte accés a totes les colleccions; el plugin declara sales vetades al manifest (`[module.memory] deny = [...]`); el manager pot vetar per sobre a `personality/server.toml` (`[plugins.memory_access.<plugin>] deny = [...]`). Un deny de politica sempre guanya. Aixo no es un tall de seguretat (tot corre in-process): es governanca, saber qui toca la memoria i poder-la canviar en un lloc.
 
 ### 4. Integration
 Si el modul implementa `NexeModuleWithRouter`, el core registra el router a FastAPI via `app.include_router()`.

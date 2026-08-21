@@ -19,9 +19,9 @@ from plugins.web_ui_module.core.memory_helper import get_memory_helper  # noqa: 
 from plugins.web_ui_module.core.compactor import compact_session  # noqa: F401 — re-export for test patches
 from plugins.web_ui_module.core.rag_handler import generate_rag_metadata  # noqa: F401 — re-export
 
-# Import RAG header parser (re-export for tests)
+# RAG header parser via the core porter (plugins/ must not import memory/).
 try:
-    from memory.rag.header_parser import parse_rag_header  # noqa: F401
+    from core.rag_header import parse_rag_header  # noqa: F401
 except ImportError:
     parse_rag_header = None  # type: ignore[assignment]  # noqa: F841
 

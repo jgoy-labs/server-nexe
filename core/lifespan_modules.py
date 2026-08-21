@@ -236,34 +236,27 @@ async def _check_needs_reingest(
 async def auto_ingest_knowledge(server_state):
     """Auto-ingest knowledge/ folder on first run only."""
     try:
-        # prefer SidecarConfig.is_production over direct NEXE_ENV,
-        # fallback a os.getenv per backward-compat. Reconstruim la string `nexe_env`
-        # només per al log (vegeu _auto_ingest_is_disabled).
-        # in sidecar mode use SidecarConfig.auto_ingest_knowledge
-        #
-        # MC-086: el default DIVERGENT per mode és INTENCIONAL, NO un descuit —
-        # NO l'unifiquis flipejant aquesta línia a "false":
-        #   · standalone (aquesta línia)        → default ON  (l'usuari corre el
-        #     seu propi server amb la seva knowledge/ → auto-ingest és comoditat)
-        #   · sidecar (l'app Tauri, línia 172-173) → default OFF (l'onboarding de
-        #     l'app controla la ingesta explícitament)
-        # Aquí només s'unifica el PARSEIG (parse_truthy, MC-088), no el default.
-        # FOLLOW-UP: quan arribi el plugin multiusuari, replantejar l'auto-ingest
-        # com a consentiment per-usuari (opt-in explícit), com el patró de B247.
-        auto_ingest_enabled = parse_truthy(os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE", "true"))
+        # D-P: SidecarConfig already applies the catalog default per mode
+        # (standalone ON, sidecar OFF). No second parse and no sidecar-only
+        # override — that was the reconciliation this letter kills.
         try:
             from core.sidecar_config import get_sidecar_config
             cfg = get_sidecar_config()
             nexe_env = "production" if cfg.is_production else "development"
-            if cfg.is_sidecar:
-                auto_ingest_enabled = cfg.auto_ingest_knowledge
+            auto_ingest_enabled = cfg.auto_ingest_knowledge
         except Exception as exc:
             logger.debug(
                 "SidecarConfig unavailable in auto_ingest_knowledge, "
-                "falling back to NEXE_ENV: %s",
+                "falling back to catalog: %s",
                 exc,
             )
-            nexe_env = os.getenv("NEXE_ENV", "production").lower()
+            from core.config_catalog import default_for
+            nexe_env = os.getenv("NEXE_ENV", str(default_for("env"))).lower()
+            raw = os.getenv("NEXE_AUTO_INGEST_KNOWLEDGE")
+            if raw is None or raw.strip() == "":
+                auto_ingest_enabled = bool(default_for("auto_ingest_knowledge"))
+            else:
+                auto_ingest_enabled = parse_truthy(raw)
 
         if _auto_ingest_is_disabled(nexe_env, auto_ingest_enabled):
             logger.debug(

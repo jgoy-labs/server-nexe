@@ -72,6 +72,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from core.config_catalog import default_for
 from core.env_utils import parse_truthy as _parse_truthy
 
 
@@ -115,9 +116,9 @@ SIDECAR_CORS_ORIGINS: tuple[str, ...] = (
 # Default trusted hosts when NEXE_LOCALHOST_ALIASES is unset.
 DEFAULT_TRUSTED_HOSTS: tuple[str, ...] = ("127.0.0.1", "::1", "localhost")  # nosemgrep
 
-# Default fallbacks for standalone mode (NO NEXE_SIDECAR).
-_DEFAULT_HOST = "127.0.0.1"  # nosemgrep
-_DEFAULT_PORT = 9119  # nosemgrep — server-nexe canonical port
+# Default fallbacks for standalone mode (NO NEXE_SIDECAR). D-P catalog.
+_DEFAULT_HOST = default_for("server_host")  # nosemgrep
+_DEFAULT_PORT = default_for("server_port")  # nosemgrep — server-nexe canonical port
 
 # Port validation range — matches NexeSettings ge/le constraints at core/config.py.
 # Below the registered ports cutoff require root/elevated permissions; above the
@@ -164,7 +165,9 @@ def _resolve_paths(is_sidecar: bool) -> dict[str, Path]:
     cache_dir = Path(
         os.environ.get("NEXE_CACHE_DIR", str(Path.home() / ".nexe" / "cache"))
     ).expanduser()
-    vectors_fallback = str(data_dir / "vectors") if is_sidecar else "storage/vectors"
+    vectors_fallback = (
+        str(data_dir / "vectors") if is_sidecar else default_for("qdrant_path")
+    )
     vectors_dir = Path(
         os.environ.get("NEXE_QDRANT_PATH", vectors_fallback)
     ).expanduser()
@@ -257,13 +260,21 @@ def _resolve_bootstrap_ttl() -> int:
     """
     raw = os.environ.get("NEXE_BOOTSTRAP_TTL")
     if raw is None or raw.strip() == "":
-        return 30
+        return int(default_for("bootstrap_ttl"))
     try:
         return int(raw.strip())
     except ValueError as e:
         raise SidecarConfigError(
             f"NEXE_BOOTSTRAP_TTL not parseable as int: {raw!r}"
         ) from e
+
+
+def _resolve_auto_ingest(is_sidecar: bool) -> bool:
+    """NEXE_AUTO_INGEST_KNOWLEDGE: catalog default per mode, env wins when set."""
+    raw = os.environ.get("NEXE_AUTO_INGEST_KNOWLEDGE")
+    if raw is None or raw.strip() == "":
+        return bool(default_for("auto_ingest_knowledge", sidecar=is_sidecar))
+    return _parse_truthy(raw)
 
 
 def _resolve_encryption_enabled() -> str:
@@ -273,8 +284,10 @@ def _resolve_encryption_enabled() -> str:
     how to interpret 'auto' (typically: enable if libsodium available).
     Returns lowercase normalized value.
     """
-    raw = os.environ.get("NEXE_ENCRYPTION_ENABLED", "auto")
-    return raw.strip().lower() or "auto"
+    raw = os.environ.get(
+        "NEXE_ENCRYPTION_ENABLED", default_for("encryption_enabled")
+    )
+    return raw.strip().lower() or default_for("encryption_enabled")
 
 
 @dataclass(frozen=True)
@@ -336,7 +349,7 @@ class SidecarConfig:
         is_sidecar = _parse_truthy(os.environ.get("NEXE_SIDECAR"))
         env_value = os.environ.get(
             "NEXE_ENV",
-            "production" if is_sidecar else "development",
+            str(default_for("env", sidecar=is_sidecar)),
         )
         is_production = env_value.strip().lower() == "production"
 
@@ -359,16 +372,15 @@ class SidecarConfig:
             api_key=os.environ.get("NEXE_PRIMARY_API_KEY", ""),
             parent_pid=_resolve_parent_pid(),
             approved_modules=_resolve_approved_modules(),
-            default_model=os.environ.get("NEXE_DEFAULT_MODEL", ""),
+            default_model=os.environ.get("NEXE_DEFAULT_MODEL", default_for("default_model")),
             model_engine=os.environ.get("NEXE_MODEL_ENGINE"),
-            prompt_tier=os.environ.get("NEXE_PROMPT_TIER", "full"),
-            lang=os.environ.get("NEXE_LANG", "en"),
-            # Services (prepared for future iterations)
-            ollama_host=os.environ.get("NEXE_OLLAMA_HOST", "http://localhost:11434"),  # nosemgrep
+            prompt_tier=os.environ.get("NEXE_PROMPT_TIER", default_for("prompt_tier")),
+            lang=os.environ.get("NEXE_LANG", default_for("lang")),
+            ollama_host=os.environ.get("NEXE_OLLAMA_HOST", default_for("ollama_host")),  # nosemgrep
             qdrant_url=os.environ.get("NEXE_QDRANT_URL"),
             csrf_secret=os.environ.get("NEXE_CSRF_SECRET"),
             encryption_enabled=_resolve_encryption_enabled(),
-            auto_ingest_knowledge=_parse_truthy(os.environ.get("NEXE_AUTO_INGEST_KNOWLEDGE")),
+            auto_ingest_knowledge=_resolve_auto_ingest(is_sidecar),
             bootstrap_ttl=_resolve_bootstrap_ttl(),
             **paths,
         )

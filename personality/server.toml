@@ -188,6 +188,11 @@ max_request_size = 104857600
 [plugins.modules]
 enabled = [ "security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module",]
 
+# D-M — manager veto on memory collections. Default is access to all.
+# A deny here always wins over the plugin's [module.memory] deny.
+# Example: [plugins.memory_access.agenda]
+# deny = ["personal_memory"]
+
 [plugins.models]
 preferred_engine = "auto"  # Configurat per l'instal·lador via .env (NEXE_MODEL_ENGINE)
 primary = ""               # Configurat dinàmicament via .env (NEXE_DEFAULT_MODEL)

@@ -37,14 +37,11 @@ def _reset_v1_global():
 
 
 # ══════════════════════════════════════════════════════════════════
-# F1 — WARNING visibility when v1 singleton fallback fails
+# D-M — plugin must not fabricate MemoryAPI when the porter fails
 # ══════════════════════════════════════════════════════════════════
 
 class TestF1WarningVisibility:
-    """
-    Bug: logger.debug at memory_helper:279 silences v1 singleton failures.
-    Fix: promote to logger.warning so failures surface immediately.
-    """
+    """D-M: the old fallback constructed a private MemoryAPI. That path is gone."""
 
     def setup_method(self):
         _reset_memory_helper_globals()
@@ -55,44 +52,26 @@ class TestF1WarningVisibility:
         _reset_v1_global()
 
     @pytest.mark.asyncio
-    async def test_v1_singleton_fallback_emits_warning(self, caplog):
-        """When v1.get_memory_api() raises, a WARNING must be emitted (not DEBUG)."""
+    async def test_door_failure_returns_none_without_fabricating_api(self, caplog):
+        """When get_memory_view raises, the helper returns None and never builds MemoryAPI."""
         import logging
+        import inspect
         import plugins.web_ui_module.core.memory_helper as mh
 
-        with patch.dict("sys.modules", {"memory.memory.api.v1": None}):
-            with caplog.at_level(logging.DEBUG, logger="plugins.web_ui_module.core.memory_helper"):
-                try:
-                    await mh.get_memory_helper().get_memory_api()
-                except Exception:
-                    pass
+        src = inspect.getsource(mh.MemoryHelper._create_memory_api)
+        assert "MemoryAPI(" not in src
+        assert "from memory" not in src
 
-        v1_records = [r for r in caplog.records if "reuse" in r.message.lower() or "v1 singleton" in r.message.lower()]
-        assert v1_records, (
-            f"Expected a log about v1 singleton fallback. Got: {[r.message for r in caplog.records]}"
-        )
-        assert v1_records[0].levelno >= logging.WARNING, (
-            f"Expected WARNING level, got {v1_records[0].levelname}: {v1_records[0].message}"
-        )
+        with patch(
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(side_effect=RuntimeError("no memory")),
+        ):
+            with caplog.at_level(logging.ERROR, logger="plugins.web_ui_module.core.memory_helper"):
+                result = await mh.get_memory_helper().get_memory_api()
 
-    @pytest.mark.asyncio
-    async def test_v1_fallback_warning_not_debug_level(self, caplog):
-        """The log record level must be WARNING (≥30), not DEBUG (10)."""
-        import logging
-        import plugins.web_ui_module.core.memory_helper as mh
-
-        with patch.dict("sys.modules", {"memory.memory.api.v1": None}):
-            with caplog.at_level(logging.DEBUG, logger="plugins.web_ui_module.core.memory_helper"):
-                try:
-                    await mh.get_memory_helper().get_memory_api()
-                except Exception:
-                    pass
-
-        v1_records = [r for r in caplog.records if "reuse" in r.message.lower() or "v1 singleton" in r.message.lower()]
-        assert v1_records, f"No v1-singleton log found. Records: {[r.message for r in caplog.records]}"
-        assert v1_records[0].levelno >= logging.WARNING, (
-            f"Expected WARNING (≥{logging.WARNING}), got {v1_records[0].levelno} ({v1_records[0].levelname})"
-        )
+        assert result is None
+        assert mh._memory_api_init_failed is True
+        assert any("Failed to initialize Memory API" in r.message for r in caplog.records)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -205,14 +184,11 @@ class TestF3RetryBackoff:
         """After a failed init, _memory_api_init_failed must be True."""
         import plugins.web_ui_module.core.memory_helper as mh
 
-        with patch.dict("sys.modules", {"memory.memory.api.v1": None}):
-            with patch("memory.memory.api.MemoryAPI") as MockAPI:
-                mock_instance = MagicMock()
-                mock_instance.initialize = AsyncMock(
-                    side_effect=RuntimeError("embed model missing")
-                )
-                MockAPI.return_value = mock_instance
-                result = await mh.get_memory_helper().get_memory_api()
+        with patch(
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(side_effect=RuntimeError("embed model missing")),
+        ):
+            result = await mh.get_memory_helper().get_memory_api()
 
         assert result is None
         assert mh._memory_api_init_failed is True
@@ -234,19 +210,20 @@ class TestF3RetryBackoff:
         mh._memory_api_init_failed = True
         mh._memory_api_last_failure_ts = time.monotonic() - 61.0  # 61s ago — should retry
 
+        from core.memory_access import MemoryView
         mock_api = MagicMock()
-        mock_api.initialize = AsyncMock(return_value=True)
-        mock_api._initialized = True
         mock_api.collection_exists = AsyncMock(return_value=True)
+        view = MemoryView(mock_api, plugin_id="web_ui_module")
 
-        with patch.dict("sys.modules", {"memory.memory.api.v1": None}):
-            with patch("memory.memory.api.MemoryAPI", return_value=mock_api):
-                result = await mh.get_memory_helper().get_memory_api()
+        with patch(
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(return_value=view),
+        ):
+            result = await mh.get_memory_helper().get_memory_api()
 
-        assert result is not None, "After 60s, retry must succeed if init works"
-        # Flag reset happens inside the lock — verify post-success state
+        assert result is view, "After 60s, retry must succeed if init works"
         assert mh._memory_api_init_failed is False, "Flag must be reset after successful retry"
-        assert mh._memory_api_instance is mock_api, "Instance must be cached after retry"
+        assert mh._memory_api_instance is view, "Instance must be cached after retry"
 
     @pytest.mark.asyncio
     async def test_retry_failure_resets_timestamp(self):
@@ -256,14 +233,11 @@ class TestF3RetryBackoff:
         mh._memory_api_init_failed = True
         mh._memory_api_last_failure_ts = old_ts
 
-        with patch.dict("sys.modules", {"memory.memory.api.v1": None}):
-            with patch("memory.memory.api.MemoryAPI") as MockAPI:
-                mock_instance = MagicMock()
-                mock_instance.initialize = AsyncMock(
-                    side_effect=RuntimeError("still failing")
-                )
-                MockAPI.return_value = mock_instance
-                result = await mh.get_memory_helper().get_memory_api()
+        with patch(
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(side_effect=RuntimeError("still failing")),
+        ):
+            result = await mh.get_memory_helper().get_memory_api()
 
         assert result is None
         assert mh._memory_api_init_failed is True
@@ -275,14 +249,11 @@ class TestF3RetryBackoff:
         import plugins.web_ui_module.core.memory_helper as mh
         assert mh._memory_api_last_failure_ts is None
 
-        with patch.dict("sys.modules", {"memory.memory.api.v1": None}):
-            with patch("memory.memory.api.MemoryAPI") as MockAPI:
-                mock_instance = MagicMock()
-                mock_instance.initialize = AsyncMock(
-                    side_effect=RuntimeError("init failure")
-                )
-                MockAPI.return_value = mock_instance
-                await mh.get_memory_helper().get_memory_api()
+        with patch(
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(side_effect=RuntimeError("init failure")),
+        ):
+            await mh.get_memory_helper().get_memory_api()
 
         assert mh._memory_api_last_failure_ts is not None, "Failure timestamp must be set after first failure"
 
@@ -355,39 +326,41 @@ class TestGetMemoryAPIHappyPaths:
 
     @pytest.mark.asyncio
     async def test_v1_reuse_success_sets_instance(self):
-        """When v1.get_memory_api() returns a valid API, instance is cached."""
+        """When the porter returns a view, the instance is cached."""
         import plugins.web_ui_module.core.memory_helper as mh
+        from core.memory_access import MemoryView
 
         mock_api = MagicMock()
-        mock_api._initialized = True
         mock_api.collection_exists = AsyncMock(return_value=True)
+        view = MemoryView(mock_api, plugin_id="web_ui_module")
 
-        mock_v1_module = MagicMock()
-        mock_v1_module.get_memory_api = AsyncMock(return_value=mock_api)
-
-        with patch.dict("sys.modules", {"memory.memory.api.v1": mock_v1_module}):
+        with patch(
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(return_value=view),
+        ):
             result = await mh.get_memory_helper().get_memory_api()
 
-        assert result is mock_api, "Must return the API from v1"
-        assert mh._memory_api_instance is mock_api, "Must cache the API in the module global"
+        assert result is view
+        assert mh._memory_api_instance is view
 
     @pytest.mark.asyncio
     async def test_v1_reuse_creates_collections_if_missing(self):
-        """If v1 API exists but collections are missing, they are created."""
+        """If the API exists but collections are missing, they are created through the view."""
         import plugins.web_ui_module.core.memory_helper as mh
+        from core.memory_access import MemoryView
 
         mock_api = MagicMock()
-        mock_api._initialized = True
         mock_api.collection_exists = AsyncMock(return_value=False)
         mock_api.create_collection = AsyncMock(return_value=True)
+        view = MemoryView(mock_api, plugin_id="web_ui_module")
 
-        mock_v1_module = MagicMock()
-        mock_v1_module.get_memory_api = AsyncMock(return_value=mock_api)
-
-        with patch.dict("sys.modules", {"memory.memory.api.v1": mock_v1_module}):
+        with patch(
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(return_value=view),
+        ):
             result = await mh.get_memory_helper().get_memory_api()
 
-        assert result is mock_api
+        assert result is view
         assert mock_api.create_collection.call_count == 2, (
             "Both personal_memory and user_knowledge must be created"
         )

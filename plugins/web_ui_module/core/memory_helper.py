@@ -16,9 +16,8 @@ import time
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple, List
 
-from memory.memory.constants import DEFAULT_VECTOR_SIZE
-from memory.memory.config import resolve_ingest_config
 from core.endpoints.chat_sanitization import _filter_rag_injection
+from core.memory_access import get_memory_view
 
 logger = logging.getLogger(__name__)
 
@@ -298,24 +297,18 @@ class MemoryHelper:
 
     @staticmethod
     async def _create_memory_api():
-        """Create (or reuse) MemoryAPI and ensure required collections exist.
+        """Obtain the filtered memory view and ensure this plugin's collections.
 
         Bug #19a — creates missing collections only; never deletes/recreates existing ones.
+        D-M — never constructs a private API. If the porter fails, the caller sees None.
         """
-        try:
-            from memory.memory.api.v1 import get_memory_api as _get_v1_api
-            api = await _get_v1_api()
-            logger.info("MemoryAPI singleton reused from v1.py")
-        except Exception as _v1_err:
-            logger.warning("Could not reuse v1 singleton (%s), creating new MemoryAPI", _v1_err)
-            from memory.memory.api import MemoryAPI
-            api = MemoryAPI()
-            await api.initialize()
-        for coll_name in ("personal_memory", "user_knowledge"):
-            if not await api.collection_exists(coll_name):
-                await api.create_collection(coll_name, vector_size=DEFAULT_VECTOR_SIZE)
+        view = await get_memory_view("web_ui_module")
+        logger.info("Memory view obtained from core.memory_access")
+        for coll_name in view.filter_requested(("personal_memory", "user_knowledge")):
+            if not await view.collection_exists(coll_name):
+                await view.create_collection(coll_name)
                 logger.info("Created memory collection %s", coll_name)
-        return api
+        return view
 
     async def get_memory_api(self):
         """Get or initialize Memory API instance (module-level singleton, thread-safe)."""
@@ -919,7 +912,7 @@ class MemoryHelper:
         # Documents go to user_knowledge (separate from personal_memory which is for personal memory)
         DOC_COLLECTION = "user_knowledge"
         if not await memory.collection_exists(DOC_COLLECTION):
-            await memory.create_collection(DOC_COLLECTION, vector_size=DEFAULT_VECTOR_SIZE)
+            await memory.create_collection(DOC_COLLECTION)
             logger.info(f"Created {DOC_COLLECTION} collection")
 
         total = len(chunks)
@@ -938,7 +931,9 @@ class MemoryHelper:
         # Bug #16: BATCH_SIZE was hardcoded to 50 here. Now sourced from
         # the IngestConfig SSOT via the defensive resolver (default still
         # 50 → behaviour-preserving). See memory/memory/config.py.
-        BATCH_SIZE = resolve_ingest_config(memory).store_batch_size
+        cfg = getattr(memory, "ingest_config", None)
+        raw_batch = getattr(cfg, "store_batch_size", None) if cfg is not None else None
+        BATCH_SIZE = raw_batch if isinstance(raw_batch, int) and raw_batch > 0 else 50
 
         # Defense-in-depth — We apply `_filter_rag_injection` to each chunk
         # before indexing to `user_knowledge`. The same filter is already applied at
@@ -1071,8 +1066,10 @@ class MemoryHelper:
                 logger.warning("RAG recall: MemoryAPI not available (init failed or not ready)")
                 return {"success": False, "results": [], "message": "Memory API not available"}
 
-            _all_collections = ["nexe_documentation", "personal_memory", "user_knowledge"]
-            collections_to_search = [c for c in _all_collections if c in collections] if collections is not None else _all_collections
+            if collections is not None:
+                collections_to_search = memory.filter_requested(collections)
+            else:
+                collections_to_search = await memory.visible_names()
 
             # MC-002: embed the query ONCE and reuse it across collections instead
             # of recomputing the identical embedding per collection. Falls back to
@@ -1156,7 +1153,7 @@ class MemoryHelper:
             if await memory.collection_exists("personal_memory"):
                 # Delete and recreate collection
                 await memory.delete_collection("personal_memory")
-                await memory.create_collection("personal_memory", vector_size=DEFAULT_VECTOR_SIZE)
+                await memory.create_collection("personal_memory")
                 logger.info("Memory collection cleared and recreated")
 
             return {

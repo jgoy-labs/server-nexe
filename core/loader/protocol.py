@@ -283,7 +283,8 @@ def validate_module(module: Any) -> bool:
 # One dict for plugins and memory. Callers that used to pass `config=` or
 # `{config, project_root}` go through build_initialize_context.
 
-_TOML_TOP_LEVEL = frozenset({"meta", "personality", "core", "plugins", "security"})
+# D-P: top-level TOML tables live in the catalog. module_config_from_context
+# slices [module_name] and nothing else — tests pass a production-shaped dict.
 
 
 def build_initialize_context(
@@ -303,8 +304,13 @@ def build_initialize_context(
 
 
 def services_from_server_state(server_state: Any) -> Dict[str, Any]:
-  """Shared services actually available at boot. Empty keys are omitted."""
-  services: Dict[str, Any] = {}
+  """Shared services actually available at boot. Empty keys are omitted.
+
+  ``memory`` is the D-M porter (``get_memory_view``). Always present — it is
+  a function, not a boot-time resource that can be missing.
+  """
+  from core.memory_access import get_memory_view
+  services: Dict[str, Any] = {"memory": get_memory_view}
   i18n = getattr(server_state, "i18n", None)
   if i18n is not None:
     services["i18n"] = i18n
@@ -319,8 +325,8 @@ def module_config_from_context(
 ) -> Dict[str, Any]:
   """Per-module overrides from a protocol context.
 
-  Production passes the full TOML as ``config``; a ``[memory]`` (etc.) table
-  is the slice. Tests pass a flat override dict under ``config``.
+  Production and tests pass the same shape: ``config[<module_name>]`` is the
+  slice. A flat dict is not a module section — it returns {}.
   """
   if not isinstance(context, dict):
     return {}
@@ -328,11 +334,9 @@ def module_config_from_context(
   if not isinstance(cfg, dict):
     return {}
   section = cfg.get(module_name)
-  if isinstance(section, dict):
-    inner = section.get("config")
-    if isinstance(inner, dict):
-      return dict(inner)
-    return {k: v for k, v in section.items() if k != "modules"}
-  if set(cfg) & _TOML_TOP_LEVEL:
+  if not isinstance(section, dict):
     return {}
-  return dict(cfg)
+  inner = section.get("config")
+  if isinstance(inner, dict):
+    return dict(inner)
+  return {k: v for k, v in section.items() if k != "modules"}

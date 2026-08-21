@@ -62,7 +62,7 @@
  "plugins/security/manifest.py -> core.loader.manifest_base",
  "plugins/security/module.py -> core.loader.protocol",
  "plugins/security/security_logger/helpers.py -> personality.i18n",
- "plugins/web_ui_module/api/routes.py -> memory.rag.header_parser",
+ "plugins/web_ui_module/api/routes.py -> core.rag_header",
  "plugins/web_ui_module/api/routes_auth.py -> core.runtime_state",
  "plugins/web_ui_module/api/routes_chat.py -> core.dependencies",
  "plugins/web_ui_module/api/routes_chat.py -> core.endpoints.chat_sanitization",
@@ -75,8 +75,7 @@
  "plugins/web_ui_module/api/routes_sessions.py -> core.dependencies",
  "plugins/web_ui_module/api/routes_static.py -> core.version",
  "plugins/web_ui_module/core/memory_helper.py -> core.endpoints.chat_sanitization",
- "plugins/web_ui_module/core/memory_helper.py -> memory.memory.config",
- "plugins/web_ui_module/core/memory_helper.py -> memory.memory.constants",
+ "plugins/web_ui_module/core/memory_helper.py -> core.memory_access",
  "plugins/web_ui_module/manifest.py -> core.loader.manifest_base",
  "plugins/web_ui_module/messages.py -> core.dependencies",
  "plugins/web_ui_module/module.py -> core.loader.protocol"

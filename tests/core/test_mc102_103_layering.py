@@ -104,3 +104,30 @@ class TestLayeringGateIgnoresTypeChecking:
         c = Collector()
         c.visit(ast.parse(src))
         assert "json" in c.modules
+
+
+class TestPluginMemoryDoor:
+    """D-M: plugins/ → memory/ is forbidden even as a deferred import."""
+
+    def _mod(self):
+        spec = importlib.util.spec_from_file_location(
+            "_check_layering", _REPO / "scripts" / "check_layering.py"
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_deferred_plugin_memory_import_is_collected(self):
+        mod = self._mod()
+        src = (
+            "def f():\n"
+            "    from memory.memory.api import MemoryAPI\n"
+            "    return MemoryAPI\n"
+        )
+        c = mod._AllImportsCollector()
+        c.visit(ast.parse(src))
+        assert "memory.memory.api" in c.modules
+
+    def test_repo_plugins_do_not_import_memory(self):
+        mod = self._mod()
+        assert mod._plugin_memory_edges() == []

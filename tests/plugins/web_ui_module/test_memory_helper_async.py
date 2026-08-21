@@ -10,11 +10,14 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
+import inspect
 import logging
 import re
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
+
+from core.memory_access import MemoryView
 
 import plugins.web_ui_module.core.memory_helper as mh_module
 from plugins.web_ui_module.core.memory_helper import (
@@ -55,6 +58,10 @@ def make_memory_mock(
     results = search_results if search_results is not None else []
     mem.search = AsyncMock(return_value=results)
     mem.count = AsyncMock(return_value=count if count is not None else len(results))
+    mem.filter_requested = lambda requested: list(requested)
+    mem.visible_names = AsyncMock(
+        return_value=["nexe_documentation", "personal_memory", "user_knowledge"]
+    )
     return mem
 
 
@@ -79,23 +86,24 @@ class TestGetMemoryApi:
     def test_initializes_singleton(self):
         mem = make_memory_mock(collection_exists=True)
         helper = MemoryHelper()
+        view = MemoryView(mem, plugin_id="web_ui_module")
 
-        # MemoryAPI is imported inside the function: patch the source module.
-        # We also force v1 to fail so it falls into the legacy branch where the mock lives.
-        with patch("memory.memory.api.v1.get_memory_api", side_effect=ImportError("force fallback")):
-            with patch("memory.memory.api.MemoryAPI", return_value=mem):
-                result = asyncio.run(helper.get_memory_api())
+        with patch("plugins.web_ui_module.core.memory_helper.get_memory_view",
+                   AsyncMock(return_value=view)):
+            result = asyncio.run(helper.get_memory_api())
 
-        assert result is mem
-        assert mh_module._memory_api_instance is mem
+        assert result is view
+        assert result._api is mem
+        assert mh_module._memory_api_instance is view
 
     def test_creates_collection_if_not_exists(self):
         mem = make_memory_mock(collection_exists=False)
         helper = MemoryHelper()
+        view = MemoryView(mem, plugin_id="web_ui_module")
 
-        with patch("memory.memory.api.v1.get_memory_api", side_effect=ImportError("force fallback")):
-            with patch("memory.memory.api.MemoryAPI", return_value=mem):
-                asyncio.run(helper.get_memory_api())
+        with patch("plugins.web_ui_module.core.memory_helper.get_memory_view",
+                   AsyncMock(return_value=view)):
+            asyncio.run(helper.get_memory_api())
 
         assert mem.create_collection.call_count == 2  # personal_memory + user_knowledge
 
@@ -104,17 +112,19 @@ class TestGetMemoryApi:
         mh_module._memory_api_instance = mem
         helper = MemoryHelper()
 
-        with patch("memory.memory.api.MemoryAPI") as mock_cls:
+        with patch("plugins.web_ui_module.core.memory_helper.get_memory_view") as mock_door:
             result = asyncio.run(helper.get_memory_api())
 
-        mock_cls.assert_not_called()
+        mock_door.assert_not_called()
         assert result is mem
 
     def test_returns_none_on_exception(self):
         helper = MemoryHelper()
-        with patch("memory.memory.api.v1.get_memory_api", side_effect=ImportError("force fallback")):
-            with patch("memory.memory.api.MemoryAPI", side_effect=Exception("no MemoryAPI")):
-                result = asyncio.run(helper.get_memory_api())
+        with patch(
+            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            AsyncMock(side_effect=Exception("door closed")),
+        ):
+            result = asyncio.run(helper.get_memory_api())
 
         assert result is None
         assert mh_module._memory_api_instance is None
@@ -122,11 +132,19 @@ class TestGetMemoryApi:
     def test_sets_instance_attribute(self):
         mem = make_memory_mock()
         helper = MemoryHelper()
-        with patch("memory.memory.api.v1.get_memory_api", side_effect=ImportError("force fallback")):
-            with patch("memory.memory.api.MemoryAPI", return_value=mem):
-                asyncio.run(helper.get_memory_api())
+        view = MemoryView(mem, plugin_id="web_ui_module")
+        with patch("plugins.web_ui_module.core.memory_helper.get_memory_view",
+                   AsyncMock(return_value=view)):
+            asyncio.run(helper.get_memory_api())
 
-        assert helper._memory_api is mem
+        assert helper._memory_api is view
+
+    def test_does_not_construct_memory_api(self):
+        src = inspect.getsource(MemoryHelper._create_memory_api)
+        assert "MemoryAPI(" not in src, (
+            "D-M: the plugin must not fabricate a private API. Go through get_memory_view."
+        )
+        assert "from memory" not in src
 
 
 # ─── Tests _check_duplicate ───────────────────────────────────────────────────
@@ -607,6 +625,10 @@ class TestRecallFromMemory:
             mem.collection_exists = AsyncMock(return_value=True)
             mem.embed_query = AsyncMock(return_value=[0.1, 0.2])
             mem.search = search_side
+            mem.filter_requested = lambda requested: list(requested)
+            mem.visible_names = AsyncMock(
+                return_value=["nexe_documentation", "personal_memory", "user_knowledge"]
+            )
             helper = MemoryHelper()
 
             with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
@@ -654,7 +676,7 @@ class TestRecallFromMemory:
         async def collection_exists_side(name):
             return True
 
-        async def search_side(query, collection, top_k):
+        async def search_side(query, collection, top_k=5, **kwargs):
             nonlocal call_count
             call_count += 1
             if collection == "personal_memory":
@@ -663,6 +685,10 @@ class TestRecallFromMemory:
 
         mem.collection_exists = collection_exists_side
         mem.search = search_side
+        mem.filter_requested = lambda requested: list(requested)
+        mem.visible_names = AsyncMock(
+            return_value=["nexe_documentation", "personal_memory", "user_knowledge"]
+        )
         helper = MemoryHelper()
 
         with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):

@@ -531,9 +531,16 @@ def test_encryption_enabled_normalized(clean_env, value, expected):
     assert config.encryption_enabled == expected
 
 
-def test_auto_ingest_knowledge_default_false(clean_env):
-    """NEXE_AUTO_INGEST_KNOWLEDGE unset → False."""
+def test_auto_ingest_knowledge_default_standalone_on(clean_env):
+    """Unset + not sidecar → catalog standalone default (ON)."""
     config = SidecarConfig.from_env()
+    assert config.auto_ingest_knowledge is True
+
+
+def test_auto_ingest_knowledge_default_sidecar_off(sidecar_env):
+    """Unset + sidecar → catalog sidecar default (OFF)."""
+    config = SidecarConfig.from_env()
+    assert config.is_sidecar is True
     assert config.auto_ingest_knowledge is False
 
 

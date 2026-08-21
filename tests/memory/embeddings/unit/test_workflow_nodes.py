@@ -41,7 +41,7 @@ async def setup_module(mock_text_embedding):
 
   module = EmbeddingsModule.get_instance()
 
-  await module.initialize({"config": {"model_name": "test-model", "device": "cpu"}})
+  await module.initialize({"config": {"embeddings": {"model_name": "test-model", "device": "cpu"}}})
 
   assert module._cached_embedder is not None
   module._cached_embedder.encoder._load_model = Mock(return_value=mock_text_embedding)

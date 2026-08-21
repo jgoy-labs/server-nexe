@@ -52,3 +52,9 @@ class = "WebUIModule"
 
 [module.router]
 prefix = "/ui"
+
+# D-M — collections this plugin will not see. Default is access to all.
+# The manager can still veto above this list: [plugins.memory_access.web_ui_module]
+# deny in personality/server.toml always wins.
+[module.memory]
+deny = []

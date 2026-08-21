@@ -40,12 +40,18 @@ class TestRecallEmptyCollectionsMC041:
         import plugins.web_ui_module.core.memory_helper as mh
         helper = mh.get_memory_helper()
         searched = []
+        mem = MagicMock()
+        mem.filter_requested = lambda requested: list(requested)
+        mem.visible_names = AsyncMock(
+            return_value=["nexe_documentation", "personal_memory", "user_knowledge"]
+        )
+        mem.embed_query = AsyncMock(side_effect=RuntimeError("skip embed"))
 
         async def fake_search(memory, query, collection, limit, session_id, query_embedding=None):
             searched.append(collection)
             return []
 
-        with patch.object(helper, "get_memory_api", new=AsyncMock(return_value=MagicMock())), \
+        with patch.object(helper, "get_memory_api", new=AsyncMock(return_value=mem)), \
                 patch.object(helper, "_search_collection_results", new=fake_search):
             result = await helper.recall_from_memory("q", collections=collections)
         return searched, result

@@ -263,7 +263,7 @@ class TestMemoryModuleAdditional:
     with patch("memory.memory.module.get_server_state", return_value=mock_state), \
          patch("core.paths.detection.get_repo_root", return_value=tmp_path), \
          patch("pathlib.Path.cwd", return_value=tmp_path):
-      result = await module.initialize({"config": {"flash_ttl_seconds": 3600}})
+      result = await module.initialize({"config": {"memory": {"flash_ttl_seconds": 3600}}})
       assert result is True
 
     await module.shutdown()
@@ -280,7 +280,7 @@ class TestMemoryModuleAdditional:
       mock_gs.return_value.project_root = tmp_path
       mock_gs.return_value.config = {}
       mock_gs.return_value.crypto_provider = None
-      result = await module.initialize({"config": {"ram_max_entries": 50}})
+      result = await module.initialize({"config": {"memory": {"ram_max_entries": 50}}})
       assert result is True
 
     await module.shutdown()

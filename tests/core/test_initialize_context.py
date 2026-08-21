@@ -45,9 +45,14 @@ class TestBuildInitializeContext:
 
 
 class TestModuleConfigFromContext:
-    def test_flat_overrides_for_tests(self):
-        ctx = {"config": {"flash_ttl_seconds": 3600}}
+    def test_module_section_is_the_slice(self):
+        ctx = {"config": {"memory": {"flash_ttl_seconds": 3600}}}
         assert module_config_from_context(ctx, "memory") == {"flash_ttl_seconds": 3600}
+
+    def test_flat_dict_is_not_a_module_section(self):
+        """D-P: production code no longer sniffs test-shaped dicts."""
+        ctx = {"config": {"flash_ttl_seconds": 3600}}
+        assert module_config_from_context(ctx, "memory") == {}
 
     def test_toml_section_slice(self):
         ctx = {"config": {"memory": {"ram_max_entries": 50}, "plugins": {}}}
@@ -70,6 +75,8 @@ class TestServicesFromServerState:
         services = services_from_server_state(state)
         assert services["i18n"] == "i18n-obj"
         assert "crypto_provider" not in services
+        from core.memory_access import get_memory_view
+        assert services["memory"] is get_memory_view
 
 
 class TestPluginInitializeGetsTheFullContext:
@@ -97,6 +104,8 @@ class TestPluginInitializeGetsTheFullContext:
         assert captured["project_root"] == "/tmp"
         assert captured["services"]["i18n"] == "i18n-obj"
         assert "crypto_provider" not in captured["services"]
+        from core.memory_access import get_memory_view
+        assert captured["services"]["memory"] is get_memory_view
         assert "fake_plugin" in captured["modules"]
         assert captured["modules"]["fake_plugin"] is fake
 

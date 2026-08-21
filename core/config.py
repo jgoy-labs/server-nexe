@@ -19,6 +19,7 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from core.config_catalog import default_for
 from core.env_utils import parse_port
 from core.paths.constants import BASE_CONFIG_RELATIVE
 
@@ -92,16 +93,16 @@ def encryption_is_mandatory(env_value: str) -> bool:
     return env_value.strip().lower() == 'true'
 
 
-# Default configuration
+# Default configuration — host/port/mode drink from the D-P catalog.
 DEFAULT_CONFIG = {
     'core': {
         'server': {
-            'host': '127.0.0.1',  # nosemgrep
-            'port': 9119,
+            'host': default_for("server_host"),  # nosemgrep
+            'port': default_for("server_port"),
             'cors_origins': ['http://localhost:3000']
         },
         'environment': {
-            'mode': 'production'  # 'production' or 'development'
+            'mode': default_for("env", sidecar=True),  # TOML of the product is production
         }
     },
     'security': {
@@ -492,8 +493,8 @@ def get_localhost_aliases() -> list:
 # Used to centralize the previously-hardcoded "9119" / "127.0.0.1" lists  # nosemgrep
 # spread across runner.py, lifespan.py, middleware.py, cli/*, installer/tray.py
 # and plugins/web_ui_module/module.py.
-DEFAULT_HOST = "127.0.0.1"  # nosemgrep
-DEFAULT_PORT = 9119
+DEFAULT_HOST = default_for("server_host")  # nosemgrep
+DEFAULT_PORT = default_for("server_port")
 
 
 def get_default_host() -> str:
@@ -632,16 +633,28 @@ if _PYDANTIC_SETTINGS_AVAILABLE:
         def list_settings(cls) -> list[dict]:
             """For the future admin panel: list all settings with metadata.
 
-            Returns:
-                List of dicts with: name (env var), field, default, description, type.
+            Defaults, origin and sensitivity come from the D-P catalog when the
+            env alias is declared there; Field() stays as the pydantic binding.
             """
-            return [
-                {
-                    "name": (field_info.alias or name).upper(),
+            from core.config_catalog import by_env
+            rows = []
+            for name, field_info in cls.model_fields.items():
+                alias = field_info.alias or name
+                decl = by_env(alias)
+                rows.append({
+                    "name": alias.upper(),
                     "field": name,
-                    "default": field_info.default,
-                    "description": field_info.description,
+                    "default": decl.default if decl is not None else field_info.default,
+                    "default_sidecar": (
+                        decl.default_for(sidecar=True) if decl is not None else field_info.default
+                    ),
+                    "description": (
+                        decl.description if decl is not None and decl.description
+                        else field_info.description
+                    ),
                     "type": str(field_info.annotation),
-                }
-                for name, field_info in cls.model_fields.items()
-            ]
+                    "origin": decl.origin if decl is not None else "env",
+                    "sensitive": bool(decl and decl.sensitive),
+                    "runtime": bool(decl and decl.runtime),
+                })
+            return rows

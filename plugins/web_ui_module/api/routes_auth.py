@@ -400,10 +400,13 @@ def _mark_active_backend(backends: list, current_backend: str) -> str:
 async def _fetch_rag_collections() -> list:
     """Return list of RAG collection dicts {name, count}. Returns [] on error."""
     try:
-        from memory.memory.api.v1 import get_memory_api
-        mem = await get_memory_api()
+        from plugins.web_ui_module.core.memory_helper import get_memory_helper
+        mem = await get_memory_helper().get_memory_api()
+        if not mem:
+            return []
+        names = await mem.visible_names()
         result = []
-        for coll_name in ("nexe_documentation", "personal_memory", "user_knowledge"):
+        for coll_name in names:
             try:
                 count = await mem.count(coll_name) if await mem.collection_exists(coll_name) else -1
                 result.append({"name": coll_name, "count": count})
