@@ -50,7 +50,7 @@ async def cmd_encode(text: str, model: Optional[str] = None):
     config = {}
     if model:
       config["model_name"] = model
-    await module.initialize(config=config)
+    await module.initialize({"config": config})
   
   from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL
   request = EmbeddingRequest(text=text, model=model or DEFAULT_EMBEDDING_MODEL)

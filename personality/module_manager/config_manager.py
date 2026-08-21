@@ -189,37 +189,31 @@ class ConfigManager:
       }
     }
 
+  def _project_root(self) -> Path:
+    project_root = self.config_path.parent
+    if project_root.name == "personality":
+      project_root = project_root.parent
+    return project_root
+
   def _resolve_module_layer(self, module_info) -> str:
     module_path = getattr(module_info, "path", None)
     layer = "plugins"
     if module_path:
       try:
-        project_root = self.config_path.parent
-        if project_root.name == "personality":
-          project_root = project_root.parent
-        relative = module_path.resolve().relative_to(project_root.resolve())
+        relative = module_path.resolve().relative_to(self._project_root().resolve())
         if len(relative.parts) > 0:
           layer = relative.parts[0]
       except Exception as e:
         logger.debug("Could not determine module layer for %s: %s", module_path, e)
     return layer
 
-  def _is_plugins_module(self, module_info) -> bool:
-    module_path = getattr(module_info, "path", None)
-    if module_path is None:
-      return True
-    try:
-      resolved_module = module_path.resolve()
-    except Exception:
-      resolved_module = module_path
-    project_root = self.config_path.parent
-    if project_root.name == "personality":
-      project_root = project_root.parent
-    try:
-      relative = resolved_module.relative_to(project_root.resolve())
-    except Exception:
-      return True
-    return len(relative.parts) > 0 and relative.parts[0] == "plugins"
+  def _is_core_nature(self, module_info) -> bool:
+    from personality.module_manager.core_modules import is_core_nature_at
+    return is_core_nature_at(
+      getattr(module_info, "name", None),
+      getattr(module_info, "path", None),
+      self._project_root(),
+    )
 
   def _apply_enabled_from_core(self, module_info) -> None:
     module_info.enabled = True
@@ -235,7 +229,7 @@ class ConfigManager:
   def _apply_enabled_from_list_or_manifest(self, module_info, modules_config: dict) -> bool:
     from personality.data.models import ModuleState
     enabled_list = modules_config.get('enabled', None)
-    if isinstance(enabled_list, list) and self._is_plugins_module(module_info):
+    if isinstance(enabled_list, list):
       if module_info.name in enabled_list:
         module_info.enabled = True
         logger.debug("Module %s enabled (from list)", module_info.name)
@@ -243,11 +237,7 @@ class ConfigManager:
         module_info.enabled = False
         logger.info("Module %s not in enabled list, disabling", module_info.name)
         module_info.state = ModuleState.DISABLED
-        return False  # signals early return
-    elif isinstance(enabled_list, list):
-      logger.debug("Module %s skipping plugins allowlist (module outside plugins/*)", module_info.name)
-      module_info.enabled = module_info.manifest.get('module', {}).get('enabled', True)
-      logger.debug("Module %s enabled=%s (from manifest default)", module_info.name, module_info.enabled)
+        return False
     else:
       module_info.enabled = module_info.manifest.get('module', {}).get('enabled', True)
       logger.debug("Module %s enabled=%s (from manifest default)", module_info.name, module_info.enabled)
@@ -257,28 +247,61 @@ class ConfigManager:
     """
     Apply configuration to a ModuleInfo.
 
-    Supports two configuration formats:
-    - FORMAT 1 (list): [plugins.modules] enabled = ["security", "security"]
-    - FORMAT 2 (dict): [plugins.modules.security] enabled = true
+    Admission has THREE paths, in this order (D-L / #887). The first one that
+    matches decides `enabled`; the later ones are not consulted:
 
-    Priority: dict > list (more specific wins)
+    - NATURE (wins over everything): `is_core_nature_at(name, path, root)` —
+      declared core AND sitting at its canonical path (`memory/*`, `core/cli`,
+      `personality/module_manager`). Always enabled; ignores both formats below.
+      First-party plugins under `plugins/` (security, ollama_module) are NOT
+      core nature: they stay on the list.
+    - FORMAT 2 (dict): [plugins.modules.security] enabled = true
+    - FORMAT 1 (list): [plugins.modules] enabled = ["security", ...] — applies
+      to every non-core module, wherever it lives. Living outside `plugins/` is
+      no longer a free pass.
+
+    Priority: nature > dict > list (more specific wins).
+
+    `priority` / `auto_start` are read from [plugins.modules.<name>] with
+    [<layer>.modules.<name>] on top when the module lives outside plugins/.
+    An `enabled` key under [<layer>.modules.<name>] is NOT read (it decided
+    before D-L); a warning is logged if one is found.
 
     Args:
       module_info: ModuleInfo to configure
     """
     from personality.data.models import ModuleState
 
-    layer = self._resolve_module_layer(module_info)
-    modules_config = self._config.get(layer, {}).get('modules', {})
-    module_config = modules_config.get(module_info.name, {})
+    # Admission is nature, not folder (D-L / #887). Non-core modules go
+    # through [plugins.modules] even if they sit under memory/ or elsewhere.
+    plugins_modules = self._config.get("plugins", {}).get("modules", {})
+    if not isinstance(plugins_modules, dict):
+      plugins_modules = {}
+    plugin_dict = plugins_modules.get(module_info.name, {})
+    if not isinstance(plugin_dict, dict):
+      plugin_dict = {}
 
-    module_path = getattr(module_info, "path", None)
-    if module_path and '/core/' in str(module_path):
+    layer = self._resolve_module_layer(module_info)
+    layer_modules = self._config.get(layer, {}).get("modules", {})
+    if not isinstance(layer_modules, dict):
+      layer_modules = {}
+    layer_dict = layer_modules.get(module_info.name, {})
+    if not isinstance(layer_dict, dict):
+      layer_dict = {}
+    module_config = {**plugin_dict, **layer_dict} if layer != "plugins" else plugin_dict
+    if layer != "plugins" and "enabled" in layer_dict:
+      logger.warning(
+        "[%s.modules.%s] has an 'enabled' key that is no longer read (D-L): "
+        "admission goes through nature or [plugins.modules]. Move it there.",
+        layer, module_info.name,
+      )
+
+    if self._is_core_nature(module_info):
       self._apply_enabled_from_core(module_info)
-    elif isinstance(module_config, dict) and 'enabled' in module_config:
-      self._apply_enabled_from_dict(module_info, module_config)
+    elif "enabled" in plugin_dict:
+      self._apply_enabled_from_dict(module_info, plugin_dict)
     else:
-      if not self._apply_enabled_from_list_or_manifest(module_info, modules_config):
+      if not self._apply_enabled_from_list_or_manifest(module_info, plugins_modules):
         return
 
     module_info.priority = module_config.get(
@@ -310,11 +333,7 @@ class ConfigManager:
       True if saved successfully
     """
     try:
-      project_root = self.config_path.parent
-      if project_root.name == "personality":
-        project_root = project_root.parent
-
-      relative = module_path.resolve().relative_to(project_root.resolve())
+      relative = module_path.resolve().relative_to(self._project_root().resolve())
       layer = relative.parts[0] if len(relative.parts) > 0 else "plugins"
     except Exception:
       layer = "plugins"

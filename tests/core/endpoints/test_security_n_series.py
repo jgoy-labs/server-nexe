@@ -335,11 +335,13 @@ class TestMemoryAPIErrorDisclosure:
             f"memory_search leaked the raw exception into the HTTP body: {resp.text!r}"
         )
 
-    def test_health_exception_no_str_e_in_response(self):
-        """memory_health (unauthenticated) must not contain str(e) on failure.
+    def test_health_exception_no_str_e_in_response(self, monkeypatch):
+        """memory_health must not contain str(e) on failure.
 
         B072 — reforçat de teatre a conductual. memory_health retorna 200 amb un
         dict genèric quan falla; el text de l'excepció no hi pot aparèixer.
+        Auth is required (ADR-005 D-O, 21/08): the leak check is on the
+        authenticated path, otherwise the handler never runs.
 
         Prova de mutació: afegir str(e) al dict de resposta → VERMELL.
         """
@@ -347,10 +349,12 @@ class TestMemoryAPIErrorDisclosure:
         from fastapi.testclient import TestClient
 
         SENTINEL = "SENTINEL_HEALTH_EXC_B072"
+        api_key = "nexe_test_health_b072"
+        monkeypatch.setenv("NEXE_PRIMARY_API_KEY", api_key)
         app = _build_minimal_memory_app()
         with patch("memory.memory.api.v1.get_memory_api", side_effect=RuntimeError(SENTINEL)):
             with TestClient(app) as client:
-                resp = client.get("/memory/health")
+                resp = client.get("/memory/health", headers={"X-API-Key": api_key})
         assert resp.status_code == 200, (
             f"memory_health should return 200 even when unhealthy, got {resp.status_code}: {resp.text}"
         )

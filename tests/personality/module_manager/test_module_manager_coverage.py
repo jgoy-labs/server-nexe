@@ -358,6 +358,19 @@ class TestLoadMemoryModules:
         result = mm.load_memory_modules_sync()
         assert result == {}
 
+    def test_refuses_unknown_memory_module_name(self, mm, tmp_path):
+        """Unknown names must not reach importlib (the old nosemgrep claimed
+        NEXE_APPROVED_MODULES validated this; it never did)."""
+        memory_path = tmp_path / "memory"
+        evil = memory_path / "evil"
+        evil.mkdir(parents=True)
+        (evil / "manifest.py").write_text("MODULE_ID = 'evil'\n")
+        mm.path_discovery.base_path = tmp_path
+        with patch("importlib.import_module") as imp:
+            result = asyncio.run(mm._load_single_memory_module("evil", memory_path, None))
+        assert result is None
+        imp.assert_not_called()
+
 
 class TestLoadPluginRouters:
     """Test lines 439-497: load_plugin_routers branches."""

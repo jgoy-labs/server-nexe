@@ -308,9 +308,9 @@ async def memory_search(request: Request, body: MemorySearchRequest):
         logger.error("Memory search failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Internal error. Check server logs.")
 
-@router.get("/health", summary="Health check for memory subsystem and Qdrant collections", operation_id="memory_health")
+@router.get("/health", dependencies=[Depends(require_api_key)], summary="Health check for memory subsystem and Qdrant collections (API key required)", operation_id="memory_health")
 async def memory_health():
-    """Health check for memory subsystem."""
+    """Health check for memory subsystem. Requires the same API key as store/search."""
     try:
         memory = await get_memory_api()
         collections = await memory.list_collections()

@@ -56,14 +56,14 @@ async def embeddings_module(mock_text_embedding, tmp_path):
 
   with patch('fastembed.TextEmbedding',
         return_value=mock_text_embedding):
-    await module.initialize(config={
+    await module.initialize({"config": {
       "model_name": "test-model",
       "device": "cpu",
       "cache_enabled": True,
       "l1_max_size": 10,
       "l2_max_size_gb": 0.001,
       "max_chunk_size": 150
-    })
+    }})
 
     # Redirect the L2 disk cache to tmp_path: the default lives at
     # <cwd>/storage/cache/embeddings/embeddings_l2.db, a working-tree file

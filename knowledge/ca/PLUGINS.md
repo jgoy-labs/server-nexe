@@ -224,7 +224,7 @@ El ModuleManager escaneja `plugins/`, `memory/`, `personality/` per a fitxers `m
 Import dinamic de Python: `from plugins.my_plugin.module import MyPluginModule`. Valida el Protocol NexeModule.
 
 ### 3. Initialization
-Crida `await module.initialize(context)`. El context conte config, serveis (logger, i18n, event_system) i registre de moduls.
+Crida `await module.initialize(context)`. El context te **quatre claus**: `config` (la config sencera del TOML), `services` (els serveis realment disponibles a l'arrencada: `i18n` i `crypto_provider`; les claus buides s'ometen), `modules` (registre de moduls carregats) i `project_root`. **Els moduls de `memory/` reben exactament el mateix dict** — abans rebien `initialize(config=<seccio>)`, un segon contracte que ja no existeix. Per llegir els teus overrides des del context: `module_config_from_context(context, "<nom>")` a `core/loader/protocol.py`.
 
 ### 4. Integration
 Si el modul implementa `NexeModuleWithRouter`, el core registra el router a FastAPI via `app.include_router()`.
@@ -236,6 +236,21 @@ Crida `await module.shutdown()` durant l'aturada del servidor. Ha de ser idempot
 
 server-nexe te **tres mecanismes complementaris** per decidir quins plugins s'activen. Els tres conviuen i es combinen — no son alternatives.
 
+### 0. Naturalesa declarada — qui NO passa per la llista
+
+Abans dels tres mecanismes hi ha una pregunta previa: el modul es **core per
+naturalesa**? Ho es si esta **declarat** i **al seu path canonic**: `memory/embeddings`, `memory/rag`,
+`memory/memory`, `core/cli` i `personality/module_manager` (el carregador no pot ser plugin de si
+mateix). Aquests s'activen sempre i **no** passen per `[plugins.modules]`.
+
+Tota la resta passa per la llista, **visqui on visqui**. Viure fora de `plugins/` ja **no** es un passi
+lliure: un modul estrany sota `memory/` que abans s'activava pel default del seu manifest, ara queda
+desactivat si no es a `enabled`. `security` i `ollama_module` son first-party pero viuen sota
+`plugins/` → segueixen la llista com qualsevol altre.
+
+> Un `enabled` sota `[<capa>.modules.<nom>]` (ex: `[memory.modules.x]`) **ja no decideix res**; el
+> servidor ho registra amb un warning. L'admissio va per naturalesa o per `[plugins.modules]`.
+
 ### 1. `server.toml` — seccio `[plugins.modules]`
 
 Llista estatica declarativa al fitxer `personality/server.toml` (seccio `[plugins.modules]`). Es la font primaria: indica al servidor quins plugins HA d'activar a l'arrencada.
@@ -245,7 +260,7 @@ Llista estatica declarativa al fitxer `personality/server.toml` (seccio `[plugin
 enabled = ["security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module"]
 ```
 
-> **Nota: 5 plugins reals, no 6.** La llista d'`enabled` conté 6 noms però `rag` **NO és un plugin NexeModule** — és un subsistema intern gestionat per `memory/rag/` (la capa RAG del sistema de memòria). Es llista aquí per coherència històrica i perquè l'activador de mòduls el reconegui, però no té `manifest.toml` ni implementa el Protocol NexeModule. Els **5 plugins reals** són: `mlx_module`, `llama_cpp_module`, `ollama_module`, `security`, `web_ui_module`.
+> **Nota: 5 plugins reals, no 6.** La llista d'`enabled` conté 6 noms però `rag` **NO és un plugin NexeModule** — és un subsistema intern gestionat per `memory/rag/` (la capa RAG del sistema de memòria). Hi surt per coherència històrica, però des de l'agost de 2026 **ja no cal**: `rag` és core per naturalesa (`memory/rag`) i s'activa encara que no sigui a la llista. No té `manifest.toml` ni implementa el Protocol NexeModule. Els **5 plugins reals** són: `mlx_module`, `llama_cpp_module`, `ollama_module`, `security`, `web_ui_module`.
 
 Per afegir un plugin nou cal incloure'l explicitament aqui.
 

@@ -263,7 +263,7 @@ class TestMemoryModuleAdditional:
     with patch("memory.memory.module.get_server_state", return_value=mock_state), \
          patch("core.paths.detection.get_repo_root", return_value=tmp_path), \
          patch("pathlib.Path.cwd", return_value=tmp_path):
-      result = await module.initialize(config={"flash_ttl_seconds": 3600})
+      result = await module.initialize({"config": {"flash_ttl_seconds": 3600}})
       assert result is True
 
     await module.shutdown()
@@ -280,7 +280,7 @@ class TestMemoryModuleAdditional:
       mock_gs.return_value.project_root = tmp_path
       mock_gs.return_value.config = {}
       mock_gs.return_value.crypto_provider = None
-      result = await module.initialize(config={"ram_max_entries": 50})
+      result = await module.initialize({"config": {"ram_max_entries": 50}})
       assert result is True
 
     await module.shutdown()
@@ -365,4 +365,68 @@ class TestMemoryModuleAdditional:
         result = module.get_metrics()
         assert isinstance(result, dict)
 
+    MemoryModule._instance = None
+
+
+class TestProjectRootFromContext:
+  """The context may pre-empt the resolution chain only with an ABSOLUTE root.
+
+  `path_discovery.base_path` defaults to Path("."), which is truthy: accepting
+  it would skip server_state, get_repo_root() AND the cwd guard, and a sidecar
+  launched from $HOME would root storage at the user's home directory.
+
+  Mutation proof: drop the `is_absolute()` check in
+  memory/memory/module.py and this test goes RED.
+  """
+
+  async def test_relative_project_root_is_ignored(self, tmp_path, caplog):
+    from pathlib import Path as _Path
+    from unittest.mock import patch, MagicMock
+    import logging
+
+    MemoryModule._instance = None
+    module = MemoryModule.get_instance()
+
+    mock_state = MagicMock()
+    mock_state.project_root = tmp_path
+    mock_state.config = {}
+    mock_state.crypto_provider = None
+
+    with caplog.at_level(logging.WARNING, logger="memory.memory.module"):
+      with patch("memory.memory.module.get_server_state", return_value=mock_state):
+        result = await module.initialize(
+          {"config": {}, "services": {}, "modules": {}, "project_root": _Path(".")}
+        )
+
+    assert result is True
+    assert (tmp_path / "storage" / "vectors").exists(), (
+      "storage was not rooted at the absolute project_root from server_state"
+    )
+    assert any("relative project_root" in r.message for r in caplog.records), (
+      "the ignored relative root must be logged, not swallowed"
+    )
+
+    await module.shutdown()
+    MemoryModule._instance = None
+
+  async def test_absolute_project_root_from_context_is_used(self, tmp_path):
+    from unittest.mock import patch, MagicMock
+
+    MemoryModule._instance = None
+    module = MemoryModule.get_instance()
+
+    mock_state = MagicMock()
+    mock_state.project_root = None
+    mock_state.config = {}
+    mock_state.crypto_provider = None
+
+    ctx_root = tmp_path / "from_context"
+    ctx_root.mkdir()
+    with patch("memory.memory.module.get_server_state", return_value=mock_state):
+      result = await module.initialize({"config": {}, "project_root": ctx_root})
+
+    assert result is True
+    assert (ctx_root / "storage" / "vectors").exists()
+
+    await module.shutdown()
     MemoryModule._instance = None

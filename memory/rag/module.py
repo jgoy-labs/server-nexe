@@ -91,14 +91,15 @@ class RAGModule:
         cls._instance = cls()
     return cls._instance
 
-  async def initialize(self, config: Optional[Dict[str, Any]] = None) -> bool:
+  async def initialize(self, context: Optional[Dict[str, Any]] = None) -> bool:
     """
     Initializes the RAG module.
 
     Loads RAG sources (PersonalityRAG) and prepares the module for operation.
 
     Args:
-      config: Optional configuration (default from manifest)
+      context: Protocol initialize context (D-C). Module overrides under
+        context['config'].
 
     Returns:
       bool: True if initialization correct
@@ -111,6 +112,8 @@ class RAGModule:
       return True
 
     try:
+      from core.loader.protocol import module_config_from_context
+      config = module_config_from_context(context, "rag")
       final_config = {**self.manifest.get("default_config", {})}
       if config:
         final_config.update(config)

@@ -20,6 +20,7 @@ import pytest
 from personality.module_manager.core_modules import (
     get_core_modules,
     is_core_module_at,
+    is_core_nature_at,
 )
 
 
@@ -65,6 +66,34 @@ class TestIsCoreModuleAt:
         assert get_core_modules() == {
             "security", "ollama_module", "rag", "embeddings", "memory", "cli",
         }
+
+
+class TestIsCoreNatureAt:
+    def test_memory_and_cli_at_canonical_are_core_nature(self):
+        for name, rel in [
+            ("rag", "memory/rag"),
+            ("embeddings", "memory/embeddings"),
+            ("memory", "memory/memory"),
+            ("cli", "core/cli"),
+            ("module_manager", "personality/module_manager"),
+        ]:
+            assert is_core_nature_at(name, PROJECT_ROOT / rel, PROJECT_ROOT), name
+
+    def test_first_party_plugins_are_not_core_nature(self):
+        assert not is_core_nature_at(
+            "security", PROJECT_ROOT / "plugins" / "security", PROJECT_ROOT
+        )
+        assert not is_core_nature_at(
+            "ollama_module", PROJECT_ROOT / "plugins" / "ollama_module", PROJECT_ROOT
+        )
+
+    def test_impersonator_is_not_core_nature(self):
+        assert not is_core_nature_at(
+            "memory", PROJECT_ROOT / "plugins" / "memory", PROJECT_ROOT
+        )
+        assert not is_core_nature_at(
+            "module_manager", PROJECT_ROOT / "plugins" / "module_manager", PROJECT_ROOT
+        )
 
 
 class TestCheckPluginSecurityPathPin:

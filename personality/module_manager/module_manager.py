@@ -49,6 +49,13 @@ except ImportError:
 from personality._logger import get_logger
 logger = get_logger(__name__)
 
+# Closed set of in-tree memory packages. Load order is a dependency chain
+# (embeddings → rag → memory). `_load_single_memory_module` refuses anything
+# else before importlib sees the name — this is the allowlist the two
+# import_module calls used to claim (falsely) was NEXE_APPROVED_MODULES.
+_MEMORY_CORE_MODULE_ORDER = ("embeddings", "rag", "memory")
+_MEMORY_CORE_MODULES = frozenset(_MEMORY_CORE_MODULE_ORDER)
+
 if not SECURITY_VALIDATION_AVAILABLE:
   logger.warning("Security validation not available - validate_safe_path not found")
 
@@ -318,16 +325,21 @@ class ModuleManager(PluginLoaderMixin):
     module_name: str,
     memory_path,
     config: Optional[Dict[Any, Any]],
+    loaded_modules: Optional[Dict[str, Any]] = None,
   ):
     """Import, instantiate, and initialize a single memory module by name."""
     import importlib
+    if module_name not in _MEMORY_CORE_MODULES:
+      logger.error("Refusing to import unknown memory module: %s", module_name)
+      return None
     module_path = memory_path / module_name
     manifest_file = module_path / "manifest.py"
     if not manifest_file.exists():
       logger.debug("Memory module manifest not found: %s", manifest_file)
       return None
 
-    manifest_module = importlib.import_module(f"memory.{module_name}.manifest")  # nosemgrep: non-literal-import — module_name from internal registry, validated by NEXE_APPROVED_MODULES
+    # nosemgrep: non-literal-import — module_name allowlisted against _MEMORY_CORE_MODULES (embeddings/rag/memory), not user input
+    manifest_module = importlib.import_module(f"memory.{module_name}.manifest")
     if not hasattr(manifest_module, "MODULE_ID"):
       logger.error("Memory module %s missing MODULE_ID", module_name)
       return None
@@ -335,7 +347,8 @@ class ModuleManager(PluginLoaderMixin):
     module_id = manifest_module.MODULE_ID
     logger.info("Loading memory module: %s (ID: %s)", module_name, module_id)
 
-    module_py = importlib.import_module(f"memory.{module_name}.module")  # nosemgrep: non-literal-import — module_name from internal registry, validated by NEXE_APPROVED_MODULES
+    # nosemgrep: non-literal-import — same closed set as the manifest import above
+    module_py = importlib.import_module(f"memory.{module_name}.module")
     module_class_name = self._resolve_memory_class_name(module_name)
     if not hasattr(module_py, module_class_name):
       logger.error("Memory module class not found: %s", module_class_name)
@@ -344,8 +357,17 @@ class ModuleManager(PluginLoaderMixin):
     module_class = getattr(module_py, module_class_name)
     instance = module_class.get_instance()
 
-    module_config = config.get(module_name) if config else None
-    success = await instance.initialize(config=module_config)
+    from core.loader.protocol import build_initialize_context
+    services = {}
+    if getattr(self, "i18n", None) is not None:
+      services["i18n"] = self.i18n
+    context = build_initialize_context(
+      config=config,
+      services=services,
+      modules=loaded_modules,
+      project_root=getattr(self.path_discovery, "base_path", None),
+    )
+    success = await instance.initialize(context)
     if not success:
       logger.error("Memory module initialization failed: %s", module_name)
       return None
@@ -400,12 +422,11 @@ class ModuleManager(PluginLoaderMixin):
       logger.warning("Memory path not found: %s", memory_path)
       return loaded_modules
 
-    # Initialization order (dependency chain)
-    module_order = ["embeddings", "rag", "memory"]
-
-    for module_name in module_order:
+    for module_name in _MEMORY_CORE_MODULE_ORDER:
       try:
-        result = await self._load_single_memory_module(module_name, memory_path, config)
+        result = await self._load_single_memory_module(
+          module_name, memory_path, config, loaded_modules
+        )
         if result is not None:
           module_id, instance = result
           loaded_modules[module_id] = instance

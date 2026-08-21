@@ -450,7 +450,7 @@ class TestMemoryHealthEndpoint:
         mock_mem = make_mock_memory()
 
         with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
-            resp = client.get("/memory/health")
+            resp = client.get("/memory/health", headers={"X-Api-Key": API_KEY})
 
         assert resp.status_code == 200
         data = resp.json()
@@ -462,8 +462,13 @@ class TestMemoryHealthEndpoint:
 
         with patch("memory.memory.api.v1.get_memory_api",
                    AsyncMock(side_effect=Exception("Qdrant not running"))):
-            resp = client.get("/memory/health")
+            resp = client.get("/memory/health", headers={"X-Api-Key": API_KEY})
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "unhealthy"
+
+    def test_health_missing_api_key_returns_401(self):
+        client = TestClient(make_app(), raise_server_exceptions=False)
+        resp = client.get("/memory/health")
+        assert resp.status_code == 401

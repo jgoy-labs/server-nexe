@@ -138,8 +138,9 @@ class NexeModule(Protocol):
     Args:
       context: Dictionary with services and configuration:
         - config: Global configuration
-        - services: Shared services (logger, i18n, etc.)
+        - services: Shared services (i18n, crypto_provider, …)
         - modules: Reference to the module registry
+        - project_root: Repo/install root (already delivered to plugins)
 
     Returns:
       True if initialization succeeds, False if it fails
@@ -276,3 +277,62 @@ def validate_module(module: Any) -> bool:
     return False
 
   return True
+
+
+# --- initialize context (D-C / #870 / #894) ---------------------------------
+# One dict for plugins and memory. Callers that used to pass `config=` or
+# `{config, project_root}` go through build_initialize_context.
+
+_TOML_TOP_LEVEL = frozenset({"meta", "personality", "core", "plugins", "security"})
+
+
+def build_initialize_context(
+  *,
+  config: Optional[Dict[str, Any]] = None,
+  services: Optional[Dict[str, Any]] = None,
+  modules: Optional[Dict[str, Any]] = None,
+  project_root: Any = None,
+) -> Dict[str, Any]:
+  """Build the single initialize() context. Keys match NexeModule.initialize."""
+  return {
+    "config": config if config is not None else {},
+    "services": services if services is not None else {},
+    "modules": modules if modules is not None else {},
+    "project_root": project_root,
+  }
+
+
+def services_from_server_state(server_state: Any) -> Dict[str, Any]:
+  """Shared services actually available at boot. Empty keys are omitted."""
+  services: Dict[str, Any] = {}
+  i18n = getattr(server_state, "i18n", None)
+  if i18n is not None:
+    services["i18n"] = i18n
+  crypto = getattr(server_state, "crypto_provider", None)
+  if crypto is not None:
+    services["crypto_provider"] = crypto
+  return services
+
+
+def module_config_from_context(
+  context: Optional[Dict[str, Any]], module_name: str
+) -> Dict[str, Any]:
+  """Per-module overrides from a protocol context.
+
+  Production passes the full TOML as ``config``; a ``[memory]`` (etc.) table
+  is the slice. Tests pass a flat override dict under ``config``.
+  """
+  if not isinstance(context, dict):
+    return {}
+  cfg = context.get("config")
+  if not isinstance(cfg, dict):
+    return {}
+  section = cfg.get(module_name)
+  if isinstance(section, dict):
+    inner = section.get("config")
+    if isinstance(inner, dict):
+      return dict(inner)
+    return {k: v for k, v in section.items() if k != "modules"}
+  if set(cfg) & _TOML_TOP_LEVEL:
+    return {}
+  return dict(cfg)

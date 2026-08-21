@@ -25,6 +25,7 @@ PROTECTED_ENDPOINTS = [
     "/ollama/health",
     "/ollama/info",
     "/memory/health",
+    "/v1/memory/health",
     "/memory/info",
     "/memory/stats/test-user",
     "/memory/profile/test-user",

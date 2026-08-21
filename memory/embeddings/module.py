@@ -111,7 +111,7 @@ class EmbeddingsModule:
         cls._instance = cls()
     return cls._instance
 
-  async def initialize(self, config: Optional[Dict[str, Any]] = None) -> bool:
+  async def initialize(self, context: Optional[Dict[str, Any]] = None) -> bool:
     """
     Initializes the Embeddings module.
 
@@ -122,7 +122,8 @@ class EmbeddingsModule:
     4. Validate dependencies
 
     Args:
-      config: Optional configuration
+      context: Protocol initialize context (D-C). Module overrides under
+        context['config']:
         - model_name: str (default: paraphrase-multilingual-mpnet-base-v2)
         - device: str (default: cpu)
         - max_workers: int (default: 2)
@@ -144,6 +145,8 @@ class EmbeddingsModule:
       return True
 
     try:
+      from core.loader.protocol import module_config_from_context
+      config = module_config_from_context(context, "embeddings")
       from .constants import DEFAULT_EMBEDDING_MODEL
       default_config = {
         "model_name": DEFAULT_EMBEDDING_MODEL,

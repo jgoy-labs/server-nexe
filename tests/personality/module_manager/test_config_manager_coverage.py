@@ -176,36 +176,55 @@ class TestLoadManifest:
 
 
 class TestApplyConfigCoreModule:
-    def test_core_module_always_enabled(self, tmp_path):
-        """Lines 251-256: core module path -> always enabled."""
-        config_file = tmp_path / "server.toml"
-        config_file.write_text("")
+    def test_declared_core_always_enabled(self, tmp_path):
+        """Canonical memory/memory is CORE even with an empty plugins list."""
+        config_file = tmp_path / "personality" / "server.toml"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text('[plugins.modules]\nenabled = []\n')
         cm = ConfigManager(config_file)
-        cm._config = {"plugins": {"modules": {"enabled": []}}}
 
         from personality.data.models import ModuleInfo
+        canonical = tmp_path / "memory" / "memory"
+        canonical.mkdir(parents=True)
         module_info = ModuleInfo(
-            name="core_module",
-            path=Path("/project/core/some_module"),
-            manifest_path=Path("/project/core/some_module/manifest.toml"),
+            name="memory",
+            path=canonical,
+            manifest_path=canonical / "manifest.toml",
             manifest={"module": {"enabled": True, "priority": 10}}
         )
         cm.apply_config_to_module(module_info)
         assert module_info.enabled is True
 
-
-class TestApplyConfigNonPluginsModule:
-    def test_non_plugins_module_skips_allowlist(self, tmp_path):
-        """Lines 272-276: module outside plugins/ skips allowlist."""
+    def test_core_in_path_is_not_enough(self, tmp_path):
+        """A '/core/' substring is not nature. Unknown names follow the list."""
         config_file = tmp_path / "personality" / "server.toml"
         config_file.parent.mkdir(parents=True)
-        config_file.write_text("""
-[memory.modules]
-enabled = ["rag"]
-""")
+        config_file.write_text('[plugins.modules]\nenabled = []\n')
         cm = ConfigManager(config_file)
 
-        from personality.data.models import ModuleInfo
+        from personality.data.models import ModuleInfo, ModuleState
+        impostor = tmp_path / "core" / "some_module"
+        impostor.mkdir(parents=True)
+        module_info = ModuleInfo(
+            name="core_module",
+            path=impostor,
+            manifest_path=impostor / "manifest.toml",
+            manifest={"module": {"enabled": True, "priority": 10}}
+        )
+        cm.apply_config_to_module(module_info)
+        assert module_info.enabled is False
+        assert module_info.state == ModuleState.DISABLED
+
+
+class TestApplyConfigNonPluginsModule:
+    def test_stranger_under_memory_does_not_skip_plugins_list(self, tmp_path):
+        """Living under memory/ is not a free pass (D-L)."""
+        config_file = tmp_path / "personality" / "server.toml"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text('[plugins.modules]\nenabled = ["security"]\n')
+        cm = ConfigManager(config_file)
+
+        from personality.data.models import ModuleInfo, ModuleState
         module_path = tmp_path / "memory" / "test_mod"
         module_path.mkdir(parents=True)
         module_info = ModuleInfo(
@@ -215,7 +234,45 @@ enabled = ["rag"]
             manifest={"module": {"enabled": True, "priority": 10}}
         )
         cm.apply_config_to_module(module_info)
-        # Should use manifest default since it's not in plugins/
+        assert module_info.enabled is False
+        assert module_info.state == ModuleState.DISABLED
+
+    def test_canonical_security_still_follows_the_plugins_list(self, tmp_path):
+        """security is TCB-internal but still a plugin for the TOML list."""
+        config_file = tmp_path / "personality" / "server.toml"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text('[plugins.modules]\nenabled = []\n')
+        cm = ConfigManager(config_file)
+
+        from personality.data.models import ModuleInfo, ModuleState
+        canonical = tmp_path / "plugins" / "security"
+        canonical.mkdir(parents=True)
+        module_info = ModuleInfo(
+            name="security",
+            path=canonical,
+            manifest_path=canonical / "manifest.toml",
+            manifest={"module": {"enabled": True, "priority": 10}}
+        )
+        cm.apply_config_to_module(module_info)
+        assert module_info.enabled is False
+        assert module_info.state == ModuleState.DISABLED
+
+    def test_canonical_rag_is_core_without_being_on_the_list(self, tmp_path):
+        config_file = tmp_path / "personality" / "server.toml"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text('[plugins.modules]\nenabled = ["security"]\n')
+        cm = ConfigManager(config_file)
+
+        from personality.data.models import ModuleInfo
+        canonical = tmp_path / "memory" / "rag"
+        canonical.mkdir(parents=True)
+        module_info = ModuleInfo(
+            name="rag",
+            path=canonical,
+            manifest_path=canonical / "manifest.toml",
+            manifest={"module": {"enabled": True, "priority": 10}}
+        )
+        cm.apply_config_to_module(module_info)
         assert module_info.enabled is True
 
 
@@ -281,3 +338,39 @@ class TestUpdateModuleEnabled:
                    return_value=True):
             cm.update_module_enabled("mod", True, module_path)
         assert "plugins" in cm._config
+
+
+class TestIgnoredLayerEnabledIsLogged:
+    """[<layer>.modules.X] enabled stopped deciding with D-L. Say so out loud.
+
+    Silently ignoring a config key the user wrote is how a server ends up
+    running something its owner believes is off.
+    """
+
+    def test_layer_enabled_key_logs_a_warning(self, tmp_path, caplog):
+        import logging
+
+        config_file = tmp_path / "personality" / "server.toml"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text(
+            '[plugins.modules]\nenabled = ["security"]\n'
+            '[memory.modules.test_mod]\nenabled = false\n'
+        )
+        cm = ConfigManager(config_file)
+
+        from personality.data.models import ModuleInfo
+        module_path = tmp_path / "memory" / "test_mod"
+        module_path.mkdir(parents=True)
+        module_info = ModuleInfo(
+            name="test_mod",
+            path=module_path,
+            manifest_path=module_path / "manifest.toml",
+            manifest={"module": {"enabled": True, "priority": 10}}
+        )
+
+        with caplog.at_level(logging.WARNING):
+            cm.apply_config_to_module(module_info)
+
+        assert any("no longer read" in r.message for r in caplog.records), (
+            "an ignored enabled key must be reported, not swallowed"
+        )

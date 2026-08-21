@@ -147,7 +147,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 |----------|--------|------|------------|-------------|
 | `/v1/memory/store` | POST | Yes | **30/min** (hardcoded, `memory/memory/api/v1.py`) | Store text to a collection |
 | `/v1/memory/search` | POST | Yes | **60/min** (hardcoded, `memory/memory/api/v1.py`) | Semantic search in a collection |
-| `/v1/memory/health` | GET | No | default | Memory subsystem health + Qdrant collections |
+| `/v1/memory/health` | GET | Yes | default | Memory subsystem health + Qdrant collections |
 
 **Store request:**
 ```json

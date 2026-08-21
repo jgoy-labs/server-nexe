@@ -33,6 +33,7 @@ class TestFailClosed:
         ("POST", "/v1/memory/search",  {"query": "test", "limit": 1}),
         ("GET",  "/status",            None),
         ("GET",  "/memory/health",     None),
+        ("GET",  "/v1/memory/health",  None),
         ("POST", "/ui/session/new",    None),
     ]
 

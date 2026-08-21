@@ -38,6 +38,50 @@ def get_memory_service():
     return instance._memory_service
 
 
+def _resolve_project_root(context: Optional[Dict[str, Any]]):
+  """Resolve the memory root: context → server_state → repo root → cwd.
+
+  Only an ABSOLUTE root from the context may pre-empt the chain.
+  `path_discovery.base_path` defaults to `Path(".")`, which is truthy:
+  accepting it would skip server_state, get_repo_root() AND the cwd guard,
+  and a sidecar launched from $HOME would root storage at the user's home
+  directory — the very failure the cwd fallback guard exists to prevent.
+  """
+  from pathlib import Path as _Path
+
+  project_root = context.get("project_root") if isinstance(context, dict) else None
+  if project_root and not _Path(str(project_root)).is_absolute():
+    logger.warning(
+      "Ignoring relative project_root from initialize context: %s", project_root
+    )
+    project_root = None
+  if project_root:
+    return project_root
+
+  project_root = get_server_state().project_root
+  if project_root:
+    return project_root
+
+  # NEXE_HOME-aware resolution before falling back to cwd. Sidecar processes
+  # launch from $HOME, so an unguarded Path.cwd() would point the memory
+  # module at the user's home directory.
+  try:
+    from core.paths.detection import get_repo_root
+    project_root = get_repo_root()
+    logger.warning(
+      "project_root not found in server_state, using get_repo_root(): %s",
+      project_root,
+    )
+  except Exception as exc:
+    project_root = _Path.cwd()
+    logger.warning(
+      "project_root not found in server_state and get_repo_root() failed "
+      "(%s), falling back to cwd: %s",
+      exc, project_root,
+    )
+  return project_root
+
+
 class MemoryModule:
   """
   Memory Module - Flash Memory + RAM Context + Persistence + MemoryService.
@@ -99,15 +143,15 @@ class MemoryModule:
         cls._instance = cls()
     return cls._instance
 
-  async def initialize(self, config: Optional[Dict[str, Any]] = None) -> bool:
+  async def initialize(self, context: Optional[Dict[str, Any]] = None) -> bool:
     """
     Initializes the Memory Module.
 
-    Eliminates "brute force" path detection (__file__).
-    Uses the project_root registered in the Container.
+    Same context as plugins (D-C): config / services / modules / project_root.
 
     Args:
-      config: Optional configuration (default from manifest)
+      context: Protocol initialize context. Module overrides live under
+        context['config'] (flat for tests, or a [memory] table in TOML).
 
     Returns:
       bool: True if initialization correct
@@ -117,32 +161,15 @@ class MemoryModule:
       return True
 
     try:
+      from core.loader.protocol import module_config_from_context
+      config = module_config_from_context(context, "memory")
       final_config = {**self.manifest.get("config", {})}
       if config:
         final_config.update(config)
 
       logger.debug("MemoryModule initializing...")
 
-      project_root = get_server_state().project_root
-      if not project_root:
-        # NEXE_HOME-aware resolution before falling back to cwd.
-        # Sidecar processes launch from $HOME, so an unguarded Path.cwd()
-        # would point the memory module at the user's home directory.
-        try:
-          from core.paths.detection import get_repo_root
-          project_root = get_repo_root()
-          logger.warning(
-            "project_root not found in server_state, using get_repo_root(): %s",
-            project_root,
-          )
-        except Exception as exc:
-          from pathlib import Path
-          project_root = Path.cwd()
-          logger.warning(
-            "project_root not found in server_state and get_repo_root() failed "
-            "(%s), falling back to cwd: %s",
-            exc, project_root,
-          )
+      project_root = _resolve_project_root(context)
 
       # In sidecar mode use the canonical sidecar
       # vectors_dir so MemoryModule, MemoryService, and MemoryAPI all share

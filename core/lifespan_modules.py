@@ -90,7 +90,16 @@ async def initialize_plugin_modules(app, server_state):
             if hasattr(instance, 'initialize') and callable(instance.initialize):
                 try:
                     logger.info(f"Initializing plugin: {module_name}")
-                    context = {"config": server_state.config, "project_root": server_state.project_root}
+                    from core.loader.protocol import (
+                        build_initialize_context,
+                        services_from_server_state,
+                    )
+                    context = build_initialize_context(
+                        config=getattr(server_state, "config", None),
+                        services=services_from_server_state(server_state),
+                        modules=plugin_modules,
+                        project_root=getattr(server_state, "project_root", None),
+                    )
                     success = await instance.initialize(context)  # pyright: ignore[reportGeneralTypeIssues]  # plugin protocol: initialize() is awaitable (duck-typed)
                     if success:
                         logger.info(f"  {module_name} initialized successfully")
