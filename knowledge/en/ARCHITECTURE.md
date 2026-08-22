@@ -319,7 +319,7 @@ Handles startup and shutdown of the server. Split into 4 submodules.
 
 ## Module Manager
 
-`personality/module_manager/` is the SINGLE SOURCE OF TRUTH for all modules. There is NO `plugins/base.py` or `plugins/registry.py`.
+`core/modules/` is the SINGLE SOURCE OF TRUTH for all modules. There is NO `plugins/base.py` or `plugins/registry.py`.
 
 **Components:**
 - ConfigManager: config + manifests

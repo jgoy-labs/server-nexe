@@ -274,8 +274,12 @@ class TestReadinessAggregationContract:
     future loosens the aggregation rule, the failure is caught immediately.
 
     Contract verified end-to-end via /health/ready:
-      - Any required-module get_health() returning {"status": "unhealthy"}
-        propagates to readiness status = "unhealthy".
+      - A module that fails one sub-check aggregates to "unhealthy" — that is
+        the rule this class exists to protect, and it is unchanged.
+      - What that means for the user depends on the module's declared
+        criticality (core/operational_state.py): a degradable one leaves the
+        server "degraded" and the interface open; a critical one is
+        "unhealthy" and there is nothing to open.
       - No internal details (per-sub-check names, statuses) leak to the
         response body (combined with the Bug #2 sensitive-keys guard).
     """
@@ -295,11 +299,20 @@ class TestReadinessAggregationContract:
         )
 
     @pytest.mark.parametrize("failing_subcheck", _RAG_SUBCHECK_NAMES)
-    def test_readiness_unhealthy_propagates_from_module_subcheck(
+    def test_a_failing_subcheck_is_surfaced_without_blocking_the_user(
         self, failing_subcheck, monkeypatch
     ):
-        """End-to-end: a required module reporting unhealthy via get_health()
-        must surface as readiness.status='unhealthy' without leaking internals.
+        """End-to-end, rewritten 22/08 — what this sentinel protects is that a
+        failing sub-check is never swallowed, NOT that the user is locked out.
+
+        The unit test above still holds the real contract: one failing
+        sub-check flips the whole module to "unhealthy", and no aggregation
+        change may loosen that. What changed is the consequence. RAG is
+        degradable: readiness now answers "degraded" so the interface loads,
+        and the failure is reported through /status (behind the API key) and
+        shown in the UI. Reporting "unhealthy" here kept the readiness overlay
+        up for ~6 minutes on a problem the user could do nothing about from
+        behind it (#889).
 
         Note on NEXE_APPROVED_MODULES: importing core.endpoints.root sets this
         env var to the default installer allowlist (security, web_ui_module,
@@ -324,8 +337,9 @@ class TestReadinessAggregationContract:
         resp = TestClient(app).get("/health/ready")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "unhealthy", (
-            f"[{failing_subcheck}] readiness did not propagate unhealthy"
+        assert data["status"] == "degraded", (
+            f"[{failing_subcheck}] a degradable module reporting unhealthy must "
+            "not lock the user out of the interface"
         )
         # Re-assert the Bug #2 contract: no internal details leak.
         for key in _SENSITIVE_READINESS_KEYS:

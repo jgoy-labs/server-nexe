@@ -116,9 +116,9 @@ OpenAI-compatible chat completion with RAG and streaming support.
 |----------|--------|------|-------------|
 | `/` | GET | No | System info (version, status, port) |
 | `/health` | GET | No | Basic health check |
-| `/health/ready` | GET | No | Readiness check (verifies required modules) |
+| `/health/ready` | GET | No | Readiness check. Only **critical** subsystems (authentication and the interface) make it answer `unhealthy`; when what is failing or missing is degradable (RAG, embeddings, an engine) it answers `degraded` and the interface loads anyway, so the user can get in and fix it. A degradable module reporting itself unhealthy is **shown, not used as a door**: the interface says so in the status indicator and next to where you type |
 | `/health/circuits` | GET | Yes (X-API-Key) | Circuit breaker states (Ollama, Qdrant) |
-| `/status` | GET | Yes (X-API-Key) | Real-time status: `configured_engine` (intent), `resolved_engine` (the engine chat will effectively run, node-aware), `model` (the configured default — MLX/llama.cpp report their actually-loaded model only in the chat response), loaded modules |
+| `/status` | GET | Yes (X-API-Key) | Real-time status: `configured_engine` (intent), `resolved_engine` (the engine chat will effectively run, node-aware), `model` (the configured default — MLX/llama.cpp report their actually-loaded model only in the chat response), loaded modules, `operational_state` (`normal`/`degraded`/`limited`/`refused`) and `impaired_subsystems` (what is not working). The interface polls this to warn the user when a subsystem failed to start, instead of letting them chat believing memory works |
 | `/api/info` | GET | No | API info and a representative subset of public endpoints (not exhaustive) |
 | `/docs` | GET | No | Swagger/OpenAPI interactive documentation |
 | `/admin/system/restart` | POST | Yes (X-API-Key) | Restart the server (used by the UI after config changes) |

@@ -64,7 +64,7 @@ from core.server.helpers import translate as _translate  # noqa: E402
 # REMOVED DIRECT ROUTES GUARD
 #
 # Routes declared in manifest.removed_direct_routes are registered here at
-# plugin load time (by personality/module_manager/module_manager.py).
+# plugin load time (by core/modules/module_manager.py).
 # The middleware checks every incoming request against this registry and
 # returns 403 before any other processing.
 #

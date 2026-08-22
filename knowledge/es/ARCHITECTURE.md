@@ -319,7 +319,7 @@ Gestiona el arranque y apagado del servidor. Dividido en 4 submodulos.
 
 ## Module Manager
 
-`personality/module_manager/` es la FUENTE UNICA DE VERDAD para todos los modulos. NO existe `plugins/base.py` ni `plugins/registry.py`.
+`core/modules/` es la FUENTE UNICA DE VERDAD para todos los modulos. NO existe `plugins/base.py` ni `plugins/registry.py`.
 
 **Componentes:**
 - ConfigManager: config + manifests

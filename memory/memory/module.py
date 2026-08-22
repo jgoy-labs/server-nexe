@@ -161,7 +161,7 @@ class MemoryModule:
       return True
 
     try:
-      from core.loader.protocol import module_config_from_context
+      from core.modules.protocol import module_config_from_context
       config = module_config_from_context(context, "memory")
       final_config = {**self.manifest.get("config", {})}
       if config:

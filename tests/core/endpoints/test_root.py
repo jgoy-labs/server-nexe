@@ -309,18 +309,70 @@ class TestReadinessEndpoint:
         data = resp.json()
         assert data["status"] == "healthy"
 
-    def test_readiness_missing_module(self):
-        """Required module absent → unhealthy"""
+    def test_readiness_missing_engine_does_not_lock_the_user_out(self):
+        """Preferred engine absent → degraded, NOT unhealthy.
+
+        This test used to assert "unhealthy", which documented the very bug
+        #889 describes on another module: the readiness overlay only lifts on
+        healthy/degraded, so an absent engine left the user staring at a black
+        screen for six minutes — unable to reach the UI and pick a working
+        engine, which is the only place the problem can be fixed. An inference
+        engine is degradable (core/operational_state.py); its absence limits
+        the server, it does not refuse it.
+        """
         config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
         app = make_app(config=config, modules={})
         client = TestClient(app)
         resp = client.get("/health/ready")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "unhealthy"
+        assert data["status"] == "degraded", (
+            "a missing degradable module must not report unhealthy: the UI "
+            "overlay never lifts and the user cannot act (#889)"
+        )
 
-    def test_readiness_unhealthy_module(self):
-        """Module present but unhealthy → unhealthy"""
+    def test_readiness_missing_rag_does_not_lock_the_user_out(self, monkeypatch):
+        """#889 verbatim: rag enabled and approved but never initialised.
+
+        module_manager drops a memory module whose initialize() returned False
+        without raising, so it never reaches app.state.modules. The product
+        (nexe-app lib.rs) approves rag, so it stays in the required set and the
+        old rule turned its absence into unhealthy → ~6 min of black screen.
+        """
+        monkeypatch.setenv(
+            "NEXE_APPROVED_MODULES",
+            "rag,security,web_ui_module,ollama_module,mlx_module,llama_cpp_module",
+        )
+        mock_security = MagicMock()
+        mock_security.get_health.return_value = {"status": "healthy"}
+        config = {"plugins": {"modules": {"enabled": ["security", "rag"]}}}
+        app = make_app(config=config, modules={"security": mock_security})
+        client = TestClient(app)
+        resp = client.get("/health/ready")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "degraded", (
+            "rag is degradable: absent it limits the server, it does not "
+            "refuse it (#889)"
+        )
+
+    def test_readiness_missing_critical_module_is_unhealthy(self, monkeypatch):
+        """The other half of the contract: without auth there is nothing to
+        use, and readiness must keep saying so."""
+        monkeypatch.setenv("NEXE_APPROVED_MODULES", "security,web_ui_module")
+        config = {"plugins": {"modules": {"enabled": ["security", "web_ui_module"]}}}
+        app = make_app(config=config, modules={})
+        client = TestClient(app)
+        resp = client.get("/health/ready")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "unhealthy"
+
+    def test_readiness_unhealthy_degradable_module_does_not_block(self):
+        """A degradable module answering "unhealthy" → degraded, not unhealthy.
+
+        Same reasoning as the missing case: the overlay would keep the user
+        out of the only screen where the problem can be fixed. The failure is
+        reported through /status and shown in the interface instead.
+        """
         mock_module = MagicMock()
         mock_module.get_health.return_value = {"status": "unhealthy"}
         config = {"plugins": {"models": {"preferred_engine": "ollama"}}}
@@ -330,7 +382,7 @@ class TestReadinessEndpoint:
         resp = client.get("/health/ready")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "unhealthy"
+        assert data["status"] == "degraded"
 
     def test_readiness_degraded_module(self):
         """Degraded module → degraded"""

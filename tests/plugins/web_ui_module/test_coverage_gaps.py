@@ -258,7 +258,7 @@ class TestWebUIModuleGaps:
     async def test_health_check_not_initialized(self):
         """Line 259-263: health check when not initialized."""
         from plugins.web_ui_module.module import WebUIModule
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
         mod = WebUIModule()
         result = await mod.health_check()
         assert result.status == HealthStatus.UNKNOWN

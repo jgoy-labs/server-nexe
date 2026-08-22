@@ -25,7 +25,7 @@ def setup_i18n_and_config(project_root: Path) -> Tuple[Any, Any, Any]:
     Tuple[ModularI18nManager, dict, ModuleManager]
   """
   from personality.i18n.modular_i18n import ModularI18nManager
-  from personality.module_manager import ModuleManager
+  from core.modules import ModuleManager
   from core.config import load_config
 
   config_path = project_root / "server.toml"

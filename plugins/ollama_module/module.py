@@ -22,7 +22,7 @@ except ImportError:
 
 from fastapi import APIRouter
 
-from core.loader.protocol import HealthResult, HealthStatus, ModuleMetadata
+from core.modules.protocol import HealthResult, HealthStatus, ModuleMetadata
 from core.resilience import ollama_breaker  # noqa: F401 — accessed dynamically by core/models.py
 
 from .core.client import (

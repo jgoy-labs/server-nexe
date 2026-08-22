@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from .helpers import translate
+from core.operational_state import RefusalReason, record_refusal
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ def validate_production_security(i18n: Any, config: Any = None) -> None:
       "Example: export NEXE_APPROVED_MODULES='security,observability,rag'"
     )
     logger.error(error_msg)
+    record_refusal(RefusalReason.NO_MODULE_ALLOWLIST, "production mode without NEXE_APPROVED_MODULES")
     raise ValueError(error_msg)
 
   if allowlist is not None:

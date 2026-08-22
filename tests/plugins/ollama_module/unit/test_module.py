@@ -144,7 +144,7 @@ class TestHealthCheck:
 
     def test_healthy_when_connected(self):
         from plugins.ollama_module.module import OllamaModule
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
         m = OllamaModule()
 
         with patch.object(m, "check_connection", AsyncMock(return_value=True)):
@@ -154,7 +154,7 @@ class TestHealthCheck:
 
     def test_degraded_when_not_connected(self):
         from plugins.ollama_module.module import OllamaModule
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
         m = OllamaModule()
 
         with patch.object(m, "check_connection", AsyncMock(return_value=False)):
@@ -164,7 +164,7 @@ class TestHealthCheck:
 
     def test_degraded_on_exception(self):
         from plugins.ollama_module.module import OllamaModule
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
         m = OllamaModule()
 
         with patch.object(m, "check_connection", AsyncMock(side_effect=Exception("timeout"))):
@@ -174,7 +174,7 @@ class TestHealthCheck:
 
     def test_unknown_when_httpx_none(self):
         from plugins.ollama_module.module import OllamaModule
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
         import plugins.ollama_module.module as mod
 
         m = OllamaModule()

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter
-from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
+from core.modules.protocol import ModuleMetadata, HealthResult, HealthStatus
 
 from .core.session_manager import SessionManager
 from .core.file_handler import FileHandler

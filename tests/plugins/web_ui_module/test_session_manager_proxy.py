@@ -3,7 +3,7 @@ Regression tests for the session-manager double-init + router stale-reference
 chain (commit 5abd171).
 
 Three bugs chained together:
-  1. Loader early-init — core/loader/manifest_base._get_module calls
+  1. Loader early-init — core/modules/manifest_base._get_module calls
      instance._init_router() immediately after __init__, before
      initialize() runs.
   2. Plugin double-create — WebUIModule used to build a SessionManager()

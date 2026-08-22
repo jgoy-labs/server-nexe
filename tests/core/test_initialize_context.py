@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.loader.protocol import (
+from core.modules.protocol import (
     build_initialize_context,
     module_config_from_context,
     services_from_server_state,
@@ -128,9 +128,9 @@ class TestMemoryModuleGetsTheSameContext:
             '[personality.orchestrator]\nmodules_path = "plugins"\n'
         )
         with patch(
-            "personality.module_manager.module_manager.SECURITY_VALIDATION_AVAILABLE", False
+            "core.modules.module_manager.SECURITY_VALIDATION_AVAILABLE", False
         ):
-            from personality.module_manager.module_manager import ModuleManager
+            from core.modules.module_manager import ModuleManager
 
             return ModuleManager(config_path=config_file)
 

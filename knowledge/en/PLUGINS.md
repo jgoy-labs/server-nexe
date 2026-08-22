@@ -25,7 +25,7 @@ server-nexe uses a plugin architecture based on automatic discovery via manifest
 
 server-nexe uses **Python Protocols** (duck typing), NOT class inheritance. There is NO `BasePlugin` class. A plugin is valid if it implements the right methods — no need to import or extend anything.
 
-**Defined in:** `core/loader/protocol.py`
+**Defined in:** `core/modules/protocol.py`
 
 ### Required interface (NexeModule)
 
@@ -224,7 +224,7 @@ The ModuleManager scans `plugins/`, `memory/`, `personality/` for `manifest.toml
 Dynamic Python import: `from plugins.my_plugin.module import MyPluginModule`. Validates NexeModule Protocol.
 
 ### 3. Initialization
-Calls `await module.initialize(context)`. The context has **four keys**: `config` (the whole TOML config), `services` (the services actually available at boot: `i18n`, `crypto_provider` and the memory door `memory`; empty keys are omitted, except `memory` which is always present), `modules` (registry of loaded modules) and `project_root`. **Modules under `memory/` get exactly the same dict** — they used to get `initialize(config=<section>)`, a second contract that no longer exists. To read your own overrides from the context: `module_config_from_context(context, "<name>")` in `core/loader/protocol.py` — it expects `config[<name>]`, the same shape as the TOML. The key catalog lives in `core/config_catalog.py`: it declares origin, per-mode default and whether a key is sensitive; it holds no secret values.
+Calls `await module.initialize(context)`. The context has **four keys**: `config` (the whole TOML config), `services` (the services actually available at boot: `i18n`, `crypto_provider` and the memory door `memory`; empty keys are omitted, except `memory` which is always present), `modules` (registry of loaded modules) and `project_root`. **Modules under `memory/` get exactly the same dict** — they used to get `initialize(config=<section>)`, a second contract that no longer exists. To read your own overrides from the context: `module_config_from_context(context, "<name>")` in `core/modules/protocol.py` — it expects `config[<name>]`, the same shape as the TOML. The key catalog lives in `core/config_catalog.py`: it declares origin, per-mode default and whether a key is sensitive; it holds no secret values.
 
 ### Memory porter
 
@@ -244,7 +244,7 @@ server-nexe has **three complementary mechanisms** to decide which plugins get a
 
 Before the three mechanisms there is a prior question: is the module **core by
 nature**? It is when it is **declared** and **at its canonical path**: `memory/embeddings`,
-`memory/rag`, `memory/memory`, `core/cli` and `personality/module_manager` (the loader cannot be a
+`memory/rag`, `memory/memory`, `core/cli` and `core/modules` (the loader cannot be a
 plugin of itself). These are always enabled and do **not** go through `[plugins.modules]`.
 
 Everything else goes through the list, **wherever it lives**. Living outside `plugins/` is **no
@@ -280,7 +280,7 @@ Format: comma-separated list, e.g. `NEXE_APPROVED_MODULES="security,ollama_modul
 
 ### 3. `PathDiscovery` — drop-in discovery
 
-Defined in `personality/module_manager/path_discovery.py`. It automatically scans known paths looking for folders containing `manifest.toml`:
+Defined in `core/modules/path_discovery.py`. It automatically scans known paths looking for folders containing `manifest.toml`:
 
 ```python
 known_paths = [
@@ -304,7 +304,7 @@ known_paths = [
 
 ## ModuleManager Architecture
 
-The ModuleManager lives in `personality/module_manager/` — 15 files, ~3500 lines. It is the central facade of the plugin system.
+The ModuleManager lives in `core/modules/` — 15 files, ~3500 lines. It is the central facade of the plugin system.
 
 ### Main components
 
@@ -430,13 +430,13 @@ Both methods may be called multiple times. Always check `self._initialized` guar
 
 | Concept | File |
 |---------|------|
-| NexeModule Protocol | `core/loader/protocol.py` |
-| ModuleManager facade | `personality/module_manager/module_manager.py` |
-| Path Discovery | `personality/module_manager/path_discovery.py` |
-| Module Discovery | `personality/module_manager/discovery.py` |
-| Module Lifecycle | `personality/module_manager/module_lifecycle.py` |
-| Config Manager | `personality/module_manager/config_manager.py` |
-| Module Registry | `personality/module_manager/registry.py` |
+| NexeModule Protocol | `core/modules/protocol.py` |
+| ModuleManager facade | `core/modules/module_manager.py` |
+| Path Discovery | `core/modules/path_discovery.py` |
+| Module Discovery | `core/modules/discovery.py` |
+| Module Lifecycle | `core/modules/module_lifecycle.py` |
+| Config Manager | `core/modules/config_manager.py` |
+| Module Registry | `core/modules/registry.py` |
 | Security Allowlist | `core/config.py` (`get_module_allowlist()`) |
 | Router Registration | `core/server/factory_modules.py` |
 | Reference plugin (cleanest) | `plugins/llama_cpp_module/` |

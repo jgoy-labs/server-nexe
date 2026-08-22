@@ -132,6 +132,10 @@ CATALOG: tuple[KeyDecl, ...] = (
        description="Print bootstrap token to the console"),
     _k("host_alias", "NEXE_HOST", "env", "127.0.0.1",
        description="Alias of NEXE_SERVER_HOST used by the sidecar"),
+    _k("state_watcher_interval", "NEXE_STATE_WATCHER_INTERVAL", "env", 30.0,
+       description="Seconds between operational-state rounds; 0 disables the watcher"),
+    _k("state_watcher_confirmations", "NEXE_STATE_WATCHER_CONFIRMATIONS", "env", 2,
+       description="Equal readings needed before a new state is believed (anti-flap)"),
 )
 
 

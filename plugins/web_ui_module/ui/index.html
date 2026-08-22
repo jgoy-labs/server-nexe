@@ -217,6 +217,9 @@
                     <button id="imageClearBtn" style="background:none;border:none;color:#e62020;
                             cursor:pointer;font-size:1rem;padding:0 4px;" title="Remove image">✕</button>
                 </div>
+                <!-- D-Q: a subsystem that is down has to be visible exactly
+                     where the user is typing, not only in the boot log. -->
+                <div id="degradedNotice" class="degraded-notice" style="display:none" role="status"></div>
                 <input type="file" id="fileInput" accept=".txt,.md,.markdown,.pdf,image/jpeg,image/png,image/webp" style="display: none">
                 <input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp" style="display: none">
                 <div id="statsBar" class="stats-bar">

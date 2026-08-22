@@ -79,7 +79,7 @@ prefix = "/my-module"
 
 ### module.py
 
-Each module implements the `NexeModule` protocol (see `core/loader/protocol.py`). The required members are `metadata`, `initialize`, `shutdown`, and `health_check`. Modules that expose HTTP endpoints additionally implement `NexeModuleWithRouter` (`get_router` + `get_router_prefix`).
+Each module implements the `NexeModule` protocol (see `core/modules/protocol.py`). The required members are `metadata`, `initialize`, `shutdown`, and `health_check`. Modules that expose HTTP endpoints additionally implement `NexeModuleWithRouter` (`get_router` + `get_router_prefix`).
 
 Minimal (faithful) example:
 
@@ -87,7 +87,7 @@ Minimal (faithful) example:
 from typing import Any, Dict
 from fastapi import APIRouter
 
-from core.loader.protocol import (
+from core.modules.protocol import (
     HealthResult,
     HealthStatus,
     ModuleMetadata,

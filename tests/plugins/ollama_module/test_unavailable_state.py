@@ -98,7 +98,7 @@ class TestOllamaModuleUnavailableState:
     async def test_health_check_unavailable_reports_not_configured(self, fresh_module):
         """health_check() must report UNKNOWN with actionable message when
         Ollama is unavailable."""
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
 
         with patch.object(
             fresh_module.client, "ensure_ollama_running",

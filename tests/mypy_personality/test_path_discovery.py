@@ -16,7 +16,7 @@ def test_cluster3_find_module_path_inexistent_returns_none():
     PASSES pre-fix (runtime behaviour already correct).
     FAILS if dev changes the implementation to raise or return non-None for unknown modules.
     """
-    from personality.module_manager.path_discovery import PathDiscovery
+    from core.modules.path_discovery import PathDiscovery
 
     pd = PathDiscovery()
     result = pd.find_module_path("__module_that_does_not_exist_onada4__")
@@ -33,7 +33,7 @@ def test_cluster3_find_module_path_signature_accepts_str():
     Pins that the public signature does not add new mandatory parameters (dev mypy scope).
     """
     import inspect
-    from personality.module_manager.path_discovery import PathDiscovery
+    from core.modules.path_discovery import PathDiscovery
 
     sig = inspect.signature(PathDiscovery.find_module_path)
     params = list(sig.parameters.keys())

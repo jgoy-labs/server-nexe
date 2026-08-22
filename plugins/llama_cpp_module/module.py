@@ -14,7 +14,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter
-from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
+from core.modules.protocol import ModuleMetadata, HealthResult, HealthStatus
 from .core.chat import LlamaCppChatNode
 from .core.config import LlamaCppConfig
 

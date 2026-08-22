@@ -7,7 +7,7 @@ Lines: 69-73 (init exception), 80 (info endpoint), 84-95 (chat endpoint),
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from plugins.llama_cpp_module.module import LlamaCppModule
-from core.loader.protocol import HealthStatus
+from core.modules.protocol import HealthStatus
 
 
 @pytest.mark.asyncio

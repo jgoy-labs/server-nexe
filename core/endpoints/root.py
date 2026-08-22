@@ -16,6 +16,14 @@ from fastapi import APIRouter, Request, Depends
 from core.version import __version__
 from core.i18n_utils import translate
 from core.uptime import uptime_str
+from core.state_watcher import watcher
+from core.operational_state import (
+  STATUS_MISSING,
+  ModuleSignal,
+  OperationalState,
+  decide,
+  readiness_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -160,44 +168,38 @@ async def readiness_check(request: Request) -> dict:
 
   required = _required_modules_from_config(config)
 
-  missing = []
-  unhealthy = []
-  degraded = []
+  # D-Q: this endpoint observes and reports; core.operational_state decides.
+  # Readiness used to rule here, and it ruled by absence alone — a missing
+  # degradable module (rag) produced "unhealthy", which kept the UI overlay up
+  # for six minutes with no way for the user to act.
+  signals = []
   statuses = {}
 
   for module_name in sorted(required):
     instance = modules.get(module_name)
     if not instance:
-      missing.append(module_name)
+      signals.append(ModuleSignal(module_name, STATUS_MISSING))
       continue
 
     status = await _module_health_status(instance)
     statuses[module_name] = status
-    if status == "unhealthy":
-      unhealthy.append(module_name)
-    elif status == "degraded":
-      degraded.append(module_name)
-    elif status == "unknown":
-      degraded.append(module_name)
+    signals.append(ModuleSignal(module_name, status))
 
-  if missing or unhealthy:
-    overall = "unhealthy"
-  elif degraded:
-    overall = "degraded"
-  else:
-    overall = "healthy"
+  state = decide(signals)
+  overall = readiness_status(state)
 
   # instrumentation: log which module(s) drove a non-healthy
   # verdict so the next empirical session has the data to fix the root
   # cause. SECURITY: the log line is server-internal — clients still see
   # only the minimal payload below (no per-module details exposed).
-  if overall != "healthy":
+  if state is not OperationalState.NORMAL:
     logger.warning(
-      "readiness=%s missing=%s unhealthy=%s degraded=%s required=%s statuses=%s",
+      "readiness=%s state=%s missing=%s unhealthy=%s degraded=%s required=%s statuses=%s",
       overall,
-      sorted(missing),
-      sorted(unhealthy),
-      sorted(degraded),
+      state.value,
+      sorted(s.name for s in signals if s.status == STATUS_MISSING),
+      sorted(s.name for s in signals if s.status == "unhealthy"),
+      sorted(s.name for s in signals if s.status in ("degraded", "unknown")),
       sorted(required),
       statuses,
     )
@@ -316,6 +318,13 @@ async def server_status(
     "qdrant_available": getattr(request.app.state, "qdrant_available", False) if hasattr(request.app.state, "qdrant_available") else _get_qdrant_status(),
     "timestamp": datetime.now(timezone.utc).isoformat(),
     "minimal_mode": bool(getattr(request.app.state, "minimal_mode", False)),
+    # D-Q: what the watcher last saw. Behind the API key on purpose —
+    # /health/ready stays a single word for unauthenticated callers, this
+    # endpoint may name what is not working because the UI needs to say so.
+    # Until now a subsystem could fail at startup and the only trace was a
+    # line in the boot log the user never reads.
+    "operational_state": watcher.state.value,
+    "impaired_subsystems": sorted({s.name for s in watcher.last_signals}),
   }
 
 @router.get("/health/circuits", summary="Circuit breaker status (Ollama) (API key required)", response_model=dict, operation_id="circuit_status")

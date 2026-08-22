@@ -15,7 +15,7 @@ from typing import Dict, Any
 from pathlib import Path
 
 from fastapi import APIRouter
-from core.loader.protocol import ModuleMetadata, HealthResult, HealthStatus
+from core.modules.protocol import ModuleMetadata, HealthResult, HealthStatus
 
 logger = logging.getLogger(__name__)
 

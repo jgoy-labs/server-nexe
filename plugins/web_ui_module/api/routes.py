@@ -63,7 +63,7 @@ class _SessionManagerProxy:
     """Late-binding proxy to module_instance.session_manager.
 
     create_router() is invoked by the loader *before* initialize() runs
-    (see core/loader/manifest_base._get_module). At that time the plugin
+    (see core/modules/manifest_base._get_module). At that time the plugin
     has not yet created its real SessionManager. Capturing
     module_instance.session_manager as a local would snapshot None (or a
     pre-crypto placeholder), and the routes would never see the real

@@ -340,6 +340,53 @@ class NexeUI {
         }
     }
 
+    // D-Q: say it out loud when a subsystem is down. Until now the only trace
+    // was a line in the boot log; the user kept chatting believing memory
+    // worked. The state is the watcher's confirmed one, so a backend that
+    // flaps for a few seconds does not blink a warning nobody would read.
+    _updateDegradedBanner(status) {
+        const state = status && status.operational_state;
+        const impaired = (status && status.impaired_subsystems) || [];
+        const healthy = !state || state === 'normal' || impaired.length === 0;
+
+        // The health summary: a glance at the footer indicator is enough.
+        // Both directions: a label left saying "half power" after recovery is
+        // a lie that survives until the next reload. This method only runs
+        // when the server answered, so "connected" is the right word here.
+        const label = document.querySelector('.status-indicator span');
+        if (label) label.textContent = healthy ? this.t('connected') : this.t('degraded_status');
+
+        if (healthy) {
+            this._clearDegradedNotice();
+            return;
+        }
+
+        const dot = document.querySelector('.status-dot');
+        if (dot) dot.classList.add('degraded');
+
+        // The detail: right where the user is about to type, so nobody sends
+        // a message expecting memory to work when it does not.
+        const notice = document.getElementById('degradedNotice');
+        if (!notice) return;
+        const names = this.t('degraded_names') || {};
+        const readable = impaired.map(name => names[name] || name).join(', ');
+        const suffix = impaired.length === 1 ? 'degraded_suffix_one' : 'degraded_suffix_many';
+        notice.textContent = this.t('degraded_prefix') + readable + this.t(suffix);
+        notice.style.display = 'block';
+    }
+
+    // While the server is unreachable nothing is known about its subsystems,
+    // so the last warning stops being information. Leaving it up also leaves
+    // the dot's amber ring around a red dot.
+    _clearDegradedNotice() {
+        const dot = document.querySelector('.status-dot');
+        if (dot) dot.classList.remove('degraded');
+        const notice = document.getElementById('degradedNotice');
+        if (!notice) return;
+        notice.style.display = 'none';
+        notice.textContent = '';
+    }
+
     _getActiveCollections() {
         const ALL = ['personal_memory', 'user_knowledge', 'nexe_documentation'];
         const saved = localStorage.getItem('nexe_collections');
@@ -675,11 +722,24 @@ class NexeUI {
                 const ok = r.ok;
                 statusDot.classList.toggle('active', ok);
                 statusDot.style.background = ok ? '' : '#ff4444';
+                // _updateDegradedBanner overwrites this with the degraded
+                // label when a subsystem is down; "connected" is only about
+                // reaching the server, not about it being well.
                 statusText.textContent = ok ? this.t('connected') : this.t('disconnected');
+                if (ok) {
+                    try {
+                        this._updateDegradedBanner(await r.json());
+                    } catch (err) {
+                        console.warn('[nexe] status payload:', err.message || err);
+                    }
+                } else {
+                    this._clearDegradedNotice();
+                }
             } catch {
                 statusDot.classList.remove('active');
                 statusDot.style.background = '#ff4444';
                 statusText.textContent = this.t('disconnected');
+                this._clearDegradedNotice();
             }
         };
         checkStatus();

@@ -25,7 +25,7 @@ server-nexe utilitza una arquitectura de plugins basada en descobriment automati
 
 server-nexe utilitza **Python Protocols** (duck typing), NO herencia de classes. NO existeix cap classe `BasePlugin`. Un plugin es valid si implementa els metodes correctes — no cal importar ni estendre res.
 
-**Definit a:** `core/loader/protocol.py`
+**Definit a:** `core/modules/protocol.py`
 
 ### Interficie requerida (NexeModule)
 
@@ -224,7 +224,7 @@ El ModuleManager escaneja `plugins/`, `memory/`, `personality/` per a fitxers `m
 Import dinamic de Python: `from plugins.my_plugin.module import MyPluginModule`. Valida el Protocol NexeModule.
 
 ### 3. Initialization
-Crida `await module.initialize(context)`. El context te **quatre claus**: `config` (la config sencera del TOML), `services` (els serveis realment disponibles a l'arrencada: `i18n`, `crypto_provider` i la porta de memoria `memory`; les claus buides s'ometen, excepte `memory` que hi es sempre), `modules` (registre de moduls carregats) i `project_root`. **Els moduls de `memory/` reben exactament el mateix dict** — abans rebien `initialize(config=<seccio>)`, un segon contracte que ja no existeix. Per llegir els teus overrides des del context: `module_config_from_context(context, "<nom>")` a `core/loader/protocol.py` — espera `config[<nom>]`, la mateixa forma que el TOML. El catàleg de claus viu a `core/config_catalog.py`: declara origen, default per mode i si es sensible; no hi ha valors secrets.
+Crida `await module.initialize(context)`. El context te **quatre claus**: `config` (la config sencera del TOML), `services` (els serveis realment disponibles a l'arrencada: `i18n`, `crypto_provider` i la porta de memoria `memory`; les claus buides s'ometen, excepte `memory` que hi es sempre), `modules` (registre de moduls carregats) i `project_root`. **Els moduls de `memory/` reben exactament el mateix dict** — abans rebien `initialize(config=<seccio>)`, un segon contracte que ja no existeix. Per llegir els teus overrides des del context: `module_config_from_context(context, "<nom>")` a `core/modules/protocol.py` — espera `config[<nom>]`, la mateixa forma que el TOML. El catàleg de claus viu a `core/config_catalog.py`: declara origen, default per mode i si es sensible; no hi ha valors secrets.
 
 ### Porteria de la memoria
 
@@ -244,7 +244,7 @@ server-nexe te **tres mecanismes complementaris** per decidir quins plugins s'ac
 
 Abans dels tres mecanismes hi ha una pregunta previa: el modul es **core per
 naturalesa**? Ho es si esta **declarat** i **al seu path canonic**: `memory/embeddings`, `memory/rag`,
-`memory/memory`, `core/cli` i `personality/module_manager` (el carregador no pot ser plugin de si
+`memory/memory`, `core/cli` i `core/modules` (el carregador no pot ser plugin de si
 mateix). Aquests s'activen sempre i **no** passen per `[plugins.modules]`.
 
 Tota la resta passa per la llista, **visqui on visqui**. Viure fora de `plugins/` ja **no** es un passi
@@ -279,7 +279,7 @@ Format: llista separada per comes, ex: `NEXE_APPROVED_MODULES="security,ollama_m
 
 ### 3. `PathDiscovery` — descobriment drop-in
 
-Definit a `personality/module_manager/path_discovery.py`. Escaneja automaticament paths coneguts cercant carpetes amb `manifest.toml`:
+Definit a `core/modules/path_discovery.py`. Escaneja automaticament paths coneguts cercant carpetes amb `manifest.toml`:
 
 ```python
 known_paths = [
@@ -303,7 +303,7 @@ known_paths = [
 
 ## Arquitectura del ModuleManager
 
-El ModuleManager viu a `personality/module_manager/` — 15 fitxers, ~3500 linies. Es la facade central del sistema de plugins.
+El ModuleManager viu a `core/modules/` — 15 fitxers, ~3500 linies. Es la facade central del sistema de plugins.
 
 ### Components principals
 
@@ -429,13 +429,13 @@ Ambdos metodes es poden cridar multiples vegades. Posa sempre guard `self._initi
 
 | Concepte | Fitxer |
 |---------|------|
-| Protocol NexeModule | `core/loader/protocol.py` |
-| ModuleManager facade | `personality/module_manager/module_manager.py` |
-| Descobriment de paths | `personality/module_manager/path_discovery.py` |
-| Descobriment de moduls | `personality/module_manager/discovery.py` |
-| Cicle de vida de moduls | `personality/module_manager/module_lifecycle.py` |
-| Gestor de configuracio | `personality/module_manager/config_manager.py` |
-| Registre de moduls | `personality/module_manager/registry.py` |
+| Protocol NexeModule | `core/modules/protocol.py` |
+| ModuleManager facade | `core/modules/module_manager.py` |
+| Descobriment de paths | `core/modules/path_discovery.py` |
+| Descobriment de moduls | `core/modules/discovery.py` |
+| Cicle de vida de moduls | `core/modules/module_lifecycle.py` |
+| Gestor de configuracio | `core/modules/config_manager.py` |
+| Registre de moduls | `core/modules/registry.py` |
 | Allowlist de seguretat | `core/config.py` (`get_module_allowlist()`) |
 | Registre de routers | `core/server/factory_modules.py` |
 | Plugin de referencia (el mes net) | `plugins/llama_cpp_module/` |

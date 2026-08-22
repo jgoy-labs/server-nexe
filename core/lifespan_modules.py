@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 
 from core.env_utils import parse_truthy
+from core.operational_state import MEMORY_CORE_MODULES
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,18 @@ async def load_memory_modules(app, server_state, _translate):
         msg = _translate(server_state.i18n, "core.server.memory_loaded",
             "Memory modules loaded: {count}", count=len(loaded))
         logger.info(msg)
+
+        # A memory module whose initialize() returns False is dropped WITHOUT
+        # raising, so the except below never sees it and nothing was ever
+        # flagged. That silence is what left the user staring at a black
+        # screen: rag simply was not there, and no one said so.
+        for module_name in MEMORY_CORE_MODULES:
+            if module_name not in loaded:
+                logger.warning(
+                    "Memory module did not load: %s (the features that depend "
+                    "on it are unavailable)", module_name
+                )
+                server_state.degraded_modules.append(module_name)
 
         for id_res, instance in loaded.items():
             logger.info("  - %s (%s)", instance.name, id_res)
@@ -83,14 +96,14 @@ async def initialize_plugin_modules(app, server_state):
 
         for module_name, instance in list(plugin_modules.items()):
             # Skip memory modules (already initialized)
-            if module_name in ['memory', 'rag', 'embeddings'] or module_name.startswith('{{NEXE_'):
+            if module_name in MEMORY_CORE_MODULES or module_name.startswith('{{NEXE_'):
                 continue
 
             # Initialize if module has initialize method
             if hasattr(instance, 'initialize') and callable(instance.initialize):
                 try:
                     logger.info(f"Initializing plugin: {module_name}")
-                    from core.loader.protocol import (
+                    from core.modules.protocol import (
                         build_initialize_context,
                         services_from_server_state,
                     )

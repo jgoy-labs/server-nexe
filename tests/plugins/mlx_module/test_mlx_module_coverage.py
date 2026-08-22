@@ -8,7 +8,7 @@ Lines: 49 (already initialized), 63-65 (config invalid), 72-74 (init exception),
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from plugins.mlx_module.module import MLXModule
-from core.loader.protocol import HealthStatus
+from core.modules.protocol import HealthStatus
 
 
 @pytest.mark.asyncio

@@ -197,7 +197,7 @@ class TestMLXModuleInitializeNotConfiguredState:
     async def test_health_check_with_no_model_reports_not_configured(
         self, fresh_module, monkeypatch, mock_metal_available
     ):
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
         from plugins.mlx_module.core import config as mlx_cfg
 
         monkeypatch.delenv("NEXE_MLX_MODEL", raising=False)

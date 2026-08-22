@@ -23,8 +23,8 @@ def test_bug12_resolve_force_flag_returns_none_for_known_modules(monkeypatch):
     from unittest.mock import MagicMock
 
     from personality.data.models import ModuleInfo, ModuleState
-    from personality.module_manager.discovery import ModuleDiscovery
-    from personality.module_manager.types import DiscoveryConfig
+    from core.modules.discovery import ModuleDiscovery
+    from core.modules.types import DiscoveryConfig
 
     # Remove the test-mode env shortcuts so the production branch is exercised.
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)

@@ -116,7 +116,7 @@ class TestProductionReadPath:
         [personality.orchestrator] sortissin com a "missing" tot i ser al
         fitxer. (storage sí que pot sortir: B049 la va eliminar de veritat.)
         """
-        from personality.module_manager.config_validator import ConfigValidator
+        from core.modules.config_validator import ConfigValidator
 
         result = ConfigValidator().validate(_SERVER_TOML)
         false_missing = [

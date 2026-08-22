@@ -60,9 +60,16 @@ class TestModuleId:
     """Verify MODULE_ID is not empty."""
     assert len(MODULE_ID) > 0
 
-  def test_module_id_format(self):
-    """Verify MODULE_ID follows expected format."""
-    assert MODULE_ID == "rag" or "Nexe" in MODULE_ID or "RAG" in MODULE_ID
+  def test_module_id_is_the_folder_name(self):
+    """The id is load-bearing: the module manager keys the loaded-modules dict
+    by MODULE_ID and startup flags a memory module as missing by FOLDER NAME.
+    They have to be the same word.
+
+    This assertion used to accept anything containing "Nexe" or "RAG", so a
+    rename to "NexeRAG" passed here while it would have marked the search as
+    permanently failed in the user's interface. See
+    tests/core/test_state_watcher.py::TestMemoryModulesAreDeclared."""
+    assert MODULE_ID == "rag"
 
 class TestManifestDefaultConfig:
   """Tests for MANIFEST default_config."""

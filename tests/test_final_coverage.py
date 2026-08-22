@@ -1728,14 +1728,14 @@ class TestRouteManagerFinal:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 28. personality/module_manager/config_validator.py — remaining lines
+# 28. core/modules/config_validator.py — remaining lines
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestConfigValidatorFinal:
 
     def test_validate_invalid_environment(self, tmp_path):
         """Line 157: invalid environment."""
-        from personality.module_manager.config_validator import ConfigValidator
+        from core.modules.config_validator import ConfigValidator
         import tomli_w
 
         config = {
@@ -1754,7 +1754,7 @@ class TestConfigValidatorFinal:
 
     def test_validate_invalid_port(self, tmp_path):
         """Lines 168-170: port out of range."""
-        from personality.module_manager.config_validator import ConfigValidator
+        from core.modules.config_validator import ConfigValidator
         import tomli_w
 
         config = {
@@ -1773,7 +1773,7 @@ class TestConfigValidatorFinal:
 
     def test_validate_invalid_workers(self, tmp_path):
         """Line 181: workers < 1."""
-        from personality.module_manager.config_validator import ConfigValidator
+        from core.modules.config_validator import ConfigValidator
         import tomli_w
 
         config = {
@@ -1792,7 +1792,7 @@ class TestConfigValidatorFinal:
 
     def test_validate_invalid_cors_url(self, tmp_path):
         """Lines 208-213: invalid CORS origin URL."""
-        from personality.module_manager.config_validator import ConfigValidator
+        from core.modules.config_validator import ConfigValidator
         import tomli_w
 
         config = {
@@ -1812,7 +1812,7 @@ class TestConfigValidatorFinal:
 
     def test_validate_section(self, tmp_path):
         """Lines 326-370: validate_section for specific section."""
-        from personality.module_manager.config_validator import ConfigValidator
+        from core.modules.config_validator import ConfigValidator
         import tomli_w
 
         config = {
@@ -1833,14 +1833,14 @@ class TestConfigValidatorFinal:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 29. personality/module_manager/registry.py — remaining lines
+# 29. core/modules/registry.py — remaining lines
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestModuleRegistryFinal:
 
     def test_register_duplicate(self):
         """Line 74: duplicate registration returns False."""
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
 
         registry = ModuleRegistry()
         mock_instance = MagicMock(spec=[])
@@ -1850,14 +1850,14 @@ class TestModuleRegistryFinal:
 
     def test_unregister_nonexistent(self):
         """Line 116: unregister non-existent module."""
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
 
         registry = ModuleRegistry()
         assert registry.unregister_module("nonexistent") is False
 
     def test_ui_route_from_capabilities(self):
         """Lines 157-159: ui_route from capabilities.has_ui."""
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
 
         registry = ModuleRegistry()
         mock_instance = MagicMock(spec=[])
@@ -1870,7 +1870,7 @@ class TestModuleRegistryFinal:
 
     def test_get_modules_by_category(self):
         """Lines 232-238: filter by category."""
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
 
         registry = ModuleRegistry()
         registry.register_module("a", MagicMock(spec=[]),
@@ -1880,7 +1880,7 @@ class TestModuleRegistryFinal:
 
     def test_check_dependencies(self):
         """Lines 248-260: check dependencies."""
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
 
         registry = ModuleRegistry()
         manifest = {"module": {}, "dependencies": {"internal": ["other"]}}
@@ -1890,7 +1890,7 @@ class TestModuleRegistryFinal:
 
     def test_find_modules_with_tag(self):
         """Lines 327-336: find modules with endpoint tag."""
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
 
         registry = ModuleRegistry()
         # Module with no matching tags
@@ -1902,7 +1902,7 @@ class TestModuleRegistryFinal:
 
     def test_export_openapi_spec(self):
         """Lines 280-308: export OpenAPI."""
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
 
         registry = ModuleRegistry()
         spec = registry.export_openapi_spec()
@@ -1910,7 +1910,7 @@ class TestModuleRegistryFinal:
 
     def test_get_module_dependencies_tree(self):
         """Lines 310-325: dependency tree."""
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
 
         registry = ModuleRegistry()
         registry.register_module("a", MagicMock(spec=[]),
@@ -1920,14 +1920,14 @@ class TestModuleRegistryFinal:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 30. personality/module_manager/system_lifecycle.py — remaining lines
+# 30. core/modules/system_lifecycle.py — remaining lines
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestSystemLifecycleFinal:
 
     def test_start_system_success(self):
         """Lines 42-74: start_system happy path."""
-        from personality.module_manager.system_lifecycle import SystemLifecycleManager
+        from core.modules.system_lifecycle import SystemLifecycleManager
         from personality.data.models import ModuleInfo, ModuleState
 
         mi = ModuleInfo(name="test", path=Path("/x"),
@@ -1938,7 +1938,7 @@ class TestSystemLifecycleFinal:
         mock_lifecycle.load_module = AsyncMock(return_value=True)
         mock_lifecycle.start_module = AsyncMock(return_value=True)
 
-        from personality.module_manager.types import SystemLifecycleConfig
+        from core.modules.types import SystemLifecycleConfig
         slm = SystemLifecycleManager(SystemLifecycleConfig(
             modules={}, module_lifecycle=mock_lifecycle,
             discovery_func=AsyncMock(return_value=["test"]),
@@ -1950,8 +1950,8 @@ class TestSystemLifecycleFinal:
 
     def test_start_system_failure(self):
         """Lines 76-82: start_system exception."""
-        from personality.module_manager.system_lifecycle import SystemLifecycleManager
-        from personality.module_manager.types import SystemLifecycleConfig
+        from core.modules.system_lifecycle import SystemLifecycleManager
+        from core.modules.types import SystemLifecycleConfig
 
         slm = SystemLifecycleManager(SystemLifecycleConfig(
             modules={}, module_lifecycle=MagicMock(),
@@ -1963,8 +1963,8 @@ class TestSystemLifecycleFinal:
 
     def test_shutdown_system(self):
         """Lines 84-100: shutdown_system."""
-        from personality.module_manager.system_lifecycle import SystemLifecycleManager
-        from personality.module_manager.types import SystemLifecycleConfig
+        from core.modules.system_lifecycle import SystemLifecycleManager
+        from core.modules.types import SystemLifecycleConfig
         from personality.data.models import ModuleInfo, ModuleState
 
         mi = ModuleInfo(name="x", path=Path("/x"),

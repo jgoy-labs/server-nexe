@@ -719,6 +719,18 @@ body.light .icon-moon,
 }
 
 /* Collection warning banner (F-checks-info) */
+.degraded-notice {
+    max-width: 900px;
+    margin: 0.4rem auto 0;
+    padding: 0.35rem 0.6rem;
+    background: rgb(255 180 0 / 10%);
+    border: 1px solid rgb(255 180 0 / 30%);
+    border-radius: 0.35rem;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
 .collection-warning {
     margin-top: 0.35rem;
     padding: 0.3rem 0.5rem;
@@ -811,6 +823,21 @@ body.light .icon-moon,
     background: var(--color-success);
     box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px rgb(34 197 94 / 25%);
     animation: status-pulse 2.5s ease-in-out infinite;
+}
+
+/* The health summary lives in the status indicator: at half power the dot goes
+   amber, so a glance at the footer is enough.
+
+   Declared AFTER .active, and with a selector that also wins on specificity.
+   Both on purpose: the first version sat 90 lines above .active with the same
+   specificity, so the cascade handed the connected-but-impaired dot straight
+   back to green — the exact glance it was written for. It also has to undo the
+   green halo, or the amber dot keeps a green ring. The pulse stays: the
+   connection IS alive; that is not what is wrong. */
+.status-dot.degraded,
+.status-dot.active.degraded {
+    background: #ffb400;
+    box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px rgb(255 180 0 / 25%);
 }
 
 @keyframes status-pulse {

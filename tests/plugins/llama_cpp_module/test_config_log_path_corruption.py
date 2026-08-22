@@ -247,7 +247,7 @@ class TestLlamaCppModuleInitializeNotConfiguredState:
     ):
         """health_check() must report a non-HEALTHY status when no model is
         configured so the /status endpoint correctly informs UI."""
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
 
         monkeypatch.delenv("NEXE_LLAMA_CPP_MODEL", raising=False)
         monkeypatch.delenv("NEXE_STORAGE_PATH", raising=False)

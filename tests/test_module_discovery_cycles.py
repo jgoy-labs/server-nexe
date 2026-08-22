@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from personality.data.models import ModuleInfo, ModuleState
-from personality.module_manager.discovery import ModuleDiscovery
+from core.modules.discovery import ModuleDiscovery
 
 
 def _make_discovery(modules_dict):
@@ -44,7 +44,7 @@ def _make_discovery(modules_dict):
     i18n = MagicMock()
     i18n.get.return_value = "msg"
 
-    from personality.module_manager.types import DiscoveryConfig
+    from core.modules.types import DiscoveryConfig
     return ModuleDiscovery(DiscoveryConfig(
         path_discovery=path_disc,
         config_manager=config_mgr,
@@ -71,7 +71,7 @@ def test_cycle_detected_disables_modules_and_logs(caplog):
     disc = _make_discovery(modules)
     lock = threading.RLock()
 
-    with caplog.at_level(logging.ERROR, logger="personality.module_manager.discovery"):
+    with caplog.at_level(logging.ERROR, logger="core.modules.discovery"):
         asyncio.run(disc.discover(modules, lock, force=True))
 
     # Modules disabled

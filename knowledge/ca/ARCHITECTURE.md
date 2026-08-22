@@ -319,7 +319,7 @@ Gestiona l'arrencada i l'aturada del servidor. Separat en 4 submoduls.
 
 ## Module Manager
 
-`personality/module_manager/` es la FONT UNICA DE VERITAT per a tots els moduls. NO existeix cap `plugins/base.py` ni `plugins/registry.py`.
+`core/modules/` es la FONT UNICA DE VERITAT per a tots els moduls. NO existeix cap `plugins/base.py` ni `plugins/registry.py`.
 
 **Components:**
 - ConfigManager: config + manifests

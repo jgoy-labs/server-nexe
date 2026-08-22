@@ -22,7 +22,7 @@ from core.config_catalog import (
     is_sensitive,
 )
 from core.config import DEFAULT_HOST, DEFAULT_PORT, DEFAULT_CONFIG, NexeSettings
-from core.loader.protocol import module_config_from_context
+from core.modules.protocol import module_config_from_context
 
 
 REPO = Path(__file__).resolve().parents[2]

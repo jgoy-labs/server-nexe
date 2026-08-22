@@ -85,7 +85,7 @@ def completed_onboarding_env(tmp_path_factory):
 def _iter_route_limiters(app):
     """Yield every slowapi Limiter captured in the app's route closures.
 
-    The web_ui router is a cached lazy singleton (core/loader/manifest_base),
+    The web_ui router is a cached lazy singleton (core/modules/manifest_base),
     while the suite's session ``app`` fixture calls
     create_app(force_reload=True) which re-imports core.dependencies. After a
     reload, ``app.state.limiter`` / ``core.dependencies.limiter`` point to a

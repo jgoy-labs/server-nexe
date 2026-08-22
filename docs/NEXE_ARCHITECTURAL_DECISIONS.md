@@ -9,32 +9,41 @@ load-bearing decisions a reader of the code needs in order not to misread it.
 
 **ModuleManager is the single source of truth for all module operations.**
 Discovery, loading, the registry, manifests, and lifecycle all go through
-`personality/module_manager/`. `core/server/factory_modules.py` only delegates to
+`core/modules/`. `core/server/factory_modules.py` only delegates to
 it (`discover_and_load_modules` → `ModuleManager.load_plugin_routers`).
 
 `ModuleManager` coordinates: `ConfigManager`, `PathDiscovery`, `ModuleDiscovery`,
 `ModuleLoader`, `ModuleRegistry`, `ModuleLifecycleManager`, `SystemLifecycleManager`,
 `SyncWrapper`, the event system, metrics and i18n.
 
-### Layering: ModuleManager is an infra kernel — its location is historical (MC-130)
+### Layering: the module system lives in core/modules — and it is not a kernel
 
-`personality/module_manager/` is an **infra kernel** (module discovery / loading /
-registry), not a persona/i18n concern, even though it physically lives under
-`personality/`. It predates the core/personality split; `core`'s lifespan depends on
-it. **Do not read the directory as a domain signal.**
+`core/modules/` holds **the module system**: what a module *is* (`protocol.py`,
+`manifest_base.py`) and what loads it (discovery, registry, lifecycle, config,
+admission). The two halves used to live apart — the contract in `core/loader/`, the
+loading in `personality/module_manager/` — which read as *"the loader is the protocol
+and the kernel is the loader"*. One package now answers both questions.
 
-The "right" home is a low layer (e.g. `core/kernel`), but the move is **deliberately
-deferred post-1.0.7** and must be done as a single **atomic, i18n-first epic**, not in
-isolation:
+**It is deliberately not called a kernel.** It has no privilege boundary, no scheduling
+and no resource arbitration: plugins are imported into the same process and the same
+address space. Naming it a kernel would point a reader at the wrong place for the
+isolation story, which lives elsewhere — the module allowlist (`core/config.py`), the
+memory porter with veto (`core.memory_access.get_memory_view`) and the layering gate.
+Nor is it minimal, which is what the microkernel pattern means by the word: the
+`ModuleManager` façade still takes a dozen collaborators and inherits from a mixin.
+Splitting it into mechanism and policy is open work.
 
-- Moving the kernel alone would add ~16 new cross-package import edges to the **frozen
-  layering baseline** (`scripts/check_layering.py`, ADR below), inflating exactly the
-  debt the gate exists to freeze. The current cross-package coupling is broken by
-  deferred imports and is a P3 maintainability concern, not a runtime cycle.
-- The kernel imports `personality.i18n.I18nManager`, so the **i18n relocation is the
-  keystone**: do it first (`personality.i18n → core`), which turns those edges into
-  intra-core imports (baseline goes **down**), then config, then the kernel. Sequence:
-  **i18n → config → kernel**, three independent commits each re-passing `check_layering.py`.
+**What the move cost, measured.** The frozen layering baseline went from 80 to 101
+import-time cross-package edges, reconciled in the same commit as the move. Nine of the
+24 new edges are only `personality._logger` and five more are `__init__` imports that had
+to become absolute; lowering the logger into `core` would remove nine of them at once,
+and that is the obvious next step. The debt is now **visible instead of implied**.
+
+**The "i18n-first" precondition this note used to attach to the move was empty.**
+Verified by running a real `I18nManager`, not by reading the loader: the package ships 15
+translation files that are never loaded — the lookup expects a literal `location/` path
+segment that does not exist — so its messages already came out in English. There was no
+live i18n to preserve, and the move did not need to wait for the i18n relocation.
 
 **Related — base config path SSOT (MC-129):** the base server config `personality/server.toml`
 triples as the BASE config layer, the repo-root marker, and the runtime write target. The
@@ -42,19 +51,15 @@ literal is centralised in `core/paths/constants.py::BASE_CONFIG_RELATIVE` (lowes
 layer inversion); the file itself is **not** moved (it's the repo-root marker). All core-side
 consumers reference the constant.
 
-> **Milestone commitment:** the physical `personality → core` extraction epic should land
-> within ~2 sprints after the 1.0.7 release, so this documented P3 debt does not silently
-> accrete. Until then it is frozen by the layering gate and explained by this note.
-
 ### Intentional scaffolding (do not delete)
 
 The per-module / per-system **lifecycle layer** is scaffolding for the planned
 plugin-isolation runtime (ADR-001): isolating the DRAFT plugins into sandboxed
 subprocesses with explicit start/stop/health control.
 
-- `personality/module_manager/module_lifecycle.py` — `ModuleLifecycleManager`
+- `core/modules/module_lifecycle.py` — `ModuleLifecycleManager`
   (`load_module` / `start_module` / `stop_module`)
-- `personality/module_manager/system_lifecycle.py` — `SystemLifecycleManager`
+- `core/modules/system_lifecycle.py` — `SystemLifecycleManager`
   (`start_system` / `shutdown_system`)
 - `personality/loading/` — the loader/extractor/finder/importer/validator chain
 

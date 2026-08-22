@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 
 import logging
 
-from core.loader.manifest_base import create_lazy_manifest, install_lazy_manifest
+from core.modules.manifest_base import create_lazy_manifest, install_lazy_manifest
 
 logger = logging.getLogger(__name__)
 

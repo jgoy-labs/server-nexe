@@ -116,7 +116,7 @@ class TestOllamaModuleCheckConnection:
         # The module checks if httpx is None in health_check but not in check_connection
         # We verify that health_check returns UNKNOWN if httpx is None
         with patch("plugins.ollama_module.module.httpx", None):
-            from core.loader.protocol import HealthStatus
+            from core.modules.protocol import HealthStatus
             result = await module.health_check()
         assert result.status == HealthStatus.UNKNOWN
 
@@ -124,7 +124,7 @@ class TestOllamaModuleCheckConnection:
 class TestOllamaModuleHealthCheck:
     @pytest.mark.asyncio
     async def test_health_check_connected(self):
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
         module = OllamaModule()
         with patch.object(module, "check_connection", return_value=True):
             result = await module.health_check()
@@ -132,7 +132,7 @@ class TestOllamaModuleHealthCheck:
 
     @pytest.mark.asyncio
     async def test_health_check_not_connected(self):
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
         module = OllamaModule()
         with patch.object(module, "check_connection", return_value=False):
             result = await module.health_check()
@@ -140,7 +140,7 @@ class TestOllamaModuleHealthCheck:
 
     @pytest.mark.asyncio
     async def test_health_check_exception(self):
-        from core.loader.protocol import HealthStatus
+        from core.modules.protocol import HealthStatus
         module = OllamaModule()
         with patch.object(module, "check_connection", side_effect=Exception("error")):
             result = await module.health_check()

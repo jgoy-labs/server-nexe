@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from plugins.mlx_module.module import MLXModule
-from core.loader.protocol import HealthStatus
+from core.modules.protocol import HealthStatus
 
 @pytest.mark.asyncio
 async def test_mlx_module_metadata():

@@ -183,8 +183,8 @@ class TestLoaderFailFast:
     def test_plugin_with_colliding_route_is_rejected(self):
         """Fake plugin declares removed=["/foo"] and registers @router.post("/foo")
         → PluginLoadError with plugin_name and colliding_route."""
-        from core.loader.protocol import PluginLoadError
-        from personality.module_manager.module_manager import ModuleManager
+        from core.modules.protocol import PluginLoadError
+        from core.modules.module_manager import ModuleManager
 
         # Build a fake manifest_module
         router = APIRouter(prefix="/fake")

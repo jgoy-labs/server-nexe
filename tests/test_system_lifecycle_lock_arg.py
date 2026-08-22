@@ -6,9 +6,9 @@ import inspect
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
-from personality.module_manager.module_lifecycle import ModuleLifecycleManager
-from personality.module_manager.system_lifecycle import SystemLifecycleManager
-from personality.module_manager.types import LifecycleConfig, SystemLifecycleConfig
+from core.modules.module_lifecycle import ModuleLifecycleManager
+from core.modules.system_lifecycle import SystemLifecycleManager
+from core.modules.types import LifecycleConfig, SystemLifecycleConfig
 
 
 @pytest.mark.asyncio

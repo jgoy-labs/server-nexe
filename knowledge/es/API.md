@@ -116,9 +116,9 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 |----------|--------|------|-------------|
 | `/` | GET | No | Info del sistema (version, estado, puerto) |
 | `/health` | GET | No | Health check basico |
-| `/health/ready` | GET | No | Readiness check (verifica modulos requeridos) |
+| `/health/ready` | GET | No | Readiness check. Solo los subsistemas **criticos** (autenticacion e interfaz) hacen que responda `unhealthy`; si lo que falla o falta es degradable (RAG, embeddings, un motor) responde `degraded` y la interfaz carga igualmente, para que el usuario pueda entrar a arreglarlo. Un modulo degradable que informa de que no esta bien **se muestra, no bloquea**: la interfaz lo dice en el indicador de estado y junto a donde se escribe |
 | `/health/circuits` | GET | Sí (X-API-Key) | Estado de circuit breakers (Ollama, Qdrant) |
-| `/status` | GET | Sí (X-API-Key) | Estado en tiempo real: `configured_engine` (intención), `resolved_engine` (el engine que el chat correrá efectivamente, node-aware), `model` (el default configurado — MLX/llama.cpp reportan el modelo realmente cargado solo en la respuesta de chat), modulos cargados |
+| `/status` | GET | Sí (X-API-Key) | Estado en tiempo real: `configured_engine` (intención), `resolved_engine` (el engine que el chat correrá efectivamente, node-aware), `model` (el default configurado — MLX/llama.cpp reportan el modelo realmente cargado solo en la respuesta de chat), modulos cargados, `operational_state` (`normal`/`degraded`/`limited`/`refused`) e `impaired_subsystems` (lo que no funciona). La interfaz lo consulta para avisar al usuario cuando un subsistema no ha arrancado, en vez de dejarle chatear creyendo que la memoria funciona |
 | `/api/info` | GET | No | Info de la API y un subconjunto representativo de endpoints publicos (no exhaustivo) |
 | `/docs` | GET | No | Documentacion interactiva Swagger/OpenAPI |
 | `/admin/system/restart` | POST | Sí (X-API-Key) | Reinicia el servidor (lo usa la UI tras cambios de config) |

@@ -451,6 +451,14 @@ def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[se
     if approved:
         return {m.strip() for m in approved.split(",") if m.strip()}
     elif is_prod:
+        # No record_refusal() here on purpose. This is a QUERY, not the place
+        # that refuses: it is also called by the plugin loader and by anything
+        # that wants to know the allowlist. A recorded refusal outranks every
+        # signal in current_state(), so recording one from a query would let a
+        # caller that merely asked — and caught the error — leave the watcher
+        # reporting REFUSED on a server that is serving fine. The site that
+        # actually aborts startup is validate_production_security(), and that
+        # is where the reason is named (a gate checks it still is).
         raise ValueError(
             "SECURITY ERROR: NEXE_APPROVED_MODULES is required in production. "
             "Set NEXE_APPROVED_MODULES or NEXE_ENV=development."

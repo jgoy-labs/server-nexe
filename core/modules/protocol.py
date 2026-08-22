@@ -1,0 +1,342 @@
+"""
+────────────────────────────────────
+Server Nexe
+Author: Jordi Goy 
+Location: core/modules/protocol.py
+Description: str = ""
+
+www.jgoy.net · https://server-nexe.org
+────────────────────────────────────
+"""
+
+from typing import Dict, Any, List, Optional, Protocol, runtime_checkable
+from dataclasses import dataclass, field
+from enum import Enum
+
+class ModuleStatus(Enum):
+  """Module status."""
+  DISCOVERED = "discovered"
+  LOADING = "loading"
+  INITIALIZED = "initialized"
+  RUNNING = "running"
+  DEGRADED = "degraded"
+  FAILED = "failed"
+  STOPPED = "stopped"
+
+class HealthStatus(Enum):
+  """Module health status."""
+  HEALTHY = "healthy"
+  DEGRADED = "degraded"
+  UNHEALTHY = "unhealthy"
+  UNKNOWN = "unknown"
+
+@dataclass
+class ModuleMetadata:
+  """
+  Module metadata - read from manifest.toml.
+
+  The core only needs this data to manage the module.
+  It has no knowledge of the module's internal workings.
+  """
+  name: str
+  version: str
+  description: str = ""
+  author: str = ""
+  license: str = "AGPL-3.0"
+
+  module_type: str = "module"
+
+  quadrant: str = "core"
+
+  dependencies: List[str] = field(default_factory=list)
+
+  tags: List[str] = field(default_factory=list)
+
+  manifest_path: Optional[str] = None
+
+  module_path: Optional[str] = None
+
+@dataclass
+class HealthResult:
+  """Health check result."""
+  status: HealthStatus
+  message: str = ""
+  details: Dict[str, Any] = field(default_factory=dict)
+  checks: List[Dict[str, Any]] = field(default_factory=list)
+
+  def to_dict(self) -> Dict[str, Any]:
+    return {
+      "status": self.status.value,
+      "message": self.message,
+      "details": self.details,
+      "checks": self.checks
+    }
+
+@dataclass
+class SpecialistInfo:
+  """
+  Information about a specialist that the module exposes or consumes.
+
+  Specialists are specialized components that can be
+  "sent" to other modules or "received" from other modules.
+  """
+  name: str
+  specialist_type: str
+  file_path: str
+  target_module: Optional[str] = None
+
+@runtime_checkable
+class NexeModule(Protocol):
+  """
+  Protocol defining the minimum interface for a Nexe module.
+
+  The core loads modules that implement this protocol.
+  It is "runtime_checkable" to allow isinstance() checks.
+
+  Implementation example:
+
+  ```python
+  class MyModule:
+    @property
+    def metadata(self) -> ModuleMetadata:
+      return ModuleMetadata(
+        name="my_module",
+        version="1.0.0",
+        description="My module"
+      )
+
+    async def initialize(self, context: Dict[str, Any]) -> bool:
+      return True
+
+    async def shutdown(self) -> None:
+      pass
+
+    async def health_check(self) -> HealthResult:
+      return HealthResult(
+        status=HealthStatus.HEALTHY,
+        message="All good"
+      )
+  ```
+  """
+
+  @property
+  def metadata(self) -> ModuleMetadata:
+    """
+    Return the module's metadata.
+
+    This data is used to:
+    - Register the module in the system
+    - Check dependencies
+    - Display information to the user
+    """
+    ...
+
+  async def initialize(self, context: Dict[str, Any]) -> bool:
+    """
+    Initialize the module with the provided context.
+
+    Args:
+      context: Dictionary with services and configuration:
+        - config: Global configuration
+        - services: Shared services (i18n, crypto_provider, …)
+        - modules: Reference to the module registry
+        - project_root: Repo/install root (already delivered to plugins)
+
+    Returns:
+      True if initialization succeeds, False if it fails
+    """
+    ...
+
+  async def shutdown(self) -> None:
+    """
+    Shut down the module and release resources.
+
+    Called when the server stops or the module is unloaded.
+    Must be idempotent (can be called multiple times).
+    """
+    ...
+
+  async def health_check(self) -> HealthResult:
+    """
+    Return the module's health status.
+
+    Called periodically by the monitoring system.
+    Must be fast (< 1 second).
+
+    Returns:
+      HealthResult with the current status
+    """
+    ...
+
+@runtime_checkable
+class NexeModuleWithRouter(NexeModule, Protocol):
+  """
+  Extension of NexeModule for modules that expose HTTP endpoints.
+
+  Modules with a router are automatically registered in FastAPI.
+  """
+
+  def get_router(self) -> Any:
+    """
+    Return the module's FastAPI router.
+
+    Returns:
+      fastapi.APIRouter with the module's endpoints
+    """
+    ...
+
+  def get_router_prefix(self) -> str:
+    """
+    Return the URL prefix for the router.
+
+    Example: "/security" -> endpoints at /security/*
+
+    Returns:
+      String with the prefix (must start with /)
+    """
+    ...
+
+@runtime_checkable
+class NexeModuleWithSpecialists(NexeModule, Protocol):
+  """
+  Extension of NexeModule for modules that manage specialists.
+
+  Specialists are components that can be sent to other
+  modules or received from other modules to perform checks or actions.
+  """
+
+  def get_outgoing_specialists(self) -> List[SpecialistInfo]:
+    """
+    Return the list of specialists that this module sends.
+
+    Example: The Security module can send a SecuritySpecialist
+    to modules that offer security capabilities.
+    """
+    ...
+
+  def get_incoming_specialist_types(self) -> List[str]:
+    """
+    Return the specialist types that this module accepts.
+
+    Example: The security module accepts specialists of type
+    "security", "memory", "performance", etc.
+    """
+    ...
+
+  async def register_specialist(self, _specialist: Any) -> bool:
+    """
+    Register an incoming specialist with the module.
+
+    Args:
+      specialist: Specialist instance to register
+
+    Returns:
+      True if registration succeeds
+    """
+    ...
+
+class PluginLoadError(Exception):
+  """Raised when a plugin cannot be loaded due to a configuration conflict.
+
+  Specifically: a plugin declares a route in removed_direct_routes AND
+  simultaneously registers that same route on its router — a contradiction
+  that would leave the guard bypassed. Fail-fast at load time, not at
+  request time.
+  """
+
+  def __init__(self, message: str, *, plugin_name: str, colliding_route: str):
+    super().__init__(message)
+    self.plugin_name = plugin_name
+    self.colliding_route = colliding_route
+
+  def __str__(self) -> str:
+    return (
+      f"PluginLoadError: plugin='{self.plugin_name}' "
+      f"colliding_route='{self.colliding_route}' — {self.args[0]}"
+    )
+
+
+def validate_module(module: Any) -> bool:
+  """
+  Validate that an object implements the NexeModule protocol.
+
+  Args:
+    module: Object to validate
+
+  Returns:
+    True if it correctly implements the protocol
+  """
+  if not isinstance(module, NexeModule):
+    return False
+
+  try:
+    meta = module.metadata
+    if not isinstance(meta, ModuleMetadata):
+      return False
+  except Exception:
+    return False
+
+  return True
+
+
+# --- initialize context (D-C / #870 / #894) ---------------------------------
+# One dict for plugins and memory. Callers that used to pass `config=` or
+# `{config, project_root}` go through build_initialize_context.
+
+# D-P: top-level TOML tables live in the catalog. module_config_from_context
+# slices [module_name] and nothing else — tests pass a production-shaped dict.
+
+
+def build_initialize_context(
+  *,
+  config: Optional[Dict[str, Any]] = None,
+  services: Optional[Dict[str, Any]] = None,
+  modules: Optional[Dict[str, Any]] = None,
+  project_root: Any = None,
+) -> Dict[str, Any]:
+  """Build the single initialize() context. Keys match NexeModule.initialize."""
+  return {
+    "config": config if config is not None else {},
+    "services": services if services is not None else {},
+    "modules": modules if modules is not None else {},
+    "project_root": project_root,
+  }
+
+
+def services_from_server_state(server_state: Any) -> Dict[str, Any]:
+  """Shared services actually available at boot. Empty keys are omitted.
+
+  ``memory`` is the D-M porter (``get_memory_view``). Always present — it is
+  a function, not a boot-time resource that can be missing.
+  """
+  from core.memory_access import get_memory_view
+  services: Dict[str, Any] = {"memory": get_memory_view}
+  i18n = getattr(server_state, "i18n", None)
+  if i18n is not None:
+    services["i18n"] = i18n
+  crypto = getattr(server_state, "crypto_provider", None)
+  if crypto is not None:
+    services["crypto_provider"] = crypto
+  return services
+
+
+def module_config_from_context(
+  context: Optional[Dict[str, Any]], module_name: str
+) -> Dict[str, Any]:
+  """Per-module overrides from a protocol context.
+
+  Production and tests pass the same shape: ``config[<module_name>]`` is the
+  slice. A flat dict is not a module section — it returns {}.
+  """
+  if not isinstance(context, dict):
+    return {}
+  cfg = context.get("config")
+  if not isinstance(cfg, dict):
+    return {}
+  section = cfg.get(module_name)
+  if not isinstance(section, dict):
+    return {}
+  inner = section.get("config")
+  if isinstance(inner, dict):
+    return dict(inner)
+  return {k: v for k, v in section.items() if k != "modules"}

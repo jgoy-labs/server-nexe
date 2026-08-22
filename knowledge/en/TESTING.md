@@ -47,7 +47,7 @@ tests/plugins/ollama_module/ # Ollama tests
 tests/memory/memory/        # Memory module tests
 tests/memory/rag/           # RAG tests
 tests/memory/embeddings/    # Embeddings tests
-tests/personality/module_manager/ # Module manager tests
+tests/core/modules/ # Module manager tests
 tests/integration/          # Integration tests
 ```
 

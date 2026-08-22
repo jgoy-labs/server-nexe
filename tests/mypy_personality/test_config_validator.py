@@ -23,7 +23,7 @@ def test_cluster1_missing_required_key_returns_validation_error(tmp_path):
     FAILS pre-fix (TypeError at _validate_required_keys L141).
     PASSES post-fix (rename key → msg_key in _get_message signature).
     """
-    from personality.module_manager.config_validator import ConfigValidator, ValidationResult
+    from core.modules.config_validator import ConfigValidator, ValidationResult
 
     config = {
         "meta": {"environment": "development"},  # missing 'version' and 'environment' is not sufficient
@@ -50,7 +50,7 @@ def test_cluster1_port_string_type_returns_validation_error(tmp_path):
     _get_message('validation.type_mismatch', key='port', ...)).
     PASSES post-fix.
     """
-    from personality.module_manager.config_validator import ConfigValidator, ValidationResult
+    from core.modules.config_validator import ConfigValidator, ValidationResult
 
     cfg_content = """\
 [meta]
@@ -84,7 +84,7 @@ def test_cluster1_temperature_out_of_range_returns_validation_error(tmp_path):
     _get_message('validation.value_out_of_range', key='temperature', ...)).
     PASSES post-fix.
     """
-    from personality.module_manager.config_validator import ConfigValidator, ValidationResult
+    from core.modules.config_validator import ConfigValidator, ValidationResult
 
     config = {
         "meta": {"version": "0.9", "environment": "development"},

@@ -2,7 +2,7 @@ import pytest
 import importlib
 from unittest.mock import MagicMock, patch
 from plugins.llama_cpp_module.module import LlamaCppModule
-from core.loader.protocol import HealthStatus
+from core.modules.protocol import HealthStatus
 
 _llama_cpp_available = importlib.util.find_spec("llama_cpp") is not None
 

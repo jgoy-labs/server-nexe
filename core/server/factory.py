@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 from core.env_utils import parse_truthy
+from core.operational_state import RefusalReason, record_refusal
 
 from fastapi import FastAPI
 
@@ -96,6 +97,7 @@ def create_app(project_root: Optional[Path] = None, force_reload: bool = False) 
           "production" if _sidecar_cfg.is_production else "development",
         )
       except Exception as exc:
+        record_refusal(RefusalReason.SIDECAR_CONFIG_INVALID, str(exc))
         raise RuntimeError(
           f"NEXE_SIDECAR=1 but SidecarConfig validation failed: {exc}. "
           "Required env vars (NEXE_PRIMARY_API_KEY, NEXE_PORT) must be set "

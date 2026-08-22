@@ -17,8 +17,16 @@ import warnings as _warnings
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from core.env_utils import parse_truthy
+from core.operational_state import (
+    STATUS_MISSING,
+    ModuleSignal,
+    RefusalReason,
+    record_refusal,
+)
+from core.state_watcher import register_sensor, watcher
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Environment setup — must go BEFORE any import that could transitively load
@@ -323,6 +331,7 @@ async def _startup_init(app: FastAPI) -> None:
         logger.debug("SidecarConfig unavailable, using default PID file behavior: %s", exc)
 
     if not _skip_pid_file and server_state.project_root and not _write_pid_file(server_state.project_root, _startup_port):
+        record_refusal(RefusalReason.PORT_IN_USE, f"PID file: port {_startup_port} held by a live instance")
         raise RuntimeError(
             f"Server already running on port {_startup_port}. "
             "Use './nexe stop' to stop the existing instance."
@@ -353,6 +362,7 @@ async def _startup_services(app: FastAPI) -> None:
             "Check Qdrant and Ollama availability.",
             STARTUP_TIMEOUT,
         )
+        record_refusal(RefusalReason.SERVICES_TIMEOUT, f"{STARTUP_TIMEOUT}s")
         raise RuntimeError(f"Services startup timed out after {STARTUP_TIMEOUT}s")
 
     from core.config import DEFAULT_HOST, DEFAULT_PORT
@@ -394,6 +404,7 @@ async def _startup_phases_and_tokens(app: FastAPI) -> None:
                 "Server may be degraded.",
                 _phase_name, STARTUP_TIMEOUT,
             )
+            record_refusal(RefusalReason.STARTUP_PHASE_TIMEOUT, f"phase '{_phase_name}' after {STARTUP_TIMEOUT}s")
             raise RuntimeError(f"Startup phase '{_phase_name}' timed out after {STARTUP_TIMEOUT}s")
 
     server_state._knowledge_ingest_task = asyncio.create_task(
@@ -453,6 +464,43 @@ def _startup_final_banner() -> None:
     logger.info("=" * 70)
 
 
+def _modules_sensor(app: FastAPI) -> Callable[[], list[ModuleSignal]]:
+    """Eye on the modules: what fell during startup, and what never came back.
+
+    Reports; it does not judge. core.operational_state weighs each name against
+    its declared criticality.
+    """
+
+    def read() -> list[ModuleSignal]:
+        fallen = sorted(set(getattr(server_state, "degraded_modules", []) or []))
+        loaded = getattr(app.state, "modules", {}) or {}
+        return [
+            ModuleSignal(name, STATUS_MISSING)
+            for name in fallen
+            if name not in loaded
+        ]
+
+    return read
+
+
+def _qdrant_sensor() -> list[ModuleSignal]:
+    """Eye on the vector store: without it recall is gone, but the chat is not."""
+    if getattr(server_state, "qdrant_available", False):
+        return []
+    return [ModuleSignal("qdrant", STATUS_MISSING)]
+
+
+async def _start_state_watcher(app: FastAPI) -> None:
+    """Open the eye. A watcher that cannot start must not stop the server."""
+    try:
+        register_sensor("modules", _modules_sensor(app))
+        register_sensor("qdrant", _qdrant_sensor)
+        await watcher.prime()
+        watcher.start()
+    except Exception as exc:
+        logger.warning("state watcher: could not start: %s", exc)
+
+
 async def _startup(app: FastAPI) -> None:
     """Startup orchestrator: delegates each phase to its helper."""
     await _startup_init(app)
@@ -481,6 +529,7 @@ async def _startup(app: FastAPI) -> None:
     await _startup_services(app)
     await _startup_phases_and_tokens(app)
     _startup_final_banner()
+    await _start_state_watcher(app)
 
 
 def _shutdown_join_timeout() -> float:
@@ -509,6 +558,10 @@ async def _cancel_background_tasks() -> None:
     ingest can never upsert against a closed store.
     """
     timeout = _shutdown_join_timeout()
+    try:
+        await watcher.stop()
+    except Exception:
+        logger.debug("state watcher: stop() raised during shutdown", exc_info=True)
     # MC-119: stop the dreaming cycle here too (B215 intent: cancel ALL background
     # tasks before tearing down the stores). It was previously only cancelled in
     # _shutdown_memory_service, which runs AFTER _shutdown_qdrant.
@@ -599,8 +652,10 @@ async def lifespan(app: FastAPI):
   Application lifespan — façade that delegates each startup/shutdown phase
   to dedicated submodule helpers.
   """
+  started = False
   try:
     await _startup(app)
+    started = True
     yield
   except asyncio.CancelledError:
     # SIGTERM (or any external cancel) reached us mid-startup or mid-serve.
@@ -615,6 +670,12 @@ async def lifespan(app: FastAPI):
       "Critical system error: {error}", error=str(e))
     logger.error(msg)
     logger.exception("Critical startup error", exc_info=True)
+    if not started:
+      # The try above also wraps the yield, i.e. the whole serving life. An
+      # error raised after startup succeeded is not a refusal to start, and
+      # recording it as one would leave the state machine reporting REFUSED
+      # for a server that ran fine for hours.
+      record_refusal(RefusalReason.CRITICAL_STARTUP_ERROR, str(e))
     raise
   finally:
     await _shutdown(app)

@@ -1,17 +1,17 @@
 """
 Tests for remaining personality/ coverage gaps.
-- personality/module_manager/system_lifecycle.py lines missing
-- personality/module_manager/config_manager.py lines missing
-- personality/module_manager/registry.py lines missing
-- personality/module_manager/discovery.py lines missing
-- personality/module_manager/manifest.py lines missing
+- core/modules/system_lifecycle.py lines missing
+- core/modules/config_manager.py lines missing
+- core/modules/registry.py lines missing
+- core/modules/discovery.py lines missing
+- core/modules/manifest.py lines missing
 - personality/loading/loader.py lines missing
 - personality/loading/module_lifecycle.py lines missing
 - personality/loading/module_extractor.py lines missing
 - personality/loading/module_finder.py lines missing
 - personality/metrics/metrics_collector.py lines missing
 - personality/i18n/modular_i18n.py lines missing
-- personality/module_manager/__init__.py lines missing
+- core/modules/__init__.py lines missing
 """
 import asyncio
 import pytest
@@ -23,7 +23,7 @@ from personality.data.models import ModuleInfo, ModuleState
 class TestModuleManagerSystemLifecycle:
 
     def test_start_system(self):
-        from personality.module_manager.system_lifecycle import SystemLifecycleManager
+        from core.modules.system_lifecycle import SystemLifecycleManager
         import threading
 
         modules = {}
@@ -37,7 +37,7 @@ class TestModuleManagerSystemLifecycle:
                        state=ModuleState.DISCOVERED, auto_start=True, enabled=True)
         ])
 
-        from personality.module_manager.types import SystemLifecycleConfig
+        from core.modules.types import SystemLifecycleConfig
         slm = SystemLifecycleManager(SystemLifecycleConfig(
             modules=modules, module_lifecycle=mock_lifecycle,
             discovery_func=discover_fn, list_modules_func=list_fn,
@@ -48,7 +48,7 @@ class TestModuleManagerSystemLifecycle:
         assert result is True
 
     def test_shutdown_system(self):
-        from personality.module_manager.system_lifecycle import SystemLifecycleManager
+        from core.modules.system_lifecycle import SystemLifecycleManager
         import threading
 
         mod = ModuleInfo(name="mod1", path=Path("."), manifest_path=Path("."),
@@ -57,7 +57,7 @@ class TestModuleManagerSystemLifecycle:
         mock_lifecycle = MagicMock()
         mock_lifecycle.stop_module = AsyncMock(return_value=True)
 
-        from personality.module_manager.types import SystemLifecycleConfig
+        from core.modules.types import SystemLifecycleConfig
         slm = SystemLifecycleManager(SystemLifecycleConfig(
             modules=modules, module_lifecycle=mock_lifecycle,
             discovery_func=AsyncMock(), list_modules_func=MagicMock(),
@@ -72,20 +72,20 @@ class TestModuleManagerSystemLifecycle:
 class TestModuleManagerRegistry:
 
     def test_register_and_get(self):
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
         reg = ModuleRegistry()
         reg.register_module("test", MagicMock(), {"id": "test"})
         assert reg.get_module("test") is not None
 
     def test_unregister(self):
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
         reg = ModuleRegistry()
         reg.register_module("test", MagicMock(), {})
         reg.unregister_module("test")
         assert reg.get_module("test") is None
 
     def test_get_registry_stats(self):
-        from personality.module_manager.registry import ModuleRegistry
+        from core.modules.registry import ModuleRegistry
         reg = ModuleRegistry()
         stats = reg.get_registry_stats()
         assert "total_modules" in stats
@@ -94,7 +94,7 @@ class TestModuleManagerRegistry:
 class TestModuleManagerDiscovery:
 
     def test_discover(self):
-        from personality.module_manager.discovery import ModuleDiscovery
+        from core.modules.discovery import ModuleDiscovery
         import threading
 
         mock_path_disc = MagicMock()
@@ -104,7 +104,7 @@ class TestModuleManagerDiscovery:
         mock_events = MagicMock()
         mock_events.emit_event = AsyncMock()
 
-        from personality.module_manager.types import DiscoveryConfig
+        from core.modules.types import DiscoveryConfig
         disc = ModuleDiscovery(DiscoveryConfig(
             path_discovery=mock_path_disc,
             config_manager=mock_config,
@@ -119,7 +119,7 @@ class TestModuleManagerManifest:
 
     def test_manifest_router_exists(self):
         """Test that manifest.py exposes router_public."""
-        from personality.module_manager.manifest import router_public
+        from core.modules.manifest import router_public
         assert router_public is not None
 
 

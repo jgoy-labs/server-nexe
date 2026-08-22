@@ -20,6 +20,7 @@ from pathlib import Path
 from core.server.process_utils import process_is_alive
 from core.env_utils import parse_port
 from core.paths.constants import BASE_CONFIG_RELATIVE
+from core.operational_state import RefusalReason, record_refusal
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LOAD .env AT MODULE LEVEL (before any imports that depend on env vars)
@@ -144,6 +145,13 @@ def _release_pidfile(pid_path: Path) -> None:
     logger.debug("Failed to release PID file %s: %s", pid_path, e)
 
 
+def _refuse(reason: RefusalReason, detail: str) -> None:
+  """Record why the server will not start, then stop. D-Q: the refusal still
+  happens here, but its reason has a name the rest of the system can read."""
+  record_refusal(reason, detail)
+  sys.exit(1)
+
+
 def _handle_port_conflict(host: str, port: int, headless: bool, sidecar: bool, i18n: object) -> None:
   """Handle port-in-use conflict. Exits or kills depending on mode.
 
@@ -154,7 +162,7 @@ def _handle_port_conflict(host: str, port: int, headless: bool, sidecar: bool, i
       "Sidecar mode: port %s at %s already occupied. "
       "Tauri must pre-reserve the port. Exiting.", port, host
     )
-    sys.exit(1)
+    _refuse(RefusalReason.PORT_IN_USE, f"sidecar: port {port} at {host} already occupied")
   elif headless:
     if kill_process_on_port(port):
       logger.info(translate(i18n, "core.server.process_killed",
@@ -162,7 +170,7 @@ def _handle_port_conflict(host: str, port: int, headless: bool, sidecar: bool, i
     else:
       logger.error(translate(i18n, "core.server.kill_failed",
         "Could not terminate process on port {port}.", port=port))
-      sys.exit(1)
+      _refuse(RefusalReason.PORT_IN_USE, f"headless: could not free port {port}")
   else:
     try:
       print(f"\n{YELLOW}Port {port} is in use. Kill existing process? [y/N]: {RESET}", end="")
@@ -174,14 +182,14 @@ def _handle_port_conflict(host: str, port: int, headless: bool, sidecar: bool, i
         else:
           logger.error(translate(i18n, "core.server.kill_failed",
             "Could not terminate process on port {port}. Try manually: lsof -ti:{port} | xargs kill", port=port))
-          sys.exit(1)
+          _refuse(RefusalReason.PORT_IN_USE, f"interactive: could not free port {port}")
       else:
         logger.info(translate(i18n, "core.server.find_port_usage",
           "To find what's using the port: lsof -ti:{port}", port=port))
-        sys.exit(1)
+        _refuse(RefusalReason.PORT_IN_USE, f"user declined to free port {port}")
     except (EOFError, KeyboardInterrupt):
       print()
-      sys.exit(1)
+      _refuse(RefusalReason.PORT_IN_USE, f"no answer about port {port}")
 
 
 def _handle_sigterm(signum, frame):  # noqa: ARG001
@@ -250,7 +258,7 @@ def _reject_ipv6_bind(host: str) -> None:
     "authorities). Bind to 127.0.0.1 instead.",
     host
   )
-  sys.exit(1)
+  _refuse(RefusalReason.IPV6_BIND, f"host {host}")
 
 
 def _enforce_loopback_bind(host: str) -> None:
@@ -279,7 +287,7 @@ def _enforce_loopback_bind(host: str) -> None:
     "to expose it deliberately, or bind to 127.0.0.1.",
     host
   )
-  sys.exit(1)
+  _refuse(RefusalReason.NON_LOOPBACK_BIND, f"host {host} without NEXE_ALLOW_PUBLIC_BIND")
 
 
 def _setup_file_logging() -> None:
@@ -336,7 +344,7 @@ def _run_uvicorn_server(host: str, port: int, workers: int, reload: bool, i18n) 
     logger.error(translate(i18n, "core.server.server_startup_error",
       "Error starting server: {error}", error=str(e)))
     logger.exception(translate(i18n, "core.server.startup_error", "Server startup error: {error}", error=str(e)), exc_info=True)
-    sys.exit(1)
+    _refuse(RefusalReason.SERVER_STARTUP_ERROR, str(e))
 
 
 def main():

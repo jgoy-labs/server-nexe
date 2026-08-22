@@ -1,0 +1,360 @@
+"""
+────────────────────────────────────
+Server Nexe
+Author: Jordi Goy
+Location: core/modules/config_manager.py
+Description: Nexe configuration and manifest manager.
+             Uses core/config.py for unified config loading.
+
+www.jgoy.net · https://server-nexe.org
+────────────────────────────────────
+"""
+
+from pathlib import Path
+from typing import Dict, Any, Optional
+import tomllib  # read-only aquí; l'escriptura va per core.config.atomic_toml_write (#834)
+
+from core.config import (
+    load_config as core_load_config,
+    save_config as core_save_config,
+    is_production,
+    is_development,
+)
+from .messages import get_message
+
+from personality._logger import get_logger
+logger = get_logger(__name__)
+
+
+class ConfigManager:
+  """
+  Manages system configuration and manifests.
+
+  Uses core/config.py for unified config loading.
+  Adds module-specific functionality (manifests, enabled state).
+  """
+
+  def __init__(self, config_path: Optional[Path], i18n=None):
+    """
+    Initialize configuration manager.
+
+    Args:
+      config_path: Path to the server.toml file
+      i18n: Optional i18n manager
+    """
+    self.i18n = i18n
+    self.config_path = self._find_config_path(config_path)
+    self.manifests_path = self.config_path.parent / get_message(
+      self.i18n, 'paths.manifests_dir'
+    )
+    self._config: Dict[str, Any] = {}
+    self._load_config()
+
+    # Environment helpers
+    self.is_production = is_production(self._config)
+    self.is_development = is_development(self._config)
+
+  def _t(self, key: str, fallback: str, **kwargs) -> str:
+    """
+    Translation helper with fallback.
+
+    Args:
+      key: Translation key
+      fallback: Default text
+      **kwargs: Format parameters
+
+    Returns:
+      Translated text or fallback
+    """
+    if not self.i18n:
+      return fallback.format(**kwargs) if kwargs else fallback
+    try:
+      value = self.i18n.t(key, **kwargs)
+      if value == key:
+        return fallback.format(**kwargs) if kwargs else fallback
+      return value
+    except Exception:
+      return fallback.format(**kwargs) if kwargs else fallback
+
+  def _find_config_path(self, config_path: Optional[Path]) -> Path:
+    """Search for the configuration file."""
+    if config_path:
+      try:
+        return Path(config_path).resolve(strict=True)
+      except (FileNotFoundError, OSError) as e:
+        logger.debug("Config path not found or inaccessible: %s - %s", config_path, e)
+        pass
+
+    search_paths = [
+      Path("server.toml"),
+      Path("personality/server.toml"),
+      Path("config/server.toml"),
+      Path("../server.toml"),
+      Path("../../server.toml")
+    ]
+
+    for path in search_paths:
+      try:
+        return path.resolve(strict=True)
+      except (FileNotFoundError, OSError):
+        continue
+
+    return Path("personality/server.toml")
+
+  def _load_config(self) -> None:
+    """Load configuration from the TOML file using core/config."""
+    try:
+      # Use unified config loading from core/config.py
+      self._config = core_load_config(
+        config_path=self.config_path,
+        i18n=self.i18n
+      )
+    except Exception as e:
+      msg = get_message(self.i18n, 'init.config_error', error=str(e))
+      logger.error(msg, component="config_manager")
+      self._config = {}
+
+  def get_config(self) -> Dict[str, Any]:
+    """Return the full configuration."""
+    return self._config
+
+  def find_manifest(self, module_name: str, module_path: Path) -> Path:
+    """
+    Find manifest file for a module.
+
+    Args:
+      module_name: Module name
+      module_path: Module path
+
+    Returns:
+      Path to the manifest
+    """
+    manifest_filename = get_message(
+      self.i18n, 'files.module_manifest_format',
+      module_name=module_name
+    )
+    central = self.manifests_path / manifest_filename
+    try:
+      central.resolve(strict=True)
+      return central
+    except (FileNotFoundError, OSError) as e:
+      logger.debug("Central manifest not found: %s - %s", central, e)
+      pass
+
+    local_manifest_name = get_message(self.i18n, 'files.manifest_toml')
+    local = module_path / local_manifest_name
+    try:
+      local.resolve(strict=True)
+      return local
+    except (FileNotFoundError, OSError) as e:
+      logger.debug("Local manifest not found: %s - %s", local, e)
+      pass
+
+    return central
+
+  def load_manifest(self, manifest_path: Path) -> Dict[str, Any]:
+    """
+    Load manifest file.
+
+    Args:
+      manifest_path: Path to the manifest
+
+    Returns:
+      Dictionary with manifest data
+    """
+    try:
+      with open(manifest_path, 'rb') as f:
+        return tomllib.load(f)
+    except FileNotFoundError as e:
+      logger.debug("Manifest file not found: %s - %s", manifest_path, e)
+      pass
+    except (IOError, KeyError, tomllib.TOMLDecodeError) as e:
+      # B106: a corrupt/unparseable manifest must not crash the boot — fall
+      # back to the default dict below. TOMLDecodeError is a ValueError subclass;
+      # we catch it explicitly rather than bare ValueError so genuine
+      # programming errors inside the try still surface.
+      logger.warning("Error reading manifest: %s - %s", manifest_path, e)
+      pass
+
+    module_key = get_message(self.i18n, 'manifest.keys.module')
+    version_key = get_message(self.i18n, 'manifest.keys.version')
+    enabled_key = get_message(self.i18n, 'manifest.keys.enabled')
+    default_version = get_message(self.i18n, 'manifest.default.version')
+    default_enabled = get_message(self.i18n, 'manifest.default.enabled')
+
+    return {
+      module_key: {
+        version_key: default_version,
+        enabled_key: default_enabled
+      }
+    }
+
+  def _project_root(self) -> Path:
+    project_root = self.config_path.parent
+    if project_root.name == "personality":
+      project_root = project_root.parent
+    return project_root
+
+  def _resolve_module_layer(self, module_info) -> str:
+    module_path = getattr(module_info, "path", None)
+    layer = "plugins"
+    if module_path:
+      try:
+        relative = module_path.resolve().relative_to(self._project_root().resolve())
+        if len(relative.parts) > 0:
+          layer = relative.parts[0]
+      except Exception as e:
+        logger.debug("Could not determine module layer for %s: %s", module_path, e)
+    return layer
+
+  def _is_core_nature(self, module_info) -> bool:
+    from core.modules.core_modules import is_core_nature_at
+    return is_core_nature_at(
+      getattr(module_info, "name", None),
+      getattr(module_info, "path", None),
+      self._project_root(),
+    )
+
+  def _apply_enabled_from_core(self, module_info) -> None:
+    module_info.enabled = True
+    msg = self._t("module_manager.core_module_always_enabled",
+           "Module {name} is CORE, always enabled",
+           name=module_info.name)
+    logger.info(msg)
+
+  def _apply_enabled_from_dict(self, module_info, module_config: dict) -> None:
+    module_info.enabled = module_config.get('enabled', True)
+    logger.debug("Module %s enabled=%s (from dict config)", module_info.name, module_info.enabled)
+
+  def _apply_enabled_from_list_or_manifest(self, module_info, modules_config: dict) -> bool:
+    from personality.data.models import ModuleState
+    enabled_list = modules_config.get('enabled', None)
+    if isinstance(enabled_list, list):
+      if module_info.name in enabled_list:
+        module_info.enabled = True
+        logger.debug("Module %s enabled (from list)", module_info.name)
+      else:
+        module_info.enabled = False
+        logger.info("Module %s not in enabled list, disabling", module_info.name)
+        module_info.state = ModuleState.DISABLED
+        return False
+    else:
+      module_info.enabled = module_info.manifest.get('module', {}).get('enabled', True)
+      logger.debug("Module %s enabled=%s (from manifest default)", module_info.name, module_info.enabled)
+    return True
+
+  def apply_config_to_module(self, module_info) -> None:
+    """
+    Apply configuration to a ModuleInfo.
+
+    Admission has THREE paths, in this order (D-L / #887). The first one that
+    matches decides `enabled`; the later ones are not consulted:
+
+    - NATURE (wins over everything): `is_core_nature_at(name, path, root)` —
+      declared core AND sitting at its canonical path (`memory/*`, `core/cli`,
+      `core/modules`). Always enabled; ignores both formats below.
+      First-party plugins under `plugins/` (security, ollama_module) are NOT
+      core nature: they stay on the list.
+    - FORMAT 2 (dict): [plugins.modules.security] enabled = true
+    - FORMAT 1 (list): [plugins.modules] enabled = ["security", ...] — applies
+      to every non-core module, wherever it lives. Living outside `plugins/` is
+      no longer a free pass.
+
+    Priority: nature > dict > list (more specific wins).
+
+    `priority` / `auto_start` are read from [plugins.modules.<name>] with
+    [<layer>.modules.<name>] on top when the module lives outside plugins/.
+    An `enabled` key under [<layer>.modules.<name>] is NOT read (it decided
+    before D-L); a warning is logged if one is found.
+
+    Args:
+      module_info: ModuleInfo to configure
+    """
+    from personality.data.models import ModuleState
+
+    # Admission is nature, not folder (D-L / #887). Non-core modules go
+    # through [plugins.modules] even if they sit under memory/ or elsewhere.
+    plugins_modules = self._config.get("plugins", {}).get("modules", {})
+    if not isinstance(plugins_modules, dict):
+      plugins_modules = {}
+    plugin_dict = plugins_modules.get(module_info.name, {})
+    if not isinstance(plugin_dict, dict):
+      plugin_dict = {}
+
+    layer = self._resolve_module_layer(module_info)
+    layer_modules = self._config.get(layer, {}).get("modules", {})
+    if not isinstance(layer_modules, dict):
+      layer_modules = {}
+    layer_dict = layer_modules.get(module_info.name, {})
+    if not isinstance(layer_dict, dict):
+      layer_dict = {}
+    module_config = {**plugin_dict, **layer_dict} if layer != "plugins" else plugin_dict
+    if layer != "plugins" and "enabled" in layer_dict:
+      logger.warning(
+        "[%s.modules.%s] has an 'enabled' key that is no longer read (D-L): "
+        "admission goes through nature or [plugins.modules]. Move it there.",
+        layer, module_info.name,
+      )
+
+    if self._is_core_nature(module_info):
+      self._apply_enabled_from_core(module_info)
+    elif "enabled" in plugin_dict:
+      self._apply_enabled_from_dict(module_info, plugin_dict)
+    else:
+      if not self._apply_enabled_from_list_or_manifest(module_info, plugins_modules):
+        return
+
+    module_info.priority = module_config.get(
+      'priority',
+      module_info.manifest.get('module', {}).get('priority', 10)
+    )
+    module_info.auto_start = module_config.get(
+      'auto_start',
+      module_info.manifest.get('module', {}).get('auto_start', False)
+    )
+
+    deps = module_info.manifest.get('dependencies', {})
+    module_info.dependencies = deps.get('internal', [])
+
+    if not module_info.enabled:
+      logger.info("Module %s disabled via config", module_info.name)
+      module_info.state = ModuleState.DISABLED
+
+  def update_module_enabled(self, module_name: str, enabled: bool, module_path: Path) -> bool:
+    """
+    Update the enabled state of a module and persist to server.toml.
+
+    Args:
+      module_name: Module name
+      enabled: True to enable, False to disable
+      module_path: Module path
+
+    Returns:
+      True if saved successfully
+    """
+    try:
+      relative = module_path.resolve().relative_to(self._project_root().resolve())
+      layer = relative.parts[0] if len(relative.parts) > 0 else "plugins"
+    except Exception:
+      layer = "plugins"
+
+    if layer not in self._config:
+      self._config[layer] = {}
+    if 'modules' not in self._config[layer]:
+      self._config[layer]['modules'] = {}
+
+    if module_name not in self._config[layer]['modules']:
+      self._config[layer]['modules'][module_name] = {}
+
+    self._config[layer]['modules'][module_name]['enabled'] = enabled
+
+    # Use unified save from core/config.py
+    success = core_save_config(self._config, self.config_path)
+    if success:
+      logger.info("Saved module %s enabled=%s to config", module_name, enabled)
+    else:
+      msg = self._t("module_manager.error_saving_config",
+             "Error guardant configuració",
+             error="save failed")
+      logger.error(msg)
+    return success

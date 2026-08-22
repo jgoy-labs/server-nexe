@@ -10,7 +10,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from core.loader.manifest_base import create_lazy_manifest, install_lazy_manifest
+from core.modules.manifest_base import create_lazy_manifest, install_lazy_manifest
 
 _m = create_lazy_manifest(
     module_path="plugins.llama_cpp_module.module",
