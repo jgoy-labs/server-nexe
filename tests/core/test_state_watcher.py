@@ -310,3 +310,75 @@ class TestMemoryModulesAreDeclared:
                 "folder name, so this rename would mark it degraded forever. "
                 "Either keep the id, or make the check translate one to the other."
             )
+
+
+class TestQdrantEye:
+    """#891 — the watcher's Qdrant sensor could not fire.
+
+    It read server_state.qdrant_available, which startup set to True
+    unconditionally (in external mode without contacting the URL at all) and
+    only shutdown ever set back to False. So the eye reported a constant, the
+    'qdrant' entry of the interface's degraded_names was unreachable, and the
+    doctrine 'one place decides, the rest report a signal' had a sensor that
+    reported nothing.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_store_that_does_not_answer_raises_the_signal(self, monkeypatch):
+        from core import lifespan as lifespan_mod
+
+        monkeypatch.setattr(lifespan_mod, "probe_qdrant", lambda: (False, "Connection refused"))
+        lifespan_mod.server_state.qdrant_available = True  # the old lie
+
+        signals = await lifespan_mod._qdrant_sensor()
+
+        assert [s.name for s in signals] == ["qdrant"]
+        assert signals[0].status == "missing"
+        assert lifespan_mod.server_state.qdrant_available is False, (
+            "the eye must refresh what /health and /status read, or they keep "
+            "reporting the startup value forever"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_responding_store_raises_nothing(self, monkeypatch):
+        from core import lifespan as lifespan_mod
+
+        monkeypatch.setattr(lifespan_mod, "probe_qdrant", lambda: (True, "6 collection(s)"))
+        lifespan_mod.server_state.qdrant_available = False
+
+        assert await lifespan_mod._qdrant_sensor() == []
+        assert lifespan_mod.server_state.qdrant_available is True
+
+    @pytest.mark.asyncio
+    async def test_the_eye_asks_instead_of_reading_the_flag(self, monkeypatch):
+        """Mutation guard: point the sensor back at server_state.qdrant_available
+        and this turns red, because the flag says one thing and the store says
+        the other — which is exactly the situation #891 describes."""
+        from core import lifespan as lifespan_mod
+
+        monkeypatch.setattr(lifespan_mod, "probe_qdrant", lambda: (False, "down"))
+        lifespan_mod.server_state.qdrant_available = True
+
+        signals = await lifespan_mod._qdrant_sensor()
+        assert signals, "the sensor believed the flag instead of asking the store"
+
+    @pytest.mark.asyncio
+    async def test_the_probe_runs_off_the_event_loop(self, monkeypatch):
+        """A blocking probe inline would stall every request while it waits."""
+        import threading
+
+        from core import lifespan as lifespan_mod
+
+        loop_thread = threading.get_ident()
+        seen: list[int] = []
+
+        def _probe():
+            seen.append(threading.get_ident())
+            return True, "ok"
+
+        monkeypatch.setattr(lifespan_mod, "probe_qdrant", _probe)
+        await lifespan_mod._qdrant_sensor()
+
+        assert seen and seen[0] != loop_thread, (
+            "the probe ran on the event loop thread; a slow store would freeze the server"
+        )

@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 from qdrant_client import QdrantClient
@@ -134,3 +135,104 @@ def close_qdrant_client():
         except Exception as e:
             logger.warning("Qdrant pool close failed for %s: %s", key, e)
     _instances.clear()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Probe — the only place that ASKS whether Qdrant is really there
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Until now nothing asked. memory/rag/health.py reported "qdrant_available:
+# pass" after checking the installed package VERSION, and lifespan set
+# server_state.qdrant_available = True unconditionally right after a mkdir —
+# in external mode it did not even contact the URL. Everything downstream
+# inherited that: the readiness aggregate, /status, and the watcher's Qdrant
+# eye, which could not fire because it read a flag that is only ever False
+# during shutdown.
+#
+# The probe goes through the POOLED client on purpose. A probe that opens its
+# own connection measures a different thing than the one serving the chat: it
+# would answer "fine" while the shared client is wedged, or "locked" while the
+# real one holds the lock legitimately.
+
+PROBE_TIMEOUT_S = 5.0
+
+# Last real observation: (ok, detail, monotonic timestamp). Written by whoever
+# probes, read by everyone who must not.
+_last_observation: Optional[tuple[bool, str, float]] = None
+_observation_lock = threading.Lock()
+
+
+def probe_qdrant(
+    path: Optional[str] = None,
+    url: Optional[str] = None,
+    timeout: Optional[float] = None,
+) -> tuple[bool, str]:
+    """Ask Qdrant for its collections. Returns (ok, detail).
+
+    Bounded: the call runs in a daemon thread and is given ``timeout``
+    seconds. A wedged external Qdrant makes the probe answer "timeout"
+    instead of hanging whoever asked — health endpoints and the watcher both
+    call this. (The READ path of memory/RAG has no timeout of its own; that
+    is a separate, still-open concern.)
+
+    Never raises: a probe that throws would be one more way of not answering.
+    """
+    if path is None and url is None:
+        # Resolve the target the way startup does, or an external Qdrant would
+        # be probed at the local embedded path — measuring something else.
+        try:
+            from core.lifespan_qdrant import _resolve_qdrant_target
+            url, path = _resolve_qdrant_target()
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.debug("Qdrant probe: target resolution unavailable: %s", exc)
+
+    limit = PROBE_TIMEOUT_S if timeout is None else timeout
+    result: list[tuple[bool, str]] = []
+
+    def _ask() -> None:
+        try:
+            client = get_qdrant_client(path=path, url=url)
+            collections = client.get_collections().collections
+            result.append((True, f"{len(collections)} collection(s)"))
+        except Exception as exc:  # noqa: BLE001 — any failure is "not available"
+            result.append((False, f"{type(exc).__name__}: {exc}"))
+
+    worker = threading.Thread(target=_ask, name="qdrant-probe", daemon=True)
+    worker.start()
+    worker.join(limit)
+
+    if not result:
+        # The thread is left running; it is a daemon and the client has its
+        # own deadline, so it cannot hold the process open.
+        observation = (False, f"no answer in {limit}s")
+    else:
+        observation = result[0]
+
+    with _observation_lock:
+        global _last_observation
+        _last_observation = (observation[0], observation[1], time.monotonic())
+    return observation
+
+
+def qdrant_status(max_age: float = 60.0) -> tuple[bool, str]:
+    """The most recent observation, probing only when there is none.
+
+    Readers must not probe. ``get_health()`` is called synchronously on the
+    event loop (core/endpoints/root.py) and the interface polls readiness every
+    three seconds: a probe there would stall the server for as long as the
+    store takes to answer. The watcher is the eye — it probes off-loop once a
+    round and everyone else reads what it saw, which is the same doctrine the
+    operational state runs on: one place observes, the rest report.
+
+    The cold path (no observation at all yet — watcher disabled, or a call
+    before startup finished) probes with a short deadline rather than lying.
+    """
+    with _observation_lock:
+        seen = _last_observation
+    if seen is not None:
+        ok, detail, at = seen
+        age = time.monotonic() - at
+        if age <= max_age:
+            return ok, detail
+        return ok, f"{detail} (last seen {age:.0f}s ago)"
+    return probe_qdrant(timeout=2.0)

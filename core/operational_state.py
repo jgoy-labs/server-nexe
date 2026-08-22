@@ -188,7 +188,13 @@ def readiness_status(state: OperationalState) -> str:
 
 
 class RefusalReason(str, Enum):
-    """One name per cause the server can refuse to start for."""
+    """One name per cause the server can refuse to start for.
+
+    STARTUP_PHASE_TIMEOUT used to live here. A phase running out of time is no
+    longer a refusal on its own: what it was bringing up is recorded as
+    unavailable and criticality decides (#892). If nothing critical is missing
+    the server serves and says so, so there is no refusal left to name.
+    """
 
     PORT_IN_USE = "port_in_use"
     IPV6_BIND = "ipv6_bind"
@@ -196,7 +202,7 @@ class RefusalReason(str, Enum):
     SIDECAR_CONFIG_INVALID = "sidecar_config_invalid"
     NO_MODULE_ALLOWLIST = "no_module_allowlist"
     SERVICES_TIMEOUT = "services_timeout"
-    STARTUP_PHASE_TIMEOUT = "startup_phase_timeout"
+    CRITICAL_MODULE_MISSING = "critical_module_missing"
     SERVER_STARTUP_ERROR = "server_startup_error"
     CRITICAL_STARTUP_ERROR = "critical_startup_error"
 

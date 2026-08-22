@@ -21,11 +21,16 @@ from typing import Callable
 
 from core.env_utils import parse_truthy
 from core.operational_state import (
+    CRITICAL_MODULES,
+    MEMORY_CORE_MODULES,
     STATUS_MISSING,
     ModuleSignal,
+    OperationalState,
     RefusalReason,
+    decide,
     record_refusal,
 )
+from core.qdrant_pool import probe_qdrant
 from core.state_watcher import register_sensor, watcher
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -243,6 +248,30 @@ async def _prewarm_fastembed() -> None:
         logger.warning("MemoryAPI: fastembed pre-warm failed (non-fatal): %s", exc)
 
 
+def _start_qdrant_or_degrade() -> None:
+    """Bring the vector store up, or record that it is down and carry on.
+
+    #892, the other half of the inversion: this call had no guard, so a `.lock`
+    still held by the previous sidecar killed startup — while the SAME store
+    being dead one function away only degraded it. The same subsystem failed
+    open by exception and closed by clock.
+
+    Qdrant is declared degradable: without it recall is gone, the chat is not.
+    So it degrades here too, and the user is told which subsystem is down
+    instead of being shown a process that died before drawing anything.
+    """
+    try:
+        _startup_qdrant()
+    except Exception as exc:
+        logger.error(
+            "Qdrant did not start (%s); recall and ingest are unavailable, "
+            "the chat still works", exc
+        )
+        server_state.qdrant_available = False
+        if "qdrant" not in server_state.degraded_modules:
+            server_state.degraded_modules.append("qdrant")
+
+
 async def _startup_init(app: FastAPI) -> None:
     """Phase 1: initial log, reload trigger, config, PID, encryption, qdrant."""
     logger.info("=" * 70)
@@ -346,7 +375,7 @@ async def _startup_init(app: FastAPI) -> None:
             logger.warning("Parent watchdog: failed to start in sidecar mode: %s", exc)
 
     await _startup_encryption(server_state)
-    _startup_qdrant()
+    _start_qdrant_or_degrade()
 
 
 async def _startup_services(app: FastAPI) -> None:
@@ -388,8 +417,62 @@ async def _startup_services(app: FastAPI) -> None:
     logger.info(msg)
 
 
-async def _startup_phases_and_tokens(app: FastAPI) -> None:
-    """Phase 3: startup phases (timeout each), token bootstrap, background tasks, callbacks."""
+# What each startup phase is expected to produce. Used to name what is missing
+# when a phase runs out of time; "plugin modules" cannot be enumerated ahead of
+# time, so it reports itself and the criticality check below catches the case
+# that matters.
+_PHASE_SUBSYSTEMS: dict[str, tuple[str, ...]] = {
+    "memory modules": MEMORY_CORE_MODULES,
+    "MemoryService v1": ("memory",),
+}
+
+
+def _record_phase_timeout(app: FastAPI, phase_name: str) -> None:
+    """Name what a timed-out phase failed to deliver, so the user can be told."""
+    loaded = getattr(app.state, "modules", {}) or {}
+    expected = _PHASE_SUBSYSTEMS.get(phase_name)
+    missing = [m for m in expected if m not in loaded] if expected else [phase_name]
+    for name in missing:
+        if name not in server_state.degraded_modules:
+            server_state.degraded_modules.append(name)
+
+
+def _refuse_if_a_critical_module_is_missing(app: FastAPI) -> None:
+    """Ask the one place that decides whether what is missing is fatal.
+
+    #892: startup used to kill the process for ANY phase timeout, while the
+    same subsystem failing with an exception one function away left the server
+    running degraded — Qdrant dead started, Qdrant slow did not. Since D-Q the
+    project DECLARES its criticality (core/operational_state.py): rag,
+    embeddings, memory and the engines are degradable; only authentication and
+    the interface are not. The startup path now applies that declaration
+    instead of contradicting it: a degradable subsystem that did not come up
+    leaves the server running and SAYING so, and only a missing critical module
+    refuses — which is the same rule readiness answers with.
+    """
+    loaded = getattr(app.state, "modules", {}) or {}
+    signals = [
+        ModuleSignal(name, STATUS_MISSING)
+        for name in sorted(CRITICAL_MODULES)
+        if name not in loaded
+    ]
+    if decide(signals) is not OperationalState.REFUSED:
+        return
+
+    missing = ", ".join(s.name for s in signals)
+    logger.error("Refusing to start: critical module(s) missing: %s", missing)
+    record_refusal(RefusalReason.CRITICAL_MODULE_MISSING, missing)
+    raise RuntimeError(f"Critical module(s) did not load: {missing}")
+
+
+async def _run_startup_phases(app: FastAPI) -> None:
+    """Run the three startup phases, then let criticality decide.
+
+    A phase running out of time is no longer fatal on its own (#892). It used
+    to be: the same subsystem failing with an exception left the server running
+    degraded, and failing by clock killed the process. The log line even said
+    "Server may be degraded" and then aborted.
+    """
     _startup_phases = [
         ("memory modules", load_memory_modules(app, server_state, _translate)),
         ("plugin modules", initialize_plugin_modules(app, server_state)),
@@ -400,12 +483,22 @@ async def _startup_phases_and_tokens(app: FastAPI) -> None:
             await asyncio.wait_for(_phase_coro, timeout=STARTUP_TIMEOUT)
         except asyncio.TimeoutError:
             logger.error(
-                "Startup phase '%s' timed out after %ss (NEXE_STARTUP_TIMEOUT). "
-                "Server may be degraded.",
+                "Startup phase '%s' timed out after %ss (NEXE_STARTUP_TIMEOUT); "
+                "what it was bringing up is unavailable.",
                 _phase_name, STARTUP_TIMEOUT,
             )
-            record_refusal(RefusalReason.STARTUP_PHASE_TIMEOUT, f"phase '{_phase_name}' after {STARTUP_TIMEOUT}s")
-            raise RuntimeError(f"Startup phase '{_phase_name}' timed out after {STARTUP_TIMEOUT}s")
+            # Deliberately NOT record_refusal(): a recorded refusal outranks
+            # every signal in current_state(), so registering one for a phase
+            # the server survives would leave the watcher reporting REFUSED on
+            # a server that serves. Only the site that actually refuses records.
+            _record_phase_timeout(app, _phase_name)
+
+    _refuse_if_a_critical_module_is_missing(app)
+
+
+async def _startup_phases_and_tokens(app: FastAPI) -> None:
+    """Phase 3: startup phases (timeout each), token bootstrap, background tasks, callbacks."""
+    await _run_startup_phases(app)
 
     server_state._knowledge_ingest_task = asyncio.create_task(
         _wrap_knowledge_ingest(server_state)
@@ -483,10 +576,20 @@ def _modules_sensor(app: FastAPI) -> Callable[[], list[ModuleSignal]]:
     return read
 
 
-def _qdrant_sensor() -> list[ModuleSignal]:
-    """Eye on the vector store: without it recall is gone, but the chat is not."""
-    if getattr(server_state, "qdrant_available", False):
+async def _qdrant_sensor() -> list[ModuleSignal]:
+    """Eye on the vector store: without it recall is gone, but the chat is not.
+
+    This used to read server_state.qdrant_available, which startup set to True
+    unconditionally and only shutdown ever set back to False — so this eye
+    could not fire while the server served. It asks now, off the event loop,
+    and refreshes the flag everyone else reads (/health, /status) with what it
+    saw. Asking is the sensor's job; deciding is not.
+    """
+    ok, detail = await asyncio.to_thread(probe_qdrant)
+    server_state.qdrant_available = ok
+    if ok:
         return []
+    logger.warning("Qdrant not responding (%s); recall is unavailable", detail)
     return [ModuleSignal("qdrant", STATUS_MISSING)]
 
 

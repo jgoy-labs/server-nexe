@@ -166,3 +166,96 @@ def test_create_client_hardens_preexisting_lax_dir(tmp_path):
             client.close()
     finally:
         os.umask(old_umask)
+
+
+class TestProbeAndObservation:
+    """#891 — the pool grows the only place that ASKS whether Qdrant is there.
+
+    Before this, nothing asked: the RAG check read the installed package
+    version and the lifespan set qdrant_available = True right after a mkdir,
+    without contacting anything in external mode. The watcher's Qdrant eye,
+    added the day before, read that flag — so it could not fire while the
+    server served.
+    """
+
+    def setup_method(self):
+        import core.qdrant_pool as pool
+        pool._last_observation = None
+
+    def test_a_store_that_refuses_the_connection_is_not_available(self):
+        from core.qdrant_pool import probe_qdrant
+
+        ok, detail = probe_qdrant(url="http://127.0.0.1:59999", timeout=3.0)
+        assert ok is False
+        assert detail, "a failure has to say why"
+
+    def test_a_client_that_raises_is_not_available(self):
+        from unittest.mock import patch
+
+        import core.qdrant_pool as pool
+
+        with patch.object(pool, "get_qdrant_client", side_effect=RuntimeError("already accessed")):
+            ok, detail = pool.probe_qdrant(path="/tmp/whatever", timeout=3.0)
+        assert ok is False
+        assert "already accessed" in detail
+
+    def test_a_store_that_never_answers_times_out_instead_of_hanging(self):
+        import time
+        from unittest.mock import patch
+
+        import core.qdrant_pool as pool
+
+        def _forever(*_a, **_kw):
+            time.sleep(30)
+
+        started = time.monotonic()
+        with patch.object(pool, "get_qdrant_client", side_effect=_forever):
+            ok, detail = pool.probe_qdrant(path="/tmp/whatever", timeout=0.3)
+        elapsed = time.monotonic() - started
+
+        assert ok is False
+        assert "no answer" in detail
+        assert elapsed < 5, (
+            f"the probe took {elapsed:.1f}s: a wedged store must not hold up "
+            "whoever asked — health endpoints and the watcher both call this"
+        )
+
+    def test_the_observation_is_reused_instead_of_probing_again(self):
+        """qdrant_status() is what readers call, and readers run on the event
+        loop. It must answer from the last observation, not open a probe."""
+        from unittest.mock import patch
+
+        import core.qdrant_pool as pool
+
+        with patch.object(pool, "get_qdrant_client") as client:
+            client.return_value.get_collections.return_value.collections = []
+            pool.probe_qdrant(path="/tmp/whatever", timeout=3.0)
+            calls_after_probe = client.call_count
+            pool.qdrant_status()
+            pool.qdrant_status()
+
+        assert client.call_count == calls_after_probe, (
+            "qdrant_status() probed again; on the event loop that stalls the server"
+        )
+
+    def test_with_no_observation_at_all_it_probes_rather_than_lying(self):
+        from unittest.mock import patch
+
+        import core.qdrant_pool as pool
+
+        with patch.object(pool, "get_qdrant_client", side_effect=RuntimeError("nope")):
+            ok, _ = pool.qdrant_status()
+        assert ok is False, "the cold path must ask, not assume"
+
+    def test_a_stale_observation_says_how_old_it_is(self):
+        from unittest.mock import patch
+
+        import core.qdrant_pool as pool
+
+        with patch.object(pool, "get_qdrant_client") as client:
+            client.return_value.get_collections.return_value.collections = []
+            pool.probe_qdrant(path="/tmp/whatever", timeout=3.0)
+
+        ok, detail = pool.qdrant_status(max_age=-1)  # force staleness
+        assert ok is True
+        assert "last seen" in detail, "a stale reading must not pass as fresh"

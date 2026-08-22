@@ -177,3 +177,139 @@ class TestLifespanSite:
                 pass
 
         assert [r.reason for r in refusals()] == [RefusalReason.CRITICAL_STARTUP_ERROR]
+
+
+class TestCriticalityDecidesAtStartup:
+    """#892, gates G3 and G4 — the startup path applies the DECLARED criticality.
+
+    The inversion this closes: Qdrant dead let the server start (an exception
+    in load_memory_modules put the module in degraded_modules and startup went
+    on), while Qdrant slow killed it (the same three phases ran inside
+    asyncio.wait_for and a TimeoutError became a RuntimeError). The same
+    subsystem failed open by exception and closed by clock.
+
+    Since D-Q the project declares that rag, embeddings, memory and the engines
+    are degradable and only authentication and the interface are not. These
+    tests hold the startup path to that declaration.
+    """
+
+    def _app(self, modules):
+        from unittest.mock import MagicMock
+
+        app = MagicMock()
+        app.state.modules = modules
+        return app
+
+    @pytest.mark.asyncio
+    async def test_g3_a_degradable_subsystem_that_times_out_does_not_refuse(self, monkeypatch):
+        """The whole point: a slow memory store leaves a server the user can
+        reach and fix, not a process that died before showing anything.
+
+        Drives the REAL phase loop with a phase that never finishes. An earlier
+        draft called the two helpers by hand and never went through the loop —
+        putting the `raise` back left it green, which is the mutation this test
+        exists to catch.
+        """
+        import asyncio
+
+        from core import lifespan as lifespan_mod
+        from core.server_state import server_state
+
+        server_state.degraded_modules = []
+        app = self._app({"security": object(), "web_ui_module": object()})
+
+        async def _never(*_a, **_kw):
+            await asyncio.sleep(30)
+
+        async def _fine(*_a, **_kw):
+            return None
+
+        monkeypatch.setattr(lifespan_mod, "load_memory_modules", _never)
+        monkeypatch.setattr(lifespan_mod, "initialize_plugin_modules", _fine)
+        monkeypatch.setattr(lifespan_mod, "start_memory_service_v1", _fine)
+        monkeypatch.setattr(lifespan_mod, "STARTUP_TIMEOUT", 0.05)
+
+        await lifespan_mod._run_startup_phases(app)  # must not raise
+
+        assert "rag" in server_state.degraded_modules, (
+            "the subsystem that did not come up has to be named, or nothing "
+            "downstream can warn the user"
+        )
+        assert refusals() == (), (
+            "a phase the server survives must not record a refusal: a recorded "
+            "refusal outranks every signal in current_state()"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_timeout_that_loses_a_critical_module_still_refuses(self, monkeypatch):
+        """Criticality decides both ways, through the same loop."""
+        import asyncio
+
+        from core import lifespan as lifespan_mod
+        from core.server_state import server_state
+
+        server_state.degraded_modules = []
+        app = self._app({"security": object()})  # web_ui_module never arrives
+
+        async def _never(*_a, **_kw):
+            await asyncio.sleep(30)
+
+        monkeypatch.setattr(lifespan_mod, "load_memory_modules", _never)
+        monkeypatch.setattr(lifespan_mod, "initialize_plugin_modules", _never)
+        monkeypatch.setattr(lifespan_mod, "start_memory_service_v1", _never)
+        monkeypatch.setattr(lifespan_mod, "STARTUP_TIMEOUT", 0.05)
+
+        with pytest.raises(RuntimeError, match="web_ui_module"):
+            await lifespan_mod._run_startup_phases(app)
+
+    def test_a_missing_critical_module_still_refuses(self):
+        """Criticality decides BOTH ways. Without this, the fix above would
+        read as 'startup never refuses', which is a different bug."""
+        from core.lifespan import _refuse_if_a_critical_module_is_missing
+
+        app = self._app({"web_ui_module": object()})  # security absent
+
+        with pytest.raises(RuntimeError, match="security"):
+            _refuse_if_a_critical_module_is_missing(app)
+        assert [r.reason for r in refusals()] == [RefusalReason.CRITICAL_MODULE_MISSING]
+
+    def test_the_refusal_names_every_missing_critical_module(self):
+        from core.lifespan import _refuse_if_a_critical_module_is_missing
+
+        with pytest.raises(RuntimeError) as exc:
+            _refuse_if_a_critical_module_is_missing(self._app({}))
+        assert "security" in str(exc.value) and "web_ui_module" in str(exc.value)
+
+    @pytest.mark.asyncio
+    async def test_g4_qdrant_failing_to_start_degrades_instead_of_killing(self, monkeypatch):
+        """A `.lock` still held by the previous sidecar used to prevent startup
+        while the same store being dead only degraded it.
+
+        Drives the real _start_qdrant_or_degrade(). Two earlier drafts of this
+        test were worse: one asserted that the stub raised (proving nothing
+        about the code under test) and one re-implemented the guard's body
+        inside the test, which would stay green if the guard were deleted.
+        """
+        from core import lifespan as lifespan_mod
+        from core.server_state import server_state
+
+        server_state.degraded_modules = []
+        server_state.qdrant_available = True
+
+        def _locked():
+            raise RuntimeError(
+                "Storage folder storage/vectors is already accessed by another instance"
+            )
+
+        monkeypatch.setattr(lifespan_mod, "_startup_qdrant", _locked)
+
+        # Drives the production helper, not a copy of it.
+        lifespan_mod._start_qdrant_or_degrade()
+
+        assert server_state.qdrant_available is False
+        assert "qdrant" in server_state.degraded_modules
+        assert refusals() == (), "a degradable store failing to start is not a refusal"
+
+
+async def _noop_async(*_a, **_kw):
+    return None

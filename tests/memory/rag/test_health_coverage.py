@@ -18,19 +18,59 @@ from memory.rag.health import (
 
 
 class TestCheckQdrantAvailableCoverage:
+    """Gate G8 (#891): the check must reflect whether the store ANSWERS.
 
-    def test_qdrant_version_unknown(self):
-        """When importlib.metadata can't find version."""
-        import importlib.metadata
-        with patch.object(importlib.metadata, "version", side_effect=Exception("not found")):
+    The two tests that lived here documented the bug instead of catching it.
+    One patched importlib.metadata to fail and then asserted status == "pass"
+    — writing down that the check reports Qdrant available while knowing
+    nothing about it. The other asserted `status in ["pass", "fail"]`, which
+    cannot fail. Between them, the check could never go red, and everything
+    downstream (readiness, /status, the watcher's eye) inherited that.
+    """
+
+    def test_a_store_that_does_not_answer_reports_fail(self):
+        """G8: kill Qdrant -> the check says fail. This is the whole point."""
+        with patch("core.qdrant_pool.qdrant_status",
+                   return_value=(False, "ResponseHandlingException: Connection refused")):
             result = check_qdrant_available()
-            assert result["status"] == "pass"
+        assert result["status"] == "fail", (
+            "the store is not answering and the check still reports pass — "
+            "this is #891, and it leaves the quarantine mechanism with no input"
+        )
+        assert "Connection refused" in result["message"], "the reason has to reach the reader"
 
-    def test_qdrant_check_returns_result(self):
-        """General check returns a result."""
-        result = check_qdrant_available()
-        assert result["status"] in ["pass", "fail"]
-        assert "name" in result
+    def test_a_responding_store_reports_pass(self):
+        """Control: without this, a check hardwired to 'fail' would pass above."""
+        with patch("core.qdrant_pool.qdrant_status", return_value=(True, "6 collection(s)")):
+            result = check_qdrant_available()
+        assert result["status"] == "pass"
+        assert result["name"] == "qdrant_available"
+
+    def test_the_check_reads_the_observation_and_does_not_probe(self):
+        """get_health() runs synchronously on the event loop and the interface
+        polls readiness every 3s: probing here would stall the server for as
+        long as the store takes to answer. The watcher probes; this reads."""
+        with patch("core.qdrant_pool.probe_qdrant") as probe, \
+             patch("core.qdrant_pool.qdrant_status", return_value=(True, "ok")):
+            check_qdrant_available()
+        probe.assert_not_called()
+
+    def test_the_old_shape_would_have_missed_it(self):
+        """Calibration: the version-only check answered 'pass' with the store
+        unreachable. Reproduced here so the gate above is demonstrably able to
+        tell the two implementations apart."""
+        import importlib.metadata
+
+        def legacy_check():
+            try:
+                version = importlib.metadata.version("qdrant-client")
+            except Exception:
+                version = "unknown"
+            return {"name": "qdrant_available", "status": "pass", "message": version}
+
+        with patch("core.qdrant_pool.qdrant_status", return_value=(False, "Connection refused")):
+            assert legacy_check()["status"] == "pass", "calibration: the old shape never failed"
+            assert check_qdrant_available()["status"] == "fail", "and the new one does"
 
 
 class TestCheckStoragePathsCoverage:

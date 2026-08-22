@@ -14,7 +14,7 @@ import logging
 import os
 import signal as _signal
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from core.env_utils import parse_truthy
 from core.ollama_utils import resolve_ollama_url as _resolve_ollama_url
@@ -46,6 +46,7 @@ def _setup_qdrant(project_root: Path, server_state) -> None:
 
     if qdrant_url is None:
         qdrant_url = os.getenv("NEXE_QDRANT_URL")
+    probe_path: Optional[str] = None
     if qdrant_url:
         # External Qdrant override (Docker, cluster, Qdrant Cloud)
         logger.info("Qdrant: External mode via URL=%s", qdrant_url)
@@ -58,7 +59,27 @@ def _setup_qdrant(project_root: Path, server_state) -> None:
             qdrant_path = project_root / qdrant_path
         qdrant_path.mkdir(parents=True, exist_ok=True)
         logger.info("Qdrant: Embedded mode (path=%s)", qdrant_path)
-    server_state.qdrant_available = True
+        # ANCHORED, not the raw string: a relative NEXE_QDRANT_PATH is anchored
+        # here at project_root, and the pool would anchor it at the repo root
+        # instead — MC-091, a Tauri sidecar (cwd=$HOME) opening a different
+        # vectors dir than the one just prepared.
+        probe_path = str(qdrant_path)
+
+    # The flag used to be set to True here unconditionally, outside both
+    # branches: in external mode nothing had contacted the URL, and in
+    # embedded mode a successful mkdir was taken as proof the store works.
+    # Everything that reads it — /health, /status, the watcher's Qdrant eye —
+    # was reading a constant. Now it carries the answer to an actual question.
+    from core.qdrant_pool import probe_qdrant
+    ok, detail = probe_qdrant(url=qdrant_url, path=probe_path)
+    server_state.qdrant_available = ok
+    if ok:
+        logger.info("Qdrant: responding (%s)", detail)
+    else:
+        logger.warning(
+            "Qdrant: NOT responding (%s) — recall and ingest are unavailable; "
+            "the chat still works", detail
+        )
 
 
 async def _check_ollama_running(client, ollama_url: str) -> bool:

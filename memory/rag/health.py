@@ -29,33 +29,36 @@ def check_module_initialized(module: Any) -> Dict[str, Any]:
   return _shared_check_module_initialized(module, "rag")
 
 def check_qdrant_available() -> Dict[str, Any]:
-  """Check 2: Verify Qdrant is available."""
-  i18n = get_i18n()
-  try:
-    pass
-    try:
-      import importlib.metadata
-      version = importlib.metadata.version("qdrant-client")
-    except Exception:
-      version = "unknown"
+  """Check 2: ask Qdrant whether it is actually there.
 
+  This used to open a `try:` with a bare `pass`, read the installed
+  qdrant-client VERSION and return "pass" — the `except ImportError` below it
+  was unreachable, so the check answered "available" even with the package
+  missing and, more to the point, never asked the store anything. Everything
+  downstream inherited the lie: the readiness aggregate, /status, and the
+  watcher's Qdrant eye.
+
+  What is read is the watcher's last observation of the SHARED pooled client
+  — the one that serves the chat, not a second one opened for the occasion.
+  """
+  i18n = get_i18n()
+  from core.qdrant_pool import qdrant_status  # deferred: memory/ must not import core/ at import time
+
+  # Reads the watcher's last observation; it must not probe here, because
+  # get_health() runs on the event loop and readiness is polled every 3s.
+  ok, detail = qdrant_status()
+  if ok:
     return {
       "name": "qdrant_available",
       "status": "pass",
-      "message": i18n.t("rag.health.qdrant_available", "qdrant-client {version} available", version=version)
+      "message": i18n.t("rag.health.qdrant_available", "Qdrant responding ({detail})", detail=detail)
     }
-  except ImportError:
-    return {
-      "name": "qdrant_available",
-      "status": "fail",
-      "message": i18n.t("rag.health.qdrant_not_installed", "qdrant-client not installed (pip install qdrant-client)")
-    }
-  except Exception as e:
-    return {
-      "name": "qdrant_available",
-      "status": "fail",
-      "message": i18n.t("rag.health.qdrant_check_error", "Error checking qdrant-client: {error}", error=str(e))
-    }
+  return {
+    "name": "qdrant_available",
+    "status": "fail",
+    "message": i18n.t("rag.health.qdrant_unreachable", "Qdrant not responding ({detail})", detail=detail)
+  }
+
 
 def check_storage_paths() -> Dict[str, Any]:
   """Check 3: Verify storage paths exist (storage/vectors/)."""
