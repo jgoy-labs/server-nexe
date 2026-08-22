@@ -320,13 +320,21 @@ class QdrantAdapter:
         )
 
     def close(self) -> None:
-        """Closes the internal client. Do not use if the client comes from the shared pool."""
-        if self._client is not None:
-            try:
-                self._client.close()
-            except Exception:  # nosec B110: best-effort QdrantClient close; cleanup is the caller's responsibility either way
-                pass
-            self._client = None
+        """Releases this adapter's handle. It does NOT close the client (#895).
+
+        The client always comes from core.qdrant_pool: from_pool() asks the pool
+        for it and the plain constructor falls through to _create_client(),
+        which asks too. The pool is its only owner, and it is SHARED — closing
+        it here killed it for every other consumer, which then got "QdrantLocal
+        instance is closed" while the pool went on serving the dead object, with
+        no recovery. It is the policy memory/memory/api/__init__.py already
+        stated ("Do NOT close the Qdrant client here"); this is the code
+        obeying it.
+
+        The process-wide teardown is core.qdrant_pool.close_qdrant_client(),
+        called from the lifespan shutdown.
+        """
+        self._client = None
 
     # ── High-level helpers (hide Qdrant models from callers) ──────────────────
     # Allow consumers (e.g. vector_index.py) to avoid importing

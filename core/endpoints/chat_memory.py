@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 
 from core.endpoints.chat_sanitization import _filter_rag_injection
-from memory.memory.constants import DEFAULT_VECTOR_SIZE
+from core.memory_access import DEFAULT_VECTOR_SIZE
 
 logger = logging.getLogger(__name__)
 

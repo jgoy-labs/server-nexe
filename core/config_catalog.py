@@ -132,6 +132,8 @@ CATALOG: tuple[KeyDecl, ...] = (
        description="Print bootstrap token to the console"),
     _k("host_alias", "NEXE_HOST", "env", "127.0.0.1",
        description="Alias of NEXE_SERVER_HOST used by the sidecar"),
+    _k("memory_read_timeout", "NEXE_MEMORY_READ_TIMEOUT", "env", 8.0,
+       description="Seconds a memory/RAG READ may take before it gives up (#890)"),
     _k("state_watcher_interval", "NEXE_STATE_WATCHER_INTERVAL", "env", 30.0,
        description="Seconds between operational-state rounds; 0 disables the watcher"),
     _k("state_watcher_confirmations", "NEXE_STATE_WATCHER_CONFIRMATIONS", "env", 2,

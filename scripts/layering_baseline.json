@@ -2,7 +2,6 @@
  "core/endpoints/bootstrap.py -> plugins.security.core.auth_dependencies",
  "core/endpoints/chat.py -> plugins.security.core.auth_dependencies",
  "core/endpoints/chat.py -> plugins.security.core.input_sanitizers",
- "core/endpoints/chat_memory.py -> memory.memory.constants",
  "core/endpoints/modules.py -> plugins.security.core.auth_dependencies",
  "core/endpoints/root.py -> plugins.security.core.auth_dependencies",
  "core/endpoints/system.py -> plugins.security.core.auth",

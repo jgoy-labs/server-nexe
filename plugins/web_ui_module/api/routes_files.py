@@ -146,6 +146,29 @@ def _apply_rag_header_metadata(doc_metadata: dict, rag_header, body_content: str
         logger.info(f"No RAG header — metadata simple per '{filename}'")
 
 
+async def _index_document_chunks(*, chunks, filename, session_id, metadata) -> dict:
+    """Index the chunks for RAG, reporting failure instead of raising it (#893).
+
+    save_document_chunks() walks into collection_exists()/create_collection()
+    with no guard of its own, so a memory/ that is down surfaces here as a plain
+    exception. The document is already attached to the conversation by the time
+    this runs; what is at stake is only whether it will be searchable.
+    """
+    try:
+        return await _get_memory_helper().save_document_chunks(
+            chunks=chunks,
+            filename=filename,
+            session_id=session_id,
+            metadata=metadata,
+        )
+    except Exception as e:
+        logger.warning(
+            "Document '%s' attached but NOT indexed (memory unavailable): %s",
+            filename, e,
+        )
+        return {"success": False, "chunks_saved": 0, "message": str(e)}
+
+
 def _compute_chunk_size(rag_header, body_content: str, filename: str) -> int:
     """Return chunk size: from RAG header if valid, else auto from doc length.
 
@@ -247,26 +270,31 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         chunks = file_handler.chunk_text(body_content, chunk_size=chunk_size)
         logger.info(f"Document '{file.filename}': {len(body_content)} chars -> {len(chunks)} chunks (chunk_size={chunk_size})")
 
-        # Index chunks in user_knowledge with session_id for cross-session isolation
-        memory_helper = _get_memory_helper()
-        ingestion_result = await memory_helper.save_document_chunks(
+        # #893: attach to the session FIRST. The conversation needs memory/ for
+        # nothing here, and indexing is the part that can fail — doing it first
+        # made an optional dependency fatal for a function that is not, and cost
+        # the user the document as well as the index. Same guarantee the chat
+        # path already gives by writing the user's turn to disk before memory/
+        # enters the scene.
+        session = session_mgr.get_or_create_session(session_id)
+        session.add_context_file(file.filename)
+
+        # small=full, large=first 50 chunks (~30K tokens with 65K context)
+        MAX_PREVIEW_CHUNKS = 50
+        preview_chunks = chunks[:MAX_PREVIEW_CHUNKS]
+        session.attach_document(file.filename, body_content, preview_chunks, total_chunks=len(chunks))
+        session_mgr._save_session_to_disk(session)
+        logger.info(f"Document '{file.filename}' attached ({len(preview_chunks)}/{len(chunks)} chunks)")
+
+        # Index chunks in user_knowledge with session_id for cross-session
+        # isolation. Degradable: what a broken memory/ costs is the search
+        # index, and the answer says so via `ingested`.
+        ingestion_result = await _index_document_chunks(
             chunks=chunks,
             filename=file.filename,
             session_id=session_id or "web_ui_upload",
             metadata=doc_metadata,
         )
-
-        # Attach to session
-        session = session_mgr.get_or_create_session(session_id)
-        session.add_context_file(file.filename)
-
-        # Attach to session: small=full, large=first 50 chunks (~30K tokens with 65K context)
-        MAX_PREVIEW_CHUNKS = 50
-        preview_chunks = chunks[:MAX_PREVIEW_CHUNKS]
-        session.attach_document(file.filename, body_content, preview_chunks, total_chunks=len(chunks))
-        logger.info(f"Document '{file.filename}' attached ({len(preview_chunks)}/{len(chunks)} chunks) + RAG-ready")
-
-        session_mgr._save_session_to_disk(session)
 
         return {
             "filename": file.filename,

@@ -209,7 +209,12 @@ class VectorIndex:
         return info.points_count
 
     def close(self):
-        """Close the QdrantAdapter client."""
+        """Releases the QdrantAdapter handle (it does not close the client).
+
+        The adapter comes from the shared pool, whose lifecycle belongs to
+        core.qdrant_pool.close_qdrant_client() at shutdown (#895). This used to
+        close the shared client and blind every other consumer of the store.
+        """
         if self._client:
             try:
                 self._client.close()

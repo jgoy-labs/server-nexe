@@ -28,6 +28,17 @@ _SYSTEM_COLLECTIONS = (
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Vector width of the default embedding model. It lives HERE, in core, and not
+# imported from memory/, because core/endpoints/chat_memory.py needs it at
+# import time and that import is reached from create_app() — pulling
+# memory.memory.constants in loads MemoryModule, MemoryAPI and the whole
+# embeddings package, so a broken memory/ left the product with NO server at
+# all (#888). memory/ is DEGRADABLE by decision: the chat must come up without
+# it. The canonical declaration is still memory/embeddings/constants.py; the
+# two are pinned together by tests/core/test_vector_size_anchor.py, which
+# fails if they ever drift apart.
+DEFAULT_VECTOR_SIZE = 768
+
 
 class CollectionDenied(PermissionError):
     """Plugin asked to use a collection the view (or the manager) has closed."""

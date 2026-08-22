@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
+from ._budget import within_read_budget
 from .models import Document, SearchResult
 
 logger = logging.getLogger(__name__)
@@ -324,8 +325,14 @@ async def search_documents(
   Returns:
     List[SearchResult]: Results sorted by similarity
   """
+  # #890: the read path had no time budget at all. A Qdrant or an embedder that
+  # HANGS (rather than failing) walked straight through every try/except on the
+  # chat path, because a try/except does not catch a block. Writes have had a
+  # 30s ceiling since forever; reads had none.
   if query_embedding is None:
-    query_embedding = await generate_embedding(query)
+    query_embedding = await within_read_budget(
+      generate_embedding(query), f"embedding the query for '{collection}'"
+    )
   loop = asyncio.get_running_loop()
   now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -334,7 +341,9 @@ async def search_documents(
     raw = _qdrant_query(qdrant, collection, query_embedding, top_k, threshold, include_expired, filter_metadata)
     return _filter_search_results(raw, collection, top_k, include_expired, now_iso)
 
-  result = await loop.run_in_executor(executor, _search)
+  result = await within_read_budget(
+    loop.run_in_executor(executor, _search), f"searching '{collection}'"
+  )
 
   # Fill text from TextStore if available and text is missing from payload
   if text_store and result:

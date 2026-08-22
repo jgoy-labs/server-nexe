@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 from ..constants import DEFAULT_EMBEDDING_MODEL, DEFAULT_VECTOR_SIZE
 from ..config import IngestConfig
 
+from ._budget import within_read_budget
 from .models import (
   CollectionInfo,
   CollectionNotFoundError,
@@ -490,7 +491,11 @@ class MemoryAPI:
     instead of recomputing it per collection (MC-001).
     """
     self._ensure_initialized()
-    return await self._generate_embedding(text)
+    # #890: callers that embed once and fan out over collections skip the
+    # budget inside search(), so it has to be here too.
+    return await within_read_budget(
+      self._generate_embedding(text), "embedding a query"
+    )
 
   async def get(self, doc_id: str, collection: str) -> Optional[Document]:
     """Get a document by ID."""
