@@ -27,7 +27,7 @@ pyyaml==6.0.3
 numpy==2.4.6
 slowapi==0.1.10
 prometheus-client==0.25.0
-psutil==5.9.8
+psutil==7.2.2
 # huggingface_hub: transitiva mlx-lm/fastembed; transformers 5.x requereix >=1.5.0;
 # F2.A11 va intentar pinar a 1.15.0 però pip-audit detecta conflicte amb typer==0.9.4
 # (deps transitives click). [refresh 2026-05-17]
