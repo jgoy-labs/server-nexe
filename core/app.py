@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import inspect
 import logging
 import os
 from pathlib import Path
@@ -26,6 +27,55 @@ if not logging.getLogger().handlers:
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
   )
+
+
+# Uvicorn limits for the whole product (#918, decision of 23/08/2026, option b).
+# They live here and not in the CLI runner because both start-up paths resolve the
+# very same app string, "core.app:app": the CLI (core.server.runner) and the
+# product (`python -m uvicorn core.app:app ...`, from the nexe-app sidecar and
+# src-tauri/lib.rs). Two hand-synchronised lists diverge sooner or later, and #918
+# was exactly that: the path the user runs had neither of these.
+# Only the two parameters that really diverged are set here. timeout_keep_alive=5
+# and limit_max_requests=None are uvicorn's own defaults and need no help.
+UVICORN_LIMITS = {
+  'timeout_graceful_shutdown': 10,
+  'limit_concurrency': 100,
+}
+
+
+def _apply_uvicorn_limits() -> bool:
+  """Apply UVICORN_LIMITS onto the live uvicorn.Config, whichever path started the server.
+
+  Uvicorn imports the application from inside Config.load(), so while this module
+  is being imported the Config being loaded sits on the call stack — for both
+  start-up paths, which is what makes this the one place they cannot diverge.
+  Both values are read late (limit_concurrency when a connection arrives,
+  timeout_graceful_shutdown at shutdown), so setting them here takes effect.
+
+  Returns:
+    True when a live uvicorn.Config was found and updated, False otherwise
+    (module imported by a test, a CLI command or any non-server context).
+  """
+  try:
+    from uvicorn.config import Config as _UvicornConfig
+  except ImportError:
+    return False
+
+  frame = inspect.currentframe()
+  frame = frame.f_back if frame is not None else None
+  while frame is not None:
+    candidate = frame.f_locals.get('self')
+    if isinstance(candidate, _UvicornConfig):
+      for name, value in UVICORN_LIMITS.items():
+        setattr(candidate, name, value)
+      return True
+    frame = frame.f_back
+  return False
+
+
+# Applied at import time: uvicorn resolves "core.app:app" from inside Config.load(),
+# so this is the moment the live Config is reachable on both paths.
+_apply_uvicorn_limits()
 
 
 def create_app(project_root: Optional[Path] = None, force_reload: bool = False) -> FastAPI:
@@ -78,6 +128,10 @@ def get_app() -> FastAPI:
   read-only filesystem or in unit tests does not trigger factory side effects.
   """
   global _app_instance
+  # Second chance for the limits: if this module was already imported before the
+  # server started, the import-time call above ran outside Config.load(). Uvicorn
+  # still resolves `app` from inside load(), so the live Config is reachable here.
+  _apply_uvicorn_limits()
   if _app_instance is None:
     force_reload = parse_truthy(os.getenv('NEXE_FORCE_RELOAD', 'false'))
     _app_instance = create_app(force_reload=force_reload)
@@ -103,7 +157,7 @@ def __getattr__(name: str):
 # first accessed. Listing it here would trigger ruff F822 / pyright
 # reportUnsupportedDunderAll. Consumers should keep using
 # `from core.app import app` (PEP 562 dispatches the access) or `get_app()`.
-__all__ = ['create_app', 'main', 'get_app']
+__all__ = ['create_app', 'main', 'get_app', 'UVICORN_LIMITS']
 
 
 if __name__ == '__main__':

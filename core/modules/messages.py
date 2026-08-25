@@ -11,6 +11,13 @@ www.jgoy.net · https://server-nexe.org
 
 import logging
 
+# #920 — the catalogs nest these keys under their component, which is the dotted
+# format I18nManager.t() documents ("module_manager.init.started"). The keys below
+# stay short because they are also the English fallback table and every caller in
+# core/modules/ asks for them that way; get_message() is what bridges the two.
+# Measured 23/08/2026: all 34 fallback keys resolve under this one component.
+I18N_COMPONENT = 'module_manager'
+
 FALLBACK_MESSAGES = {
   'paths.manifests_dir': 'manifests',
   'files.manifest_toml': 'manifest.toml',
@@ -69,13 +76,15 @@ def get_message(i18n, key: str, **kwargs) -> str:
     Formatted message
   """
   if i18n:
-    try:
-      translated = i18n.t(key, **kwargs)
-      if isinstance(translated, str) and translated != key:
-        return translated
-    except Exception as e:
-      logging.debug("Translation failed for key '%s': %s", key, e)
-      pass
+    # Ask for the component-qualified key first (the catalogs' format), then the
+    # bare key: a manager that already resolves short keys keeps working.
+    for candidate in (f'{I18N_COMPONENT}.{key}', key):
+      try:
+        translated = i18n.t(candidate, **kwargs)
+        if isinstance(translated, str) and translated != candidate:
+          return translated
+      except Exception as e:
+        logging.debug("Translation failed for key '%s': %s", candidate, e)
 
   message = FALLBACK_MESSAGES.get(key, key)
   try:

@@ -6,7 +6,23 @@ opt-in NEXE_ALLOW_PUBLIC_BIND is set.
 
 import pytest
 
+from core.operational_state import clear_refusals
+
 from core.server.runner import _enforce_loopback_bind, _host_is_loopback
+
+
+@pytest.fixture(autouse=True)
+def _clean_refusal_register():
+    """El registre de refusos és de procés: cap test n'hereta d'un altre.
+
+    Aquests tests exerciten llocs que criden record_refusal() de veritat, i
+    sense això el deixaven registrat: tot el que corregués després en el mateix
+    procés veia current_state() == REFUSED, passessin el que passessin els
+    senyals (mesurat 24/08 amb el gate de #944).
+    """
+    clear_refusals()
+    yield
+    clear_refusals()
 
 
 @pytest.mark.parametrize("host", [

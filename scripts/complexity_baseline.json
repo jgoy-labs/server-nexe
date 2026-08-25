@@ -4,7 +4,6 @@
  "core/endpoints/installer.py::_stream_gguf": 19,
  "core/lifespan.py::_startup_init": 15,
  "installer/installer_ollama_install.py::_install_ollama_windows": 15,
- "memory/memory/api/text_store.py::TextStore._migrate_to_encrypted": 20,
  "memory/memory/engines/persistence_sqlite.py::SqliteStorageMixin._migrate_to_encrypted": 19,
  "plugins/mlx_module/core/chat.py::MLXChatNode._get_model": 22,
  "plugins/mlx_module/core/config.py::model_kv_bytes_per_token": 17,

@@ -192,8 +192,14 @@ class TestChatCompletionsEndpoint:
         # RAG searches but Ollama fails → 503
         assert resp.status_code == 503
 
-    def test_rag_memory_api_fails_uses_rag_module_fallback(self):
-        """If MemoryAPI fails, try rag_module as fallback."""
+    def test_rag_memory_api_fails_degrades_without_context(self):
+        """#899: si MemoryAPI falla, el torn continua SENSE context.
+
+        Abans hi havia un fallback al RAG legacy (retirat: ADR-002:68 el
+        descrivia com estructuralment buit). El que aquest test mesura no
+        canvia — la petició no peta per culpa del RAG —, però el nom deia que
+        exercitava un fallback que ja no existeix.
+        """
         mock_rag = MagicMock()
         mock_rag.search = AsyncMock(return_value=["Some RAG result"])
 

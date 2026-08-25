@@ -634,8 +634,6 @@ if _PYDANTIC_SETTINGS_AVAILABLE:
         bootstrap_ttl: int = Field(30, description="TTL del token bootstrap (segons)", alias="NEXE_BOOTSTRAP_TTL")
         bootstrap_display: bool = Field(True, description="Mostrar token bootstrap a la consola", alias="NEXE_BOOTSTRAP_DISPLAY")
         bootstrap_auto_renew: bool = Field(True, description="Renovar token bootstrap automàticament", alias="NEXE_BOOTSTRAP_AUTO_RENEW")
-        auto_clean_enabled: bool = Field(False, description="Activar neteja automàtica de dades antigues", alias="NEXE_AUTO_CLEAN_ENABLED")
-        auto_clean_dry_run: bool = Field(True, description="Executar neteja automàtica en mode simulació", alias="NEXE_AUTO_CLEAN_DRY_RUN")
 
         @classmethod
         def list_settings(cls) -> list[dict]:

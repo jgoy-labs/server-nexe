@@ -10,9 +10,25 @@ server.toml [core.environment.mode], not only NEXE_ENV env var.
 
 import os
 import pytest
+
+from core.operational_state import clear_refusals
 from unittest.mock import MagicMock
 
 from core.server.factory_security import validate_production_security
+
+
+@pytest.fixture(autouse=True)
+def _clean_refusal_register():
+    """El registre de refusos és de procés: cap test n'hereta d'un altre.
+
+    Aquests tests exerciten llocs que criden record_refusal() de veritat, i
+    sense això el deixaven registrat: tot el que corregués després en el mateix
+    procés veia current_state() == REFUSED, passessin el que passessin els
+    senyals (mesurat 24/08 amb el gate de #944).
+    """
+    clear_refusals()
+    yield
+    clear_refusals()
 
 
 @pytest.fixture

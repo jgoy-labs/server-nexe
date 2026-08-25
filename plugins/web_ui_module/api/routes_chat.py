@@ -1427,6 +1427,48 @@ async def _arm_mem_deletes_nonstreaming(
     return ""
 
 
+@dataclass
+class NonStreamRepromptContext:
+    """El que el re-prompt de #856 necessita i que viu dins `_handle_chat_engine`.
+
+    `_yield_reprompt` demana engine/model/sig/lang/system_prompt/messages i
+    thinking_enabled. Al camí streaming els porta `StreamingChatContext`; el camí
+    no-streaming no tenia cap vehicle, i per això acea60f1 (31/07) va portar-hi
+    només la segona meitat de la xarxa (la confirmació) i no el re-prompt. Això
+    és el vehicle: els mateixos valors, capturats al mateix lloc, sense
+    reconstruir el torn ni duplicar-ne la preparació.
+    """
+    engine: Any
+    model_name: "str | None"
+    sig: Any
+    lang: str
+    system_prompt: str
+    messages: list
+    thinking_enabled: bool
+
+
+async def _reprompt_nonstreaming(
+    ctx: "NonStreamRepromptContext", mem_saves: list,
+) -> str:
+    """Re-prompt del camí no-streaming. Torna "" si no rendeix text.
+
+    Mateix generador que el camí streaming (`_yield_reprompt`, la font única):
+    allà els trossos es van emetent al client a mesura que arriben; aquí no hi
+    ha res a qui emetre'ls, així que es consumeixen i el que compta és el text
+    acumulat que el generador deixa a `rp_out`. Els errors ja els empassa
+    `_yield_reprompt` (log + res), de manera que un re-prompt que falla acaba
+    igual que un que no rendeix: cadena buida i, més amunt, la confirmació.
+    """
+    _rp_out: list = []
+    async for _chunk in _yield_reprompt(
+        ctx.engine, ctx.model_name, ctx.sig, ctx.lang,
+        ctx.system_prompt, ctx.messages, mem_saves,
+        ctx.thinking_enabled, _rp_out,
+    ):
+        pass
+    return _rp_out[0] if _rp_out else ""
+
+
 async def _handle_nonstreaming_response(
     response_text: str,
     session,
@@ -1434,6 +1476,7 @@ async def _handle_nonstreaming_response(
     message: str,
     memory_action: Optional[str],
     rag_collections: "list | None" = None,
+    reprompt_ctx: "NonStreamRepromptContext | None" = None,
 ) -> tuple[str, Optional[str], int]:
     """Returns (response_text, memory_action, mem_deleted_delta).
 
@@ -1473,8 +1516,14 @@ async def _handle_nonstreaming_response(
     # failing that, emitted a confirmation. Seen live 31/07 (glm-4.7-flash
     # answered a bare hallucinated directive in 0.58 s). The re-prompt itself
     # needs engine/sig/system_prompt/messages, which stay local to
-    # _handle_chat_engine — so this path lands on the same fallback text the
-    # streaming one uses when its re-prompt yields nothing.
+    # _handle_chat_engine — so this path landed straight on the same fallback
+    # text the streaming one uses when its re-prompt yields nothing.
+    # 23/08: la paritat es completa — el context del torn ara viatja fins aquí
+    # (NonStreamRepromptContext) i el re-prompt es prova PRIMER, com al camí
+    # streaming; la confirmació queda com el que sempre havia de ser: l'última
+    # xarxa quan el segon intent tampoc rendeix text.
+    if not response_text and _mem_saves_ns and reprompt_ctx is not None:
+        response_text = await _reprompt_nonstreaming(reprompt_ctx, _mem_saves_ns)
     if not response_text:
         response_text = _mem_save_fallback_text(_mem_saves_ns)
     return response_text, memory_action, mem_deleted_delta
@@ -2876,9 +2925,20 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         memory_helper,
         message: str,
         request: FastAPIRequest,
-    ) -> tuple[str, Optional[str], Any]:
-        """Returns (response_text, model_name, streaming_response_or_None)."""
+    ) -> tuple[str, Optional[str], Any, "NonStreamRepromptContext | None"]:
+        """Returns (response_text, model_name, streaming_response_or_None, reprompt_ctx).
+
+        `reprompt_ctx` és el que #856 necessita al camí no-streaming (re-prompt);
+        és None si cap engine ha arribat a preparar el torn.
+        """
         model_name = None
+        # #856: el context del re-prompt es capta dins el bucle d'engines, quan
+        # el torn ja està preparat. S'inicialitza AQUÍ, abans de qualsevol
+        # `try`, perquè el retorn del camí d'error (get_server_state() que peta,
+        # cap engine viu) el troba definit igualment — inicialitzar-lo a dins
+        # feia que aquell retorn petés amb UnboundLocalError i el 200 degradat
+        # es convertís en un 500.
+        _reprompt_ctx: "NonStreamRepromptContext | None" = None
         image_b64 = body.get("image_b64")
         stream = body.get("stream", False)
         # FD-S6: continue mode — resume the last assistant turn.
@@ -3005,6 +3065,15 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     # Adapt to different chat signatures
                     import inspect
                     sig = inspect.signature(engine.chat)
+
+                    # #856: el re-prompt del camí no-streaming necessita aquests
+                    # locals, que moren en sortir d'aquí. Es capturen ara, que
+                    # són vius, i viatgen amb el retorn.
+                    _reprompt_ctx = NonStreamRepromptContext(
+                        engine=engine, model_name=model_name, sig=sig, lang=_lang,
+                        system_prompt=system_prompt, messages=messages,
+                        thinking_enabled=thinking_enabled,
+                    )
 
                     # Ollama/MLX/LlamaCpp expect base64 strings, not bytes
                     _images_arg = [image_b64] if image_b64 else None
@@ -3160,7 +3229,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 # next message, orphaning everything before it.
                                 "X-Session-Id": session.id,
                             }
-                        )
+                        ), _reprompt_ctx
 
                     # Handle non-streaming response accumulation
                     await _accumulate_nonstreaming_response(chat_result, response_chunks)
@@ -3212,7 +3281,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                 _disconnect_monitor_task.cancel()
 
     # Strip MEM_SAVE tags and extract facts (non-streaming path)
-        return response_text or "", model_name, None
+        return response_text or "", model_name, None, _reprompt_ctx
 
 
     async def _chat_inner(request: FastAPIRequest, body: Dict[str, Any], _auth):
@@ -3251,7 +3320,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                  if m.get("role") == "user"),
                 "",
             )
-            response_text, model_name, _streaming_resp = await _handle_chat_engine(
+            # El 4t element (context de re-prompt de #856) no aplica al camí
+            # continue: aquí no hi ha extracció de MEM_SAVE ni cos buit a cobrir
+            # — el torn es reprèn i el text es fusiona amb l'anterior.
+            response_text, model_name, _streaming_resp, _ = await _handle_chat_engine(
                 body, _c_session, _get_memory_helper(), _last_user, request
             )
             if _streaming_resp is not None:
@@ -3312,6 +3384,9 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         response_text = ""
         memory_action = None
         model_name = None
+        # #856: només el camí "chat" el rep ple; inicialitzat aquí perquè el
+        # pas al handler no-streaming no depengui de l'ordre de les branques.
+        _reprompt_ctx = None
         _mem_deleted = 0  # count of deleted entries (for session stats / UI badge)
 
         if intent != "chat":
@@ -3321,7 +3396,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             _mem_deleted += _mem_deleted_delta
 
         if intent == "chat":
-            response_text, model_name, _streaming_resp = await _handle_chat_engine(
+            response_text, model_name, _streaming_resp, _reprompt_ctx = await _handle_chat_engine(
                 body, session, memory_helper, message, request
             )
             if _streaming_resp is not None:
@@ -3329,7 +3404,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         if response_text and intent == "chat" and not response_text.startswith("Error:"):
             response_text, memory_action, _del_delta = await _handle_nonstreaming_response(
                 response_text, session, memory_helper, message, memory_action,
-                body.get("rag_collections"),
+                body.get("rag_collections"), _reprompt_ctx,
             )
             _mem_deleted += _del_delta
 

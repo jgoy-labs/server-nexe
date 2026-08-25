@@ -185,6 +185,43 @@ jobs:
           name: coverage-xml
           path: coverage.xml
 
+  web-ui-integration:
+    name: Web UI Integration Tests (#940)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run web_ui_module integration tests (non-GPU)
+        # #940: these 35 tests were collected but never run anywhere — the
+        # default filter (`tests` job above) deselects `integration`
+        # entirely and no job re-included them. These 25 need no real model
+        # engine (they hit the REST surface: health, sessions, uploads,
+        # validation, static files). The other 10 (TestChatOllama/MLX,
+        # TestChatMemoryIntent*) stay excluded here — a real Ollama/MLX
+        # engine on a CI runner is a separate cost/scope decision.
+        # TestMemoryRoundTrip (4 of the 25) self-skips with a clear reason
+        # when Qdrant isn't at localhost:6333 (no service configured here)
+        # — an honest skip, not a silent one.
+        env:
+          NEXE_ENV: testing
+          NEXE_PRIMARY_API_KEY: ${{ secrets.NEXE_CI_API_KEY || 'nexe-ci-test-key' }}
+          NEXE_CSRF_SECRET: ${{ secrets.NEXE_CI_CSRF_SECRET || 'nexe-ci-csrf-secret' }}
+        run: >
+          pytest tests/plugins/web_ui_module/integration/
+          -m "not gpu"
+          --no-cov --tb=short -q
+
   precompute-check:
     name: Precomputed KB Manifest
     runs-on: ubuntu-latest
@@ -211,11 +248,13 @@ jobs:
         # version bumps will all trigger a failure here so the repo
         # cannot merge with a stale precomputed artefact set.
         #
-        # continue-on-error: small knowledge edits between DMG builds
-        # must not block CI. Authoritative check runs locally
-        # (`scripts/precompute_kb.py --verify`) and at DMG build time
-        # (ship-nexe.sh), where stale embeddings must be regenerated
-        # before notarisation.
+        # continue-on-error: small knowledge edits between builds must not
+        # block CI. Authoritative check (#939) runs locally
+        # (`scripts/precompute_kb.py --verify`) and — the one that actually
+        # gates a shipped product — inside nexe-app/scripts/build-sidecar.sh,
+        # which fails the sidecar build on a stale manifest before it ever
+        # reaches a bundle. NOT installer/build_dmg.sh: that DMG (`/dmg-nexe`)
+        # is the legacy standalone installer, not the product being built.
         continue-on-error: true
         run: |
           if [ -f knowledge/.embeddings/manifest.json ]; then

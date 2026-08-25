@@ -9,7 +9,6 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-import os
 import logging
 from pathlib import Path
 from typing import List, Dict, Any
@@ -23,27 +22,56 @@ class WebSecurityCheck:
     def __init__(self, project_root: Path = None):  # type: ignore[assignment]  # no_implicit_optional
         self.project_root = project_root or Path(__file__).parent.parent.parent.parent
 
+    def _effective_cors_origins(self) -> List[str]:
+        """Els orígens que MANEN, en el mateix ordre que els aplica el servidor.
+
+        #865: aquest check llegia `NEXE_CORS_ORIGINS`, una variable que no
+        existeix enlloc del producte — auditava un fantasma i deia «no
+        configurat» encara que server.toml tingués el CORS restringit (i mai
+        hauria vist un `cors_origins = ["*"]` de debò). La font real és la de
+        `core/middleware.py:setup_cors`: en mode sidecar mana
+        `SidecarConfig.cors_origins` (hi entren els orígens Tauri) i, si no,
+        `[core.server].cors_origins` de server.toml.
+
+        No s'hi afegeix cap variable d'entorn nova: una segona font de veritat
+        és precisament el que #918 acaba de decidir evitar.
+        """
+        try:
+            from core.sidecar_config import get_sidecar_config
+            sidecar_cfg = get_sidecar_config()
+            if sidecar_cfg.is_sidecar:
+                return list(sidecar_cfg.cors_origins)
+        except Exception as e:
+            # Mateix criteri defensiu que setup_cors: si SidecarConfig no es pot
+            # llegir, es cau a server.toml en comptes de deixar el check cec.
+            logger.debug("CORS check: SidecarConfig unavailable, using server.toml: %s", e)
+
+        from core.config import load_config
+        config = load_config(project_root=self.project_root)
+        server_cfg = config.get("core", {}).get("server", {})
+        return list(server_cfg.get("cors_origins") or [])
+
     def run(self) -> List[Dict[str, Any]]:
         """Runs the web security checks."""
         findings = []
 
-        # Check 1: CORS origins configured?
-        cors_origins = os.getenv("NEXE_CORS_ORIGINS", "").strip()
+        # Check 1: CORS origins configured? (llegit de la font que mana)
+        cors_origins = self._effective_cors_origins()
         if not cors_origins:
             findings.append({
                 "check": "web_security",
                 "severity": "MEDIUM",
                 "title": "CORS origins not configured",
-                "description": "NEXE_CORS_ORIGINS not set. Default CORS policy will be used.",
-                "recommendation": "Set NEXE_CORS_ORIGINS to restrict allowed origins"
+                "description": "No cors_origins in the effective configuration; no cross-origin caller is allowed.",
+                "recommendation": "Set [core.server].cors_origins in server.toml"
             })
         elif "*" in cors_origins:
             findings.append({
                 "check": "web_security",
                 "severity": "HIGH",
                 "title": "CORS allows all origins",
-                "description": "NEXE_CORS_ORIGINS contains '*'. Any origin can access the API.",
-                "recommendation": "Restrict CORS to specific origins"
+                "description": "The effective cors_origins contains '*'. Any origin can access the API.",
+                "recommendation": "Restrict [core.server].cors_origins to specific origins"
             })
 
         # Check 2: Injection detectors available?
@@ -91,16 +119,13 @@ class WebSecurityCheck:
                 "recommendation": "Check plugins/security/sanitizer/"
             })
 
-        # Check 4: HTTPS in production?
-        nexe_env = os.getenv("NEXE_ENV", "development").lower()
-        ssl_cert = os.getenv("NEXE_SSL_CERT", "").strip()
-        if nexe_env == "production" and not ssl_cert:
-            findings.append({
-                "check": "web_security",
-                "severity": "MEDIUM",
-                "title": "No SSL certificate configured for production",
-                "description": "NEXE_SSL_CERT not set in production mode.",
-                "recommendation": "Configure SSL/TLS for production deployment"
-            })
+        # #865: aquí hi havia un «Check 4: HTTPS in production?» que exigia
+        # `NEXE_SSL_CERT`. Retirat: el producte és local-first sobre loopback i
+        # no serveix TLS enlloc — zero paràmetres de certificat o clau privada
+        # a tot el codi de producte, cosa que vigila
+        # tests/plugins/security/test_g16_cors_ssl_real_source.py (els noms
+        # exactes viuen allà a posta: escrits aquí, el check es denunciaria a
+        # si mateix). Un check que reclama un certificat que el producte no pot
+        # tenir és soroll que tapa els findings de debò.
 
         return findings

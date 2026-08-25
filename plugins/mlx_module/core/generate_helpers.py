@@ -118,6 +118,79 @@ def _apply_template(
     return tokenizer.apply_chat_template(messages, **kwargs)
 
 
+def _message_text(msg: Dict) -> str:
+    """Extract the text of a message for token-budget estimation.
+
+    ``content`` is a plain string for the text path and a list of typed
+    blocks for the VLM path (image + text). Only the text blocks count here
+    — image tokens aren't estimated by this helper, which is consistent with
+    #845's scope: the VLM path never receives max_kv_size at all today (it
+    builds unbounded KV inside mlx_vlm), so it never calls this truncation.
+    """
+    content = msg.get("content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(
+            block.get("text", "") for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+    return ""
+
+
+# Fixed safety margin (chat-template overhead: BOS/special tokens, role
+# markers) that a per-message raw token count doesn't capture. Small on
+# purpose — it only has to absorb template scaffolding, not a whole turn.
+_TRUNCATION_MARGIN_TOKENS = 256
+
+
+def truncate_messages_to_budget(
+    system: str,
+    messages: List[Dict],
+    tokenizer: Any,
+    max_kv_size: int,
+    max_tokens: Optional[int],
+) -> List[Dict]:
+    """Drop the oldest messages until the estimated prompt fits the context
+    budget, preserving the system prompt's room and the most recent turn.
+
+    #845: mlx-lm silently ignores max_kv_size for every model this product
+    ships by default (Qwen3.5, gemma4, gpt-oss all define their own
+    model.make_cache(), which cache.py:31-32 prefers over the configured
+    limit) — this is the enforcement mlx-lm doesn't provide, done at the
+    prompt level instead of the KV cache. Budget = max_kv_size minus room
+    reserved for the model's own reply and the template margin above.
+    """
+    if not messages:
+        return messages
+
+    reply_budget = max_tokens if max_tokens is not None else 0
+    budget = max_kv_size - reply_budget - _TRUNCATION_MARGIN_TOKENS
+    if budget <= 0:
+        # Degenerate config (max_tokens close to or over max_kv_size): keep
+        # just the most recent turn rather than producing an empty prompt.
+        return messages[-1:]
+
+    system_cost = len(tokenizer.encode(system)) if system else 0
+    remaining = budget - system_cost
+
+    # Walk from the most recent message backwards, keeping whole messages
+    # while they fit; a message that doesn't is dropped, never cut in half
+    # (would break role alternation / template validity). The most recent
+    # message is evaluated first and always kept, even alone if it alone
+    # exceeds the budget — this never emits zero turns.
+    kept: List[Dict] = []
+    running = 0
+    for msg in reversed(messages):
+        cost = len(tokenizer.encode(_message_text(msg)))
+        if kept and running + cost > remaining:
+            break
+        kept.append(msg)
+        running += cost
+    kept.reverse()
+    return kept
+
+
 def prepare_tokens(
     system: str,
     messages: List[Dict],
@@ -126,6 +199,8 @@ def prepare_tokens(
     thinking_enabled: bool = True,
     model_type: str = "",
     continue_final: bool = False,
+    max_kv_size: Optional[int] = None,
+    max_tokens: Optional[int] = None,
 ) -> Tuple[List[int], List[int], List[Dict], List[Dict]]:
     """
     Prepares and tokenizes messages for generation and cache.
@@ -139,6 +214,10 @@ def prepare_tokens(
         model_type: ``config.json.model_type`` of the loaded model. Used to
             decide whether to inject the Qwen3.5 thinking-force directive
             (see ``qwen35_directive._qwen35_needs_thinking_directive``).
+        max_kv_size: Context budget for prompt truncation (#845). ``None``
+            (default) disables truncation — existing callers are unaffected.
+        max_tokens: Reply length reserved out of ``max_kv_size`` when
+            truncating. Ignored when ``max_kv_size`` is ``None``.
 
     Returns:
         Tuple: (full_tokens, cache_lookup_tokens, all_messages, all_cache_messages)
@@ -146,6 +225,16 @@ def prepare_tokens(
     # Sanitize messages for strict role alternation (Gemma, etc.)
     sanitized_messages = sanitize_messages_for_alternation(messages)
     sanitized_cache_messages = sanitize_messages_for_alternation(messages_for_cache)
+
+    # Truncate to the context budget (#845) — after sanitization (alternation
+    # must hold for the messages actually kept), before templating.
+    if max_kv_size is not None:
+        sanitized_messages = truncate_messages_to_budget(
+            system, sanitized_messages, tokenizer, max_kv_size, max_tokens
+        )
+        sanitized_cache_messages = truncate_messages_to_budget(
+            system, sanitized_cache_messages, tokenizer, max_kv_size, max_tokens
+        )
 
     # Build OpenAI-format messages
     all_messages = [{"role": "system", "content": system}] + sanitized_messages

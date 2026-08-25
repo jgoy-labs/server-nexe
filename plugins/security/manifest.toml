@@ -125,7 +125,6 @@ format = "json"
 retention_days = 90
 action = "ARCHIVE"
 archive_to = "storage/archives/security/{year}-{month}/"
-auto_clean = false
 description = "Security logs - compliance 90 dies"
 
 [module.storage.protection]

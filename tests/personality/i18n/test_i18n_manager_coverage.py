@@ -156,12 +156,19 @@ class TestLanguageManagement:
 class TestLoadModuleTranslations:
 
     def test_load_module_translations(self, tmp_path):
+        """#920: the catalog layout is <module>/languages/<lang>/messages_<component>.json.
+
+        This fixture used to build a ``location/`` level that does not exist
+        anywhere in the repo, so the test passed while the loader found nothing
+        in production — an inverted assert that fixed the bug in place. The
+        component name now comes from the FILE name, not the directory.
+        """
         from personality.i18n.i18n_manager import I18nManager
         # Create module with translations
         mod_dir = tmp_path / "plugins" / "moduls" / "test_mod"
-        lang_dir = mod_dir / "location" / "languages" / "en-US"
+        lang_dir = mod_dir / "languages" / "en-US"
         lang_dir.mkdir(parents=True)
-        (lang_dir / "messages.json").write_text(json.dumps({"mod_key": "mod_val"}))
+        (lang_dir / "messages_test_mod.json").write_text(json.dumps({"mod_key": "mod_val"}))
 
         config = tmp_path / "server.toml"
         config.write_text('[personality]\n[personality.location]\n')
@@ -172,12 +179,16 @@ class TestLoadModuleTranslations:
         assert "test_mod" in mgr.translations["en-US"]
 
     def test_load_module_translations_with_meta(self, tmp_path):
-        """Lines 130-131: _meta key filtered."""
+        """The reserved ``_meta`` key is filtered out of a module catalog.
+
+        Layout updated with #920 (see the sibling test): no ``location/`` level,
+        and the component comes from ``messages_<component>.json``.
+        """
         from personality.i18n.i18n_manager import I18nManager
         mod_dir = tmp_path / "plugins" / "moduls" / "test_mod"
-        lang_dir = mod_dir / "location" / "languages" / "en-US"
+        lang_dir = mod_dir / "languages" / "en-US"
         lang_dir.mkdir(parents=True)
-        (lang_dir / "messages.json").write_text(json.dumps({"_meta": {}, "key": "val"}))
+        (lang_dir / "messages_test_mod.json").write_text(json.dumps({"_meta": {}, "key": "val"}))
 
         config = tmp_path / "server.toml"
         config.write_text('[personality]\n[personality.location]\n')

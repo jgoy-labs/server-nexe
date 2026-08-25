@@ -15,6 +15,7 @@ www.jgoy.net · https://server-nexe.org
 from __future__ import annotations
 
 import os
+import pathlib
 import secrets
 import shutil
 import subprocess
@@ -358,6 +359,44 @@ def _f56_reset_rate_limiter():
     except Exception:  # nosec B110: limiter unavailable in some test paths — non-fatal
         pass
     yield
+
+
+@pytest.fixture(autouse=True)
+def _uploads_never_pile_up_in_the_product():
+    """Cap test deixa fitxers al directori d'uploads del PRODUCTE.
+
+    `plugins/web_ui_module/ui/uploads/` és on aterren els documents de
+    l'usuari i viu DINS l'arbre del producte. Mesurat el 24/08: la suite hi
+    deixava un fitxer per execució (`test.txt`, `test_1.txt`, `test_2.txt`…)
+    perquè `test_upload_txt_file` mocka la memòria però la pujada és REAL. El
+    build copia del directori de treball, o sigui que d'allà se'ls enduia al
+    bundle (#930).
+
+    Es neteja per DIFERÈNCIA (què hi havia abans vs què hi ha després), no per
+    llista de noms coneguts: la llista és justament el que ha deixat passar
+    aquests quatre.
+
+    I NO es redirigeix el directori, que era el primer intent: el guard
+    WS5-01 (`/ui/static/uploads/**` mai servit sense auth) es mesura contra el
+    path real del mòdul, i moure'l deixava passar un document per static amb
+    200. Un fixture que desactiva un control de seguretat és pitjor que la
+    brossa que volia evitar.
+    """
+    uploads = pathlib.Path(__file__).parent / "plugins" / "web_ui_module" / "ui" / "uploads"
+    before = set(uploads.iterdir()) if uploads.is_dir() else set()
+    yield
+    if not uploads.is_dir():
+        return
+    for path in uploads.iterdir():
+        if path in before:
+            continue
+        try:
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink()
+        except OSError:  # nosec B110: no és feina d'aquest fixture tombar un test per no poder esborrar
+            pass
 
 
 @pytest.fixture(scope="function")

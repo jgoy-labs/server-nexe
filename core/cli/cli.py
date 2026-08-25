@@ -17,6 +17,7 @@ www.jgoy.net · https://server-nexe.org
 import os
 import sys
 import click
+from pathlib import Path
 from typing import Optional, List
 
 from .router import CLIRouter
@@ -617,19 +618,38 @@ def knowledge():
     """RAG document management (knowledge/)."""
     pass
 
+def _resolve_knowledge_path(project_root: Path) -> Path:
+    """Carpeta a ingerir: knowledge/<NEXE_LANG>, amb el `.env` comptant.
+
+    #902: el servidor carrega el `.env` a l'arrencada (core/server/runner.py:30)
+    i serveix, per exemple, `ca`; el CLI llegia NEXE_LANG només de l'entorn del
+    procés i queia a `en`, de manera que `./nexe knowledge ingest` indexava
+    knowledge/en mentre el producte servia knowledge/ca. Ara el CLI llegeix el
+    mateix `.env` amb el patró que ja fa servir core/cli/chat_cli.py:169-178 —
+    `load_dotenv` NO sobreescriu el que ja hi ha a l'entorn, així que qui
+    exporta NEXE_LANG (el llançador del bundle, el pare Tauri) continua manant i
+    no s'afegeix cap segona font de veritat.
+
+    Sense subdirectori de llengua es torna knowledge/ tal qual: instal·lacions
+    antigues amb l'arbre pla han de continuar ingerint.
+    """
+    from dotenv import load_dotenv
+
+    env_path = project_root / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+    knowledge_path = project_root / "knowledge"
+    lang_path = knowledge_path / os.getenv("NEXE_LANG", "en")
+    return lang_path if lang_path.is_dir() else knowledge_path
+
+
 @knowledge.command(name="ingest")
 def ingest_knowledge_cmd():
     """Ingest documents from knowledge/ into Qdrant."""
     import asyncio
-    import os
-    from pathlib import Path
 
     project_root = Path(__file__).parent.parent.parent
-    knowledge_path = project_root / "knowledge"
-    _nexe_lang = os.getenv("NEXE_LANG", "en")
-    lang_path = knowledge_path / _nexe_lang
-    if lang_path.is_dir():
-        knowledge_path = lang_path
+    knowledge_path = _resolve_knowledge_path(project_root)
 
     if not knowledge_path.exists():
         click.echo(click.style(f"❌ Folder '{knowledge_path}' does not exist.", fg="red"))

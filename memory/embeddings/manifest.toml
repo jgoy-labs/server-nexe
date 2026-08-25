@@ -188,11 +188,6 @@ action = "LRU_EVICTION"
 max_size_gb = 5.0
 ttl_hours = 72
 description = "Cache L2 d'embeddings - LRU eviction quan supera 5GB o 72h"
-# Auto-clean agressiu per cache
-auto_clean = true
-max_files_per_run = 5000
-max_size_mb_per_run = 500
-cooldown_minutes = 15
 
 [module.storage.protection]
 # Fitxers que MAI s'han de tocar

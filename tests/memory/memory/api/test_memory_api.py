@@ -22,7 +22,6 @@ def make_mock_api():
     api._embedder = MagicMock()
     api._executor = MagicMock()
     api._initialized = True
-    api._text_store = None
     api._crypto = None
     api.qdrant_url = "http://localhost:6333"
     api.qdrant_path = None

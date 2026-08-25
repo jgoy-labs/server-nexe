@@ -692,11 +692,20 @@ class TestMC114ExcInfo:
         assert _has_exc_info(caplog, "Llama.cpp streaming error")
 
     def test_rag_error_has_exc_info(self, caplog):
+        """#899: el boom venia de `_rag_module_fallback`, que ja no existeix.
+
+        Retirat el fallback, l'únic codi que queda dins el `try` EXTERN de
+        `build_rag_context` és el log de degradació del `except` intern — que
+        és, doncs, l'única manera d'arribar avui a «RAG Error». Es fa petar
+        aquell log: `logger.error` segueix sent el real, així que el que es
+        mesura (que l'error porta `exc_info`) és el de sempre.
+        """
+        from core.endpoints import chat_rag
         from core.endpoints.chat_rag import build_rag_context
         with patch("memory.memory.api.v1.get_memory_api",
                    new=AsyncMock(side_effect=RuntimeError("api down"))), \
-             patch("core.endpoints.chat_rag._rag_module_fallback",
-                   new=AsyncMock(side_effect=RuntimeError("fallback boom"))):
+             patch.object(chat_rag.logger, "warning",
+                          side_effect=RuntimeError("log boom")):
             with caplog.at_level(logging.ERROR):
                 asyncio.run(build_rag_context("hello", MagicMock(), "en"))
         assert _has_exc_info(caplog, "RAG Error")

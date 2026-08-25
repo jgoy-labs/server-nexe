@@ -19,7 +19,12 @@ import threading
 from typing import Any, Callable, Optional
 
 from core.config_catalog import default_for
-from core.operational_state import ModuleSignal, OperationalState, current_state
+from core.operational_state import (
+    STATUS_UNKNOWN,
+    ModuleSignal,
+    OperationalState,
+    current_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,25 +53,64 @@ def sensor_names() -> tuple[str, ...]:
         return tuple(sorted(_sensors))
 
 
-async def _read(name: str, sensor: Sensor) -> list[ModuleSignal]:
-    """Read one sensor. A sensor that raises reports nothing and says so."""
+async def _ask(name: str, sensor: Sensor) -> list[ModuleSignal]:
+    """Ask one sensor, without deciding what to do if it misbehaves."""
+    result = sensor()
+    if inspect.isawaitable(result):
+        result = await result
+    return list(result or [])
+
+
+async def _read(name: str, sensor: Sensor, timeout: float) -> list[ModuleSignal]:
+    """Read one sensor. A sensor that raises — or that HANGS — says so.
+
+    #944: the round used to wait forever. A sensor that raises was handled from
+    the start, but a sensor that simply never returns is not an exception, so
+    `except Exception` never saw it: one blind eye blinded the whole round, the
+    confirmed state froze at whatever it was (normal, in the case that matters)
+    and not one line was logged. The failure mode was not a false red — it was a
+    green that lied.
+
+    A sensor that runs out of time reports STATUS_UNKNOWN, which `decide()`
+    reads as DEGRADED: "I cannot see" is a finding, not silence. The signal
+    carries the SENSOR's name because that is what failed; the modules it was
+    meant to watch stay unreported, which is honest.
+
+    Limit worth knowing: this only reaches sensors that await. A SYNCHRONOUS
+    sensor that blocks holds the event loop itself, and no timeout inside a
+    coroutine can interrupt that — it would need a thread. Today's sensors are
+    local and synchronous; the type has always accepted awaitables.
+    """
     try:
-        result = sensor()
-        if inspect.isawaitable(result):
-            result = await result
-        return list(result or [])
+        return await asyncio.wait_for(_ask(name, sensor), timeout)
+    except asyncio.TimeoutError:
+        logger.warning(
+            "state watcher: sensor %r did not answer in %ss — reporting unknown",
+            name,
+            timeout,
+        )
+        return [ModuleSignal(name=name, status=STATUS_UNKNOWN)]
     except Exception as exc:
         logger.warning("state watcher: sensor %r failed: %s", name, exc)
         return []
 
 
-async def collect() -> list[ModuleSignal]:
-    """One round of every sensor, concurrently."""
+async def collect(*, sensor_timeout: Optional[float] = None) -> list[ModuleSignal]:
+    """One round of every sensor, concurrently, each on its own clock.
+
+    The timeout defaults from the catalog rather than from the caller, so a
+    `collect()` from anywhere else is bounded too (#944).
+    """
     with _sensors_lock:
         items = list(_sensors.items())
     if not items:
         return []
-    readings = await asyncio.gather(*(_read(name, s) for name, s in items))
+    timeout = float(
+        sensor_timeout
+        if sensor_timeout is not None
+        else default_for("state_watcher_sensor_timeout")
+    )
+    readings = await asyncio.gather(*(_read(name, s, timeout) for name, s in items))
     return [signal for reading in readings for signal in reading]
 
 
@@ -84,6 +128,7 @@ class StateWatcher:
         *,
         interval: Optional[float] = None,
         confirmations: Optional[int] = None,
+        sensor_timeout: Optional[float] = None,
     ) -> None:
         self.interval = float(
             interval if interval is not None else default_for("state_watcher_interval")
@@ -95,6 +140,11 @@ class StateWatcher:
                 if confirmations is not None
                 else default_for("state_watcher_confirmations")
             ),
+        )
+        self.sensor_timeout = float(
+            sensor_timeout
+            if sensor_timeout is not None
+            else default_for("state_watcher_sensor_timeout")
         )
         self._confirmed = OperationalState.NORMAL
         self._candidate = OperationalState.NORMAL
@@ -132,7 +182,7 @@ class StateWatcher:
 
     async def poll_once(self) -> OperationalState:
         """One full round: read the eyes, ask the decider, apply hysteresis."""
-        signals = await collect()
+        signals = await collect(sensor_timeout=self.sensor_timeout)
         self.last_signals = tuple(signals)
         return self.observe(current_state(signals))
 
@@ -143,7 +193,7 @@ class StateWatcher:
         module. The starting point is not a change: if RAG failed to load
         during startup, the user has to be told now, not two rounds from now.
         """
-        signals = await collect()
+        signals = await collect(sensor_timeout=self.sensor_timeout)
         self.last_signals = tuple(signals)
         self._confirmed = current_state(signals)
         self._candidate = self._confirmed

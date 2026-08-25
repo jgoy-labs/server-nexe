@@ -85,7 +85,6 @@ from .lifespan_modules import (  # noqa: E402  # after warnings filter
 )
 from .lifespan_crypto import _startup_encryption  # noqa: E402  # after warnings filter
 from .lifespan_qdrant import _startup_qdrant, _shutdown_qdrant  # noqa: E402  # after warnings filter
-from .lifespan_auto_clean import _startup_auto_clean  # noqa: E402  # after warnings filter
 from .lifespan_sessions import _startup_session_cleanup  # noqa: E402  # after warnings filter
 
 logger = logging.getLogger(__name__)
@@ -523,8 +522,6 @@ async def _startup_phases_and_tokens(app: FastAPI) -> None:
     # B.1 — pre-warm fastembed ONNX runtime (background, non-blocking)
     server_state._prewarm_task = asyncio.create_task(_prewarm_fastembed())
     logger.info("MemoryAPI: fastembed pre-warm task scheduled")
-
-    await _startup_auto_clean(server_state, _translate)
 
     if hasattr(server_state, 'configure_modules_callback') and server_state.configure_modules_callback is not None:
         server_state.configure_modules_callback(server_state.api_integrator, server_state.i18n)

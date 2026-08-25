@@ -37,7 +37,6 @@ def test_falsy_values(value):
     "core.lifespan_services",
     "core.lifespan_tokens",
     "core.lifespan",
-    "core.lifespan_auto_clean",
     "core.lifespan_modules",
 ])
 def test_no_adhoc_env_bool_parsing(module_path):

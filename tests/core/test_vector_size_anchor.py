@@ -9,7 +9,8 @@ lives in ``core.memory_access``.
 Moving a value out of its home package buys resilience and costs a second
 source of truth. That is only acceptable while something fails when the two
 disagree — this test is that something. Same reasoning as the duplicated
-``_EMBEDDER_MODEL_ID`` in core/endpoints/installer.py, which has no anchor yet.
+``_EMBEDDER_MODEL_ID`` in core/endpoints/installer.py, anchored below
+(g13, 23/08/2026).
 """
 from __future__ import annotations
 
@@ -55,4 +56,29 @@ def test_chat_memory_does_not_import_memory_at_module_level():
         "core/endpoints/chat_memory.py imports memory/ at module level again: "
         f"{module_level}. create_app() is reached through this file — see "
         "tests/core/test_g1_memory_degradation.py"
+    )
+
+
+def test_installer_embedder_model_matches_the_embeddings_declaration():
+    """g13 — the installer's copy == the canonical declaration in memory/embeddings.
+
+    core/endpoints/installer.py keeps its own copy of the fastembed model id on
+    purpose: it must stay import-safe inside PBS bundles, where the
+    memory/structlog import chain can fail. That copy is NOT to be replaced by an
+    import — the resilience is the point.
+
+    What the copy costs is a second source of truth, and the deal only holds
+    while something breaks when the two disagree. This test is that something:
+    change either side alone and the wizard would install a different model from
+    the one memory/ indexes with, producing vectors nothing can search.
+    """
+    from core.endpoints.installer import _EMBEDDER_MODEL_ID
+    from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL as CANONICAL
+
+    assert _EMBEDDER_MODEL_ID == CANONICAL, (
+        f"core/endpoints/installer.py::_EMBEDDER_MODEL_ID ({_EMBEDDER_MODEL_ID!r}) "
+        f"has drifted from the canonical memory/embeddings/constants.py::"
+        f"DEFAULT_EMBEDDING_MODEL ({CANONICAL!r}). The wizard would install a model "
+        f"the rest of the system does not use. Update core/endpoints/installer.py — "
+        f"do NOT import the constant: the installer must stay import-safe in PBS bundles."
     )

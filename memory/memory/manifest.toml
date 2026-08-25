@@ -133,11 +133,8 @@ tests = "memory/memory/tests"
 path = "storage/memory/flash"
 type = "flash_memory"
 format = "json"
-retention_minutes = 30
 action = "AUTO_GC"
 description = "Flash memory temporal - TTL 30 minuts, GC cada 5 minuts"
-# Auto-clean gestionat pel propi mòdul (garbage collector intern)
-auto_clean = false
 
 [[module.storage.paths]]
 path = "storage/memory/storage"
@@ -145,7 +142,6 @@ type = "persistent_memory"
 format = "json"
 action = "PERMANENT"
 description = "Memòria persistent - MAI esborrar automàticament"
-auto_clean = false
 
 [[module.storage.paths]]
 path = "storage/memory/ledger"
@@ -155,9 +151,6 @@ retention_days = 30
 action = "ROTATE"
 max_files = 100
 description = "Ledger de transaccions - rotació a 100 fitxers màxim"
-auto_clean = true
-max_files_per_run = 50
-cooldown_minutes = 60
 
 [module.storage.protection]
 # Fitxers que MAI s'han de tocar

@@ -138,6 +138,8 @@ CATALOG: tuple[KeyDecl, ...] = (
        description="Seconds between operational-state rounds; 0 disables the watcher"),
     _k("state_watcher_confirmations", "NEXE_STATE_WATCHER_CONFIRMATIONS", "env", 2,
        description="Equal readings needed before a new state is believed (anti-flap)"),
+    _k("state_watcher_sensor_timeout", "NEXE_STATE_WATCHER_SENSOR_TIMEOUT", "env", 5.0,
+       description="Seconds one sensor may take before the round stops waiting for it (#944)"),
 )
 
 

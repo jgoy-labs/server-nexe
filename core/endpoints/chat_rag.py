@@ -117,8 +117,17 @@ async def build_rag_context(
                     len(context_text), len(all_results),
                 )
         except Exception as mem_err:
-            logger.debug("MemoryAPI not available: %s", mem_err)
-            context_text = await _rag_module_fallback(app_state, last_user_msg)
+            # #899: aquí hi queia `_rag_module_fallback` (el RAG legacy,
+            # PersonalityRAG), que ADR-002:68 ja descriu com estructuralment
+            # buit: sempre tornava "" i el seu únic senyal era el WARNING que
+            # B114 li va posar perquè el camí mort fos audible. Retirat el camí,
+            # el senyal es queda — el que importa no era el fallback sinó que
+            # el torn es respon SENSE CONTEXT i això no pot passar en silenci.
+            # Ara surt sempre que MemoryAPI cau, no només quan hi havia un
+            # mòdul `rag` registrat.
+            logger.warning(
+                "RAG: no context this turn — MemoryAPI unavailable: %s", mem_err,
+            )
 
     except Exception as e:
         logger.error("RAG Error: %s", e, exc_info=True)
@@ -179,30 +188,3 @@ def _build_context_from_results(all_results: list) -> str:
         source = getattr(r, 'metadata', {}).get('source', 'unknown') if hasattr(r, 'metadata') else 'unknown'
         parts.append(f"[Font: {source}]\n{r.text}")
     return "\n\n".join(parts)
-
-
-async def _rag_module_fallback(app_state: Any, query: str) -> str:
-    """Fallback to legacy RAG module if MemoryAPI is unavailable."""
-    from memory.rag_sources.base import SearchRequest
-
-    rag_module = app_state.modules.get('rag') if hasattr(app_state, 'modules') else None
-    if not (rag_module and hasattr(rag_module, 'search')):
-        logger.debug("No RAG source available")
-        return ""
-
-    search_request = SearchRequest(query=query, top_k=3)
-    results = await rag_module.search(search_request, source="personality")
-
-    if not results:
-        # B114: the legacy PersonalityRAG fallback is a structurally-empty dead
-        # loop (superseded by MemoryAPI/Qdrant). Make the empty result audible
-        # so the dead path is observable instead of silently swallowed.
-        logger.warning("RAG Search returned no results")
-        return ""
-
-    if isinstance(results, list):
-        context_text = "\n".join([_rag_result_to_text(r) for r in results])
-    else:
-        context_text = str(results)
-    logger.info("RAG Context found (RAG module): %d chars", len(context_text))
-    return context_text

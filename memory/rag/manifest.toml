@@ -122,19 +122,12 @@ assets_path = ""
 [config]
 top_k = 5
 similarity_threshold = 0.7
-circuit_breaker_threshold = 5
-circuit_breaker_timeout = 60
 max_concurrent_searches = 3
 
 [config.vector_search]
 default_top_k = 5
 min_similarity = 0.7
 max_results = 50
-
-[config.circuit_breaker]
-failure_threshold = 5
-timeout_seconds = 60
-recovery_timeout = 120
 
 [config.sources]
 # WS6-01/02: only the personality source survives (chat fallback).
@@ -164,7 +157,6 @@ type = "document_store"
 format = "mixed"
 action = "PERMANENT"
 description = "Documents i coneixement del sistema - MAI esborrar"
-auto_clean = false
 
 [[module.storage.paths]]
 path = "storage/rag/vectors"
@@ -172,7 +164,6 @@ type = "vector_store"
 format = "binary"
 action = "PERMANENT"
 description = "Vector stores FAISS - MAI esborrar automàticament"
-auto_clean = false
 
 [[module.storage.paths]]
 path = "storage/rag/indexes"
@@ -180,7 +171,6 @@ type = "index_metadata"
 format = "json"
 action = "PERMANENT"
 description = "Metadades dels índexs vectorials - MAI esborrar"
-auto_clean = false
 
 [module.storage.protection]
 # Fitxers que MAI s'han de tocar - TOT és crític per RAG

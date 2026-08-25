@@ -1,0 +1,6 @@
+{
+  "storage_orphans_count": 7,
+  "env_orphans_count": 5,
+  "frozen_on": "2026-08-23",
+  "note": "#945: kept OUTSIDE test_g9_autoclean_orphans.py on purpose. Growing SURVIVING_ORPHANS/ENV_SURVIVING_ORPHANS and bumping its ceiling in the same edit of the same file was a silent-growth hole (MUT-M5b). Bumping this file is now a separate, visible edit from adding the exception."
+}

@@ -21,6 +21,33 @@ from fastapi.testclient import TestClient
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+def _discover_removed_routes() -> list[tuple[str, str, str]]:
+    """(plugin_name, route, prefix) for every removed_direct_routes entry
+    declared in plugins/*/manifest.toml (#936): read from the real
+    declaration, not invented per test."""
+    try:
+        import tomllib
+    except ImportError:
+        import tomli as tomllib  # type: ignore[no-redef]
+
+    found = []
+    for manifest_toml in sorted((PROJECT_ROOT / "plugins").glob("*/manifest.toml")):
+        with open(manifest_toml, "rb") as f:
+            data = tomllib.load(f)
+        endpoints = data.get("module", {}).get("endpoints", {})
+        prefix = endpoints.get("router_prefix", "")
+        for route in endpoints.get("removed_direct_routes", []):
+            found.append((manifest_toml.parent.name, route, prefix))
+    return found
+
+
+_REMOVED_ROUTES = _discover_removed_routes()
+# Control d'abast (#936): si la descoberta els deixa de trobar, algun canvi
+# al parsing o al manifest real l'ha deixat cec — no s'hi val enumerar
+# a mà sense res que vigili que l'enumeració no s'encongeix.
+_KNOWN_PLUGINS_WITH_REMOVED_ROUTES = {"llama_cpp_module", "mlx_module", "ollama_module"}
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ──────────────────────────────────────────────────────────────────────────
@@ -58,37 +85,29 @@ def _build_guarded_app(*blocked_routes: tuple) -> FastAPI:
 # ──────────────────────────────────────────────────────────────────────────
 
 class TestBlockedRoutes:
-    """The 3 routes declared in removed_direct_routes must return 403."""
+    """Every route declared in a real plugins/*/manifest.toml
+    removed_direct_routes must return 403 (#936)."""
 
-    def test_mlx_chat_direct_returns_403(self):
-        """POST /mlx/chat → 403 with error code direct_plugin_endpoint_disabled."""
-        app = _build_guarded_app(("mlx_module", "/chat", "/mlx"))
+    def test_the_discovery_still_finds_the_known_plugins(self):
+        discovered = {p for p, _route, _prefix in _REMOVED_ROUTES}
+        missing = _KNOWN_PLUGINS_WITH_REMOVED_ROUTES - discovered
+        assert not missing, f"la descoberta de removed_direct_routes ja no troba: {missing}"
+
+    @pytest.mark.parametrize(
+        "plugin_name,route,prefix", _REMOVED_ROUTES,
+        ids=[p for p, _route, _prefix in _REMOVED_ROUTES],
+    )
+    def test_removed_route_returns_403(self, plugin_name, route, prefix):
+        """POST <prefix><route> → 403 with error code direct_plugin_endpoint_disabled,
+        for the exact route the plugin's own manifest.toml declares removed."""
+        app = _build_guarded_app((plugin_name, route, prefix))
+        full_route = f"{prefix}{route}"
         with TestClient(app, raise_server_exceptions=False) as client:
-            r = client.post("/mlx/chat", json={"messages": []})
+            r = client.post(full_route, json={})
         assert r.status_code == 403
         body = r.json()
         assert body["error"] == "direct_plugin_endpoint_disabled"
-        assert body["removed_route"] == "/mlx/chat"
-
-    def test_llama_cpp_chat_direct_returns_403(self):
-        """POST /llama-cpp/chat → 403."""
-        app = _build_guarded_app(("llama_cpp_module", "/chat", "/llama-cpp"))
-        with TestClient(app, raise_server_exceptions=False) as client:
-            r = client.post("/llama-cpp/chat", json={})
-        assert r.status_code == 403
-        body = r.json()
-        assert body["error"] == "direct_plugin_endpoint_disabled"
-        assert body["removed_route"] == "/llama-cpp/chat"
-
-    def test_ollama_api_chat_direct_returns_403(self):
-        """POST /ollama/api/chat → 403."""
-        app = _build_guarded_app(("ollama_module", "/api/chat", "/ollama"))
-        with TestClient(app, raise_server_exceptions=False) as client:
-            r = client.post("/ollama/api/chat", json={})
-        assert r.status_code == 403
-        body = r.json()
-        assert body["error"] == "direct_plugin_endpoint_disabled"
-        assert body["removed_route"] == "/ollama/api/chat"
+        assert body["removed_route"] == full_route
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -307,14 +326,10 @@ class TestTomlManifestConsistency:
     Prevents silent drift between the documentation (TOML) and the runtime (manifest.py).
     """
 
-    _PLUGINS = [
-        ("mlx_module",      "mlx_module.manifest",      "/mlx"),
-        ("llama_cpp_module", "llama_cpp_module.manifest", "/llama-cpp"),
-        ("ollama_module",   "ollama_module.manifest",   "/ollama"),
-    ]
+    _PLUGINS = sorted({plugin_name for plugin_name, _route, _prefix in _REMOVED_ROUTES})
 
-    @pytest.mark.parametrize("plugin_name,manifest_import,_prefix", _PLUGINS)
-    def test_toml_matches_python(self, plugin_name: str, manifest_import: str, _prefix: str):
+    @pytest.mark.parametrize("plugin_name", _PLUGINS)
+    def test_toml_matches_python(self, plugin_name: str):
         """The TOML and the plugin's manifest.py must have identical removed_direct_routes."""
         try:
             import tomllib
@@ -331,7 +346,7 @@ class TestTomlManifestConsistency:
             "removed_direct_routes", []
         )
 
-        manifest = importlib.import_module(f"plugins.{manifest_import}")
+        manifest = importlib.import_module(f"plugins.{plugin_name}.manifest")
         python_routes = getattr(manifest, "removed_direct_routes", [])
 
         assert sorted(toml_routes) == sorted(python_routes), (

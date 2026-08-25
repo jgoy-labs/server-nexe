@@ -14,7 +14,11 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import logging
+
 import tomllib  # uiri toml moria abans de [personality.i18n] al server.toml real (#834)
+
+logger = logging.getLogger(__name__)
 
 __all__ = ['I18nManager']
 
@@ -46,6 +50,54 @@ class I18nManager:
     from core.config import find_config_path as core_find_config_path
     return core_find_config_path() or Path("personality/server.toml")
   
+  def _configured_additional_paths(self) -> list:
+    """The orchestrator's additional_paths, accepting both shapes it comes in.
+
+    server.toml declares `additional_paths = ["personality", "memory"]` — a
+    LIST — while this module assumed the `{paths = [...]}` table shape and did
+    `.get('paths', [])` on it. That AttributeError was swallowed whole by the
+    `except Exception` in _load_translations, taking the entire module-catalog
+    scan down with it: a third, silent cause of #920. core/modules/path_discovery.py
+    already handles both shapes (:197-205); this is the same handling.
+    """
+    configured = self.config.get('personality', {}).get('orchestrator', {}).get('additional_paths', [])
+    if isinstance(configured, dict):
+      configured = configured.get('paths', [])
+    return configured if isinstance(configured, list) else []
+
+  def _resolve_scan_base(self, relative: str) -> Path:
+    """Resolve a catalog directory, honouring base_path before the repo root.
+
+    base_path comes from the caller and is authoritative: tests and embedders
+    pass their own tree and must keep getting it. But ModuleManager passes the
+    directory holding server.toml (personality/), and the config paths
+    ('personality/languages', 'plugins', 'memory') are written against the REPO
+    ROOT — under personality/ they resolve to personality/personality/languages
+    and friends, none of which exist. That is one half of #920.
+
+    So: caller's base_path first; only when nothing is there, the canonical repo
+    root that core/paths already computes.
+    """
+    from_base = self.base_path / relative
+    if from_base.is_dir():
+      return from_base
+
+    try:
+      from core.paths.detection import get_repo_root
+      repo_root = get_repo_root()
+    except Exception:
+      return from_base
+
+    # Only fall back for a base_path that lives INSIDE the repo (personality/,
+    # the real caller). A base_path pointing elsewhere — a tmp_path in a test, an
+    # embedder's own tree — is the caller's own world and must stay isolated:
+    # reaching into the repo from there would load catalogs nobody asked for.
+    try:
+      self.base_path.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+      return from_base
+    return repo_root / relative
+
   def _load_config(self) -> None:
     """Load language configuration from server.toml"""
     try:
@@ -77,7 +129,7 @@ class I18nManager:
       translations_path = loc_config.get('path_traduccions', 'personality/languages')
       
       if not Path(translations_path).is_absolute():
-        translations_path = self.base_path / translations_path
+        translations_path = self._resolve_scan_base(translations_path)
       
       self._load_language_files(translations_path / self.current_language, self.current_language)
       
@@ -88,6 +140,29 @@ class I18nManager:
       if self.current_language not in self.translations:
         self.translations[self.current_language] = {}
   
+  def _catalog_is_for(self, catalog: Path, data: dict, language: str) -> bool:
+    """Whether a catalog may be served for ``language``.
+
+    A catalog that DECLARES ``_meta.language`` and declares a different one is a
+    mislabelled copy: serving it would hand the user a language they did not ask
+    for. core/modules/languages/{en-US,es-ES}/ are byte-for-byte copies of the
+    ca-ES catalogs, `_meta.language: "ca-ES"` included — before #920 nothing
+    reached the user and they got the English fallback, and that fallback is
+    still the honest answer until the catalogs are really translated.
+
+    Declaring NOTHING is not the same as declaring the wrong thing: six catalogs
+    in the repo ship no ``_meta.language`` and keep loading exactly as today.
+    """
+    declared = data.get('_meta', {}).get('language') if isinstance(data.get('_meta'), dict) else None
+    if declared is None or declared == language:
+      return True
+    logger.warning(
+      "i18n: refusing catalog %s — it declares language %r but sits in the %r "
+      "directory; falling back rather than serving the wrong language",
+      catalog, declared, language,
+    )
+    return False
+
   def _load_language_files(self, lang_path: Path, language: str) -> None:
     """Load JSON files for a specific language.
 
@@ -115,6 +190,8 @@ class I18nManager:
         try:
           with open(comp_file, 'r', encoding='utf-8') as f:
             comp_data = json.load(f)
+          if not self._catalog_is_for(comp_file, comp_data, language):
+            continue
           if '_meta' in comp_data:
             del comp_data['_meta']
           component = comp_file.stem[len('messages_'):]
@@ -122,38 +199,66 @@ class I18nManager:
         except (IOError, KeyError, ValueError):
           pass
 
-    modules_base = self.base_path / 'plugins'
-    if modules_base.exists():
-      self._load_module_translations(modules_base, language)
-    
-    additional_paths = self.config.get('personality', {}).get('orchestrator', {}).get('additional_paths', {}).get('paths', [])
-    for path_str in additional_paths:
-      additional_path = self.base_path / path_str
-      if additional_path.exists():
-        self._load_module_translations(additional_path, language)
+    # #920 — these used to hang off base_path, which ModuleManager sets to the
+    # directory holding server.toml (personality/), so they resolved to
+    # personality/plugins, personality/personality and personality/memory: none
+    # of them exist. Anchored at the repo root, the way ModularI18nManager is
+    # given project_root.
+    # 'core' is not in server.toml's additional_paths because the module system
+    # moved down to core/modules/ on 22/08 and the config was not updated.
+    for path_str in ('core', 'plugins', *self._configured_additional_paths()):
+      base_dir = self._resolve_scan_base(path_str)
+      if base_dir.is_dir():
+        self._load_module_translations(base_dir, language)
   
   def _load_module_translations(self, modules_path: Path, language: str) -> None:
-    """Load translations from module directories"""
+    """Load the translation catalogs the modules under ``modules_path`` ship.
+
+    #920 — the layout this used to look for (``<module>/location/languages/
+    <lang>/messages.json``) never existed: there is no literal ``location/``
+    directory anywhere in the repo. The real layout is flat and per component,
+    the same one ``_load_language_files`` and ModularI18nManager already read:
+
+        <module>/languages/<lang>/messages_<component>.json
+
+    The component name comes from the file name, so keys resolve as
+    ``component.section.key`` — the dotted format ``t()`` documents.
+    """
     try:
-      for module_dir in modules_path.iterdir():
+      for module_dir in sorted(modules_path.iterdir()):
         if not module_dir.is_dir():
           continue
-        
-        module_messages = module_dir / 'location' / 'languages' / language / 'messages.json'
-        if module_messages.exists():
+
+        catalog_dir = module_dir / 'languages' / language
+        if not catalog_dir.is_dir():
+          continue
+
+        for catalog in sorted(catalog_dir.glob('messages_*.json')):
+          component = catalog.stem[len('messages_'):]
           try:
-            with open(module_messages, 'r', encoding='utf-8') as f:
+            with open(catalog, 'r', encoding='utf-8') as f:
               module_data = json.load(f)
-              if '_meta' in module_data:
-                del module_data['_meta']
-              module_name = module_dir.name
-              if module_name not in self.translations[language]:
-                self.translations[language][module_name] = {}
-              self.translations[language][module_name].update(module_data)
-          except (IOError, KeyError):
-            pass
-    except (IOError, KeyError):
-      pass
+          except (IOError, KeyError, ValueError) as exc:
+            # Not silent: a malformed catalog used to leave the user with
+            # English and no way to know why (#890 — ask what happens when it
+            # breaks, not only whether it raises). Not widened to
+            # `except Exception`: a bug in our own code must still surface.
+            logger.warning("i18n: could not load catalog %s: %s", catalog, exc)
+            continue
+
+          if not self._catalog_is_for(catalog, module_data, language):
+            continue
+          if '_meta' in module_data:
+            del module_data['_meta']
+          # The loaders unwrap a top-level key equal to the component, if present.
+          if component in module_data and isinstance(module_data[component], dict):
+            module_data = module_data[component]
+
+          if component not in self.translations[language]:
+            self.translations[language][component] = {}
+          self.translations[language][component].update(module_data)
+    except (IOError, KeyError, OSError) as exc:
+      logger.warning("i18n: could not scan modules under %s: %s", modules_path, exc)
   
   def t(self, key: str, **kwargs) -> str:
     """

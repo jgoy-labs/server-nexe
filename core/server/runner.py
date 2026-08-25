@@ -333,8 +333,10 @@ def _run_uvicorn_server(host: str, port: int, workers: int, reload: bool, i18n) 
       reload=reload,
       log_level="info",
       timeout_keep_alive=5,
-      timeout_graceful_shutdown=10,
-      limit_concurrency=100,
+      # timeout_graceful_shutdown and limit_concurrency are NOT passed here on
+      # purpose: core.app applies them to the live uvicorn.Config for both
+      # start-up paths (#918). Passing them here again would recreate the
+      # hand-synchronised copy that made the product run without them.
       limit_max_requests=None
     )
   except KeyboardInterrupt:

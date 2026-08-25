@@ -5,7 +5,7 @@ Author: Jordi Goy
 Location: tests/memory/memory/api/test_delete_verify.py
 Description: Stage 1 (ADR-002) — delete must VERIFY the point is actually gone.
             A silent Qdrant delete (accepts the call but leaves the point) must
-            not be reported as success. A TextStore failure must not crash and
+            not be reported as success.
             must be logged as an orphan, without flipping a successful vector
             delete to failure.
 
@@ -61,24 +61,3 @@ def test_delete_retries_then_succeeds():
         ex.shutdown(wait=False)
     assert result is True
     assert q.delete.call_count == 2  # it retried the delete
-
-
-def test_textstore_failure_does_not_crash_and_keeps_success(caplog):
-    """Qdrant point gone but TextStore.delete raises → still success, orphan logged."""
-    q = MagicMock()
-    q.delete = MagicMock()
-    q.retrieve = MagicMock(return_value=[])  # point is gone
-    text_store = MagicMock()
-    text_store.delete = MagicMock(side_effect=RuntimeError("sqlite is locked"))
-    ex = _executor()
-    try:
-        with caplog.at_level(logging.ERROR):
-            result = asyncio.run(
-                delete_document(q, ex, _DOC_ID, "col", text_store=text_store)
-            )
-    finally:
-        ex.shutdown(wait=False)
-    assert result is True  # the user-visible vector is gone
-    assert any("orphan" in r.getMessage().lower() for r in caplog.records), (
-        "a TextStore delete failure must be logged as an orphan, not swallowed"
-    )

@@ -16,7 +16,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from core.crypto.provider import CryptoProvider
-from memory.memory.api import text_store as ts_mod
 from memory.memory.engines import persistence_sqlite as ps_mod
 from memory.memory.storage import sqlite_store as ss_mod
 
@@ -42,9 +41,7 @@ def _make(mod, cls_name, path_attr, db):
 CASES = [
     (ps_mod, "SqliteStorageMixin", "db_path", "_quarantine_unreadable_encrypted_db", True),
     (ss_mod, "SQLiteStore", "_db_path", "_quarantine_unreadable_encrypted_db", True),
-    (ts_mod, "TextStore", "_db_path", "_quarantine_unreadable_encrypted_db", True),
     (ss_mod, "SQLiteStore", "_db_path", "_live_encrypted_db_verified", False),
-    (ts_mod, "TextStore", "_db_path", "_live_encrypted_db_verified", False),
 ]
 
 

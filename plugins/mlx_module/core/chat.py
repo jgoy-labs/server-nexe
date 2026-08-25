@@ -1420,12 +1420,14 @@ class MLXChatNode:
         except OSError:
             model_type = ""
 
-        # 1. Prepare tokens (tokenization + sanitization)
+        # 1. Prepare tokens (tokenization + sanitization + budget truncation, #845)
         full_tokens, cache_lookup_tokens, all_messages, all_cache_messages = prepare_tokens(
             system, messages, messages_for_cache, tokenizer,
             thinking_enabled=thinking_enabled,
             model_type=model_type,
             continue_final=continue_final,
+            max_kv_size=self.config.max_kv_size,
+            max_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
         )
         total_tokens = len(full_tokens)
 

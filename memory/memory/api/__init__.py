@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from qdrant_client import QdrantClient
-    from .text_store import TextStore
 
 from ..constants import DEFAULT_EMBEDDING_MODEL, DEFAULT_VECTOR_SIZE
 from ..config import IngestConfig
@@ -102,7 +101,6 @@ class MemoryAPI:
     qdrant_path: Optional[Path] = None,
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     crypto_provider=None,
-    text_store_path: Optional[Path] = None,
     ingest_config: Optional[IngestConfig] = None,
   ):
     """
@@ -130,8 +128,6 @@ class MemoryAPI:
     self.ingest_config = ingest_config if ingest_config is not None else IngestConfig()
 
     self._crypto = crypto_provider
-    self._text_store_path = text_store_path
-    self._text_store: Optional["TextStore"] = None
     self._qdrant: Optional[QdrantClient] = None
     self._embedder = None
     self._executor = ThreadPoolExecutor(max_workers=4)
@@ -182,15 +178,6 @@ class MemoryAPI:
         self._qdrant = get_qdrant_client(url=self.qdrant_url)
         logger.info("MemoryAPI initialized (url=%s)", self.qdrant_url)
 
-      # Initialize text store if path provided
-      if self._text_store_path:
-        from .text_store import TextStore
-        self._text_store = TextStore(
-          db_path=self._text_store_path,
-          crypto_provider=self._crypto,
-        )
-        logger.info("TextStore initialized at %s", self._text_store_path)
-
       await self._init_embedder()
       self._initialized = True
       return True
@@ -239,10 +226,6 @@ class MemoryAPI:
 
     if self._executor:
       self._executor.shutdown(wait=True)
-
-    if self._text_store:
-      self._text_store.close()
-      self._text_store = None
 
     self._qdrant = None
     self._embedder = None
@@ -329,7 +312,6 @@ class MemoryAPI:
       metadata,
       doc_id,
       ttl_seconds,
-      text_store=self._text_store,
     )
 
   async def store_batch(
@@ -365,7 +347,6 @@ class MemoryAPI:
           self._generate_embeddings_batch,
           items,
           collection,
-          text_store=self._text_store,
         )
       finally:
         self._perf["store_total_ns"] += time.perf_counter_ns() - t0
@@ -377,7 +358,6 @@ class MemoryAPI:
       self._generate_embeddings_batch,
       items,
       collection,
-      text_store=self._text_store,
     )
 
   async def store_batch_precomputed(
@@ -412,7 +392,6 @@ class MemoryAPI:
           _noop,
           items,
           collection,
-          text_store=self._text_store,
           precomputed_embeddings=embeddings,
         )
       finally:
@@ -425,7 +404,6 @@ class MemoryAPI:
       _noop,
       items,
       collection,
-      text_store=self._text_store,
       precomputed_embeddings=embeddings,
     )
 
@@ -479,7 +457,6 @@ class MemoryAPI:
       threshold,
       filter_metadata,
       include_expired,
-      text_store=self._text_store,
       query_embedding=query_embedding,
     )
 
@@ -504,7 +481,7 @@ class MemoryAPI:
     if not await self.collection_exists(collection):
       raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
 
-    return await get_document(self._qdrant, self._executor, doc_id, collection, text_store=self._text_store)
+    return await get_document(self._qdrant, self._executor, doc_id, collection)
 
   async def delete(self, doc_id: str, collection: str) -> bool:
     """Delete a document."""
@@ -513,7 +490,7 @@ class MemoryAPI:
     if not await self.collection_exists(collection):
       raise CollectionNotFoundError(f"Collection '{collection}' does not exist.")
 
-    return await delete_document(self._qdrant, self._executor, doc_id, collection, text_store=self._text_store)
+    return await delete_document(self._qdrant, self._executor, doc_id, collection)
 
   async def scroll(
     self,

@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy
 Location: tests/memory/memory/test_migration_leak_mc010.py
-Description: MC-010 — _migrate_to_encrypted de SQLiteStore i TextStore ha de tancar
+Description: MC-010 — _migrate_to_encrypted de SQLiteStore ha de tancar
              LES DUES connexions (plain + encrypted) a TOTS els camins, també quan
              un enc_conn.execute() dins el bucle iterdump peta. Sense un finally les
              connexions inline només es tanquen al camí d'èxit → fuita de handles
@@ -20,9 +20,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import memory.memory.storage.sqlite_store as ss
-import memory.memory.api.text_store as ts
 from memory.memory.storage.sqlite_store import SQLiteStore
-from memory.memory.api.text_store import TextStore
 
 
 def _make_plaintext_db(path: Path) -> None:
@@ -90,25 +88,3 @@ def test_sqlite_store_closes_both_connections_on_mid_dump_raise(tmp_path):
     # Plain DB preservada (la migració va fallar, cap rename a .bak).
     assert db_path.exists()
     assert SQLiteStore._is_plaintext_sqlite(db_path) is True
-
-
-def test_text_store_closes_both_connections_on_mid_dump_raise(tmp_path):
-    db_path = tmp_path / "text_store.db"
-    _make_plaintext_db(db_path)
-    assert TextStore._is_plaintext_sqlite(db_path) is True
-
-    store = _bare(TextStore, db_path)
-    real_plain = _ConnSpy(sqlite3.connect(str(db_path)))
-    enc_conn = _enc_conn_that_raises_mid_dump()
-    fake_sqlcipher = MagicMock()
-    fake_sqlcipher.connect.return_value = enc_conn
-
-    with patch.object(ts, "SQLCIPHER_AVAILABLE", True), \
-            patch.object(ts, "sqlcipher", fake_sqlcipher), \
-            patch.object(ts.sqlite3, "connect", return_value=real_plain):
-        store._migrate_to_encrypted()
-
-    real_plain.close.assert_called_once()
-    enc_conn.close.assert_called_once()
-    assert db_path.exists()
-    assert TextStore._is_plaintext_sqlite(db_path) is True

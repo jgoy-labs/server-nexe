@@ -44,8 +44,6 @@ MANIFEST: Dict[str, Any] = {
   "default_config": {
     "top_k": 5,
     "similarity_threshold": 0.7,
-    "circuit_breaker_threshold": 5,
-    "circuit_breaker_timeout": 60,
     "max_concurrent_searches": 3
   }
 }

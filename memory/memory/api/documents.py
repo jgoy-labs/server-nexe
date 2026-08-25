@@ -68,7 +68,6 @@ async def store_document(
   metadata: Optional[Dict[str, Any]] = None,
   doc_id: Optional[str] = None,
   ttl_seconds: Optional[int] = None,
-  text_store=None,
 ) -> str:
   """
   Store text with embedding in a collection.
@@ -105,28 +104,16 @@ async def store_document(
 
   loop = asyncio.get_running_loop()
 
-  if text_store:
-    # Text goes to SQLite, Qdrant only gets vectors + IDs
-    text_store.put(
-      doc_id=doc_id, collection=collection, text=text,
-      metadata=metadata,
-      created_at=created_at_iso, expires_at=expires_at_iso,
-    )
-    qdrant_payload = {
-      "original_id": doc_id,
-      "created_at": created_at_iso,
-      "expires_at": expires_at_iso,
-      # No text in Qdrant payload
-    }
-  else:
-    # Legacy mode: text in Qdrant payload (backwards compatible)
-    qdrant_payload = {
-      "original_id": doc_id,
-      "text": text,
-      "created_at": created_at_iso,
-      "expires_at": expires_at_iso,
-      **(metadata or {}),
-    }
+  # #907: el text viu al payload de Qdrant. L'alternativa (text a SQLite via
+  # TextStore, Qdrant només amb vectors) mai es va arribar a activar — cap
+  # cridador passava el path del magatzem — i s'ha retirat.
+  qdrant_payload = {
+    "original_id": doc_id,
+    "text": text,
+    "created_at": created_at_iso,
+    "expires_at": expires_at_iso,
+    **(metadata or {}),
+  }
 
   def _store():
     """Upsert a single document point into the Qdrant collection."""
@@ -155,7 +142,6 @@ async def store_documents_batch(
   generate_embeddings_batch: Callable[[List[str]], Awaitable[List[List[float]]]],
   items: List[Dict[str, Any]],
   collection: str,
-  text_store=None,
   *,
   precomputed_embeddings: Optional[List[List[float]]] = None,
 ) -> List[str]:
@@ -203,19 +189,11 @@ async def store_documents_batch(
     if ttl_seconds is not None:
       expires_at_iso = (now + timedelta(seconds=ttl_seconds)).isoformat()
 
-    if text_store:
-      text_store.put(
-        doc_id=doc_id, collection=collection, text=text,
-        metadata=metadata,
-        created_at=created_at_iso, expires_at=expires_at_iso,
-      )
-      payload = {"original_id": doc_id, "created_at": created_at_iso, "expires_at": expires_at_iso}
-    else:
-      payload = {
-        "original_id": doc_id, "text": text,
-        "created_at": created_at_iso, "expires_at": expires_at_iso,
-        **(metadata or {}),
-      }
+    payload = {
+      "original_id": doc_id, "text": text,
+      "created_at": created_at_iso, "expires_at": expires_at_iso,
+      **(metadata or {}),
+    }
 
     points_data.append((doc_id, embedding, payload))
 
@@ -281,7 +259,7 @@ def _filter_search_results(results, collection, top_k, include_expired, now_iso)
         id=doc_id,
         score=r.score,
         collection=collection,
-        text=r.payload.get("text"),  # May be None if text_store is used
+        text=r.payload.get("text"),
         metadata={
           k: v for k, v in r.payload.items() if k not in ("text", "original_id")
         },
@@ -302,7 +280,6 @@ async def search_documents(
   threshold: float = 0.0,
   filter_metadata: Optional[Dict[str, Any]] = None,
   include_expired: bool = False,
-  text_store=None,
   query_embedding: Optional[List[float]] = None,
 ) -> List[SearchResult]:
   """
@@ -345,15 +322,6 @@ async def search_documents(
     loop.run_in_executor(executor, _search), f"searching '{collection}'"
   )
 
-  # Fill text from TextStore if available and text is missing from payload
-  if text_store and result:
-    ids_needing_text = [r.id for r in result if not r.text]
-    if ids_needing_text:
-      texts = text_store.get_many(ids_needing_text, collection)
-      for sr in result:
-        if not sr.text and sr.id in texts:
-          sr.text = texts[sr.id]["text"]
-
   ops, _ = _get_metrics()
   if ops:
     ops.labels(operation="recall").inc()
@@ -365,7 +333,6 @@ async def get_document(
   executor: ThreadPoolExecutor,
   doc_id: str,
   collection: str,
-  text_store=None,
 ) -> Optional[Document]:
   """Get a document by ID."""
   loop = asyncio.get_running_loop()
@@ -392,19 +359,12 @@ async def get_document(
       if payload.get("expires_at"):
         expires_at = datetime.fromisoformat(payload["expires_at"])
 
-      # Get text from TextStore if available, fallback to payload
       text = payload.get("text", "")
       doc_metadata = {
         k: v
         for k, v in payload.items()
         if k not in ("text", "original_id", "created_at", "expires_at")
       }
-
-      if text_store and not text:
-        stored = text_store.get(doc_id, collection)
-        if stored:
-          text = stored["text"]
-          doc_metadata = stored.get("metadata", doc_metadata)
 
       return Document(
         id=payload.get("original_id", doc_id),
@@ -426,7 +386,6 @@ async def delete_document(
   executor: ThreadPoolExecutor,
   doc_id: str,
   collection: str,
-  text_store=None,
   *,
   max_retries: int = 1,
 ) -> bool:
@@ -474,17 +433,6 @@ async def delete_document(
       logger.info("Retrying delete of %s in %s (attempt %d)", doc_id, collection, attempt + 2)
 
   if result:
-    if text_store:
-      try:
-        text_store.delete(doc_id, collection)
-      except Exception as e:
-        # The Qdrant point is gone (user-visible fact removed) but the SQLite
-        # text row survived → orphan. Log loudly; do NOT crash and do NOT flip
-        # the result to failure (the orphan is a cleanup concern, not a recall one).
-        logger.error(
-          "TextStore delete failed for %s in %s — orphan text row left behind: %s",
-          doc_id, collection, e,
-        )
     ops, _ = _get_metrics()
     if ops:
       ops.labels(operation="delete").inc()
