@@ -99,16 +99,32 @@ class I18nManager:
     return repo_root / relative
 
   def _load_config(self) -> None:
-    """Load language configuration from server.toml"""
+    """Load language configuration from server.toml.
+
+    #931: used to read personality.location.idioma_principal/fallback_idioma,
+    a section that does not exist in the real server.toml — current_language
+    fell to the literal 'ca-ES' default on every real install, regardless of
+    what the user configured. ModularI18nManager already reads the section
+    that is actually there (personality.i18n.default_language/
+    fallback_language); this now reads the same one, so both managers agree.
+
+    NEXE_LANG (set by the launcher / Tauri parent as an explicit runtime
+    override — see plugins/web_ui_module/api/routes_auth.py) takes priority
+    over server.toml when present, same as __init__ already assumed before
+    this method silently overwrote it.
+    """
     try:
       if self.config_path.exists():
         with open(self.config_path, 'rb') as f:
           self.config = tomllib.load(f)
 
-      loc_config = self.config.get('personality', {}).get('location', {})
-      self.current_language = loc_config.get('idioma_principal', 'ca-ES')
-      self.fallback_language = loc_config.get('fallback_idioma', 'ca-ES')
-      
+      if os.getenv("NEXE_LANG"):
+        return  # explicit override already set in __init__; server.toml yields to it
+
+      i18n_config = self.config.get('personality', {}).get('i18n', {})
+      self.current_language = i18n_config.get('default_language', 'en-US')
+      self.fallback_language = i18n_config.get('fallback_language', 'en-US')
+
     except Exception:
       _fallback = os.getenv("NEXE_LANG", "en-US")
       self.current_language = _fallback
@@ -123,10 +139,21 @@ class I18nManager:
     self._translations_loaded = True
   
   def _load_translations(self) -> None:
-    """Load translation files"""
+    """Load translation files.
+
+    #931 (continued): same shape as _load_config() — this used to read
+    personality.location.path_traduccions, a key that does not exist in the
+    real server.toml either. Harmless in production only by accident: the
+    hardcoded default here ('personality/languages') happens to equal
+    personality.i18n.translations_path's real value, and ModuleManager's
+    base_path (personality/) makes the FIRST resolution attempt miss too,
+    falling through to _resolve_scan_base's repo-root fallback — which
+    silently ignores whatever this key actually said. A test base_path
+    outside the repo (tmp_path) gets no such fallback and exposes it.
+    """
     try:
-      loc_config = self.config.get('personality', {}).get('location', {})
-      translations_path = loc_config.get('path_traduccions', 'personality/languages')
+      i18n_config = self.config.get('personality', {}).get('i18n', {})
+      translations_path = i18n_config.get('translations_path', 'personality/languages')
       
       if not Path(translations_path).is_absolute():
         translations_path = self._resolve_scan_base(translations_path)

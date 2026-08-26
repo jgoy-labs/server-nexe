@@ -189,21 +189,36 @@ def test_cli_path_does_not_duplicate_the_governed_limits(monkeypatch):
     )
 
 
-def test_limits_helper_is_inert_without_uvicorn(monkeypatch):
+def test_limits_helper_is_inert_without_uvicorn(monkeypatch, caplog):
     """Importing core.app must not require uvicorn.
 
     The module is also imported by CLI commands and tooling that never start a
     server. With no uvicorn around, the helper reports "nothing applied" instead
-    of raising — which is also the honest answer: there is no live config.
+    of raising — which is also the honest answer: there is no live config. This
+    case is unremarkable (uvicorn is not even here to run a server), so it logs
+    at debug, not warning — see the sibling test below for the case that must
+    be loud.
     """
     import core.app as app_module
 
     monkeypatch.setitem(sys.modules, "uvicorn.config", None)
-    assert app_module._apply_uvicorn_limits() is False
+    with caplog.at_level("DEBUG", logger="core.app"):
+        assert app_module._apply_uvicorn_limits() is False
+    assert not any(r.levelname == "WARNING" for r in caplog.records)
 
 
-def test_limits_helper_is_inert_outside_a_server(monkeypatch):
-    """Called with no uvicorn.Config on the stack, it must report False, not guess."""
+def test_limits_helper_is_inert_outside_a_server(caplog):
+    """#950: called with no uvicorn.Config on the stack, it must report False —
+    and, unlike the no-uvicorn case, warn about it. limit_concurrency is a
+    protection, not a preference: a silent False here is exactly how a real
+    server could end up running without its concurrency ceiling and nobody
+    finding out.
+    """
     import core.app as app_module
 
-    assert app_module._apply_uvicorn_limits() is False
+    with caplog.at_level("WARNING", logger="core.app"):
+        assert app_module._apply_uvicorn_limits() is False
+    assert any(
+        r.levelname == "WARNING" and "were NOT applied" in r.message
+        for r in caplog.records
+    ), f"expected a WARNING naming the unapplied limits, got: {[r.message for r in caplog.records]}"

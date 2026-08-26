@@ -44,8 +44,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 CATALOG_DIR = REPO_ROOT / "core" / "modules" / "languages"
 
 # Measured on 23/08/2026: 3 languages x 4 catalogs actually loaded.
-# `module_manager.json` is NOT counted: it does not match the `messages_*.json`
-# contract the loaders use, so nothing reads it (reported to the Director).
+# `module_manager.json` (no `messages_` prefix, old nested `personality.
+# module_manager.*` shape) never matched the `messages_*.json` contract the
+# loaders use, so nothing ever read it — a leftover of the pre-22/08 layout,
+# in ca-ES/en-US/es-ES all along, with en-US and es-ES actually holding
+# Catalan text. Deleted (#947/#959, 26/08/2026): dead weight, not a fallback.
 MIN_LANGUAGES = 3
 MIN_CATALOGS_PER_LANGUAGE = 4
 

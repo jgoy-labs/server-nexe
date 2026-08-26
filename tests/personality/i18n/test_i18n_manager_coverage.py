@@ -8,16 +8,25 @@ from unittest.mock import patch, MagicMock
 import json
 
 
+@pytest.fixture(autouse=True)
+def _no_nexe_lang_override(monkeypatch):
+    """#931: these tests control current_language via a fabricated server.toml.
+    A real NEXE_LANG (dev's own .env, loaded once per process by python-dotenv)
+    would now override it — I18nManager honours NEXE_LANG since #931's fix —
+    making results depend on whoever's environment runs the suite."""
+    monkeypatch.delenv("NEXE_LANG", raising=False)
+
+
 class TestI18nManagerInit:
 
     def test_init_with_valid_config(self, tmp_path):
         config = tmp_path / "server.toml"
         config.write_text("""
 [personality]
-[personality.location]
-idioma_principal = "en-US"
-fallback_idioma = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "en-US"
+fallback_language = "ca-ES"
+translations_path = "languages"
 """)
         from personality.i18n.i18n_manager import I18nManager
         mgr = I18nManager(config_path=config, base_path=tmp_path)
@@ -59,10 +68,10 @@ class TestTranslations:
         config = tmp_path / "server.toml"
         config.write_text(f"""
 [personality]
-[personality.location]
-idioma_principal = "en-US"
-fallback_idioma = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "en-US"
+fallback_language = "ca-ES"
+translations_path = "languages"
 """)
         from personality.i18n.i18n_manager import I18nManager
         return I18nManager(config_path=config, base_path=tmp_path)

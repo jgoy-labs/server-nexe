@@ -16,25 +16,35 @@ from unittest.mock import patch, MagicMock
 
 from personality.i18n.i18n_manager import I18nManager
 
+
+@pytest.fixture(autouse=True)
+def _no_nexe_lang_override(monkeypatch):
+  """#931: these tests control current_language via a fabricated server.toml.
+  A real NEXE_LANG (dev's own .env, loaded once per process by python-dotenv)
+  would now override it — I18nManager honours NEXE_LANG since #931's fix —
+  making results depend on whoever's environment runs the suite."""
+  monkeypatch.delenv("NEXE_LANG", raising=False)
+
+
 class TestI18nManagerInitialization:
   """Tests for I18nManager initialization."""
 
   def test_init_with_defaults(self):
-    """I18nManager should initialize with default values."""
+    """I18nManager should initialize from the real server.toml's
+    personality.i18n.default_language (#931) when no override is set."""
     i18n = I18nManager()
 
-    assert i18n.current_language == "ca-ES"
-    assert i18n.fallback_language == "ca-ES"
+    assert i18n.current_language == "en-US"
+    assert i18n.fallback_language == "en-US"
     assert isinstance(i18n.translations, dict)
 
   def test_init_with_custom_config_path(self, tmp_path):
     """I18nManager should accept custom config path."""
     config_file = tmp_path / "server.toml"
     config_file.write_text("""
-[personality.location]
-idioma_principal = "en-US"
-fallback_idioma = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "en-US"
+fallback_language = "ca-ES"
 """)
 
     i18n = I18nManager(config_path=config_file, base_path=tmp_path)
@@ -46,8 +56,8 @@ path_traduccions = "languages"
     """I18nManager should use defaults if config file missing."""
     i18n = I18nManager(config_path=Path("/nonexistent/path.toml"))
 
-    assert i18n.current_language == "ca-ES"
-    assert i18n.fallback_language == "ca-ES"
+    assert i18n.current_language == "en-US"
+    assert i18n.fallback_language == "en-US"
 
 class TestI18nManagerProductionDefaults:
   """PERS-002 regression: with no config (production defaults) the manager must
@@ -91,10 +101,10 @@ class TestI18nTranslation:
     """Create I18nManager with test translations."""
     config_file = tmp_path / "server.toml"
     config_file.write_text("""
-[personality.location]
-idioma_principal = "ca-ES"
-fallback_idioma = "en-US"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "ca-ES"
+fallback_language = "en-US"
+translations_path = "languages"
 """)
 
     ca_dir = tmp_path / "languages" / "ca-ES"
@@ -167,10 +177,10 @@ class TestI18nLanguageManagement:
     """Create I18nManager with multiple languages."""
     config_file = tmp_path / "server.toml"
     config_file.write_text("""
-[personality.location]
-idioma_principal = "ca-ES"
-fallback_idioma = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "ca-ES"
+fallback_language = "ca-ES"
+translations_path = "languages"
 """)
 
     for lang in ["ca-ES", "en-US", "es-ES"]:
@@ -219,10 +229,10 @@ class TestI18nStatistics:
     """Create I18nManager for stats testing."""
     config_file = tmp_path / "server.toml"
     config_file.write_text("""
-[personality.location]
-idioma_principal = "ca-ES"
-fallback_idioma = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "ca-ES"
+fallback_language = "ca-ES"
+translations_path = "languages"
 """)
 
     ca_dir = tmp_path / "languages" / "ca-ES"
@@ -253,10 +263,10 @@ class TestI18nReload:
     """Should reload translations successfully."""
     config_file = tmp_path / "server.toml"
     config_file.write_text("""
-[personality.location]
-idioma_principal = "ca-ES"
-fallback_idioma = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "ca-ES"
+fallback_language = "ca-ES"
+translations_path = "languages"
 """)
 
     lang_dir = tmp_path / "languages" / "ca-ES"
@@ -277,10 +287,10 @@ path_traduccions = "languages"
     """B134: a key removed from the file must NOT survive a reload in memory."""
     config_file = tmp_path / "server.toml"
     config_file.write_text("""
-[personality.location]
-idioma_principal = "ca-ES"
-fallback_idioma = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "ca-ES"
+fallback_language = "ca-ES"
+translations_path = "languages"
 """)
 
     lang_dir = tmp_path / "languages" / "ca-ES"
@@ -324,9 +334,9 @@ class TestI18nEdgeCases:
     """Should handle empty translation file."""
     config_file = tmp_path / "server.toml"
     config_file.write_text("""
-[personality.location]
-idioma_principal = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "ca-ES"
+translations_path = "languages"
 """)
 
     lang_dir = tmp_path / "languages" / "ca-ES"
@@ -342,9 +352,9 @@ path_traduccions = "languages"
     """Should handle invalid JSON gracefully."""
     config_file = tmp_path / "server.toml"
     config_file.write_text("""
-[personality.location]
-idioma_principal = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "ca-ES"
+translations_path = "languages"
 """)
 
     lang_dir = tmp_path / "languages" / "ca-ES"
@@ -359,9 +369,9 @@ path_traduccions = "languages"
     """Should ignore _meta section in translation files."""
     config_file = tmp_path / "server.toml"
     config_file.write_text("""
-[personality.location]
-idioma_principal = "ca-ES"
-path_traduccions = "languages"
+[personality.i18n]
+default_language = "ca-ES"
+translations_path = "languages"
 """)
 
     lang_dir = tmp_path / "languages" / "ca-ES"
@@ -376,3 +386,52 @@ path_traduccions = "languages"
 
     assert i18n.t("_meta.version") == "_meta.version"
     assert i18n.t("key") == "value"
+
+
+class TestI18nManagerLanguageSourceOfTruth:
+  """#931: I18nManager used to read personality.location.idioma_principal, a
+  section absent from the real server.toml, so current_language fell to the
+  literal 'ca-ES' default on every real install — regardless of what
+  personality.i18n.default_language said, and regardless of NEXE_LANG.
+  ModularI18nManager (personality/i18n/modular_i18n.py) already read the
+  right section; these gates pin both managers to agree, and pin NEXE_LANG
+  as the explicit override both were meant to honour."""
+
+  def test_both_managers_agree_on_server_toml_default_language(self, tmp_path, monkeypatch):
+    monkeypatch.delenv("NEXE_LANG", raising=False)
+    config_file = tmp_path / "server.toml"
+    config_file.write_text("""
+[personality.i18n]
+default_language = "en-US"
+fallback_language = "en-US"
+""")
+
+    from personality.i18n.modular_i18n import ModularI18nManager
+
+    i18n = I18nManager(config_path=config_file, base_path=tmp_path)
+    modular = ModularI18nManager(config_path=config_file, base_path=tmp_path)
+
+    assert i18n.current_language == "en-US", (
+      f"I18nManager reads {i18n.current_language!r}; personality.i18n."
+      f"default_language says en-US"
+    )
+    assert i18n.current_language == modular.current_language, (
+      "the two i18n managers disagree on the same server.toml: "
+      f"I18nManager={i18n.current_language!r}, "
+      f"ModularI18nManager={modular.current_language!r}"
+    )
+
+  def test_nexe_lang_overrides_server_toml(self, tmp_path, monkeypatch):
+    """The launcher / Tauri parent sets NEXE_LANG as an explicit runtime
+    choice — it must win over whatever server.toml declares."""
+    monkeypatch.setenv("NEXE_LANG", "es-ES")
+    config_file = tmp_path / "server.toml"
+    config_file.write_text("""
+[personality.i18n]
+default_language = "en-US"
+fallback_language = "en-US"
+""")
+
+    i18n = I18nManager(config_path=config_file, base_path=tmp_path)
+
+    assert i18n.current_language == "es-ES"

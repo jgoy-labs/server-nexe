@@ -28,6 +28,8 @@ if not logging.getLogger().handlers:
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
   )
 
+logger = logging.getLogger(__name__)
+
 
 # Uvicorn limits for the whole product (#918, decision of 23/08/2026, option b).
 # They live here and not in the CLI runner because both start-up paths resolve the
@@ -59,6 +61,7 @@ def _apply_uvicorn_limits() -> bool:
   try:
     from uvicorn.config import Config as _UvicornConfig
   except ImportError:
+    logger.debug("uvicorn not installed; no server to guard, skipping uvicorn limits")
     return False
 
   frame = inspect.currentframe()
@@ -70,6 +73,16 @@ def _apply_uvicorn_limits() -> bool:
         setattr(candidate, name, value)
       return True
     frame = frame.f_back
+
+  # #950: limit_concurrency is a PROTECTION (the ceiling that stops the server
+  # from accepting connections with no brake), not a style preference. If this
+  # fires while a real server is starting, it runs without that ceiling and,
+  # until now, nothing said so.
+  logger.warning(
+    "no live uvicorn.Config found on the call stack; %s were NOT applied — "
+    "if a server is actually starting, it is running without its concurrency ceiling",
+    UVICORN_LIMITS,
+  )
   return False
 
 

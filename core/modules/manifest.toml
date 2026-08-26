@@ -11,7 +11,7 @@
 [module]
 module_id = "module_manager"
 name = "module_manager"
-version = "0.9.1"
+version = "1.0.7"
 type = "core"
 description = "Sistema de gestió centralitzada de mòduls server-nexe. Auto-descoberta, registre i gestió de cicle de vida"
 location = "core/modules/"
