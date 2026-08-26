@@ -22,8 +22,8 @@ from pydantic import BaseModel, field_validator
 
 import httpx
 
-from plugins.security.core.validators import validate_safe_path
-from plugins.security.core.auth import require_api_key
+from core.security.validators import validate_safe_path
+from core.security.auth import require_api_key
 from plugins.ollama_module.core.errors import ModelNotFoundError, OllamaSemanticError
 
 logger = logging.getLogger(__name__)

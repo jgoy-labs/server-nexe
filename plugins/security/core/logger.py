@@ -13,7 +13,7 @@ import json
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 import logging
-from .messages import get_message
+from core.security.messages import get_message
 
 from core.paths import get_repo_root
 SECURITY_LOG_PATH = get_repo_root() / "storage" / "system-logs" / "security"

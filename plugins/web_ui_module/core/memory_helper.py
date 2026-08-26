@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple, List
 
 from core.endpoints.chat_sanitization import _filter_rag_injection
-from core.memory_access import get_memory_view
+from core.memory_access import KNOWLEDGE_COLLECTION, MEMORY_COLLECTION, get_memory_view
 
 logger = logging.getLogger(__name__)
 
@@ -304,7 +304,7 @@ class MemoryHelper:
         """
         view = await get_memory_view("web_ui_module")
         logger.info("Memory view obtained from core.memory_access")
-        for coll_name in view.filter_requested(("personal_memory", "user_knowledge")):
+        for coll_name in view.filter_requested((MEMORY_COLLECTION, KNOWLEDGE_COLLECTION)):
             if not await view.collection_exists(coll_name):
                 await view.create_collection(coll_name)
                 logger.info("Created memory collection %s", coll_name)
@@ -445,7 +445,7 @@ class MemoryHelper:
         try:
             results = await memory.search(
                 query=content,
-                collection="personal_memory",
+                collection=MEMORY_COLLECTION,
                 top_k=1
             )
             if results and len(results) > 0:
@@ -509,11 +509,11 @@ class MemoryHelper:
         Returns number of entries pruned.
         """
         try:
-            if not await memory.collection_exists("personal_memory"):
+            if not await memory.collection_exists(MEMORY_COLLECTION):
                 return 0
 
             # Check count first to avoid unnecessary search
-            current_count = await memory.count("personal_memory")
+            current_count = await memory.count(MEMORY_COLLECTION)
             if current_count <= MAX_MEMORY_ENTRIES:
                 return 0
 
@@ -522,7 +522,7 @@ class MemoryHelper:
             # a minimal query to retrieve all entries by vector similarity)
             all_entries = await memory.search(
                 query=" ",
-                collection="personal_memory",
+                collection=MEMORY_COLLECTION,
                 top_k=current_count
             )
 
@@ -547,7 +547,7 @@ class MemoryHelper:
             for entry, score in to_delete:
                 try:
                     if hasattr(entry, 'id') and entry.id:
-                        await memory.delete(entry.id, collection="personal_memory")
+                        await memory.delete(entry.id, collection=MEMORY_COLLECTION)
                         deleted += 1
                         # MC-112: log the entry id, never its text (user PII).
                         logger.debug("Pruned entry %s (retention=%.2f)", entry.id, score)
@@ -580,7 +580,7 @@ class MemoryHelper:
         """
         try:
             # Bug #10: respect user collection filter
-            if collections is not None and "personal_memory" not in collections:
+            if collections is not None and MEMORY_COLLECTION not in collections:
                 logger.info("Memory collection disabled by user — save_to_memory rejected")
                 return {
                     "success": False,
@@ -620,7 +620,7 @@ class MemoryHelper:
 
             doc_id = await memory.store(
                 text=content,
-                collection="personal_memory",
+                collection=MEMORY_COLLECTION,
                 metadata=meta
             )
 
@@ -705,7 +705,7 @@ class MemoryHelper:
             memory = await self.get_memory_api()
             if not memory:
                 return {"success": False, "candidates": [], "message": "Memory API not available"}
-            target_collections = collections if collections is not None else ["personal_memory", "user_knowledge"]
+            target_collections = collections if collections is not None else [MEMORY_COLLECTION, KNOWLEDGE_COLLECTION]
             candidates = await self._search_delete_candidates(memory, content, target_collections)
             return {"success": True, "candidates": candidates}
         except Exception as e:
@@ -766,7 +766,7 @@ class MemoryHelper:
             if not memory:
                 return {"success": False, "deleted": 0, "deleted_facts": [], "message": "Memory API not available"}
 
-            target_collections = collections if collections is not None else ["personal_memory", "user_knowledge"]
+            target_collections = collections if collections is not None else [MEMORY_COLLECTION, KNOWLEDGE_COLLECTION]
             candidates = await self._search_delete_candidates(memory, content, target_collections)
             if not candidates:
                 return {"success": True, "deleted": 0, "deleted_facts": [], "message": "No s'ha trobat res similar a la memoria"}
@@ -793,7 +793,7 @@ class MemoryHelper:
         """
         try:
             # Bug #10: respect user collection filter — list is semantically personal
-            if collections is not None and "personal_memory" not in collections:
+            if collections is not None and MEMORY_COLLECTION not in collections:
                 logger.info("Memory collection disabled by user — list_memories returns empty")
                 return {
                     "success": True,
@@ -806,7 +806,7 @@ class MemoryHelper:
             if not memory:
                 return {"success": False, "facts": [], "total": 0, "message": "Memory not available"}
 
-            collection = "personal_memory"
+            collection = MEMORY_COLLECTION
             if not await memory.collection_exists(collection):
                 return {"success": True, "facts": [], "total": 0, "message": "No memories stored"}
 
@@ -910,7 +910,7 @@ class MemoryHelper:
             return {"success": False, "chunks_saved": 0, "message": "Memory API not available"}
 
         # Documents go to user_knowledge (separate from personal_memory which is for personal memory)
-        DOC_COLLECTION = "user_knowledge"
+        DOC_COLLECTION = KNOWLEDGE_COLLECTION
         if not await memory.collection_exists(DOC_COLLECTION):
             await memory.create_collection(DOC_COLLECTION)
             logger.info(f"Created {DOC_COLLECTION} collection")
@@ -1115,11 +1115,11 @@ class MemoryHelper:
                 return {"error": "Memory API not available"}
 
             count = 0
-            if await memory.collection_exists("personal_memory"):
-                count = await memory.count("personal_memory")
+            if await memory.collection_exists(MEMORY_COLLECTION):
+                count = await memory.count(MEMORY_COLLECTION)
 
             return {
-                "collection": "personal_memory",
+                "collection": MEMORY_COLLECTION,
                 "entry_count": count,
                 "max_entries": MAX_MEMORY_ENTRIES,
                 "similarity_threshold": SIMILARITY_THRESHOLD,
@@ -1150,11 +1150,21 @@ class MemoryHelper:
             if not memory:
                 return {"success": False, "message": "Memory API not available"}
 
-            if await memory.collection_exists("personal_memory"):
+            if await memory.collection_exists(MEMORY_COLLECTION):
                 # Delete and recreate collection
-                await memory.delete_collection("personal_memory")
-                await memory.create_collection("personal_memory")
+                await memory.delete_collection(MEMORY_COLLECTION)
+                await memory.create_collection(MEMORY_COLLECTION)
                 logger.info("Memory collection cleared and recreated")
+
+            # #897: the RAG collection is only half of what is stored. Chat
+            # autosave PREFERS MemoryService (core/endpoints/chat_memory.py),
+            # so on a real install the facts, episodes and staging rows in
+            # memory_v1.db are precisely what the user is asking to erase —
+            # and they used to survive a wipe that reported success.
+            view = await get_memory_view("web_ui_module")
+            wiped = await view.forget_everything()
+            if wiped:
+                logger.info("MemoryService stores wiped: %s", wiped)
 
             return {
                 "success": True,

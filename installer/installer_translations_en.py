@@ -116,6 +116,11 @@ EN = {
     "ollama_install_manual": "Install it manually from: https://ollama.com/download",
     "ollama_installed": "Ollama installed successfully!",
     "ollama_install_failed": "Error installing Ollama. Install it manually:",
+    "ollama_install_needs_root": (
+        "The official Ollama installer needs administrator rights and there is "
+        "no terminal here to type the password into. Install it yourself in a "
+        "terminal with this command, then run Nexe again:"
+    ),
     "after_download": "After downloading, you can use:",
     "skip_download": "Do you want to continue without downloading now?",
     "downloading_model": "Downloading model...",

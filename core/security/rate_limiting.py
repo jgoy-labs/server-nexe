@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/rate_limiting.py
+Location: core/security/rate_limiting.py
 Description: Advanced rate limiting for bare metal. Manages limits per IP and API key.
 
 www.jgoy.net · https://server-nexe.org

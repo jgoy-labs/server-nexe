@@ -77,7 +77,7 @@ Rate limiting is applied to **all endpoints** — both the API (`/v1/*`) and the
 | /v1/rag/* | — | stubs, return 501 |
 | /ui/upload | 5/min | hardcoded in `plugins/web_ui_module/api/routes_files.py` |
 
-**Note:** The per-endpoint limits above are fixed in source code (`@limiter.limit()` decorator), **not** configurable via `.env`. The only environment variables that are actually read are `NEXE_RATE_LIMIT_GLOBAL` (default 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) and `NEXE_RATE_LIMIT_HEALTH` (1000/min) — see `plugins/security/core/rate_limiting.py` and `core/dependencies.py`. The `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` variables only appear commented out in `.env.example` and the code does not read them (reserved for future implementation).
+**Note:** The per-endpoint limits above are fixed in source code (`@limiter.limit()` decorator), **not** configurable via `.env`. The only environment variables that are actually read are `NEXE_RATE_LIMIT_GLOBAL` (default 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) and `NEXE_RATE_LIMIT_HEALTH` (1000/min) — see `core/security/rate_limiting.py` and `core/dependencies.py`. The `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` variables only appear commented out in `.env.example` and the code does not read them (reserved for future implementation).
 
 ### Web UI endpoints (hardcoded per endpoint)
 
@@ -93,7 +93,7 @@ Rate limiting is applied to **all endpoints** — both the API (`/v1/*`) and the
 | DELETE /ui/session/{id} | 10/minute |
 | PATCH /ui/session/{id}/thinking | 10/minute |
 
-Implementation: `slowapi` with `@limiter.limit()` decorator on every endpoint. `RateLimitTracker` in `plugins/security/core/rate_limiting.py`.
+Implementation: `slowapi` with `@limiter.limit()` decorator on every endpoint. `RateLimitTracker` in `core/security/rate_limiting.py`.
 
 ## Network Boundary
 
@@ -146,7 +146,7 @@ The API endpoint `POST /v1/chat/completions` validates and sanitizes input throu
 
 ## Injection Detection
 
-**6 injection detectors** in `plugins/security/core/injection_detectors.py`:
+**6 injection detectors** in `core/security/injection_detectors.py`:
 1. XSS detector
 2. SQL injection detector
 3. NoSQL injection detector

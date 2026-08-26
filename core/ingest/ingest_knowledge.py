@@ -34,6 +34,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 logger = logging.getLogger(__name__)
 
 from core.endpoints.chat_sanitization import _filter_rag_injection  # noqa: E402
+from core.memory_access import DOCS_COLLECTION, KNOWLEDGE_COLLECTION  # noqa: E402
 from memory.memory.constants import DEFAULT_VECTOR_SIZE  # noqa: E402
 from memory.memory.config import resolve_ingest_config  # noqa: E402
 from memory.memory.precomputed_loader import PrecomputedKB  # noqa: E402
@@ -78,8 +79,10 @@ def _t(key, **kwargs):
 # - DOCUMENTATION_COLLECTION: corporate know-how ingested from the `knowledge/`
 #   folder during install/post-install. The default target for this script
 #   (was wrongly defaulting to user_knowledge before the F7 fix).
-USER_KNOWLEDGE_COLLECTION = "user_knowledge"
-DOCUMENTATION_COLLECTION = "nexe_documentation"
+# #896: both names are aliases of the canonical core.memory_access constants —
+# kept local so the rest of this file doesn't need renaming.
+USER_KNOWLEDGE_COLLECTION = KNOWLEDGE_COLLECTION
+DOCUMENTATION_COLLECTION = DOCS_COLLECTION
 CHUNK_SIZE = 1500
 CHUNK_OVERLAP = 200
 

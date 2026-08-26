@@ -24,7 +24,7 @@ def make_app(api_integrator=None, i18n=None):
 
     # Import router and override the get_api_integrator dependency
     from core.endpoints.modules import router, get_api_integrator, get_i18n
-    from plugins.security.core.auth_dependencies import require_api_key
+    from core.security.auth_dependencies import require_api_key
     app.include_router(router)
 
     # Override the dependency

@@ -16,6 +16,13 @@ import os
 import unicodedata
 from typing import Any
 
+from core.memory_access import (
+    DOCS_COLLECTION,
+    KNOWLEDGE_COLLECTION,
+    MEMORY_COLLECTION,
+    SYSTEM_COLLECTIONS,
+)
+
 logger = logging.getLogger(__name__)
 
 # Cosine similarity thresholds (0-1, higher = more restrictive)
@@ -23,6 +30,48 @@ logger = logging.getLogger(__name__)
 RAG_DOCS_THRESHOLD = float(os.environ.get('NEXE_RAG_DOCS_THRESHOLD', '0.4'))
 RAG_KNOWLEDGE_THRESHOLD = float(os.environ.get('NEXE_RAG_KNOWLEDGE_THRESHOLD', '0.35'))
 RAG_MEMORY_THRESHOLD = float(os.environ.get('NEXE_RAG_MEMORY_THRESHOLD', '0.3'))
+
+# Default search params for a collection outside the 3 system ones (#896):
+# a plugin's own collection has no tuned threshold, so it gets the middle
+# ground (knowledge-grade recall) instead of being skipped entirely.
+_UNKNOWN_COLLECTION_PARAMS = (RAG_KNOWLEDGE_THRESHOLD, 3, None)
+
+
+def _rag_params_for(name: str, server_lang: str) -> tuple[float, int, dict | None]:
+    """(threshold, top_k, filter_metadata) for one collection, by name."""
+    if name == DOCS_COLLECTION:
+        return (RAG_DOCS_THRESHOLD, 3, None)
+    if name == KNOWLEDGE_COLLECTION:
+        return (RAG_KNOWLEDGE_THRESHOLD, 3, {"lang": server_lang})
+    if name == MEMORY_COLLECTION:
+        return (RAG_MEMORY_THRESHOLD, 2, None)
+    return _UNKNOWN_COLLECTION_PARAMS
+
+
+# MC-001's docs→knowledge→memory order (not SYSTEM_COLLECTIONS's docs→memory→
+# knowledge, tuned for a different caller): all_results below keeps this
+# order, and _build_context_from_results truncates to 5 — so this decides
+# which sources get dropped first when a turn pulls in more than 5 hits.
+_KNOWN_ORDER = {DOCS_COLLECTION: 0, KNOWLEDGE_COLLECTION: 1, MEMORY_COLLECTION: 2}
+
+
+async def _discover_collection_names(memory: Any) -> list[str]:
+    """Live collection names via list_collections(); SYSTEM_COLLECTIONS if that fails.
+
+    #896: this is what makes a plugin's own collection show up in chat search
+    without editing this file — the list used to be 3 hardcoded literals.
+    The 3 known collections keep MC-001's fixed order; anything discovered
+    beyond them (a plugin's own collection) is searched too, appended after.
+    """
+    try:
+        infos = await memory.list_collections()
+        names = [getattr(info, "name", None) for info in infos] if isinstance(infos, (list, tuple)) else []
+        names = [n for n in names if isinstance(n, str) and n]
+    except Exception as list_err:
+        logger.debug("RAG: collection discovery unavailable, using system defaults: %s", list_err)
+        names = []
+    names = names or list(SYSTEM_COLLECTIONS)
+    return sorted(names, key=lambda n: (_KNOWN_ORDER.get(n, len(_KNOWN_ORDER)), n))
 
 # RAG context labels per language (must match system prompt references)
 _RAG_CONTEXT_LABELS = {
@@ -84,11 +133,10 @@ async def build_rag_context(
             from memory.memory.api.v1 import get_memory_api
             memory = await get_memory_api()
 
-            collections = [
-                ("nexe_documentation", RAG_DOCS_THRESHOLD, 3, None),
-                ("user_knowledge", RAG_KNOWLEDGE_THRESHOLD, 3, {"lang": server_lang}),
-                ("personal_memory", RAG_MEMORY_THRESHOLD, 2, None),
-            ]
+            # #896: discover collections instead of a hardcoded 3-item list, so
+            # a plugin's own collection is searched too, not silently skipped.
+            names = await _discover_collection_names(memory)
+            collections = [(name, *_rag_params_for(name, server_lang)) for name in names]
 
             # MC-001: embed the (already NFKC-normalized) query ONCE and reuse it
             # for every collection instead of recomputing the identical embedding

@@ -172,10 +172,12 @@ class I18nManager:
 
     A catalog that DECLARES ``_meta.language`` and declares a different one is a
     mislabelled copy: serving it would hand the user a language they did not ask
-    for. core/modules/languages/{en-US,es-ES}/ are byte-for-byte copies of the
-    ca-ES catalogs, `_meta.language: "ca-ES"` included — before #920 nothing
-    reached the user and they got the English fallback, and that fallback is
-    still the honest answer until the catalogs are really translated.
+    for. This started as the guard for core/modules/languages/{en-US,es-ES}/,
+    which were byte-for-byte copies of the ca-ES catalogs with
+    `_meta.language: "ca-ES"` inside. Those were really translated on 2026-08-26
+    (#960), so the guard no longer refuses anything in-tree — it stays as the
+    standing rule for the next copy-pasted catalog, exercised by a synthetic
+    test rather than by real mislabelled files.
 
     Declaring NOTHING is not the same as declaring the wrong thing: six catalogs
     in the repo ship no ``_meta.language`` and keep loading exactly as today.

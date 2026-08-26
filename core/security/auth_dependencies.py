@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/auth_dependencies.py
+Location: core/security/auth_dependencies.py
 Description: FastAPI dependencies for Nexe authentication with dual-key support.
 
 www.jgoy.net · https://server-nexe.org

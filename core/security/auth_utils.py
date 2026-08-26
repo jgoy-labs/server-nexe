@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/auth_utils.py
+Location: core/security/auth_utils.py
 Description: Utilities for the Nexe authentication system.
 
 www.jgoy.net · https://server-nexe.org

@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/auth.py
+Location: core/security/auth.py
 Description: Centralised Nexe authentication system with API key support.
 
 www.jgoy.net · https://server-nexe.org

@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 
 from core.env_utils import parse_truthy
+from core.memory_access import DOCS_COLLECTION
 from core.operational_state import MEMORY_CORE_MODULES
 
 logger = logging.getLogger(__name__)
@@ -228,11 +229,11 @@ async def _check_needs_reingest(
     try:
         from memory.memory.api.v1 import get_memory_api as _get_v1_api
         _api = await _get_v1_api()
-        if not await _api.collection_exists("nexe_documentation"):
+        if not await _api.collection_exists(DOCS_COLLECTION):
             logger.warning("Knowledge: fingerprint matches but collection missing — re-ingesting")
             ingested_marker.unlink(missing_ok=True)
             return True
-        doc_count = await _api.count("nexe_documentation")
+        doc_count = await _api.count(DOCS_COLLECTION)
         if doc_count == 0:
             logger.warning("Knowledge: fingerprint matches but collection empty — re-ingesting")
             ingested_marker.unlink(missing_ok=True)
@@ -307,7 +308,7 @@ async def auto_ingest_knowledge(server_state):
         success = await ingest_knowledge(
             knowledge_path,
             quiet=True,
-            target_collection="nexe_documentation",
+            target_collection=DOCS_COLLECTION,
             replace_existing=True,
         )
         if success:

@@ -77,7 +77,7 @@ class WebSecurityCheck:
         # Check 2: Injection detectors available?
         # Defensive imports: validate availability via try/except, F401 noqa.
         try:
-            from plugins.security.core.injection_detectors import (  # noqa: F401
+            from core.security.injection_detectors import (  # noqa: F401
                 detect_xss_attempt,
                 detect_sql_injection,
                 detect_command_injection,

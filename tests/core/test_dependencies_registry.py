@@ -40,7 +40,7 @@ class TestDependencies:
         (that was the core→plugins wrong-direction edge / latent cycle). The per-IP
         limiter is now defined locally in core.
 
-        Mutation guard: re-add `from plugins.security.core.rate_limiting import ...`
+        Mutation guard: re-add `from core.security.rate_limiting import ...`
         at module scope and this test goes RED.
         """
         import ast

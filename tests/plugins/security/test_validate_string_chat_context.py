@@ -24,7 +24,7 @@ context="param" (the default) behaves as before: all detectors active.
 import pytest
 from fastapi import HTTPException
 
-from plugins.security.core.input_sanitizers import validate_string_input
+from core.security.input_sanitizers import validate_string_input
 
 
 # Sentence matches the real SQL detector pattern

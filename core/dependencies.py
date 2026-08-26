@@ -29,7 +29,7 @@ def get_i18n(request: Request):
 
 # MC-103: the per-IP limiter is defined HERE, in core, with no import from
 # plugins. Previously core imported limiter_global from
-# plugins.security.core.rate_limiting (core→plugins, the wrong direction) and
+# core.security.rate_limiting (core→plugins, the wrong direction) and
 # plugins.security re-imported `limiter` back from core — a latent import cycle
 # hidden behind a try/except. The advanced limiters it pulled (by_key/composite/
 # by_endpoint) were dead wiring already removed in MC-123/124. This definition is

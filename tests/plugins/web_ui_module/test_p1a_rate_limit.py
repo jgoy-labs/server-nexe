@@ -7,7 +7,7 @@ Problem: make_require_ui_auth() had no rate limiting.
 Fix: in-memory dict per IP, 60s window, maximum 20 attempts.
 Past the limit: 429 Too Many Requests.
 
-D-I / #883 moved the window into plugins.security.core.auth_rate_limit so both
+D-I / #883 moved the window into core.security.auth_rate_limit so both
 chat paths share it; the helpers are imported from there, and the UI path is
 still exercised end to end through make_require_ui_auth().
 
@@ -18,7 +18,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 try:
-    from plugins.security.core.auth_rate_limit import (
+    from core.security.auth_rate_limit import (
         check_auth_failure_rate_limit as _check_ui_rate_limit,
         record_auth_failure_attempt as _record_ui_auth_failure,
         auth_failures as _ui_auth_failures,
@@ -27,11 +27,11 @@ try:
     )
     from plugins.web_ui_module.api.routes_auth import make_require_ui_auth
     from fastapi import HTTPException
-    from plugins.security.core.auth_models import ApiKeyConfig, ApiKeyData
+    from core.security.auth_models import ApiKeyConfig, ApiKeyData
 except ImportError as e:
     pytest.skip(f"Rate limit helpers not available: {e}", allow_module_level=True)
 
-_LOAD = "plugins.security.core.auth_dependencies.load_api_keys"
+_LOAD = "core.security.auth_dependencies.load_api_keys"
 _KEYS = ApiKeyConfig(primary=ApiKeyData(key="real_key"))
 
 

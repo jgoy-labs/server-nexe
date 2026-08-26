@@ -464,6 +464,45 @@ class MemoryService:
                 count += 1
         return count
 
+    async def forget_everything(self, user_id: str) -> Dict[str, int]:
+        """Wipe EVERYTHING stored for ``user_id`` — SQLite and the vector index.
+
+        #897: "clear all memory" in the UI told the user "ja no recordo res
+        sobre tu" while only the Qdrant RAG collection was dropped. Everything
+        written through this service — the preferred write path for chat
+        autosave (core/endpoints/chat_memory.py) — lived on in memory_v1.db.
+
+        Unlike `forget()` this leaves NO tombstone: a tombstone of a full wipe
+        would be a record of exactly what the user asked us to forget.
+
+        The vector points are removed FIRST, while their ids are still readable
+        from SQLite — the other order loses the ids and orphans the vectors,
+        which would keep answering recalls.
+        """
+        conn = self._store._connect()
+        ids = [
+            row["id"]
+            for table in ("episodic", "profile")
+            for row in conn.execute(
+                f"SELECT id FROM {table} WHERE user_id = ?",  # nosec B608: table is a literal from the tuple above, never user input
+                (user_id,),
+            ).fetchall()
+        ]
+        vectors_removed = 0
+        if self._vector_index is not None and ids:
+            try:
+                vectors_removed = self._vector_index.delete(ids)
+            except Exception as e:
+                # Never let the vector store block the SQLite wipe: a partial
+                # forget must still remove the readable copy, and the caller is
+                # told what did not go.
+                logger.error("forget_everything: vector index delete failed: %s", e)
+                vectors_removed = -1
+
+        removed = self._store.clear_user(user_id)
+        removed["vectors"] = vectors_removed
+        return removed
+
     # ── Stats ──
 
     async def stats(self, user_id: str) -> MemoryStats:

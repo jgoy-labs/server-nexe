@@ -227,14 +227,14 @@ def mock_ollama(monkeypatch):
 def _reset_auth_failure_window():
     """Clear the shared per-IP failed-auth window between tests.
 
-    plugins.security.core.auth_rate_limit keeps a process-wide dict fed by
+    core.security.auth_rate_limit keeps a process-wide dict fed by
     BOTH conversation paths (D-I / #883). Without this reset, the hundreds
     of deliberately-unauthenticated requests the suite makes burn the
     20-failures/60s window and unrelated tests start seeing 429s.
     """
     def _clear_windows():
         try:
-            from plugins.security.core.auth_rate_limit import auth_failures
+            from core.security.auth_rate_limit import auth_failures
             auth_failures.clear()
         except Exception:
             pass

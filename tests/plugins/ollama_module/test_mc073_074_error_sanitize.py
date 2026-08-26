@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from plugins.ollama_module.api.routes import create_router
 from plugins.ollama_module.core.errors import ModelNotFoundError, OllamaSemanticError
-from plugins.security.core.auth import require_api_key
+from core.security.auth import require_api_key
 
 # Marker that a `str(e)` would leak into the body but that must NEVER appear.
 LEAK = "LEAK_/Users/secret/internal_path_4242"

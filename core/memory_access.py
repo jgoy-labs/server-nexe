@@ -17,14 +17,20 @@ from typing import Any, Dict, Iterable, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
+# Canonical names for the three collections server-nexe ships with. #896:
+# these were 75 independent literals across 22 files (some spelling
+# "personal_memory" a fourth time as a fresh string); this is the one place
+# that spells them. Import these instead of writing the literal again.
+DOCS_COLLECTION = "nexe_documentation"
+KNOWLEDGE_COLLECTION = "user_knowledge"
+MEMORY_COLLECTION = "personal_memory"
+
 # Last-resort names when list_collections() is empty or unusable. A new
 # collection created through the API becomes visible via list_collections;
-# these three only cover the case where discovery itself failed (B2).
-_SYSTEM_COLLECTIONS = (
-    "nexe_documentation",
-    "personal_memory",
-    "user_knowledge",
-)
+# these three only cover the case where discovery itself failed (B2). Order
+# matches the pre-#896 literal lists (docs, memory, knowledge) — some callers
+# (e.g. tests/test_rag_empty_collections_mc041_mc046.py) assert this order.
+SYSTEM_COLLECTIONS = (DOCS_COLLECTION, MEMORY_COLLECTION, KNOWLEDGE_COLLECTION)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -79,7 +85,7 @@ class MemoryView:
     async def visible_names(self) -> list[str]:
         names = self._listed_names(await self._try_list())
         if not names:
-            names = list(_SYSTEM_COLLECTIONS)
+            names = list(SYSTEM_COLLECTIONS)
         return [n for n in names if n not in self._denied]
 
     def _require(self, name: str) -> str:
@@ -154,6 +160,27 @@ class MemoryView:
 
     async def count(self, collection: str) -> Any:
         return await self._api.count(self._require(collection))
+
+    async def forget_everything(self, user_id: str = "default") -> Dict[str, int]:
+        """Wipe the MemoryService stores for ``user_id`` (#897).
+
+        The door exists because a plugin may not import memory/ at all (D-M),
+        not even deferred — and without it "clear all memory" could only reach
+        the RAG collection, leaving every fact MemoryService had stored while
+        telling the user nothing was left.
+
+        Returns an empty dict when the service is not running: the caller must
+        be able to tell "nothing to wipe" from "wiped nothing", and reporting a
+        clean sweep that never happened is the bug this fixes.
+        """
+        try:
+            from memory.memory.module import get_memory_service
+        except ImportError:
+            return {}
+        svc = get_memory_service()
+        if svc is None or not getattr(svc, "initialized", False):
+            return {}
+        return await svc.forget_everything(user_id)
 
     async def cleanup_expired(self, collection: str) -> Any:
         return await self._api.cleanup_expired(self._require(collection))

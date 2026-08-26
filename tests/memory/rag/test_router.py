@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 def make_app():
     app = FastAPI()
-    from plugins.security.core.auth import require_api_key
+    from core.security.auth import require_api_key
     app.dependency_overrides[require_api_key] = lambda: "test-key"
     from memory.rag.router import router_public
     app.include_router(router_public)

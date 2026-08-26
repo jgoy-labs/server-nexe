@@ -36,7 +36,7 @@ def client():
     app.include_router(router)
     # Bug 22: /api/bootstrap/info now requires X-API-Key. In unit tests
     # of the bootstrap logic we override the auth.
-    from plugins.security.core.auth_dependencies import require_api_key
+    from core.security.auth_dependencies import require_api_key
     app.dependency_overrides[require_api_key] = lambda: "test-bypass"
     return TestClient(app, raise_server_exceptions=False)
 

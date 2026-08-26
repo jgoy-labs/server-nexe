@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/messages.py
+Location: core/security/messages.py
 Description: Fallback i18n messages for security core.
 
 www.jgoy.net · https://server-nexe.org

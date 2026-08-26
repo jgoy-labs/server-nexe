@@ -21,7 +21,7 @@ from core.server.process_utils import process_liveness
 from core.version import __version__
 from core.i18n_utils import translate
 from core.uptime import uptime_str
-from plugins.security.core.auth import require_api_key
+from core.security.auth import require_api_key
 
 router_admin = APIRouter(prefix="/admin/system", tags=["system-admin"])
 logger = logging.getLogger(__name__)

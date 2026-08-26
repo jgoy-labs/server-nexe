@@ -116,6 +116,11 @@ CA = {
     "ollama_install_manual": "Instal·la'l manualment des de: https://ollama.com/download",
     "ollama_installed": "Ollama instal·lat correctament!",
     "ollama_install_failed": "Error instal·lant Ollama. Instal·la'l manualment:",
+    "ollama_install_needs_root": (
+        "L'instal·lador oficial d'Ollama necessita permisos d'administrador i "
+        "aquí no hi ha cap terminal on escriure la contrasenya. Instal·la'l tu "
+        "mateix en un terminal amb aquesta ordre i torna a executar Nexe:"
+    ),
     "after_download": "Després de descarregar, ja pots usar:",
     "skip_download": "Vols continuar sense descarregar ara?",
     "downloading_model": "Descarregant model...",

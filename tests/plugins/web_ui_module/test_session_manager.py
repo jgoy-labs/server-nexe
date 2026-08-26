@@ -522,22 +522,28 @@ class TestCorruptedSessionsDiagnosis:
 
 
 # ═══════════════════════════════════════════════════════════════
-# MC-116: consecutive same-role dedup keeps the LATEST message
+# #963: consecutive same-role messages are MERGED (supersedes MC-116)
 # ═══════════════════════════════════════════════════════════════
 
 class TestConsecutiveRoleDedupKeepsLatest:
-    """If an interrupted stream leaves an assistant turn unpersisted, two 'user'
-    messages end up adjacent. get_context_messages must keep the NEWEST so the
-    model answers the new message, not the stale (stopped) one."""
+    """Decision of 2026-08-26 (#963): consecutive same-role messages MERGE.
 
-    def test_two_consecutive_users_keeps_last(self):
+    This reverses MC-116, which kept only the latest here while the MLX engine
+    merged — two contradictory policies with nothing recording which won. The
+    accepted trade-off: a question the user stopped is re-sent prepended to the
+    new one, rather than silently dropping text the user did type.
+    """
+
+    def test_two_consecutive_users_are_merged(self):
         s = ChatSession()
         s.add_message("user", "OLD question (stopped)")
         s.add_message("user", "NEW question")
         ctx = s.get_context_messages()
         users = [m for m in ctx if m["role"] == "user"]
-        assert len(users) == 1
-        assert users[0]["content"] == "NEW question"
+        assert len(users) == 1, "they must collapse into a single turn"
+        assert users[0]["content"] == "OLD question (stopped)\n\nNEW question", (
+            "#963: no user text may be lost"
+        )
 
     def test_normal_alternation_preserved(self):
         s = ChatSession()

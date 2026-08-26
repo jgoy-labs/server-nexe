@@ -1,20 +1,20 @@
 {
  "_meta": {
   "component": "module_manager",
-  "description": "Traduccions per coordinador principal de mòduls",
+  "description": "Traducciones para el coordinador principal de módulos",
   "version": "1.0.0",
-  "language": "ca-ES"
+  "language": "es-ES"
  },
- 
+
  "paths": {
   "manifests_dir": "manifests"
  },
- 
+
  "files": {
   "manifest_toml": "manifest.toml",
   "module_manifest_format": "{module_name}.toml"
  },
- 
+
  "manifest": {
   "default": {
    "version": "1.0.0",
@@ -26,104 +26,104 @@
    "enabled": "enabled"
   }
  },
- 
+
  "api": {
   "integration": {
-   "failed": "Error integrant API per {module}: {error}"
+   "failed": "Error integrando la API para {module}: {error}"
   },
   "removal": {
-   "failed": "Error eliminant API per {module}: {error}"
+   "failed": "Error eliminando la API para {module}: {error}"
   },
   "integrator": {
-   "set": "Integrador d'API establert per al gestor de mòduls"
+   "set": "Integrador de API establecido para el gestor de módulos"
   }
  },
- 
+
  "init": {
-  "started": "ModuleManager inicialitzat",
-  "config_loaded": "Configuració carregada des de {path}",
-  "config_error": "Error carregant configuració: {error}",
-  "components_initialized": "Components especialitzats inicialitzats",
-  "base_path_set": "Path base establert: {path}"
+  "started": "ModuleManager inicializado",
+  "config_loaded": "Configuración cargada desde {path}",
+  "config_error": "Error cargando la configuración: {error}",
+  "components_initialized": "Componentes especializados inicializados",
+  "base_path_set": "Ruta base establecida: {path}"
  },
- 
+
  "discovery": {
-  "starting": "Descobrint mòduls...",
-  "completed": "Descobriment completat: {new_count} nous, {total_count} total",
-  "cycles_detected": "Cicles de dependències: {cycles}"
+  "starting": "Descubriendo módulos...",
+  "completed": "Descubrimiento completado: {new_count} nuevos, {total_count} en total",
+  "cycles_detected": "Ciclos de dependencias: {cycles}"
  },
- 
+
  "loading": {
-  "not_found": "Mòdul {module} no trobat",
-  "disabled": "Mòdul {module} està desactivat",
-  "dependency_failed": "No es pot carregar dependència {dep} per {module}",
-  "loading": "Carregant mòdul {module}...",
-  "loaded": "Mòdul {module} carregat correctament",
-  "error": "Error carregant {module}: {error}"
+  "not_found": "Módulo {module} no encontrado",
+  "disabled": "El módulo {module} está desactivado",
+  "dependency_failed": "No se ha podido cargar la dependencia {dep} para {module}",
+  "loading": "Cargando el módulo {module}...",
+  "loaded": "Módulo {module} cargado correctamente",
+  "error": "Error cargando {module}: {error}"
  },
- 
+
  "starting": {
-  "starting": "Iniciant mòdul {module}...",
-  "started": "Mòdul {module} iniciat correctament",
-  "error": "Error iniciant {module}: {error}"
+  "starting": "Iniciando el módulo {module}...",
+  "started": "Módulo {module} iniciado correctamente",
+  "error": "Error iniciando {module}: {error}"
  },
- 
+
  "stopping": {
-  "stopping": "Aturant mòdul {module}...",
-  "stopped": "Mòdul {module} aturat correctament",
-  "error": "Error aturant {module}: {error}"
+  "stopping": "Deteniendo el módulo {module}...",
+  "stopped": "Módulo {module} detenido correctamente",
+  "error": "Error deteniendo {module}: {error}"
  },
- 
+
  "lifecycle": {
-  "loading_module": "Carregant mòdul {module}...",
-  "module_loaded": "Mòdul {module} carregat correctament",
-  "starting_module": "Iniciant mòdul {module}...",
-  "module_started": "Mòdul {module} iniciat correctament",
-  "stopping_module": "Aturant mòdul {module}...",
-  "module_stopped": "Mòdul {module} aturat correctament",
-  "module_not_found": "Mòdul {module} no trobat",
-  "module_disabled": "Mòdul {module} està desactivat",
-  "dependency_failed": "No es pot carregar dependència {dep} per {module}",
-  "already_loaded": "Mòdul {module} ja està carregat",
-  "already_running": "Mòdul {module} ja està en execució"
+  "loading_module": "Cargando el módulo {module}...",
+  "module_loaded": "Módulo {module} cargado correctamente",
+  "starting_module": "Iniciando el módulo {module}...",
+  "module_started": "Módulo {module} iniciado correctamente",
+  "stopping_module": "Deteniendo el módulo {module}...",
+  "module_stopped": "Módulo {module} detenido correctamente",
+  "module_not_found": "Módulo {module} no encontrado",
+  "module_disabled": "El módulo {module} está desactivado",
+  "dependency_failed": "No se ha podido cargar la dependencia {dep} para {module}",
+  "already_loaded": "El módulo {module} ya está cargado",
+  "already_running": "El módulo {module} ya está en ejecución"
  },
- 
+
  "system": {
-  "starting": "Iniciant sistema de mòduls...",
-  "started": "Sistema de mòduls iniciat correctament",
-  "stopping": "Aturant sistema de mòduls...",
-  "stopped": "Sistema de mòduls aturat correctament",
-  "discovery_starting": "Iniciant descobriment de mòduls...",
-  "discovery_completed": "Descobriment completat: {new_count} nous, {total_count} total",
-  "auto_start_modules": "Iniciant {count} mòduls amb auto_start activat",
+  "starting": "Iniciando el sistema de módulos...",
+  "started": "Sistema de módulos iniciado correctamente",
+  "stopping": "Deteniendo el sistema de módulos...",
+  "stopped": "Sistema de módulos detenido correctamente",
+  "discovery_starting": "Iniciando el descubrimiento de módulos...",
+  "discovery_completed": "Descubrimiento completado: {new_count} nuevos, {total_count} en total",
+  "auto_start_modules": "Iniciando {count} módulos con auto_start activado",
   "startup": {
-   "initializing": "Inicialitzant sistema...",
-   "ready": "Sistema llest i operatiu"
+   "initializing": "Inicializando el sistema...",
+   "ready": "Sistema listo y operativo"
   },
   "shutdown": {
-   "initiated": "Aturada del sistema iniciada...",
-   "completed": "Aturada del sistema completada"
+   "initiated": "Apagado del sistema iniciado...",
+   "completed": "Apagado del sistema completado"
   },
   "errors": {
-   "critical": "Error crític del sistema: {error}"
+   "critical": "Error crítico del sistema: {error}"
   }
  },
- 
+
  "errors": {
-  "critical": "Error crític del sistema: {error}",
-  "module_failed": "El mòdul {module} ha fallat: {error}",
-  "load_error": "Error carregant {module}: {error}",
-  "start_error": "Error iniciant {module}: {error}",
-  "stop_error": "Error aturant {module}: {error}",
-  "dependency_cycle": "Cicle de dependències detectat: {cycle}"
+  "critical": "Error crítico del sistema: {error}",
+  "module_failed": "El módulo {module} ha fallado: {error}",
+  "load_error": "Error cargando {module}: {error}",
+  "start_error": "Error iniciando {module}: {error}",
+  "stop_error": "Error deteniendo {module}: {error}",
+  "dependency_cycle": "Ciclo de dependencias detectado: {cycle}"
  },
- 
+
  "status": {
-  "running": "Sistema en funcionament",
-  "stopped": "Sistema aturat",
-  "modules_total": "Total mòduls: {count}",
-  "modules_running": "Mòduls en execució: {count}",
-  "modules_by_state": "Mòduls per estat: {states}",
-  "uptime": "Temps de funcionament: {seconds}s"
+  "running": "Sistema en funcionamiento",
+  "stopped": "Sistema detenido",
+  "modules_total": "Total de módulos: {count}",
+  "modules_running": "Módulos en ejecución: {count}",
+  "modules_by_state": "Módulos por estado: {states}",
+  "uptime": "Tiempo de funcionamiento: {seconds}s"
  }
 }

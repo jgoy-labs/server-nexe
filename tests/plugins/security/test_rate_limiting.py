@@ -15,7 +15,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from plugins.security.core.rate_limiting import (
+from core.security.rate_limiting import (
     RateLimitTracker,
     get_api_key_identifier,
     get_composite_identifier,
@@ -48,7 +48,7 @@ class TestGetApiKeyIdentifier:
         assert result == f"apikey:{expected_hash}"
 
     def test_without_api_key_returns_ip(self):
-        with patch("plugins.security.core.rate_limiting.get_remote_address", return_value="192.168.1.1"):
+        with patch("core.security.rate_limiting.get_remote_address", return_value="192.168.1.1"):
             request = make_mock_request(api_key="")
             result = get_api_key_identifier(request)
         assert result.startswith("ip:")
@@ -65,14 +65,14 @@ class TestGetCompositeIdentifier:
     """Tests for get_composite_identifier."""
 
     def test_with_api_key_includes_hash(self):
-        with patch("plugins.security.core.rate_limiting.get_remote_address", return_value="10.0.0.1"):
+        with patch("core.security.rate_limiting.get_remote_address", return_value="10.0.0.1"):
             request = make_mock_request(api_key="test-key")
             result = get_composite_identifier(request)
         assert result.startswith("composite:")
         assert "10.0.0.1" in result
 
     def test_without_api_key_includes_nokey(self):
-        with patch("plugins.security.core.rate_limiting.get_remote_address", return_value="10.0.0.1"):
+        with patch("core.security.rate_limiting.get_remote_address", return_value="10.0.0.1"):
             request = make_mock_request(api_key="")
             result = get_composite_identifier(request)
         assert result == "composite:10.0.0.1:nokey"
@@ -82,13 +82,13 @@ class TestGetEndpointIdentifier:
     """Tests for get_endpoint_identifier."""
 
     def test_includes_path(self):
-        with patch("plugins.security.core.rate_limiting.get_remote_address", return_value="127.0.0.1"):
+        with patch("core.security.rate_limiting.get_remote_address", return_value="127.0.0.1"):
             request = make_mock_request(path="/health")
             result = get_endpoint_identifier(request)
         assert result == "endpoint:127.0.0.1:/health"
 
     def test_strips_trailing_slash(self):
-        with patch("plugins.security.core.rate_limiting.get_remote_address", return_value="127.0.0.1"):
+        with patch("core.security.rate_limiting.get_remote_address", return_value="127.0.0.1"):
             request = make_mock_request(path="/health/")
             result = get_endpoint_identifier(request)
         assert result == "endpoint:127.0.0.1:/health"
@@ -203,7 +203,7 @@ class TestDeadHelpersRemoved:
         ],
     )
     def test_dead_helper_is_absent(self, name):
-        import plugins.security.core.rate_limiting as rl
+        import core.security.rate_limiting as rl
 
         assert not hasattr(rl, name), (
             f"{name} was removed as dead code (no production call-site); "
@@ -216,7 +216,7 @@ class TestStartRateLimitCleanupTask:
 
     def test_cleanup_task_can_be_cancelled(self):
         """Verifies that the background task can be cancelled."""
-        from plugins.security.core.rate_limiting import start_rate_limit_cleanup_task
+        from core.security.rate_limiting import start_rate_limit_cleanup_task
 
         async def run_with_timeout():
             task = asyncio.create_task(start_rate_limit_cleanup_task())

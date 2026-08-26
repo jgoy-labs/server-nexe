@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/input_sanitizers.py
+Location: core/security/input_sanitizers.py
 Description: Input sanitisation. Validates strings and dicts against XSS, SQL injection, etc.
 
 www.jgoy.net · https://server-nexe.org

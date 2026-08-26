@@ -78,7 +78,7 @@ def logs(module: Optional[str], last: int):
             log_file = all_logs[0]
 
     # SECURITY FIX: ensure the log file is within the logs directory.
-    from plugins.security.core.validators import validate_safe_path
+    from core.security.validators import validate_safe_path
     log_file = validate_safe_path(log_file, logs_dir)
 
     tail_file(log_file, last)

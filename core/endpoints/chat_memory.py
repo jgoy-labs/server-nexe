@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 
 from core.endpoints.chat_sanitization import _filter_rag_injection
-from core.memory_access import DEFAULT_VECTOR_SIZE
+from core.memory_access import DEFAULT_VECTOR_SIZE, MEMORY_COLLECTION
 
 logger = logging.getLogger(__name__)
 
@@ -60,21 +60,21 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
         # Legacy Qdrant path
         from memory.memory.api.v1 import get_memory_api
 
-        logger.info("Auto-saving conversation to RAG memory (personal_memory)...")
+        logger.info("Auto-saving conversation to RAG memory (%s)...", MEMORY_COLLECTION)
 
         memory = await get_memory_api()
 
         try:
-            if not await memory.collection_exists("personal_memory"):
-                await memory.create_collection("personal_memory", vector_size=DEFAULT_VECTOR_SIZE)
-                logger.info("Created personal_memory collection")
+            if not await memory.collection_exists(MEMORY_COLLECTION):
+                await memory.create_collection(MEMORY_COLLECTION, vector_size=DEFAULT_VECTOR_SIZE)
+                logger.info("Created %s collection", MEMORY_COLLECTION)
         except Exception:
-            if not await memory.collection_exists("personal_memory"):
+            if not await memory.collection_exists(MEMORY_COLLECTION):
                 raise
 
         doc_id = await memory.store(
             text=conversation_text,
-            collection="personal_memory",
+            collection=MEMORY_COLLECTION,
             metadata={
                 "type": "conversation_turn",
                 "auto_saved": True,
@@ -83,7 +83,7 @@ async def _save_conversation_to_memory(app_state, user_msg: str, assistant_msg: 
             }
         )
 
-        logger.info("Conversation saved to personal_memory (id=%s)", doc_id)
+        logger.info("Conversation saved to %s (id=%s)", MEMORY_COLLECTION, doc_id)
 
         try:
             from core.metrics.registry import MEMORY_OPERATIONS

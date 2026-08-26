@@ -15,7 +15,7 @@ from typing import Optional
 from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
-from plugins.security.core.auth import (
+from core.security.auth import (
   load_api_keys,
   parse_datetime_or_none,
   KeyStatus,
@@ -212,7 +212,7 @@ def test_load_api_keys_no_keys_configured(monkeypatch):
 def _make_auth_test_app():
   """Creates a mini-app with a protected endpoint for testing auth."""
   from fastapi import FastAPI, Depends
-  from plugins.security.core.auth_dependencies import require_api_key
+  from core.security.auth_dependencies import require_api_key
   test_app = FastAPI()
   @test_app.get("/test-auth")
   async def protected(_: str = Depends(require_api_key)):

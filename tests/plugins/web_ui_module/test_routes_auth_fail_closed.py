@@ -12,10 +12,10 @@ from unittest.mock import patch, MagicMock
 import pytest
 from fastapi import HTTPException
 
-from plugins.security.core.auth_models import ApiKeyConfig, ApiKeyData
+from core.security.auth_models import ApiKeyConfig, ApiKeyData
 from plugins.web_ui_module.api.routes_auth import make_require_ui_auth
 
-_LOAD = "plugins.security.core.auth_dependencies.load_api_keys"
+_LOAD = "core.security.auth_dependencies.load_api_keys"
 
 
 def _cfg(primary=None):

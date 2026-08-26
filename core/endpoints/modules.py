@@ -12,7 +12,7 @@ www.jgoy.net · https://server-nexe.org
 from fastapi import APIRouter, HTTPException, Request, Depends
 
 from core.dependencies import limiter, get_i18n
-from plugins.security.core.auth_dependencies import require_api_key
+from core.security.auth_dependencies import require_api_key
 
 from core.models import (
   ModulesListResponse,

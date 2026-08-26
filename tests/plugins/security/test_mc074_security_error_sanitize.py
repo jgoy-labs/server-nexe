@@ -14,7 +14,7 @@ from slowapi import _rate_limit_exceeded_handler
 
 import plugins.security.api.routes as sec_routes
 from plugins.security.api.routes import create_router
-from plugins.security.core.auth import require_api_key
+from core.security.auth import require_api_key
 from core.dependencies import limiter as core_limiter
 
 LEAK = "LEAK_/Users/secret/internal_path_4242"

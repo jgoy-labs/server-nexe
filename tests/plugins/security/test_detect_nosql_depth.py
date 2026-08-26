@@ -12,7 +12,7 @@ suspicious (return True) without recursion explosion.
 
 import pytest
 
-from plugins.security.core.injection_detectors import (
+from core.security.injection_detectors import (
   MAX_NOSQL_DEPTH,
   detect_nosql_injection,
 )

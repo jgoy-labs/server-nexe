@@ -433,10 +433,17 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
 
   # Default True in prod, False in dev, but disabled if known local host
   # unless explicitly forced in config.
-  from core.config import DEFAULT_HOST, get_localhost_aliases
+  # #864: ask whether the bind host IS loopback, do not look it up in the alias
+  # list. NEXE_LOCALHOST_ALIASES exists for the CLIENT-IP comparison in
+  # bootstrap.py; an entry added for that purpose (say a LAN address) used to
+  # land here too and make is_local True, dropping Secure off the CSRF cookie on
+  # a production server bound to that very address with NEXE_ALLOW_PUBLIC_BIND=1.
+  # _host_is_loopback answers the question this line is actually asking, and
+  # already says False for 0.0.0.0 (binds every interface, public included).
+  from core.config import DEFAULT_HOST
+  from core.server.runner import _host_is_loopback
   host = server_config.get('host', DEFAULT_HOST)
-  is_local = host in set(get_localhost_aliases())
-  # 0.0.0.0 binds ALL interfaces including public — treat as non-local
+  is_local = _host_is_loopback(host)
 
   cookie_secure = is_prod and not is_local
 

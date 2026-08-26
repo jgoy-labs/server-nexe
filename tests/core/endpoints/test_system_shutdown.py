@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from core.endpoints.system import router_admin
-from plugins.security.core.auth import require_api_key
+from core.security.auth import require_api_key
 
 
 def _make_app() -> FastAPI:

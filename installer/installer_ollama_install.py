@@ -347,6 +347,29 @@ def _install_ollama_macos() -> bool:
         return False
 
 
+def _linux_can_reach_root() -> bool:
+    """Whether the official install.sh can become root without a terminal.
+
+    install.sh shells out to ``sudo`` for every privileged step. Running under
+    a sidecar or an app bundle there is no TTY to type a password into, so that
+    inner sudo dies with "a terminal is required to read the password" — after
+    the script has already printed its own progress, which reads like Nexe
+    broke rather than like a missing permission.
+    """
+    if os.geteuid() == 0:
+        return True
+    if not shutil.which("sudo"):
+        return False
+    try:
+        return subprocess.run(  # nosec B603 B607: fixed argv, sudo via PATH
+            ["sudo", "-n", "true"],
+            timeout=10,
+            capture_output=True,
+        ).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def _install_ollama_linux() -> bool:
     """Install Ollama on Linux via the official install script.
 
@@ -365,6 +388,13 @@ def _install_ollama_linux() -> bool:
     expected, _pinned_url, _pinned_version = _resolve_ollama_pin("linux_install_sh")
     if _pinned_url:
         url = _pinned_url
+
+    manual_cmd = f"curl -fsSL {url} -o /tmp/install.sh && bash /tmp/install.sh"
+    if not _linux_can_reach_root():
+        print_warn(t('ollama_install_needs_root'))
+        print(f"  {CYAN}{manual_cmd}{RESET}")
+        return False
+
     tmp_path: str | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -409,13 +439,14 @@ def _install_ollama_linux() -> bool:
             print_success(t('ollama_installed'))
             return True
         print_warn(t('ollama_install_failed'))
+        print(f"  {CYAN}{manual_cmd}{RESET}")
         return False
     except subprocess.TimeoutExpired:
         print_warn("Ollama install timed out (>3 min)")
         return False
     except Exception as e:
         print_warn(f"{t('ollama_install_failed')}: {e}")
-        print(f"  {CYAN}curl -fsSL {url} -o /tmp/install.sh && bash /tmp/install.sh{RESET}")
+        print(f"  {CYAN}{manual_cmd}{RESET}")
         return False
     finally:
         if tmp_path:

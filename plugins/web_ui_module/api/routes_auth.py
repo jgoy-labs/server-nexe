@@ -23,7 +23,7 @@ from core.runtime_state import get_with_env_fallback  # noqa: E402
 # security plugin. Protected endpoints fail closed via _SECURITY_AVAILABLE
 # below — they return 503, never 200 without auth.
 try:
-    from plugins.security.core.auth_config import get_admin_api_key
+    from core.security.auth_config import get_admin_api_key
     _SECURITY_AVAILABLE = True
 except ImportError:
     _SECURITY_AVAILABLE = False
@@ -106,7 +106,7 @@ def make_require_ui_auth():
                 status_code=503,
                 detail="security plugin missing — protected endpoints unavailable",
             )
-        from plugins.security.core.auth_dependencies import authenticate_ui_request
+        from core.security.auth_dependencies import authenticate_ui_request
         await authenticate_ui_request(request, x_api_key, authorization)
     return _require_ui_auth
 

@@ -13,7 +13,7 @@ import pytest
 from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
 
-from plugins.security.core.auth_dependencies import optional_api_key
+from core.security.auth_dependencies import optional_api_key
 
 
 @pytest.fixture

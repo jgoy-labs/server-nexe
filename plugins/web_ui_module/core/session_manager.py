@@ -19,6 +19,8 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from core.chat_history import merge_consecutive_same_role
+
 logger = logging.getLogger(__name__)
 
 
@@ -179,18 +181,12 @@ class ChatSession:
                 "content": "Understood, I have the context from the previous conversation."
             })
         msgs.extend(self.messages)
-        # Sanity check: drop consecutive duplicate roles to prevent VLM errors
-        cleaned: List[Dict[str, str]] = []
-        for m in msgs:
-            if cleaned and cleaned[-1]["role"] == m["role"]:
-                # MC-116: keep the LATEST of consecutive same-role messages.
-                # If an interrupted stream left an assistant turn unpersisted,
-                # two 'user' messages end up adjacent; keeping the last one
-                # means the model answers the NEW message, not the stale one.
-                cleaned[-1] = m
-                continue
-            cleaned.append(m)
-        return cleaned
+        # Collapse consecutive duplicate roles (prevents VLM errors) using the
+        # ONE canonical policy — #963: this layer used to keep the latest and
+        # drop the rest (MC-116) while the engine merged them, two answers to
+        # the same question with nothing saying which won. Merging is now the
+        # decision, so no user text is lost on either path.
+        return merge_consecutive_same_role(msgs)
 
     def get_history(self) -> List[Dict[str, str]]:
         """Get complete message history (for UI)"""

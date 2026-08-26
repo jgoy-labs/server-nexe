@@ -25,7 +25,7 @@ def make_app():
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     from core.endpoints.system import router_admin, get_router
-    from plugins.security.core.auth import require_api_key
+    from core.security.auth import require_api_key
 
     # Override auth for tests
     app.dependency_overrides[require_api_key] = lambda: "test-key"

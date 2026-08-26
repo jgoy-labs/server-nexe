@@ -8,6 +8,8 @@ import logging
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from core.chat_history import merge_consecutive_same_role
+
 from .qwen35_directive import (
     QWEN35_THINKING_DIRECTIVE,
     _inject_thinking_directive_into_messages,
@@ -18,16 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 def _merge_same_role(filtered: List[Dict]) -> List[Dict]:
-    """Merge consecutive messages that share the same role."""
-    merged: list = []
-    for msg in filtered:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        if merged and merged[-1]["role"] == role:
-            merged[-1]["content"] += "\n\n" + content
-        else:
-            merged.append({"role": role, "content": content})
-    return merged
+    """Merge consecutive messages that share the same role.
+
+    #963: the body moved to `core.chat_history` so this layer and the session
+    history cannot drift apart again. Kept as a name because the module's own
+    pipeline (and its tests) reference it.
+    """
+    return merge_consecutive_same_role(filtered)
 
 
 def _ensure_starts_with_user(merged: List[Dict]) -> List[Dict]:

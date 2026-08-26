@@ -8,7 +8,7 @@ Description: False positive tests — normal user messages that must NOT be bloc
 
 import pytest
 from fastapi import HTTPException
-from plugins.security.core.input_sanitizers import validate_string_input
+from core.security.input_sanitizers import validate_string_input
 
 CONTEXT = "chat"
 

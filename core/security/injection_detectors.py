@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/injection_detectors.py
+Location: core/security/injection_detectors.py
 Description: Injection attack detectors. Detects SQL, XSS, NoSQL, command and path traversal.
 
 www.jgoy.net · https://server-nexe.org

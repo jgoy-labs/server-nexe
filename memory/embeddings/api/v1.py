@@ -10,7 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from plugins.security.core.auth_dependencies import require_api_key
+from core.security.auth_dependencies import require_api_key
 
 router = APIRouter(prefix="/embeddings", tags=["embeddings-v1", "future"], dependencies=[Depends(require_api_key)])
 

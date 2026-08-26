@@ -24,7 +24,7 @@ def test_verify_api_key_without_admin_key():
     del os.environ["NEXE_ADMIN_API_KEY"]
 
   try:
-    from plugins.security.core.auth import verify_api_key
+    from core.security.auth import verify_api_key
 
     with pytest.raises(HTTPException) as exc_info:
       verify_api_key(x_api_key="any-key")
@@ -42,7 +42,7 @@ def test_verify_api_key_with_none():
 
   Finding
   """
-  from plugins.security.core.auth import generate_api_key, verify_api_key
+  from core.security.auth import generate_api_key, verify_api_key
   os.environ["NEXE_ADMIN_API_KEY"] = generate_api_key()
 
   with pytest.raises(HTTPException) as exc_info:
@@ -57,7 +57,7 @@ def test_verify_api_key_with_empty_string():
 
   Finding
   """
-  from plugins.security.core.auth import generate_api_key, verify_api_key
+  from core.security.auth import generate_api_key, verify_api_key
   os.environ["NEXE_ADMIN_API_KEY"] = generate_api_key()
 
   with pytest.raises(HTTPException) as exc_info:
@@ -72,7 +72,7 @@ def test_verify_api_key_with_invalid_key():
 
   Finding
   """
-  from plugins.security.core.auth import generate_api_key, verify_api_key
+  from core.security.auth import generate_api_key, verify_api_key
   valid_key = generate_api_key()
   os.environ["NEXE_ADMIN_API_KEY"] = valid_key
 
@@ -88,7 +88,7 @@ def test_verify_api_key_with_valid_key():
 
   Finding
   """
-  from plugins.security.core.auth import generate_api_key, verify_api_key
+  from core.security.auth import generate_api_key, verify_api_key
   valid_key = generate_api_key()
   os.environ["NEXE_ADMIN_API_KEY"] = valid_key
 
@@ -103,7 +103,7 @@ def test_verify_api_key_timing_safe():
 
   Verify that the implementation is not vulnerable to timing attacks.
   """
-  from plugins.security.core.auth import generate_api_key, verify_api_key
+  from core.security.auth import generate_api_key, verify_api_key
   import time
 
   valid_key = generate_api_key()
@@ -150,7 +150,7 @@ def test_verify_api_key_as_fastapi_dependency():
   """
   from fastapi import FastAPI, Depends
   from fastapi.testclient import TestClient
-  from plugins.security.core.auth import generate_api_key, verify_api_key
+  from core.security.auth import generate_api_key, verify_api_key
 
   valid_key = generate_api_key()
   os.environ["NEXE_ADMIN_API_KEY"] = valid_key
@@ -180,7 +180,7 @@ def test_verify_api_key_backwards_compatibility():
   Code that called verify_api_key() manually and caught False
   should now catch HTTPException.
   """
-  from plugins.security.core.auth import generate_api_key, verify_api_key
+  from core.security.auth import generate_api_key, verify_api_key
 
   valid_key = generate_api_key()
   os.environ["NEXE_ADMIN_API_KEY"] = valid_key

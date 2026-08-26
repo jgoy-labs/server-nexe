@@ -13,7 +13,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 from fastapi import APIRouter, Depends
 
-from plugins.security.core.auth import require_api_key
+from core.security.auth import require_api_key
 
 logger = logging.getLogger(__name__)
 

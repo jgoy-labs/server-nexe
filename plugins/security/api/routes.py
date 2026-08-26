@@ -16,8 +16,8 @@ from pathlib import Path
 import asyncio
 import logging
 
-from plugins.security.core.auth import require_api_key
-from plugins.security.core.validators import validate_safe_path
+from core.security.auth import require_api_key
+from core.security.validators import validate_safe_path
 
 try:
     from core.dependencies import limiter

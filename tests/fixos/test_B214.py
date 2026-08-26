@@ -44,7 +44,7 @@ def _make_app_with_integrator(known_modules=None):
     app.dependency_overrides[get_api_integrator] = lambda: integrator
 
     # Override require_api_key per no necesitar clau real als tests
-    from plugins.security.core.auth_dependencies import require_api_key
+    from core.security.auth_dependencies import require_api_key
     app.dependency_overrides[require_api_key] = lambda: None
 
     return TestClient(app)

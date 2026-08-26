@@ -18,7 +18,8 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from core.dependencies import limiter
-from plugins.security.core.auth_dependencies import require_api_key
+from core.memory_access import SYSTEM_COLLECTIONS
+from core.security.auth_dependencies import require_api_key
 from ..constants import DEFAULT_VECTOR_SIZE
 from .models import validate_collection_name, InvalidCollectionNameError
 
@@ -117,12 +118,7 @@ async def get_memory_api():
                 # the personal memory collection was created and nexe_documentation
                 # was a silent skip in recall_from_memory(), making the "Base de
                 # coneixement" sidebar permanently empty.
-                canonical_collections = (
-                    "nexe_documentation", # corporate know-how from knowledge/ folder
-                    "user_knowledge",     # ad-hoc docs uploaded via chat UI
-                    "personal_memory",    # personal memory MEM_SAVE (was nexe_web_ui pre-2026-04-08)
-                )
-                for col in canonical_collections:
+                for col in SYSTEM_COLLECTIONS:
                     try:
                         if not await _new_api.collection_exists(col):
                             await _new_api.create_collection(col, vector_size=DEFAULT_VECTOR_SIZE)
@@ -216,7 +212,7 @@ def _resolve_search_collections(body: "MemorySearchRequest") -> list:
         return body.collections
     if body.collection:
         return [body.collection]
-    return ["nexe_documentation", "personal_memory", "user_knowledge"]
+    return list(SYSTEM_COLLECTIONS)
 
 
 def _format_search_result(r, col: str) -> "MemorySearchResult":

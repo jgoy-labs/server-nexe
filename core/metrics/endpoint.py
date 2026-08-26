@@ -19,7 +19,7 @@ from prometheus_client import (
   REGISTRY,
 )
 
-from plugins.security.core.auth_dependencies import require_api_key
+from core.security.auth_dependencies import require_api_key
 
 from .registry import set_module_health
 

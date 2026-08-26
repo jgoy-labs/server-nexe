@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 from fastapi import HTTPException
 
-from plugins.security.core.validators import (
+from core.security.validators import (
     validate_safe_path,
     validate_command,
     validate_filename,

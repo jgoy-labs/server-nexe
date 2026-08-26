@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/auth_config.py
+Location: core/security/auth_config.py
 Description: Configuration functions for Nexe authentication system.
 
 www.jgoy.net · https://server-nexe.org

@@ -597,7 +597,7 @@ class TestSecurityValidationBranch:
     loaded, so the try/except at module scope never re-ran.  The only assert was
     `isinstance(SECURITY_VALIDATION_AVAILABLE, bool)` — trivially True for any bool.
 
-    This version forces the import of `plugins.security.core.validators` to fail
+    This version forces the import of `core.security.validators` to fail
     BEFORE loading `core.modules.module_manager`, triggering the real
     except-ImportError branch (line 37-38) and the subsequent warning (line 44).
 
@@ -610,7 +610,7 @@ class TestSecurityValidationBranch:
     """
 
     _MM_MODULE = "core.modules.module_manager"
-    _DEP_MODULE = "plugins.security.core.validators"
+    _DEP_MODULE = "core.security.validators"
 
     def _reload_without_dep(self):
         """Re-import module_manager with the security dep blocked.

@@ -25,6 +25,7 @@ import unicodedata as _unicodedata
 from fastapi import APIRouter, HTTPException, Depends, Request as FastAPIRequest
 from fastapi.responses import StreamingResponse
 from core.dependencies import limiter
+from core.memory_access import DOCS_COLLECTION, KNOWLEDGE_COLLECTION, MEMORY_COLLECTION
 
 from plugins.web_ui_module.messages import get_message, get_i18n
 # R6-15 v1.0.4: tolerate absent security plugin. The endpoints in this module
@@ -34,7 +35,7 @@ try:
     # Real implementations; type signatures differ slightly from the
     # degraded-mode fallbacks below, but in practice when these are imported
     # successfully the fallback stubs are never bound.
-    from plugins.security.core.input_sanitizers import (
+    from core.security.input_sanitizers import (
         validate_string_input,  # pyright: ignore[reportAssignmentType]
         strip_memory_tags,  # pyright: ignore[reportAssignmentType]
         detect_jailbreak_attempt,  # pyright: ignore[reportAssignmentType]
@@ -140,17 +141,17 @@ def _mem_save_fallback_text(mem_saves: list) -> str:
 _COLLECTIONS_OFF_NOTES = {
     # NB: never name literal tags here — a small model reads "[MEM_SAVE:]" in a
     # note and starts echoing/inventing tag variants (seen live: [MEM_OBLIT:]).
-    "personal_memory": {
+    MEMORY_COLLECTION: {
         "ca": "NOTA CRÍTICA: L'usuari ha DESACTIVAT la memòria personal. No tens accés a cap record. NO afirmis recordar res de l'usuari, NO prometis desar ni oblidar res, i NO escriguis cap tag de memòria. Si no t'ho pregunten, no en parlis.",
         "es": "NOTA CRÍTICA: El usuario ha DESACTIVADO la memoria personal. No tienes acceso a ningún recuerdo. NO afirmes recordar nada del usuario, NO prometas guardar ni olvidar nada, y NO escribas ningún tag de memoria. Si no te lo preguntan, no lo menciones.",
         "en": "CRITICAL NOTE: The user has DISABLED personal memory. You have no access to any memories. Do NOT claim to remember anything about the user, do NOT promise to save or forget anything, and do NOT write any memory tag. Do not bring it up unless asked.",
     },
-    "nexe_documentation": {
+    DOCS_COLLECTION: {
         "ca": "NOTA CRÍTICA: L'usuari ha DESACTIVAT la base de coneixement (documentació de server-nexe). NO tens accés a la documentació: si et demanen detalls, digues que la col·lecció està desactivada. NO inventis contingut de la documentació.",
         "es": "NOTA CRÍTICA: El usuario ha DESACTIVADO la base de conocimiento (documentación de server-nexe). NO tienes acceso a la documentación: si piden detalles, di que la colección está desactivada. NO inventes contenido de la documentación.",
         "en": "CRITICAL NOTE: The user has DISABLED the knowledge base (server-nexe documentation). You have NO access to the documentation: if asked for details, say the collection is disabled. Do NOT invent documentation content.",
     },
-    "user_knowledge": {
+    KNOWLEDGE_COLLECTION: {
         "ca": "NOTA CRÍTICA: L'usuari ha DESACTIVAT els documents pujats. NO tens accés als seus documents: no en citis ni n'inventis contingut.",
         "es": "NOTA CRÍTICA: El usuario ha DESACTIVADO los documentos subidos. NO tienes acceso a sus documentos: no cites ni inventes su contenido.",
         "en": "CRITICAL NOTE: The user has DISABLED uploaded documents. You have NO access to their documents: do not cite or invent their content.",

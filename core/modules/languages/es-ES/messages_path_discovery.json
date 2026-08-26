@@ -1,59 +1,59 @@
 {
  "_meta": {
   "component": "path_discovery",
-  "description": "Traduccions per descobriment automàtic de paths",
+  "description": "Traducciones para el descubrimiento automático de rutas",
   "version": "1.0.0",
-  "language": "ca-ES"
+  "language": "es-ES"
  },
- 
+
  "discovery": {
-  "starting": "Escanejant paths per mòduls...",
-  "path_added": "Path afegit: {path}",
-  "auto_discovered": "Auto-descobert: {path}",
-  "permission_denied": "Permisos denegats escanejant: {path}",
-  "max_dirs_reached": "Límit màxim de directoris assolit: {max}",
-  "paths_discovered": "Descoberts {count} paths de mòduls",
-  "scanning_complete": "Escaneig completat"
+  "starting": "Escaneando rutas en busca de módulos...",
+  "path_added": "Ruta añadida: {path}",
+  "auto_discovered": "Autodescubierto: {path}",
+  "permission_denied": "Permiso denegado al escanear: {path}",
+  "max_dirs_reached": "Límite máximo de directorios alcanzado: {max}",
+  "paths_discovered": "Descubiertas {count} rutas de módulos",
+  "scanning_complete": "Escaneo completado"
  },
- 
+
  "modules": {
-  "found": "Mòdul trobat: '{name}' a {path}",
-  "scanning_path": "Escanejant path: {path}",
-  "not_module": "Directori {path} no conté mòduls",
-  "api_indicators_found": "Indicadors d'API trobats a {path}",
-  "manifest_found": "Manifest trobat: {path}",
-  "python_files_found": "Fitxers Python trobats a {path}"
+  "found": "Módulo encontrado: '{name}' en {path}",
+  "scanning_path": "Escaneando ruta: {path}",
+  "not_module": "El directorio {path} no contiene módulos",
+  "api_indicators_found": "Indicadores de API encontrados en {path}",
+  "manifest_found": "Manifiesto encontrado: {path}",
+  "python_files_found": "Archivos Python encontrados en {path}"
  },
- 
+
  "cache": {
-  "saved": "Cache de paths desat a {file}",
-  "loaded": "Cache de paths carregat des de {file}",
-  "save_error": "Error desant cache: {error}",
-  "load_error": "Error carregant cache: {error}",
-  "cache_outdated": "Cache obsolet, forçant redescobriment"
+  "saved": "Caché de rutas guardada en {file}",
+  "loaded": "Caché de rutas cargada desde {file}",
+  "save_error": "Error guardando la caché: {error}",
+  "load_error": "Error cargando la caché: {error}",
+  "cache_outdated": "Caché obsoleta, forzando un nuevo descubrimiento"
  },
- 
+
  "patterns": {
-  "known_paths": "Processant paths coneguts: {count}",
-  "configured_paths": "Processant paths configurats: {count}",
-  "auto_discovery": "Iniciant auto-descobriment de paths",
-  "pattern_matched": "Patró trobat: {pattern} a {path}",
-  "ignored_pattern": "Patró ignorat: {pattern}"
+  "known_paths": "Procesando rutas conocidas: {count}",
+  "configured_paths": "Procesando rutas configuradas: {count}",
+  "auto_discovery": "Iniciando el autodescubrimiento de rutas",
+  "pattern_matched": "Patrón encontrado: {pattern} en {path}",
+  "ignored_pattern": "Patrón ignorado: {pattern}"
  },
- 
+
  "validation": {
-  "path_exists": "Path vàlid: {path}",
-  "path_missing": "Path inexistent: {path}",
-  "not_directory": "{path} no és un directori",
-  "is_module_directory": "{path} és un directori de mòdul vàlid",
-  "not_module_directory": "{path} no sembla un directori de mòdul"
+  "path_exists": "Ruta válida: {path}",
+  "path_missing": "La ruta no existe: {path}",
+  "not_directory": "{path} no es un directorio",
+  "is_module_directory": "{path} es un directorio de módulo válido",
+  "not_module_directory": "{path} no parece un directorio de módulo"
  },
- 
+
  "stats": {
-  "total_paths": "Total paths descoberts: {count}",
-  "total_modules": "Total mòduls trobats: {count}",
-  "discovery_time": "Temps de descobriment: {time}ms",
-  "cache_hit": "Cache utilitzat per {count} mòduls",
-  "new_discoveries": "Nous descobriments: {count}"
+  "total_paths": "Total de rutas descubiertas: {count}",
+  "total_modules": "Total de módulos encontrados: {count}",
+  "discovery_time": "Tiempo de descubrimiento: {time}ms",
+  "cache_hit": "Caché utilizada para {count} módulos",
+  "new_discoveries": "Nuevos descubrimientos: {count}"
  }
 }

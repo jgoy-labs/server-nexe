@@ -18,8 +18,8 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from plugins.security.core.auth_dependencies import require_api_key
-from plugins.security.core.input_sanitizers import validate_string_input, strip_memory_tags
+from core.security.auth_dependencies import require_api_key
+from core.security.input_sanitizers import validate_string_input, strip_memory_tags
 
 from .chat_schemas import Message, ChatCompletionRequest
 from core.log_redact import redact_user_content

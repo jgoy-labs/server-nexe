@@ -55,7 +55,7 @@ from .types import DiscoveryConfig, LifecycleConfig, SystemLifecycleConfig
 from .plugin_loader import PluginLoaderMixin
 
 try:
-  from plugins.security.core.validators import validate_safe_path
+  from core.security.validators import validate_safe_path
   SECURITY_VALIDATION_AVAILABLE = True
 except ImportError:
   SECURITY_VALIDATION_AVAILABLE = False

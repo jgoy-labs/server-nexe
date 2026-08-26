@@ -10,7 +10,7 @@ Covers:
 """
 import pytest
 
-from plugins.security.core.input_sanitizers import strip_memory_tags
+from core.security.input_sanitizers import strip_memory_tags
 
 
 # ── NFKC-normalizable cases + regex extension (must be neutralized) ──

@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/auth_models.py
+Location: core/security/auth_models.py
 Description: Data models for the Nexe authentication system.
 
 www.jgoy.net · https://server-nexe.org

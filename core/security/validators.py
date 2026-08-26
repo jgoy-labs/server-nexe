@@ -2,7 +2,7 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy 
-Location: plugins/security/core/validators.py
+Location: core/security/validators.py
 Description: Security validators. Prevents path traversal, RCE and command validation.
 
 www.jgoy.net · https://server-nexe.org
@@ -42,7 +42,7 @@ def validate_safe_path(requested_path: Path, base_path: Path) -> Path:
     base_resolved = base_path.resolve()
 
     if not resolved_path.is_relative_to(base_resolved):
-      from .logger import log_security_event
+      from plugins.security.core.logger import log_security_event
       log_security_event("path_traversal_blocked", {
         "requested": str(requested_path),
         "resolved": str(resolved_path),
@@ -111,7 +111,7 @@ def validate_command(command: str, allowed_commands: List[str]) -> List[str]:
 
   base_command = parts[0]
   if base_command not in allowed_commands:
-    from .logger import log_security_event
+    from plugins.security.core.logger import log_security_event
     log_security_event("rce_blocked", {
       "command": command,
       "base_command": base_command,

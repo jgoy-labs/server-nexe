@@ -207,7 +207,8 @@ async def _create_chat_session(client: Any) -> Optional[str]:
 
 
 def _parse_collections(collections_str: Optional[str]) -> Optional[list[str]]:
-    _COLL_ALIASES = {'memory': 'personal_memory', 'knowledge': 'nexe_documentation', 'docs': 'nexe_documentation'}
+    from core.memory_access import DOCS_COLLECTION, MEMORY_COLLECTION
+    _COLL_ALIASES = {'memory': MEMORY_COLLECTION, 'knowledge': DOCS_COLLECTION, 'docs': DOCS_COLLECTION}
     if not collections_str:
         return None
     return [_COLL_ALIASES.get(c.strip(), c.strip()) for c in collections_str.split(',')]

@@ -168,7 +168,7 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 ### 6.1 Spoofing
 
-**El navegador es fa passar per un usuari autenticat (boundary 1).** Mitigat per validacio dual-key `X-API-Key` amb `secrets.compare_digest` a `plugins/security/core/auth_dependencies.py:require_api_key` (linia 161; el `compare_digest` de la clau primaria es a la linia 96). Les errades son loggejades amb IP client. El bypass dev-mode esta gated a loopback nomes (la branca `if dev_mode:` a `_check_dev_mode` a la linia 67 força `_is_loopback_ip` a la linia 70 i llança 403 si `NEXE_DEV_MODE_ALLOW_REMOTE` no es `true`).
+**El navegador es fa passar per un usuari autenticat (boundary 1).** Mitigat per validacio dual-key `X-API-Key` amb `secrets.compare_digest` a `core/security/auth_dependencies.py:require_api_key` (linia 161; el `compare_digest` de la clau primaria es a la linia 96). Les errades son loggejades amb IP client. El bypass dev-mode esta gated a loopback nomes (la branca `if dev_mode:` a `_check_dev_mode` a la linia 67 força `_is_loopback_ip` a la linia 70 i llança 403 si `NEXE_DEV_MODE_ALLOW_REMOTE` no es `true`).
 
 **Un altre proces de la mateixa maquina envia peticions com si fos el daemon Ollama (boundary 4).** Parcial: Ollama escolta a loopback sense autenticacio. Qualsevol proces local corrent com el mateix usuari pot cridar-lo. Acceptat — el mateix usuari local pot llegir `~/.ollama/` directament. La defensa de server-nexe es que el pipeline de xat sempre passa per `/ui/chat` o `/v1/chat/completions` (tots dos autenticats); els endpoints per-backend directes (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) estan bloquejats pel middleware `RemovedDirectRoutesGuard` (`core/middleware.py`) — una crida directa retorna HTTP 403 amb codi d'error `direct_plugin_endpoint_disabled` abans d'arribar a cap handler. Les rutes es declaren com a `removed_direct_routes` al `manifest.toml` de cada plugin i s'apliquen tant en temps de peticio com en temps de carrega del plugin (vegeu §6.6).
 
@@ -180,9 +180,9 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 **CSRF contra la Web UI (boundary 1).** Mitigat per `starlette-csrf` amb cookie `nexe_csrf_token`, header `X-CSRF-Token`, `SameSite=strict`. Els patrons exempts estan precompilats a la carrega del modul a `core/middleware.py:36-46`: els endpoints d'API (`/v1/`, `/rag/`, `/chat`, `/metrics`, `/health`) son exempts perque son autenticats per X-API-Key, no per cookie. Els endpoints sota `/ui/` son explicitament exempts tambe perque la UI envia `X-API-Key` a cada crida (trade-off explicit; documentat).
 
-**Markdown o HTML injectat i renderitzat al xat (boundary 1).** Detector XSS corre sense condicions (`plugins/security/core/input_sanitizers.py:validate_string_input`, `check_xss=True` en tots els contexts). `sanitize_html` escapa HTML a qualsevol sortida renderitzada a la UI.
+**Markdown o HTML injectat i renderitzat al xat (boundary 1).** Detector XSS corre sense condicions (`core/security/input_sanitizers.py:validate_string_input`, `check_xss=True` en tots els contexts). `sanitize_html` escapa HTML a qualsevol sortida renderitzada a la UI.
 
-**Injeccio a memoria / RAG (boundaries 1 i 6).** L'input de l'usuari es net de tags de rol-memoria (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]`…) per `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:93`). Els documents ingestats al RAG i els resultats de retrieval passen per `_filter_rag_injection` i `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:109` i linia 151). Un document malicios no pot incrustar un tag `[MEM_DELETE:]` que el LLM copiaria verbatim.
+**Injeccio a memoria / RAG (boundaries 1 i 6).** L'input de l'usuari es net de tags de rol-memoria (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]`…) per `strip_memory_tags` (`core/security/input_sanitizers.py:93`). Els documents ingestats al RAG i els resultats de retrieval passen per `_filter_rag_injection` i `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:109` i linia 151). Un document malicios no pot incrustar un tag `[MEM_DELETE:]` que el LLM copiaria verbatim.
 
 **JSON profundament niat com a tampering d'enginyeria de payload (boundary 1).** Acotat per `MAX_NOSQL_DEPTH=100` a `detect_nosql_injection`. Abans feia crashejar el proces amb `RecursionError`; ara retorna "sospitos" en profunditats > 100.
 
@@ -228,7 +228,7 @@ Llegenda: ● = amenaça activa amb mitigacio, ◐ = parcial / nomes defensa-en-
 
 **Tightening del directori de master-key falla silenciosament.** `core/crypto/keys.py:_try_file_set` (linia 139+) ara logueja un WARNING quan `chmod 0o700` falla a `~/.nexe/` (linies 157-163). El fitxer clau segueix naixent `0o600` via `os.open(O_CREAT|O_EXCL)` aixi que aixo es nomes un fix defensa-en-profunditat.
 
-**Intent de jailbreak dins del xat.** 11 patrons regex (detector speed-bump, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, linia 41; cobreix formes imperatives CA/EN i handles coneguts com `DAN mode`, `do anything now`) afegeixen un prefix `[SECURITY NOTICE]` en lloc de rebutjar — els atacs sofisticats l'evaden trivialment i aixo esta documentat explicitament (`SECURITY.md:36`). La proteccio real requereix moderacio a nivell de model (fora d'abast, §7).
+**Intent de jailbreak dins del xat.** 11 patrons regex (detector speed-bump, `core/security/input_sanitizers.py:_JAILBREAK_PATTERNS`, linia 41; cobreix formes imperatives CA/EN i handles coneguts com `DAN mode`, `do anything now`) afegeixen un prefix `[SECURITY NOTICE]` en lloc de rebutjar — els atacs sofisticats l'evaden trivialment i aixo esta documentat explicitament (`SECURITY.md:36`). La proteccio real requereix moderacio a nivell de model (fora d'abast, §7).
 
 ## 7. Fora d'abast
 

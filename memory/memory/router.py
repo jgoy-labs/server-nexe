@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 import structlog
 
-from plugins.security.core.auth_dependencies import require_api_key
+from core.security.auth_dependencies import require_api_key
 
 from .constants import MANIFEST
 

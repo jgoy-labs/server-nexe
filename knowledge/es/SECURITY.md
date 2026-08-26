@@ -77,7 +77,7 @@ El rate limiting se aplica a **todos los endpoints** — tanto la API (`/v1/*`) 
 | /v1/rag/* | — | stubs, devuelven 501 |
 | /ui/upload | 5/min | hardcoded en `plugins/web_ui_module/api/routes_files.py` |
 
-**Nota:** Los límites por endpoint de arriba están fijados en el código fuente (decorador `@limiter.limit()`), **no** son configurables via `.env`. Las únicas variables de entorno que se leen realmente son `NEXE_RATE_LIMIT_GLOBAL` (por defecto 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) y `NEXE_RATE_LIMIT_HEALTH` (1000/min) — ver `plugins/security/core/rate_limiting.py` y `core/dependencies.py`. Las variables `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` solo aparecen comentadas en `.env.example` y el código no las lee (reservadas para implementación futura).
+**Nota:** Los límites por endpoint de arriba están fijados en el código fuente (decorador `@limiter.limit()`), **no** son configurables via `.env`. Las únicas variables de entorno que se leen realmente son `NEXE_RATE_LIMIT_GLOBAL` (por defecto 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) y `NEXE_RATE_LIMIT_HEALTH` (1000/min) — ver `core/security/rate_limiting.py` y `core/dependencies.py`. Las variables `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` solo aparecen comentadas en `.env.example` y el código no las lee (reservadas para implementación futura).
 
 ### Endpoints Web UI (fijos por endpoint)
 
@@ -93,7 +93,7 @@ El rate limiting se aplica a **todos los endpoints** — tanto la API (`/v1/*`) 
 | DELETE /ui/session/{id} | 10/minuto |
 | PATCH /ui/session/{id}/thinking | 10/minuto |
 
-Implementacion: `slowapi` con decorador `@limiter.limit()` en cada endpoint. `RateLimitTracker` en `plugins/security/core/rate_limiting.py`.
+Implementacion: `slowapi` con decorador `@limiter.limit()` en cada endpoint. `RateLimitTracker` en `core/security/rate_limiting.py`.
 
 ## Frontera de red
 
@@ -146,7 +146,7 @@ El endpoint API `POST /v1/chat/completions` valida y sanitiza la entrada a trave
 
 ## Deteccion de inyecciones
 
-**6 detectores de inyeccion** en `plugins/security/core/injection_detectors.py`:
+**6 detectores de inyeccion** en `core/security/injection_detectors.py`:
 1. Detector de XSS
 2. Detector de inyeccion SQL
 3. Detector de inyeccion NoSQL

@@ -12,10 +12,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from plugins.security.core.auth_models import ApiKeyConfig, ApiKeyData
+from core.security.auth_models import ApiKeyConfig, ApiKeyData
 from plugins.web_ui_module.api.routes_auth import make_require_ui_auth
 
-_LOAD = "plugins.security.core.auth_dependencies.load_api_keys"
+_LOAD = "core.security.auth_dependencies.load_api_keys"
 
 
 def _req(host="10.0.0.9"):
@@ -70,8 +70,8 @@ async def test_ui_accepts_bearer():
 @pytest.mark.asyncio
 async def test_ui_and_core_share_rate_limit_bucket():
     """A burn-down on /ui/ must 429 on /chat/completions for the same IP."""
-    from plugins.security.core.auth_dependencies import require_api_key
-    from plugins.security.core.auth_rate_limit import (
+    from core.security.auth_dependencies import require_api_key
+    from core.security.auth_rate_limit import (
         AUTH_FAILURE_LIMIT,
         auth_failures,
     )
@@ -92,7 +92,7 @@ async def test_ui_and_core_share_rate_limit_bucket():
 
 
 def test_presented_api_key_bearer_and_precedence():
-    from plugins.security.core.auth_dependencies import presented_api_key
+    from core.security.auth_dependencies import presented_api_key
 
     assert presented_api_key("x", "Bearer b") == "x"
     assert presented_api_key(None, "Bearer b") == "b"
@@ -105,7 +105,7 @@ class TestSharedWindowConstants:
     first request, a window of 0 would never rate-limit at all."""
 
     def test_limit_and_window_are_positive(self):
-        from plugins.security.core.auth_rate_limit import (
+        from core.security.auth_rate_limit import (
             AUTH_FAILURE_LIMIT,
             AUTH_FAILURE_WINDOW,
         )

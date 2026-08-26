@@ -22,7 +22,7 @@ from core.messages import get_message
 from core.i18n_utils import translate
 
 from core.bootstrap_tokens import create_session_token
-from plugins.security.core.auth_dependencies import require_api_key
+from core.security.auth_dependencies import require_api_key
 
 logger = logging.getLogger(__name__)
 

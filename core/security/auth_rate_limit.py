@@ -1,7 +1,7 @@
 """
 ────────────────────────────────────
 Server Nexe
-Location: plugins/security/core/auth_rate_limit.py
+Location: core/security/auth_rate_limit.py
 Description: Per-IP failed-auth window used by BOTH conversation paths (D-I / #883).
 
 www.jgoy.net · https://server-nexe.org

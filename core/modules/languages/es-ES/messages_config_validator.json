@@ -1,117 +1,117 @@
 {
  "_meta": {
   "component": "config_validator",
-  "description": "Traduccions per validador de configuració",
+  "description": "Traducciones para el validador de configuración",
   "version": "1.0.0",
-  "language": "ca-ES"
+  "language": "es-ES"
  },
- 
+
  "validation": {
-  "starting": "Iniciant validació de configuració...",
-  "completed": "Validació de configuració completada",
-  "passed": "Validació superada sense errors",
-  "failed": "Validació fallida amb {error_count} errors",
-  "warnings_found": "{warning_count} avisos trobats",
-  "file_not_found": "Fitxer de configuració no trobat: {path}",
-  "parse_error": "Error analitzant TOML: {error}"
+  "starting": "Iniciando la validación de la configuración...",
+  "completed": "Validación de la configuración completada",
+  "passed": "Validación superada sin errores",
+  "failed": "Validación fallida con {error_count} errores",
+  "warnings_found": "{warning_count} avisos encontrados",
+  "file_not_found": "Archivo de configuración no encontrado: {path}",
+  "parse_error": "Error analizando el TOML: {error}"
  },
- 
+
  "sections": {
-  "checking": "Validant secció: [{section}]",
-  "missing_required": "Secció obligatòria no trobada: [{section}]",
-  "section_valid": "Secció [{section}] vàlida",
-  "section_invalid": "Secció [{section}] conté errors",
-  "meta": "Metadades del sistema",
-  "nexe": "Configuració del servidor",
-  "personality": "Configuració del nucli",
-  "core": "Configuració de mòduls",
-  "memory": "Configuració de processament",
-  "storage": "Configuració de persistència"
+  "checking": "Validando la sección: [{section}]",
+  "missing_required": "Sección obligatoria no encontrada: [{section}]",
+  "section_valid": "La sección [{section}] es válida",
+  "section_invalid": "La sección [{section}] contiene errores",
+  "meta": "Metadatos del sistema",
+  "nexe": "Configuración del servidor",
+  "personality": "Configuración del núcleo",
+  "core": "Configuración de módulos",
+  "memory": "Configuración de procesamiento",
+  "storage": "Configuración de persistencia"
  },
- 
+
  "keys": {
-  "required_missing": "Clau obligatòria no trobada: {key}",
-  "type_mismatch": "Tipus incorrecte per '{key}': esperat {expected}, trobat {actual}",
-  "value_out_of_range": "Valor fora de rang per '{key}': {value} (rang: {min}-{max})",
-  "invalid_format": "Format invàlid per {field}",
-  "key_valid": "Clau {key} vàlida"
+  "required_missing": "Clave obligatoria no encontrada: {key}",
+  "type_mismatch": "Tipo incorrecto para '{key}': se esperaba {expected}, se encontró {actual}",
+  "value_out_of_range": "Valor fuera de rango para '{key}': {value} (rango: {min}-{max})",
+  "invalid_format": "Formato inválido para {field}",
+  "key_valid": "La clave {key} es válida"
  },
- 
+
  "nexe": {
-  "server_config": "Validant configuració del servidor...",
-  "host_valid": "Host vàlid: {host}",
-  "host_invalid": "Host invàlid: {host}",
-  "port_valid": "Port vàlid: {port}",
-  "port_invalid": "Port invàlid: {port} (rang: 1-65535)",
-  "cors_valid": "Configuració CORS vàlida",
-  "cors_invalid": "Configuració CORS invàlida",
-  "workers_valid": "Nombre de workers vàlid: {workers}",
-  "workers_invalid": "Nombre de workers ha de ser un enter positiu",
-  "timeout_valid": "Timeout vàlid: {timeout}s",
-  "timeout_invalid": "Timeout ha de ser un número positiu"
+  "server_config": "Validando la configuración del servidor...",
+  "host_valid": "Host válido: {host}",
+  "host_invalid": "Host inválido: {host}",
+  "port_valid": "Puerto válido: {port}",
+  "port_invalid": "Puerto inválido: {port} (rango: 1-65535)",
+  "cors_valid": "La configuración CORS es válida",
+  "cors_invalid": "La configuración CORS es inválida",
+  "workers_valid": "Número de workers válido: {workers}",
+  "workers_invalid": "El número de workers debe ser un entero positivo",
+  "timeout_valid": "Timeout válido: {timeout}s",
+  "timeout_invalid": "El timeout debe ser un número positivo"
  },
- 
+
  "core": {
-  "models_config": "Validant configuració de models...",
-  "temperature_valid": "Temperatura vàlida: {temperature}",
-  "temperature_invalid": "Temperatura fora de rang: {temperature} (rang: 0.0-2.0)",
-  "max_tokens_valid": "Max tokens vàlid: {tokens}",
-  "max_tokens_invalid": "Max tokens ha de ser un enter positiu"
+  "models_config": "Validando la configuración de modelos...",
+  "temperature_valid": "Temperatura válida: {temperature}",
+  "temperature_invalid": "Temperatura fuera de rango: {temperature} (rango: 0.0-2.0)",
+  "max_tokens_valid": "Max tokens válido: {tokens}",
+  "max_tokens_invalid": "Max tokens debe ser un entero positivo"
  },
- 
+
  "storage": {
-  "logging_config": "Validant configuració de registres...",
-  "log_level_valid": "Nivell de registre vàlid: {level}",
-  "log_level_invalid": "Nivell de registre invàlid: {level}. Vàlids: {valid_levels}",
-  "retention_valid": "Dies de retenció vàlids: {days}",
-  "retention_invalid": "Dies de retenció ha de ser un enter positiu",
-  "storage_config": "Validant configuració d'emmagatzematge...",
-  "max_file_size_valid": "Mida màxima de fitxer vàlida: {size}",
-  "max_file_size_invalid": "Mida màxima de fitxer ha de ser un enter positiu",
-  "extensions_valid": "Extensions permeses vàlides",
-  "extensions_invalid": "Totes les extensions han de ser strings que comencin amb '.'"
+  "logging_config": "Validando la configuración de registros...",
+  "log_level_valid": "Nivel de registro válido: {level}",
+  "log_level_invalid": "Nivel de registro inválido: {level}. Válidos: {valid_levels}",
+  "retention_valid": "Días de retención válidos: {days}",
+  "retention_invalid": "Los días de retención deben ser un entero positivo",
+  "storage_config": "Validando la configuración de almacenamiento...",
+  "max_file_size_valid": "Tamaño máximo de archivo válido: {size}",
+  "max_file_size_invalid": "El tamaño máximo de archivo debe ser un entero positivo",
+  "extensions_valid": "Las extensiones permitidas son válidas",
+  "extensions_invalid": "Todas las extensiones deben ser cadenas que empiecen por '.'"
  },
- 
+
  "paths": {
-  "checking_paths": "Verificant existència de paths...",
-  "path_exists": "Path vàlid: {path}",
-  "path_missing": "Path no existeix: {path} (de {config_key})",
-  "directory_valid": "Directori vàlid: {path}",
-  "file_valid": "Fitxer vàlid: {path}",
-  "parent_directory_missing": "Directori pare no existeix per: {path}"
+  "checking_paths": "Verificando que las rutas existan...",
+  "path_exists": "Ruta válida: {path}",
+  "path_missing": "La ruta no existe: {path} (de {config_key})",
+  "directory_valid": "Directorio válido: {path}",
+  "file_valid": "Archivo válido: {path}",
+  "parent_directory_missing": "El directorio padre no existe para: {path}"
  },
- 
+
  "urls": {
-  "checking_url": "Validant URL: {url}",
-  "url_valid": "URL vàlida: {url}",
-  "url_invalid": "URL invàlida: {url}",
-  "url_pattern_invalid": "Format d'URL no vàlid per: {url}"
+  "checking_url": "Validando la URL: {url}",
+  "url_valid": "URL válida: {url}",
+  "url_invalid": "URL inválida: {url}",
+  "url_pattern_invalid": "Formato de URL no válido: {url}"
  },
- 
+
  "environment": {
-  "checking_environment": "Validant entorn: {env}",
-  "environment_valid": "Entorn vàlid: {env}",
-  "environment_invalid": "Entorn invàlid: {env}. Vàlids: {valid_envs}"
+  "checking_environment": "Validando el entorno: {env}",
+  "environment_valid": "Entorno válido: {env}",
+  "environment_invalid": "Entorno inválido: {env}. Válidos: {valid_envs}"
  },
- 
+
  "dependencies": {
-  "checking_dependencies": "Verificant dependències...",
-  "dependency_available": "Dependència disponible: {dep}",
-  "dependency_missing": "Dependència no disponible: {dep}",
-  "all_dependencies_met": "Totes les dependències satisfetes",
-  "some_dependencies_missing": "{count} dependències no disponibles"
+  "checking_dependencies": "Verificando dependencias...",
+  "dependency_available": "Dependencia disponible: {dep}",
+  "dependency_missing": "Dependencia no disponible: {dep}",
+  "all_dependencies_met": "Todas las dependencias satisfechas",
+  "some_dependencies_missing": "{count} dependencias no disponibles"
  },
- 
+
  "summary": {
-  "validation_summary": "Resum de validació:",
-  "total_errors": "Total errors: {count}",
-  "total_warnings": "Total avisos: {count}",
-  "sections_checked": "Seccions verificades: {count}",
-  "keys_validated": "Claus validades: {count}",
-  "paths_checked": "Paths verificats: {count}",
-  "config_healthy": "Configuració saludable",
-  "config_has_issues": "Configuració té problemes",
-  "critical_errors": "Errors crítics que impedeixen l'execució",
-  "minor_warnings": "Avisos menors que no afecten l'execució"
+  "validation_summary": "Resumen de la validación:",
+  "total_errors": "Total de errores: {count}",
+  "total_warnings": "Total de avisos: {count}",
+  "sections_checked": "Secciones verificadas: {count}",
+  "keys_validated": "Claves validadas: {count}",
+  "paths_checked": "Rutas verificadas: {count}",
+  "config_healthy": "La configuración es correcta",
+  "config_has_issues": "La configuración tiene problemas",
+  "critical_errors": "Errores críticos que impiden la ejecución",
+  "minor_warnings": "Avisos menores que no afectan a la ejecución"
  }
 }

@@ -3,7 +3,6 @@ Tests for uncovered lines in plugins/security/ files.
 
 Covers:
 - security/manifest.py: lines 23-30, 105-142, 184-186
-- security/core/request_validators.py: lines 66-68, 108, 130, 156, 167-168, 185-186, 203-204, 216-219, 241
 - security/core/injection_detectors.py: lines 34, 69, 113, 115-120, 140, 173, 207
 - security/core/input_sanitizers.py: lines 45, 85, 98, 123, 129, 159
 - security/core/auth_dependencies.py: lines 32, 118, 153, 174, 193
@@ -61,60 +60,60 @@ class TestInjectionDetectorsGaps:
 
     def test_xss_empty_text_returns_false(self):
         """Line 34: empty text returns False."""
-        from plugins.security.core.injection_detectors import detect_xss_attempt
+        from core.security.injection_detectors import detect_xss_attempt
         assert detect_xss_attempt("") is False
         assert detect_xss_attempt(None) is False
 
     def test_sql_injection_empty_text_returns_false(self):
         """Line 69: empty text returns False."""
-        from plugins.security.core.injection_detectors import detect_sql_injection
+        from core.security.injection_detectors import detect_sql_injection
         assert detect_sql_injection("") is False
 
     def test_nosql_injection_string_with_function(self):
         """Generic function() is no longer detected (MongoDB-specific patterns only)."""
-        from plugins.security.core.injection_detectors import detect_nosql_injection
+        from core.security.injection_detectors import detect_nosql_injection
         assert detect_nosql_injection("function() { return true }") is False
 
     def test_nosql_injection_string_with_db_call(self):
         """MongoDB db.collection.method() pattern detected."""
-        from plugins.security.core.injection_detectors import detect_nosql_injection
+        from core.security.injection_detectors import detect_nosql_injection
         assert detect_nosql_injection("db.users.find()") is True
 
     def test_nosql_injection_string_with_operators(self):
         """MongoDB operators ($where, $regex, $ne) detected."""
-        from plugins.security.core.injection_detectors import detect_nosql_injection
+        from core.security.injection_detectors import detect_nosql_injection
         assert detect_nosql_injection("$where: function()") is True
         assert detect_nosql_injection("$regex: /admin/") is True
 
     def test_nosql_injection_list_with_malicious_items(self):
         """Lines 117-120: list containing malicious items."""
-        from plugins.security.core.injection_detectors import detect_nosql_injection
+        from core.security.injection_detectors import detect_nosql_injection
         assert detect_nosql_injection([{"$ne": None}]) is True
         assert detect_nosql_injection(["safe string"]) is False
 
     def test_nosql_injection_list_empty(self):
         """Lines 117-120: empty list."""
-        from plugins.security.core.injection_detectors import detect_nosql_injection
+        from core.security.injection_detectors import detect_nosql_injection
         assert detect_nosql_injection([]) is False
 
     def test_command_injection_empty_text(self):
         """Line 140: empty text returns False."""
-        from plugins.security.core.injection_detectors import detect_command_injection
+        from core.security.injection_detectors import detect_command_injection
         assert detect_command_injection("") is False
 
     def test_path_traversal_empty_text(self):
         """Line 173: empty text returns False."""
-        from plugins.security.core.injection_detectors import detect_path_traversal
+        from core.security.injection_detectors import detect_path_traversal
         assert detect_path_traversal("") is False
 
     def test_ldap_injection_empty_text(self):
         """Line 207: empty text returns False."""
-        from plugins.security.core.injection_detectors import detect_ldap_injection
+        from core.security.injection_detectors import detect_ldap_injection
         assert detect_ldap_injection("") is False
 
     def test_nosql_injection_non_dict_non_str_non_list(self):
         """Cover the final return False when data is not dict/str/list."""
-        from plugins.security.core.injection_detectors import detect_nosql_injection
+        from core.security.injection_detectors import detect_nosql_injection
         assert detect_nosql_injection(42) is False
         assert detect_nosql_injection(True) is False
 
@@ -127,162 +126,44 @@ class TestInputSanitizersGaps:
 
     def test_sanitize_html_empty_returns_empty(self):
         """Line 45: empty text returns text as-is."""
-        from plugins.security.core.input_sanitizers import sanitize_html
+        from core.security.input_sanitizers import sanitize_html
         assert sanitize_html("") == ""
         assert sanitize_html(None) is None
 
     def test_validate_string_input_not_string_raises(self):
         """Line 85: non-string input raises 400."""
-        from plugins.security.core.input_sanitizers import validate_string_input
+        from core.security.input_sanitizers import validate_string_input
         with pytest.raises(HTTPException) as exc_info:
             validate_string_input(123)
         assert exc_info.value.status_code == 400
 
     def test_validate_string_input_too_short(self):
         """Line 98: input shorter than min_length raises 400."""
-        from plugins.security.core.input_sanitizers import validate_string_input
+        from core.security.input_sanitizers import validate_string_input
         with pytest.raises(HTTPException) as exc_info:
             validate_string_input("ab", min_length=5)
         assert exc_info.value.status_code == 400
 
     def test_validate_string_input_path_traversal(self):
         """Line 123: path traversal detected."""
-        from plugins.security.core.input_sanitizers import validate_string_input
+        from core.security.input_sanitizers import validate_string_input
         with pytest.raises(HTTPException) as exc_info:
             validate_string_input("../../etc/passwd")
         assert exc_info.value.status_code == 400
 
     def test_validate_string_input_ldap_injection(self):
         """Line 129: LDAP injection detected when check_ldap=True."""
-        from plugins.security.core.input_sanitizers import validate_string_input
+        from core.security.input_sanitizers import validate_string_input
         with pytest.raises(HTTPException) as exc_info:
             validate_string_input("admin)(|(password=*)", check_ldap=True)
         assert exc_info.value.status_code == 400
 
     def test_validate_dict_input_not_dict_raises(self):
         """Line 159: non-dict input raises 400."""
-        from plugins.security.core.input_sanitizers import validate_dict_input
+        from core.security.input_sanitizers import validate_dict_input
         with pytest.raises(HTTPException) as exc_info:
             validate_dict_input("not a dict")
         assert exc_info.value.status_code == 400
-
-
-# ═══════════════════════════════════════════════════════════════
-# security/core/request_validators.py — uncovered lines
-# ═══════════════════════════════════════════════════════════════
-
-class MockRequestWithState:
-    """Mock request with app state for SIEM logging."""
-    def __init__(self, method="GET", path="/", headers=None, query_params=None, has_state=True, has_logger=False):
-        from fastapi.datastructures import Headers
-        self.method = method
-        self.url = type('obj', (object,), {'path': path})()
-        self.headers = Headers(headers or {})
-        self.query_params = query_params or {}
-        self.client = type('obj', (object,), {'host': '127.0.0.1'})()
-        if has_state:
-            if has_logger:
-                # WS5-03: autospec (not bare MagicMock) so calls with wrong
-                # kwargs against the real SecurityEventLogger signatures fail
-                # loudly instead of being silently swallowed.
-                from unittest.mock import create_autospec
-                from plugins.security.security_logger import SecurityEventLogger
-                security_logger = create_autospec(SecurityEventLogger, instance=True)
-            else:
-                security_logger = None
-            state = MagicMock()
-            state.i18n = None
-            state.security_logger = security_logger
-            app = MagicMock()
-            app.state = state
-            self.app = app
-        else:
-            self.app = None
-
-
-class TestRequestValidatorsGaps:
-
-    def test_validate_content_type_with_siem_logging(self):
-        """Lines 66-68: SIEM logging on invalid content type."""
-        from plugins.security.core.request_validators import validate_content_type
-        request = MockRequestWithState(has_logger=True)
-        with pytest.raises(HTTPException) as exc_info:
-            validate_content_type("application/octet-stream", "POST", request=request)
-        assert exc_info.value.status_code == 415
-
-    def test_validate_charset_malformed_raises_400(self):
-        """Line 108: IndexError/ValueError during charset parsing."""
-        from plugins.security.core.request_validators import validate_charset
-        # Malformed charset that causes IndexError
-        with pytest.raises(HTTPException) as exc_info:
-            validate_charset("application/json; charset=")
-        assert exc_info.value.status_code in [400, 415]
-
-    def test_validate_request_headers_post_with_empty_content_type(self):
-        """Line 130: POST with empty content-type passes (no validation)."""
-        from plugins.security.core.request_validators import validate_request_headers
-        request = MockRequestWithState(method="POST", headers={})
-        result = asyncio.run(validate_request_headers(request))
-        assert result is True
-
-    @pytest.mark.asyncio
-    async def test_validate_request_params_with_i18n_state(self):
-        """Line 156: i18n extracted from app.state."""
-        from plugins.security.core.request_validators import validate_request_params
-        request = MockRequestWithState(query_params={"q": "safe"}, has_state=True)
-        result = await validate_request_params(request)
-        assert result is True
-
-    @pytest.mark.asyncio
-    async def test_validate_request_params_xss_with_siem(self):
-        """Lines 167-168: XSS with SIEM logger."""
-        from plugins.security.core.request_validators import validate_request_params
-        request = MockRequestWithState(
-            query_params={"q": "<script>alert(1)</script>"},
-            has_logger=True
-        )
-        with pytest.raises(HTTPException):
-            await validate_request_params(request)
-
-    @pytest.mark.asyncio
-    async def test_validate_request_params_sql_with_siem(self):
-        """Lines 185-186: SQL injection with SIEM logger."""
-        from plugins.security.core.request_validators import validate_request_params
-        request = MockRequestWithState(
-            query_params={"id": "1' OR '1'='1"},
-            has_logger=True
-        )
-        with pytest.raises(HTTPException):
-            await validate_request_params(request)
-
-    @pytest.mark.asyncio
-    async def test_validate_request_params_command_with_siem(self):
-        """Lines 203-204: Command injection with SIEM logger."""
-        from plugins.security.core.request_validators import validate_request_params
-        request = MockRequestWithState(
-            query_params={"file": "test; rm -rf /"},
-            has_logger=True
-        )
-        with pytest.raises(HTTPException):
-            await validate_request_params(request)
-
-    @pytest.mark.asyncio
-    async def test_validate_request_params_path_traversal(self):
-        """Lines 216-219: Path traversal in query params."""
-        from plugins.security.core.request_validators import validate_request_params
-        request = MockRequestWithState(
-            query_params={"path": "../../etc/passwd"}
-        )
-        with pytest.raises(HTTPException):
-            await validate_request_params(request)
-
-    @pytest.mark.asyncio
-    async def test_validate_request_path_i18n_state(self):
-        """Line 241: i18n extracted from app state."""
-        from plugins.security.core.request_validators import validate_request_path
-        request = MockRequestWithState(path="/safe/path")
-        result = await validate_request_path(request)
-        assert result is True
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -295,7 +176,7 @@ class TestAuthConfigGaps:
         """Lines 105-111: DEV_MODE blocked when NEXE_ENV=production."""
         monkeypatch.setenv("NEXE_ENV", "production")
         monkeypatch.setenv("NEXE_DEV_MODE", "true")
-        from plugins.security.core.auth_config import is_dev_mode
+        from core.security.auth_config import is_dev_mode
         result = is_dev_mode()
         assert result is False
 
@@ -315,7 +196,7 @@ class TestAuthDependenciesGaps:
         gone — that scaffolding pretended metrics could be enabled while the
         target module never existed (permanent no-op masquerading as toggle).
         """
-        from plugins.security.core import auth_dependencies
+        from core.security import auth_dependencies
 
         # The hooks must exist as module attributes and be callable no-ops.
         for name in (
@@ -348,7 +229,7 @@ class TestAuthDependenciesGaps:
         monkeypatch.delenv("NEXE_SECONDARY_API_KEY", raising=False)
         monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
 
-        from plugins.security.core.auth_dependencies import require_api_key
+        from core.security.auth_dependencies import require_api_key
 
         mock_request = MagicMock()
         mock_request.client.host = "127.0.0.1"
@@ -363,7 +244,7 @@ class TestAuthDependenciesGaps:
         monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-key-12345")
         monkeypatch.delenv("NEXE_PRIMARY_KEY_EXPIRES", raising=False)
 
-        from plugins.security.core.auth_dependencies import require_api_key
+        from core.security.auth_dependencies import require_api_key
 
         mock_request = MagicMock()
         mock_request.url.path = "/test"
@@ -379,7 +260,7 @@ class TestAuthDependenciesGaps:
         monkeypatch.delenv("NEXE_PRIMARY_KEY_EXPIRES", raising=False)
         monkeypatch.delenv("NEXE_SECONDARY_KEY_EXPIRES", raising=False)
 
-        from plugins.security.core.auth_dependencies import require_api_key
+        from core.security.auth_dependencies import require_api_key
 
         mock_request = MagicMock()
         mock_request.url.path = "/test"
@@ -394,7 +275,7 @@ class TestAuthDependenciesGaps:
         monkeypatch.delenv("NEXE_PRIMARY_KEY_EXPIRES", raising=False)
         monkeypatch.delenv("NEXE_SECONDARY_API_KEY", raising=False)
 
-        from plugins.security.core.auth_dependencies import require_api_key
+        from core.security.auth_dependencies import require_api_key
 
         mock_request = MagicMock()
         mock_request.client.host = "127.0.0.1"
@@ -458,7 +339,7 @@ class TestAuthModelsGaps:
 
     def test_has_any_valid_key_no_keys(self):
         """No keys configured → has_any_valid_key is False."""
-        from plugins.security.core.auth_models import ApiKeyConfig
+        from core.security.auth_models import ApiKeyConfig
         config = ApiKeyConfig(primary=None, secondary=None)
         assert config.has_any_valid_key is False
 
@@ -471,7 +352,7 @@ class TestValidatorsGaps:
 
     def test_validate_safe_path_value_error(self, tmp_path):
         """Line 74: ValueError during path resolution."""
-        from plugins.security.core.validators import validate_safe_path
+        from core.security.validators import validate_safe_path
         # Create a path that causes ValueError
         # On some systems, embedded null chars cause ValueError
         with pytest.raises(HTTPException) as exc_info:
@@ -488,7 +369,7 @@ class TestRateLimitingGaps:
     @pytest.mark.asyncio
     async def test_tracker_eviction_at_capacity(self):
         """Line 184: eviction when tracker reaches MAX_TRACKED_IDENTIFIERS."""
-        from plugins.security.core.rate_limiting import RateLimitTracker
+        from core.security.rate_limiting import RateLimitTracker
         tracker = RateLimitTracker()
         original_max = tracker.MAX_TRACKED_IDENTIFIERS
         tracker.MAX_TRACKED_IDENTIFIERS = 5  # Lower for testing
@@ -503,7 +384,7 @@ class TestRateLimitingGaps:
     @pytest.mark.asyncio
     async def test_cleanup_expired_task_exists(self):
         """Line 338: start_rate_limit_cleanup_task is an async function."""
-        from plugins.security.core.rate_limiting import start_rate_limit_cleanup_task
+        from core.security.rate_limiting import start_rate_limit_cleanup_task
         import inspect
         assert inspect.iscoroutinefunction(start_rate_limit_cleanup_task)
 

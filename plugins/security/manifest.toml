@@ -108,7 +108,7 @@ main_entry = "ui/index.html"
 uses_api_key = true
 path_validation = true
 rate_limiting = true
-auth_dependency = "plugins.security.core.auth.require_api_key"
+auth_dependency = "core.security.auth.require_api_key"
 scan_limit = "2/minute"
 report_limit = "10/minute"
 

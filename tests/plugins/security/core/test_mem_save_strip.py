@@ -5,7 +5,7 @@ v0.9.1 P1-2: regex anchored to line start (^|\\n) + expanded coverage
 
 Breaking changes from v0.9.0 are documented inline with each affected test.
 """
-from plugins.security.core.input_sanitizers import strip_memory_tags
+from core.security.input_sanitizers import strip_memory_tags
 
 
 # ─── Backward compat (tests from v0.9.0) ────────────────────────────────────

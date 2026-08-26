@@ -77,7 +77,7 @@ El rate limiting s'aplica a **tots els endpoints** — tant a l'API (`/v1/*`) co
 | /v1/rag/* | — | stubs, retornen 501 |
 | /ui/upload | 5/min | hardcoded a `plugins/web_ui_module/api/routes_files.py` |
 
-**Nota:** Els límits per endpoint de dalt estan fixats al codi font (decorador `@limiter.limit()`), **no** són configurables via `.env`. Les úniques variables d'entorn que es llegeixen realment són `NEXE_RATE_LIMIT_GLOBAL` (per defecte 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) i `NEXE_RATE_LIMIT_HEALTH` (1000/min) — vegeu `plugins/security/core/rate_limiting.py` i `core/dependencies.py`. Les variables `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` només apareixen comentades a `.env.example` i el codi no les llegeix (reservades per a implementació futura).
+**Nota:** Els límits per endpoint de dalt estan fixats al codi font (decorador `@limiter.limit()`), **no** són configurables via `.env`. Les úniques variables d'entorn que es llegeixen realment són `NEXE_RATE_LIMIT_GLOBAL` (per defecte 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) i `NEXE_RATE_LIMIT_HEALTH` (1000/min) — vegeu `core/security/rate_limiting.py` i `core/dependencies.py`. Les variables `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` només apareixen comentades a `.env.example` i el codi no les llegeix (reservades per a implementació futura).
 
 ### Endpoints de la Web UI (fixats per endpoint)
 
@@ -93,7 +93,7 @@ El rate limiting s'aplica a **tots els endpoints** — tant a l'API (`/v1/*`) co
 | DELETE /ui/session/{id} | 10/minut |
 | PATCH /ui/session/{id}/thinking | 10/minut |
 
-Implementacio: `slowapi` amb decorador `@limiter.limit()` a cada endpoint. `RateLimitTracker` a `plugins/security/core/rate_limiting.py`.
+Implementacio: `slowapi` amb decorador `@limiter.limit()` a cada endpoint. `RateLimitTracker` a `core/security/rate_limiting.py`.
 
 ## Frontera de xarxa
 
@@ -146,7 +146,7 @@ L'endpoint `POST /v1/chat/completions` valida i sanititza l'input a traves del s
 
 ## Deteccio d'injeccions
 
-**6 detectors d'injeccio** a `plugins/security/core/injection_detectors.py`:
+**6 detectors d'injeccio** a `core/security/injection_detectors.py`:
 1. Detector de XSS
 2. Detector d'injeccio SQL
 3. Detector d'injeccio NoSQL

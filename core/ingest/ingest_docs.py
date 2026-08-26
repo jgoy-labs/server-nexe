@@ -20,6 +20,7 @@ PROJECT_ROOT = get_repo_root()
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.endpoints.chat_sanitization import _filter_rag_injection  # noqa: E402
+from core.memory_access import DOCS_COLLECTION  # noqa: E402,F401 — re-exported, other modules import it from here
 from memory.memory.constants import DEFAULT_VECTOR_SIZE  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,6 @@ logger = logging.getLogger(__name__)
 
 from core.ingest.chunking import chunk_text  # noqa: E402  # after sys.path setup (line 20)
 
-DOCS_COLLECTION = "nexe_documentation"
 CHUNK_SIZE = 500  # characters per chunk
 CHUNK_OVERLAP = 50
 

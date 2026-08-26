@@ -59,7 +59,7 @@ class RateLimitCheck:
 
         # Check 3: Rate limit tracker functional?
         try:
-            from plugins.security.core.rate_limiting import RateLimitTracker
+            from core.security.rate_limiting import RateLimitTracker
             # Side-effect: instantiation verifies the tracker can be constructed.
             RateLimitTracker()
             findings.append({

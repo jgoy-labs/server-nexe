@@ -29,7 +29,7 @@ from core.operational_state import (
 logger = logging.getLogger(__name__)
 
 from core.dependencies import limiter, get_i18n  # noqa: E402
-from plugins.security.core.auth_dependencies import require_api_key  # noqa: E402
+from core.security.auth_dependencies import require_api_key  # noqa: E402
 
 from core.resilience import ollama_breaker  # noqa: E402
 

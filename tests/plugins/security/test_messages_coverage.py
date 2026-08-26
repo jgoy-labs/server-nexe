@@ -3,7 +3,7 @@ Tests for plugins/security/core/messages.py - targeting uncovered lines.
 Lines: 69 (i18n path), 74-75 (format KeyError fallback).
 """
 
-from plugins.security.core.messages import get_message
+from core.security.messages import get_message
 
 
 class TestGetMessage:

@@ -168,7 +168,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 ### 6.1 Spoofing
 
-**Browser pretends to be an authenticated user (boundary 1).** Mitigated by dual-key `X-API-Key` validation with `secrets.compare_digest` in `plugins/security/core/auth_dependencies.py:require_api_key` (line 161; the primary-key `compare_digest` is at line 96). Failure is logged with client IP. Dev-mode bypass is gated to loopback only (the `if dev_mode:` branch in `_check_dev_mode` at line 67 enforces `_is_loopback_ip` at line 70 and raises 403 unless `NEXE_DEV_MODE_ALLOW_REMOTE=true`).
+**Browser pretends to be an authenticated user (boundary 1).** Mitigated by dual-key `X-API-Key` validation with `secrets.compare_digest` in `core/security/auth_dependencies.py:require_api_key` (line 161; the primary-key `compare_digest` is at line 96). Failure is logged with client IP. Dev-mode bypass is gated to loopback only (the `if dev_mode:` branch in `_check_dev_mode` at line 67 enforces `_is_loopback_ip` at line 70 and raises 403 unless `NEXE_DEV_MODE_ALLOW_REMOTE=true`).
 
 **Another process on the same machine sends requests as the Ollama daemon (boundary 4).** Partial: Ollama listens on loopback without authentication. Any local process running as the same user can call it. Accepted — the same local user can read `~/.ollama/` directly. Server-nexe's defense is that the chat pipeline always flows through `/ui/chat` or `/v1/chat/completions` (both authenticated); direct per-backend chat endpoints (`/mlx/chat`, `/llama-cpp/chat`, `/ollama/api/chat`) are blocked by the `RemovedDirectRoutesGuard` middleware (`core/middleware.py`) — a direct call returns HTTP 403 with error code `direct_plugin_endpoint_disabled` before reaching any handler. The routes are declared as `removed_direct_routes` in each plugin's `manifest.toml` and enforced both at request time and at plugin load time (see §6.6).
 
@@ -180,9 +180,9 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 **Cross-site request forgery against the Web UI (boundary 1).** Mitigated by `starlette-csrf` with cookie `nexe_csrf_token`, header `X-CSRF-Token`, `SameSite=strict`. Exempt patterns are pre-compiled at module load in `core/middleware.py:36-46`: the API endpoints (`/v1/`, `/rag/`, `/chat`, `/metrics`, `/health`) are exempt because they are X-API-Key-authenticated, not cookie-authenticated. UI endpoints under `/ui/` are explicitly exempt as well because the UI sends `X-API-Key` on every call (explicit trade-off; documented).
 
-**Injected markdown or HTML rendered back in chat (boundary 1).** XSS detector runs unconditionally (`plugins/security/core/input_sanitizers.py:validate_string_input`, `check_xss=True` in all contexts). `sanitize_html` escapes HTML on all UI-rendered output.
+**Injected markdown or HTML rendered back in chat (boundary 1).** XSS detector runs unconditionally (`core/security/input_sanitizers.py:validate_string_input`, `check_xss=True` in all contexts). `sanitize_html` escapes HTML on all UI-rendered output.
 
-**Memory / RAG injection (boundary 1 and 6).** User input is scrubbed of memory-role tags (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]` …) by `strip_memory_tags` (`plugins/security/core/input_sanitizers.py:93`). RAG-ingested documents and retrieval results pass through `_filter_rag_injection` and `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:109` and line 151). A malicious document cannot embed a `[MEM_DELETE:]` tag that the LLM would copy verbatim.
+**Memory / RAG injection (boundary 1 and 6).** User input is scrubbed of memory-role tags (`[MEM_SAVE:]`, `[SYSTEM:]`, `[ASSISTANT:]` …) by `strip_memory_tags` (`core/security/input_sanitizers.py:93`). RAG-ingested documents and retrieval results pass through `_filter_rag_injection` and `_sanitize_rag_context` (`core/endpoints/chat_sanitization.py:109` and line 151). A malicious document cannot embed a `[MEM_DELETE:]` tag that the LLM would copy verbatim.
 
 **Deep-nested JSON as a payload-engineering tampering (boundary 1).** Bounded by `MAX_NOSQL_DEPTH=100` in `detect_nosql_injection`. Previously crashed the process with `RecursionError`; now returns "suspicious" at depth > 100.
 
@@ -228,7 +228,7 @@ Legend: ● = active threat with mitigation, ◐ = partial / defense-in-depth on
 
 **Master-key directory tightening silently fails.** `core/crypto/keys.py:_try_file_set` (line 139+) now logs a WARNING when `chmod 0o700` fails on `~/.nexe/` (lines 157-163). The key file itself is still born `0o600` via `os.open(O_CREAT|O_EXCL)` so this is a defense-in-depth fix only.
 
-**Jailbreak attempt inside chat.** 11 regex patterns (speed-bump detector, `plugins/security/core/input_sanitizers.py:_JAILBREAK_PATTERNS`, line 41; covers Catalan/English imperative forms and known handles such as `DAN mode`, `do anything now`) prefix a `[SECURITY NOTICE]` instead of refusing — sophisticated attacks evade trivially and this is explicitly documented (`SECURITY.md:36`). Real protection requires model-level moderation (out of scope, §7).
+**Jailbreak attempt inside chat.** 11 regex patterns (speed-bump detector, `core/security/input_sanitizers.py:_JAILBREAK_PATTERNS`, line 41; covers Catalan/English imperative forms and known handles such as `DAN mode`, `do anything now`) prefix a `[SECURITY NOTICE]` instead of refusing — sophisticated attacks evade trivially and this is explicitly documented (`SECURITY.md:36`). Real protection requires model-level moderation (out of scope, §7).
 
 ## 7. Out of scope
 

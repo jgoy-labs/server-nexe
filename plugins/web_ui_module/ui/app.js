@@ -8,6 +8,12 @@
 // UI_STRINGS (i18n ca/en/es) lives in i18n.js, loaded as a classic <script>
 // BEFORE this file in index.html (shared top-level global scope).
 
+// #896: the 3 collection ids, spelled once. Was 4 independent literal lists
+// in this file (COLL_MAP x2, ALL x2) — Python's server-nexe.core.memory_access
+// is the cross-language source of truth; keep this in sync with it by hand.
+const NEXE_COLL_MAP = { colMemory: 'personal_memory', colKnowledge: 'user_knowledge', colDocs: 'nexe_documentation' };
+const NEXE_ALL_COLLECTIONS = Object.values(NEXE_COLL_MAP);
+
 class NexeUI {
     constructor() {
         this.apiKey = localStorage.getItem('nexe_api_key') || null;
@@ -279,22 +285,17 @@ class NexeUI {
     }
 
     _initCollectionToggles() {
-        const COLL_MAP = {
-            colMemory: 'personal_memory',
-            colKnowledge: 'user_knowledge',
-            colDocs: 'nexe_documentation'
-        };
         const saved = localStorage.getItem('nexe_collections');
         if (saved) {
             try {
                 const disabled = JSON.parse(saved);
-                for (const [id, coll] of Object.entries(COLL_MAP)) {
+                for (const [id, coll] of Object.entries(NEXE_COLL_MAP)) {
                     const cb = document.getElementById(id);
                     if (cb) cb.checked = !disabled.includes(coll);
                 }
             } catch { /* ignore corrupt localStorage */ }
         }
-        for (const id of Object.keys(COLL_MAP)) {
+        for (const id of Object.keys(NEXE_COLL_MAP)) {
             const cb = document.getElementById(id);
             if (cb) cb.addEventListener('change', () => {
                 this._saveCollectionState();
@@ -305,13 +306,8 @@ class NexeUI {
     }
 
     _saveCollectionState() {
-        const COLL_MAP = {
-            colMemory: 'personal_memory',
-            colKnowledge: 'user_knowledge',
-            colDocs: 'nexe_documentation'
-        };
         const disabled = [];
-        for (const [id, coll] of Object.entries(COLL_MAP)) {
+        for (const [id, coll] of Object.entries(NEXE_COLL_MAP)) {
             const cb = document.getElementById(id);
             if (cb && !cb.checked) disabled.push(coll);
         }
@@ -328,8 +324,7 @@ class NexeUI {
             user_knowledge: this.t('col_knowledge') || 'Knowledge base',
             nexe_documentation: this.t('col_docs') || 'Documentation'
         };
-        const ALL = ['personal_memory', 'user_knowledge', 'nexe_documentation'];
-        const disabled = ALL.filter(c => !active.includes(c));
+        const disabled = NEXE_ALL_COLLECTIONS.filter(c => !active.includes(c));
         if (disabled.length === 0) {
             warn.style.display = 'none';
             warn.textContent = '';
@@ -388,13 +383,12 @@ class NexeUI {
     }
 
     _getActiveCollections() {
-        const ALL = ['personal_memory', 'user_knowledge', 'nexe_documentation'];
         const saved = localStorage.getItem('nexe_collections');
-        if (!saved) return ALL;
+        if (!saved) return NEXE_ALL_COLLECTIONS;
         try {
             const disabled = JSON.parse(saved);
-            return ALL.filter(c => !disabled.includes(c));
-        } catch { return ALL; }
+            return NEXE_ALL_COLLECTIONS.filter(c => !disabled.includes(c));
+        } catch { return NEXE_ALL_COLLECTIONS; }
     }
 
     // ── Thinking toggle ────────────────────────────────────────────

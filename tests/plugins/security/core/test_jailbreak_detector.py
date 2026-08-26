@@ -3,7 +3,7 @@
 Speed-bump only, NOT security. These tests document the naive copy-paste
 patterns we catch and the false-positive cases we intentionally let through.
 """
-from plugins.security.core.input_sanitizers import detect_jailbreak_attempt
+from core.security.input_sanitizers import detect_jailbreak_attempt
 
 
 # ─── Positive cases (should detect) ─────────────────────────────────────────

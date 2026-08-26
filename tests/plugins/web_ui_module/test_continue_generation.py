@@ -211,9 +211,8 @@ class TestPersistMerge:
     """The dedupe trap: merging in-place vs add_message."""
 
     def test_merge_survives_get_context_messages(self):
-        """Simulates the session contract: two consecutive assistant
-        messages collapse to the LAST one — the merged single message
-        survives. Mutation control for the in-place merge decision."""
+        """Simulates the session contract: the continuation is appended to the
+        SAME message, so the reader sees one seamless assistant turn."""
         from plugins.web_ui_module.core.session_manager import ChatSession
 
         session = ChatSession(session_id="t-1")
@@ -226,9 +225,16 @@ class TestPersistMerge:
         assert len(assistants) == 1
         assert assistants[0]["content"] == "primera meitat i la segona"
 
-    def test_add_message_would_lose_the_first_half(self):
-        """Documents WHY add_message is forbidden here: the dedupe keeps
-        only the latest consecutive assistant message."""
+    def test_add_message_would_break_the_sentence_in_two(self):
+        """Documents WHY add_message is still forbidden here — but the reason
+        CHANGED with #963 (2026-08-26).
+
+        Under the old MC-116 dedupe this lost the first half outright. Now the
+        halves are merged, so nothing is lost; what a continuation gets instead
+        is a paragraph break dropped into the middle of a sentence it was meant
+        to continue. Cosmetic rather than destructive, and still wrong — hence
+        the in-place merge above.
+        """
         from plugins.web_ui_module.core.session_manager import ChatSession
 
         session = ChatSession(session_id="t-2")
@@ -237,6 +243,7 @@ class TestPersistMerge:
         session.add_message("assistant", "la cua sola")
         ctx = session.get_context_messages()
         assistants = [m for m in ctx if m["role"] == "assistant"]
-        if len(assistants) == 1:
-            # dedupe active: the first half is GONE — the exact bug
-            assert assistants[0]["content"] == "la cua sola"
+        assert len(assistants) == 1, "consecutive assistant turns must collapse"
+        assert assistants[0]["content"] == "primera meitat\n\nla cua sola", (
+            "#963: no text is lost any more — but the seam is visible"
+        )

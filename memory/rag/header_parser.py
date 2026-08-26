@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple, List
 from dataclasses import dataclass, field
 
+from core.memory_access import SYSTEM_COLLECTIONS
+
 logger = structlog.get_logger(__name__)
 
 # === CONSTANTS ===
@@ -26,13 +28,10 @@ HEADER_END = "---"
 VALID_PRIORITIES = ["P0", "P1", "P2", "P3"]
 VALID_TYPES = ["docs", "tutorial", "api", "faq", "notes", "config", "other"]
 VALID_LANGS = ["ca", "es", "en", "multi"]
-# The 3 canonical RAG collections ("library corridors"):
-# - nexe_documentation: nexe's own knowhow (auto-ingest from knowledge/)
-# - user_knowledge: ad-hoc documents uploaded by the user in chat
-# - personal_memory: facts the chat remembers (MEM_SAVE/RECALL)
-# Note: "personal_memory" was called "nexe_web_ui" until the 2026-04-08 refactor.
-# The "system" constant existed pre-v0.9.0 but no code used it — removed.
-DEFAULT_COLLECTIONS = ["nexe_documentation", "user_knowledge", "personal_memory"]
+# #896: was its own literal list of the 3 collections, unused anywhere in the
+# codebase (dead — grep confirms zero importers) and drifted in spelling from
+# the others. Now an alias of the canonical core.memory_access registry.
+DEFAULT_COLLECTIONS = list(SYSTEM_COLLECTIONS)
 
 # Chunk size limits
 MIN_CHUNK_SIZE = 400

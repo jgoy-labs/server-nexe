@@ -756,6 +756,50 @@ class SQLiteStore:
 
     # ── Cleanup ──
 
+    #: Every table holding rows scoped to a user_id. `profile_history` is NOT
+    #: here: it has no user_id and is reached through its profile_id, the same
+    #: cascade `delete_profile` already does by hand. `gc_log` holds counters
+    #: (no content) and `attribute_aliases` is created but never written by any
+    #: production code — both are left alone deliberately.
+    _USER_SCOPED_TABLES = (
+        "episodic", "staging", "profile", "tombstones",
+        "memory_events", "user_activity",
+    )
+
+    @_with_lock
+    def clear_user(self, user_id: str) -> Dict[str, int]:
+        """Hard-delete EVERYTHING stored for ``user_id``. Returns rows per table.
+
+        #897: the UI's "clear all memory" promised the user "ja no recordo res
+        sobre tu" while only the Qdrant collection was dropped — every fact,
+        episode and staging row written through MemoryService survived here.
+
+        Same policy as `delete_profile` (ADR-002): single-user local memory
+        hard-deletes, no tombstones. Leaving a tombstone for a wipe the user
+        asked for would be keeping a record of what we were told to forget —
+        so the tombstones table is emptied too, not appended to.
+        """
+        conn = self._connect()
+        removed: Dict[str, int] = {}
+        # History FIRST, and this order is load-bearing: profile_history.profile_id
+        # REFERENCES profile(id) with no ON DELETE CASCADE, and _connect() sets
+        # PRAGMA foreign_keys = ON. Deleting the profiles first does not orphan
+        # the rows — it raises IntegrityError and the whole wipe dies halfway,
+        # after the episodic and staging deletes have already gone through.
+        cursor = conn.execute(
+            "DELETE FROM profile_history WHERE profile_id IN "
+            "(SELECT id FROM profile WHERE user_id = ?)",
+            (user_id,),
+        )
+        removed["profile_history"] = cursor.rowcount
+        for table in self._USER_SCOPED_TABLES:
+            safe_table = _validate_table(table)
+            sql = f"DELETE FROM {safe_table} WHERE user_id = ?"  # nosec B608: safe_table comes from the VALID_TABLES whitelist, not user input
+            removed[safe_table] = conn.execute(sql, (user_id,)).rowcount
+        conn.commit()
+        logger.info("Memory hard-wiped for user %s: %s", user_id, removed)
+        return removed
+
     @_with_lock
     def close(self):
         """Close the database connection."""

@@ -37,8 +37,8 @@ import pytest
 _SECURITY_MODULES = (
     "plugins.security",
     "plugins.security.core",
-    "plugins.security.core.auth_config",
-    "plugins.security.core.input_sanitizers",
+    "core.security.auth_config",
+    "core.security.input_sanitizers",
 )
 
 _DEPENDENT_ROUTES_MODULES = (
@@ -66,7 +66,7 @@ def test_routes_auth_declares_security_available_flag():
         "routes_auth.py is missing the _SECURITY_AVAILABLE flag."
     )
     # The flag must default to a probe of plugins.security, not be hard-coded.
-    assert "from plugins.security.core.auth_config import get_admin_api_key" in src
+    assert "from core.security.auth_config import get_admin_api_key" in src
     assert "_SECURITY_AVAILABLE = True" in src
     assert "_SECURITY_AVAILABLE = False" in src
 
@@ -112,14 +112,14 @@ def test_require_ui_auth_returns_503_when_security_absent():
     ],
 )
 def test_dependent_routes_wrap_security_imports(module_path):
-    """Every routes_*.py that imports from plugins.security.core.input_sanitizers
+    """Every routes_*.py that imports from core.security.input_sanitizers
     must wrap it in try/except so the module is importable when security is
     absent. Otherwise the WHOLE web UI fails to load (the routes.py orchestrator
     re-imports each one)."""
     mod = importlib.import_module(module_path)
     src = inspect.getsource(mod)
     # The exact wrapping pattern: try: from plugins.security... except ImportError
-    assert "from plugins.security.core.input_sanitizers import" in src
+    assert "from core.security.input_sanitizers import" in src
     # The try and except must both be present and the except must cover ImportError.
     assert "try:" in src
     assert "except ImportError" in src, (
@@ -235,7 +235,7 @@ def test_module_warning_message_contains_actionable_cause(security_absent, caplo
     We do NOT exercise the full _init_router() here because that path imports
     the orchestrator routes.py, which transitively pulls core/endpoints/root.py
     and core/metrics/endpoint.py — both currently carry unconditional
-    ``from plugins.security.core.auth_dependencies`` imports that are out of
+    ``from core.security.auth_dependencies`` imports that are out of
     scope for R6-15 (web_ui only). Hardening those would expand the
     blast radius. The warning emission itself is verified at the source level
     by test_module_init_router_logs_warning_when_degraded above.
@@ -293,4 +293,4 @@ def test_security_present_path_is_unchanged():
     import plugins.web_ui_module.api.routes_auth as ra
     assert ra._SECURITY_AVAILABLE is True
     # Real key resolver is wired (not the degraded stub).
-    assert ra.get_admin_api_key.__module__ == "plugins.security.core.auth_config"
+    assert ra.get_admin_api_key.__module__ == "core.security.auth_config"

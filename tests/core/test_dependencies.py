@@ -3,7 +3,7 @@ Tests for core/dependencies.py
 
 MC-103: the per-IP limiter is now defined IN core (no import from plugins). The
 old try/except ImportError fallback (which made `core` depend on
-`plugins.security.core.rate_limiting`) is gone, so the tests below assert the
+`core.security.rate_limiting`) is gone, so the tests below assert the
 NEW contract instead of the removed fallback behaviour.
 """
 import ast
@@ -25,7 +25,7 @@ class TestDependenciesContract:
         """core/dependencies.py must not import from plugins at module scope.
 
         Mutation guard: re-add the old
-        `from plugins.security.core.rate_limiting import (...)` at module level
+        `from core.security.rate_limiting import (...)` at module level
         and this test goes RED.
         """
         import core.dependencies as deps

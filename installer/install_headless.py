@@ -549,9 +549,10 @@ def _run_knowledge_step(project_root, python_path, lang):
                 f"import sys; sys.path.insert(0, '{project_root}'); "
                 "import asyncio; "
                 "from core.ingest.ingest_knowledge import ingest_knowledge; "
+                "from core.memory_access import DOCS_COLLECTION; "
                 # F7: explicit target_collection — corporate docs go to
-                # nexe_documentation, not user_knowledge.
-                "asyncio.run(ingest_knowledge(quiet=False, target_collection='nexe_documentation'))"
+                # DOCS_COLLECTION ("nexe_documentation"), not KNOWLEDGE_COLLECTION.
+                "asyncio.run(ingest_knowledge(quiet=False, target_collection=DOCS_COLLECTION))"
             ], check=False, capture_output=True, text=True, timeout=300, env=ingest_env)
 
             if result.stdout:
