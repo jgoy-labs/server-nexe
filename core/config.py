@@ -324,7 +324,23 @@ def save_config(config: Dict[str, Any], config_path: Path) -> bool:
 
 def get_environment_mode(config: Dict[str, Any]) -> str:
     """
-    Get the environment mode from config.
+    Get the environment mode — the single source of truth for it (#935).
+
+    #935: this used to be one of FOUR places independently deciding
+    production-vs-development, with divergent defaults and divergent signals
+    — core/middleware.py and get_module_allowlist() below also checked
+    SidecarConfig.is_production, core/modules/path_discovery.py checked
+    NEITHER SidecarConfig nor NEXE_ENV. Measured: with NEXE_ENV=development,
+    this function said 'development' while PathDiscovery.strict_mode stayed
+    True, because it only ever read config['core']['environment']['mode'],
+    a section that does not exist in the real server.toml. Every caller now
+    goes through here.
+
+    Precedence: SidecarConfig.is_production (the runtime signal a real
+    sidecar deployment carries) > NEXE_ENV / ENV (explicit override) >
+    config's core.environment.mode (declarative fallback, default
+    'production' — fail toward the safe/strict side when nothing says
+    otherwise).
 
     Args:
         config: Configuration dictionary
@@ -332,12 +348,18 @@ def get_environment_mode(config: Dict[str, Any]) -> str:
     Returns:
         'production' or 'development'
     """
-    # Check environment variable first
+    try:
+        from core.sidecar_config import get_sidecar_config
+        sidecar = get_sidecar_config()
+        if sidecar.is_sidecar:
+            return 'production' if sidecar.is_production else 'development'
+    except Exception as exc:
+        logger.debug("SidecarConfig unavailable in get_environment_mode: %s", exc)
+
     env_mode = os.environ.get('NEXE_ENV', os.environ.get('ENV'))
     if env_mode in ('production', 'development'):
         return env_mode
 
-    # Then check config
     return config.get('core', {}).get('environment', {}).get('mode', 'production')
 
 
@@ -427,25 +449,10 @@ def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[se
     Raises:
         ValueError: If in production mode without NEXE_APPROVED_MODULES
     """
-    # prefer SidecarConfig.is_production over reading NEXE_ENV directly,
-    # fallback to os.getenv per backward-compat (tests/scripts sense singleton i
-    # tests que muten NEXE_ENV runtime sense rebuild del singleton).
-    raw_env_is_prod = os.getenv("NEXE_ENV", "production").lower() == "production"
-    sidecar_is_prod = False
-    try:
-        from core.sidecar_config import get_sidecar_config
-        sidecar_is_prod = get_sidecar_config().is_production
-    except Exception as exc:
-        logger.debug(
-            "SidecarConfig unavailable in get_module_allowlist, "
-            "using NEXE_ENV fallback: %s",
-            exc,
-        )
-    is_prod_env = sidecar_is_prod or raw_env_is_prod
-    config_mode = ""
-    if config:
-        config_mode = config.get("core", {}).get("environment", {}).get("mode", "")
-    is_prod = is_prod_env or config_mode == "production"
+    # #935: SidecarConfig / NEXE_ENV / config.core.environment.mode precedence
+    # now lives in ONE place — get_environment_mode() — instead of being
+    # re-derived here.
+    is_prod = get_environment_mode(config or {}) == "production"
 
     approved = os.getenv("NEXE_APPROVED_MODULES", "").strip()
     if approved:

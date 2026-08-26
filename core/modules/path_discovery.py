@@ -51,10 +51,13 @@ class PathDiscovery:
     if strict is not None:
       self.strict_mode = strict
     else:
-      # Read from config, default to True (production/safe)
-      env_config = self.config.get('core', {}).get('environment', {})
-      mode = env_config.get('mode', 'production')
-      self.strict_mode = mode != 'development'
+      # #935: used to read ONLY config['core']['environment']['mode'] — a
+      # section absent from the real server.toml, and blind to both
+      # SidecarConfig and NEXE_ENV — so NEXE_ENV=development left this in
+      # strict/production mode while get_environment_mode() already said
+      # 'development'. Single source of truth now.
+      from core.config import get_environment_mode
+      self.strict_mode = get_environment_mode(self.config) != 'development'
 
     if not self.strict_mode:
       logger.warning("PathDiscovery in DEV MODE - auto-discovery enabled")

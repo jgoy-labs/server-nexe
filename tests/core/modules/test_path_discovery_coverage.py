@@ -26,6 +26,23 @@ class TestPathDiscoveryInit:
         pd = PathDiscovery(strict=False)
         assert pd.strict_mode is False
 
+    def test_strict_mode_follows_nexe_env(self, monkeypatch):
+        """#935: NEXE_ENV=development used to leave strict_mode True — this
+        only ever read config['core']['environment']['mode'] (absent from
+        the real server.toml), blind to NEXE_ENV entirely, while
+        get_environment_mode() already answered 'development' from the same
+        env var. Both must now agree on an empty config."""
+        from core.config import get_environment_mode
+        from core.modules.path_discovery import PathDiscovery
+
+        monkeypatch.setenv("NEXE_ENV", "development")
+        pd = PathDiscovery(config={})
+
+        assert get_environment_mode({}) == "development"
+        assert pd.strict_mode is False, (
+            "PathDiscovery ignored NEXE_ENV=development and stayed in strict/production mode"
+        )
+
 
 class TestDiscoverAllPaths:
 

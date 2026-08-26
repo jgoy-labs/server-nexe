@@ -390,18 +390,15 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
   """
   import os
 
-  csrf_secret = os.getenv("NEXE_CSRF_SECRET")
-  config_mode = config.get("core", {}).get("environment", {}).get("mode", "").lower()
+  from core.config import get_environment_mode
 
-  # prefer SidecarConfig.is_production over direct NEXE_ENV,
-  # combinem amb OR sobre el raw env per a robustesa davant singletons stale.
-  # Session 3 part 3 already overrode csrf_secret + is_prod with SidecarConfig.
-  raw_is_prod = os.getenv("NEXE_ENV", "production") == "production"
-  sidecar_is_prod = False
+  csrf_secret = os.getenv("NEXE_CSRF_SECRET")
+
+  # Session 3 part 3 already overrode csrf_secret with SidecarConfig; keep
+  # that part here (it hands over the secret ITSELF, not just the mode).
   try:
     from core.sidecar_config import get_sidecar_config
     cfg = get_sidecar_config()
-    sidecar_is_prod = cfg.is_production
     if cfg.is_sidecar and cfg.csrf_secret:
       csrf_secret = cfg.csrf_secret
   except Exception as exc:
@@ -409,7 +406,11 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
       "SidecarConfig unavailable in setup_csrf, using NEXE_ENV fallback: %s",
       exc,
     )
-  is_prod = sidecar_is_prod or raw_is_prod or config_mode == "production"
+
+  # #935: SidecarConfig / NEXE_ENV / config.core.environment.mode precedence
+  # now lives in ONE place — get_environment_mode() — instead of being
+  # re-derived here.
+  is_prod = get_environment_mode(config) == "production"
 
   if not csrf_secret:
     # persist a stable secret on disk so cookies survive
