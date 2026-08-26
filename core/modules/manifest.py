@@ -15,6 +15,8 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from core.version import __version__
+
 logger = logging.getLogger(__name__)
 
 router_public = APIRouter(prefix="/modules", tags=["modules"])
@@ -154,7 +156,7 @@ async def list_registered_modules():
 
 MODULE_METADATA = {
   "name": "module_manager",
-  "version": "0.9.1",
+  "version": __version__,
   "description": "Centralized module management system for server-nexe",
   "router": router_public,
   "prefix": "/modules",

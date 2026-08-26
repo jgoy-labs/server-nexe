@@ -16,6 +16,7 @@ from pathlib import Path
 
 from fastapi import APIRouter
 from core.modules.protocol import ModuleMetadata, HealthResult, HealthStatus
+from core.version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class SecurityModule:
         """Return static module metadata for the security plugin."""
         return ModuleMetadata(
             name="security",
-            version="0.9.1",
+            version=__version__,
             description="Security core: auth, rate limiting, injection detection, scanning",
             author="Jordi Goy",
             module_type="core",

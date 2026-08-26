@@ -12,6 +12,7 @@ www.jgoy.net · https://server-nexe.org
 from typing import Dict, Any
 
 from memory.embeddings.constants import DEFAULT_EMBEDDING_MODEL, DEFAULT_VECTOR_SIZE  # noqa: F401 — canonical source
+from core.version import __version__
 
 MODULE_ID = "memory"
 
@@ -33,7 +34,7 @@ V1_TOMBSTONE_TTL_DAYS = 90
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "memory",
-  "version": "0.9.1",
+  "version": __version__,
   "description": "Memory System - Flash, RAM Context and Persistence with lifecycle management",
   "author": "J.Goy",
   "category": "memory.core",

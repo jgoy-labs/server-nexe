@@ -172,9 +172,10 @@ dynamic_batching = true
 adaptive_batch_size = true
 
 # ═══════════════════════════════════════════════════════════════
-# STORAGE DECLARATIONS (Auto-Clean)
+# STORAGE DECLARATIONS
 # Cada path que Embeddings escriu a storage/ ha d'estar declarat aquí.
-# El sistema Auto-Clean només gestiona paths declarats.
+# #886/#954: descriptiu, no operatiu — no hi ha cap motor Auto-Clean que
+# ho llegeixi avui; és l'espec que implementarà el futur plugin trasher.
 # ═══════════════════════════════════════════════════════════════
 
 [module.storage]
@@ -188,7 +189,3 @@ action = "LRU_EVICTION"
 max_size_gb = 5.0
 ttl_hours = 72
 description = "Cache L2 d'embeddings - LRU eviction quan supera 5GB o 72h"
-
-[module.storage.protection]
-# Fitxers que MAI s'han de tocar
-protected_patterns = ["*.db", "index.json", "metadata.json"]

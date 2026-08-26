@@ -16,6 +16,7 @@ inside the read ever gave up.
 from __future__ import annotations
 
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock
 
@@ -26,6 +27,7 @@ from memory.memory.api._budget import (
     ENV_READ_TIMEOUT,
     MemoryReadTimeout,
     read_timeout,
+    within_read_budget,
 )
 from memory.memory.api.documents import search_documents as search
 
@@ -117,6 +119,44 @@ async def test_a_healthy_read_is_not_cut(short_budget, executor):
         timeout=OUTER_DEADLINE,
     )
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_a_synchronous_blocker_off_executor_is_not_cut(monkeypatch):
+    """#955, verified 26/08/2026: the budget only cuts a hang that yields
+    control back to the loop. asyncio.wait_for cannot interrupt code that
+    never awaits — a caller that runs a blocking store call IN-LOOP, without
+    handing it to an executor, blows straight through the budget AND holds
+    the whole event loop hostage, not just this request. documents.py avoids
+    this today by wrapping its Qdrant call in run_in_executor (search()
+    above proves that path is cut); a future read path that skips that
+    wrapping is exactly the case this test would need to catch, and — being
+    itself in-loop — cannot. Known limit of the protection, not a live bug:
+    pinned here so the limit stays visible in CI instead of only in a report.
+    """
+    monkeypatch.setenv(ENV_READ_TIMEOUT, "0.05")
+
+    async def _blocks_the_loop_directly():
+        time.sleep(0.3)  # never yields — no executor, no real await inside
+        return "arrived anyway"
+
+    started = time.monotonic()
+    result = await asyncio.wait_for(
+        within_read_budget(_blocks_the_loop_directly(), "test probe"),
+        timeout=OUTER_DEADLINE,
+    )
+    elapsed = time.monotonic() - started
+
+    assert result == "arrived anyway", (
+        "a 0.05s budget did not fire on a 0.3s in-loop sleep — if this starts "
+        "raising MemoryReadTimeout, either wait_for started pre-empting "
+        "synchronous code or the scenario no longer reproduces; update the "
+        "docstring above, don't just delete the assert"
+    )
+    assert elapsed >= 0.3, (
+        "the in-loop sleep finished faster than it should have — this test's "
+        "premise (a call that never yields) no longer holds"
+    )
 
 
 def test_the_budget_is_read_per_call_not_at_import(monkeypatch):

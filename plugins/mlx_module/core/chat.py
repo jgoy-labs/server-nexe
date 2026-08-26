@@ -37,6 +37,8 @@ from .generate_helpers import (
     run_streaming_generation,
     save_cache_post_generation,
     extract_metrics,
+    sanitize_messages_for_alternation,
+    truncate_messages_to_budget,
 )
 from .qwen35_directive import (
     QWEN35_THINKING_DIRECTIVE,
@@ -867,6 +869,7 @@ class MLXChatNode:
         processor,
         has_image: bool,
         thinking_enabled: bool = True,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """Build the VLM prompt with thinking control.
 
@@ -901,11 +904,56 @@ class MLXChatNode:
         except Exception:
             mdl_config = {"model_type": ""}
 
+        # #860: sanitize before templating, like the text path does at
+        # generate_helpers.py:226. Without this the two branches built
+        # different prompts from the same history — the text one merging
+        # consecutive same-role turns, this one emitting them back to back,
+        # which is malformed for every VL model in the catalog. /ui/chat
+        # cannot produce that history (SessionManager collapses adjacent
+        # roles first), but /v1/chat/completions does not sanitize at all and
+        # the OpenAI wire format lets a client send it.
+        # System is prepended AFTER: sanitize drops system messages by design.
+        sanitized = sanitize_messages_for_alternation(messages)
+
+        # #845: the same prompt-level ceiling the text path got in 47efa879.
+        # It has to be here and not at the caller because the order is load
+        # bearing (generate_helpers.py:231): alternation must hold for the
+        # messages actually KEPT, so sanitize first, measure second.
+        #
+        # A VLM processor is NOT a tokenizer — Qwen3VLProcessor has no
+        # .encode(), it exposes .tokenizer. Passing the processor straight in
+        # would raise AttributeError on every VLM turn, which with the default
+        # model means every turn.
+        #
+        # With an image attached the estimate undercounts: image tokens never
+        # pass through the text tokenizer. That is accepted — this is a net
+        # against unbounded growth, not an exact accountant (same caveat the
+        # cache accounting already carries below).
+        if self.config.max_kv_size is not None:
+            budget_tokenizer = getattr(processor, "tokenizer", None)
+            if budget_tokenizer is None and hasattr(processor, "encode"):
+                budget_tokenizer = processor
+            if budget_tokenizer is None:
+                logger.warning(
+                    "VLM context budget skipped: processor %s exposes neither "
+                    "a tokenizer nor encode(), so the prompt cannot be measured "
+                    "(#845). The conversation grows unbounded.",
+                    type(processor).__name__,
+                )
+            else:
+                sanitized = truncate_messages_to_budget(
+                    system,
+                    sanitized,
+                    budget_tokenizer,
+                    self.config.max_kv_size,
+                    max_tokens if max_tokens is not None else self.config.max_tokens,
+                )
+
         all_messages: List[Dict[str, Any]] = []
         if system:
             all_messages.append({"role": "system", "content": system})
-        if messages:
-            all_messages.extend(messages)
+        if sanitized:
+            all_messages.extend(sanitized)
 
         # Qwen3.5-only: when Raonament=ON, reinforce thinking in the system
         # prompt because the chat template alone is not enough (model mimics
@@ -1278,6 +1326,7 @@ class MLXChatNode:
         has_image = bool(images)
         formatted_prompt = self._prepare_vlm_prompt(
             messages, system, processor, has_image, thinking_enabled=thinking_enabled,
+            max_tokens=max_tokens,
         )
 
         # Prefix-cache for the VLM path (mlx_vlm native PromptCacheState), keyed

@@ -229,8 +229,9 @@ server-nexe/
 │
 ├── personality/                  # Configuracio del sistema
 │   ├── server.toml               # Configuracio principal (prompts, moduls, models)
-│   ├── i18n/                     # Gestor i18n + traduccions (ca/es/en)
-│   └── module_manager/           # FONT UNICA DE VERITAT per a tots els moduls
+│   └── i18n/                     # Gestor i18n + traduccions (ca/es/en)
+│
+├── core/modules/                 # FONT UNICA DE VERITAT per a tots els moduls
 │
 ├── installer/                    # Instal·ladors (macOS + Windows NSIS)
 │   ├── swift-wizard/             # Wizard SwiftUI (13 fitxers Swift, 6 pantalles)

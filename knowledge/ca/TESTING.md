@@ -23,11 +23,11 @@ expires: null
 
 | Metrica | Valor |
 |--------|-------|
-| Total funcions de test col·lectades | **7694** |
-| Ultima execucio completa passats | **7432** |
+| Total funcions de test col·lectades | **8392** |
+| Ultima execucio completa passats | **8118** |
 | **Cobertura real global** | **~85%** (baseline honest, sense inflar) |
 
-Nota: xifres de l'execucio del 2026-07-04 (v1.0.7). La diferencia entre col·lectats (7694) i passats (7432) correspon a tests deseleccionats o omesos per marcadors (integration/e2e/slow) a l'execucio estandard.
+Nota: xifres de l'execucio del 2026-08-25 (v1.0.7). La diferencia entre col·lectats (8392) i passats (8118) correspon a tests deseleccionats o omesos per marcadors (integration/e2e/slow) a l'execucio estandard (235 deseleccionats, 37 omesos, 2 xfailed).
 
 > **Nota d'honestedat sobre cobertura:** Badges històrics han reportat 97.4%, 91.1% o 93% en fases concretes dels tests massius. Aquests números corresponien a subconjunts específics (baseline d'una fase, funcional contra servidor en viu) i no al global del projecte. La **cobertura real global del codi**, mesurada amb `pytest --cov` sobre tot el codebase, és **~85%**. Aquest és el valor que fem servir com a referència.
 >

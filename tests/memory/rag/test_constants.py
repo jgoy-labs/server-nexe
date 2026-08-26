@@ -9,6 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+from core.version import __version__
 from memory.rag.constants import (
   MANIFEST,
   MODULE_ID,
@@ -29,6 +30,10 @@ class TestManifest:
   def test_manifest_has_version(self):
     """Verify MANIFEST has version."""
     assert "version" in MANIFEST
+
+  def test_manifest_version_tracks_the_product_version(self):
+    """#941: a hardcoded value here silently drifts from the real version."""
+    assert MANIFEST["version"] == __version__
 
   def test_manifest_has_description(self):
     """Verify MANIFEST has description."""

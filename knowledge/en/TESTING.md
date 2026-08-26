@@ -23,11 +23,11 @@ expires: null
 
 | Metric | Value |
 |--------|-------|
-| Total test functions collected | **7694** |
-| Latest full run passed | **7432** |
+| Total test functions collected | **8392** |
+| Latest full run passed | **8118** |
 | **Actual global coverage** | **~85%** (honest baseline, not inflated) |
 
-Note: figures from the 2026-07-04 run (v1.0.7). The gap between collected (7694) and passed (7432) corresponds to tests deselected or skipped by markers (integration/e2e/slow) in the standard run.
+Note: figures from the 2026-08-25 run (v1.0.7). The gap between collected (8392) and passed (8118) corresponds to tests deselected or skipped by markers (integration/e2e/slow) in the standard run (235 deselected, 37 skipped, 2 xfailed).
 
 > **Honesty note on coverage:** Historical badges have reported 97.4%, 91.1% or 93% in specific mass-test phases. Those numbers correspond to specific subsets (a phase baseline, functional against a live server) and not to the project global. The **actual global code coverage**, measured with `pytest --cov` over the whole codebase, is **~85%**. That is the value we use as reference.
 >

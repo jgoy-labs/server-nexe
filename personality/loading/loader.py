@@ -7,12 +7,12 @@ Description: Global facade for dynamic Nexe module loading.
 
 DEPRECATION NOTICE:
   This loader is maintained for backwards compatibility.
-  For new code, prefer using core/modules which provides:
-  - Protocol-based module validation (NexeModule)
-  - manifest.toml support
-  - Cleaner API
+  For new code, import from core.modules instead — it re-exports this SAME
+  ModuleLoader class (#938, verified: `core.modules.ModuleLoader is
+  personality.loading.loader.ModuleLoader`), not a different implementation.
+  It's a path move, not a functional upgrade.
 
-  Migration: from core.modules import ModuleLoader, bootstrap
+  Migration: from core.modules import ModuleLoader
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -56,12 +56,12 @@ class ModuleLoader:
       suppress_deprecation: Set True to suppress deprecation warning
 
     Note:
-      For new code, consider using core.modules.ModuleLoader instead.
+      For new code, import from core.modules instead — same class, new path.
     """
     if not suppress_deprecation:
       warnings.warn(
         "personality.loading.ModuleLoader is deprecated. "
-        "Use core.modules.ModuleLoader for new code.",
+        "Import from core.modules instead (same class, new path).",
         DeprecationWarning,
         stacklevel=2
       )

@@ -16,9 +16,17 @@ Description: G9 gate (#886) — no manifest in the repo may declare an auto-clea
 
     Scope of the gate: the `auto_clean` key is the one that CLAIMS an engine
     runs the policy. The descriptive retention spec that surrounds it
-    (retention_days, action, max_files, protected_patterns) stays in the
-    manifests on purpose — it is the specification the trasher plugin will
-    implement, and removing it was not part of the decision.
+    (retention_days, action, max_files) stays in the manifests on purpose —
+    it is the specification the trasher plugin will implement, and removing
+    it was not part of the decision.
+
+    #948, 26/08/2026: `protected_patterns` was a different case — a
+    protection declaration with zero readers, not a cleanup policy, and it
+    survived #886 only because that fix scoped itself to auto_clean and
+    retention keys. Decision by Jordi: it falls, like the others. Removed
+    from all 4 manifests that declared it (memory/embeddings, memory/memory,
+    memory/rag, plugins/security) and from SURVIVING_ORPHANS below — a
+    reintroduction is caught by test_no_orphan_storage_key_in_manifests.
 
     A1-bis (23/08/2026): the gate used to name a single key, `auto_clean`, which
     is the G1 hole of the night before — a gate that ENUMERATES can be walked
@@ -103,18 +111,10 @@ ENV_EXAMPLE = REPO_ROOT / ".env.example"
 SURVIVING_ORPHANS = {
     ("memory/embeddings/manifest.toml", "max_size_gb"):
         "cache size ceiling (5.0); outside the six keys #886 names — pending a decision by Jordi",
-    ("memory/embeddings/manifest.toml", "protected_patterns"):
-        "a PROTECTION, not a cleanup policy: it says what must never be touched",
     ("memory/memory/manifest.toml", "max_files"):
         "ledger rotation ceiling (100); outside the six keys #886 names — pending a decision by Jordi",
-    ("memory/memory/manifest.toml", "protected_patterns"):
-        "a PROTECTION, not a cleanup policy: it says what must never be touched",
-    ("memory/rag/manifest.toml", "protected_patterns"):
-        "a PROTECTION, not a cleanup policy; RAG declares to protect itself, never to be cleaned",
     ("plugins/security/manifest.toml", "archive_to"):
         "compliance archive target; file outside Dev1's A1-bis scope",
-    ("plugins/security/manifest.toml", "protected_patterns"):
-        "a PROTECTION, not a cleanup policy; file outside Dev1's A1-bis scope",
 }
 
 # Frozen on 23/08/2026, and read from g9_surviving_orphans_baseline.json —

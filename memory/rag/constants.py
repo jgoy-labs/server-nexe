@@ -11,12 +11,14 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Dict, Any
 
+from core.version import __version__
+
 MODULE_ID = "rag"
 
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "rag",
-  "version": "0.9.1",
+  "version": __version__,
   "description": "RAG module: health/info introspection + PersonalityRAG source for the chat pipeline (the standalone /rag surface was retired, WS6-01/02)",
   "author": "J.Goy",
   "category": "memory.core",

@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from core.modules.manifest_base import create_lazy_manifest, install_lazy_manifest
+from core.version import __version__
 
 _m = create_lazy_manifest(
     module_path="plugins.security.module",
@@ -31,7 +32,7 @@ MODULE_NAME = "security"
 
 MODULE_METADATA = {
     "name": MODULE_NAME,
-    "version": "0.9.1",
+    "version": __version__,
     "description": "Security scanning and validation module",
     "routers": ["router_public"],
     "auto_discover": True

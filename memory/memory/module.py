@@ -163,7 +163,7 @@ class MemoryModule:
     try:
       from core.modules.protocol import module_config_from_context
       config = module_config_from_context(context, "memory")
-      final_config = {**self.manifest.get("config", {})}
+      final_config = {**self.manifest.get("default_config", {})}
       if config:
         final_config.update(config)
 
@@ -339,7 +339,7 @@ class MemoryModule:
       "description": self.manifest.get("description", ""),
       "capabilities": self.manifest.get("capabilities", []),
       "initialized": self._initialized,
-      "config": self.manifest.get("config", {})
+      "config": self.manifest.get("default_config", {})
     }
 
   async def ingest(self, entry: MemoryEntry) -> bool:

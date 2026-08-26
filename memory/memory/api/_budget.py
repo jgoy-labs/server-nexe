@@ -67,6 +67,15 @@ async def within_read_budget(awaitable: Awaitable[T], what: str) -> T:
     Note what this does NOT do: a blocking call already handed to the executor
     keeps running in its thread after the budget expires. The budget protects
     the REQUEST, not the worker — Qdrant's own client offers no cancellation.
+
+    #955, verified 26/08/2026: this ONLY cuts a hang if the blocking work runs
+    off the event loop (documents.py wraps its Qdrant call in
+    loop.run_in_executor, so wait_for can cut it by giving up on the executor
+    future). A caller that calls a blocking store SYNCHRONOUSLY, in-loop,
+    without an executor, will NOT be cut — asyncio.wait_for cannot interrupt
+    running synchronous code, and the whole event loop hangs with it, not just
+    this request. Any new read path MUST go through an executor (or be truly
+    async) or this budget is decorative for it.
     """
     budget = read_timeout()
     try:

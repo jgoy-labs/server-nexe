@@ -34,16 +34,20 @@ Nor is it minimal, which is what the microkernel pattern means by the word: the
 Splitting it into mechanism and policy is open work.
 
 **What the move cost, measured.** The frozen layering baseline went from 80 to 101
-import-time cross-package edges, reconciled in the same commit as the move. Nine of the
+import-time cross-package edges, reconciled in the same commit as the move — since dropped
+to **100** by 62b713f3, which removed one edge without touching this text (#938; the live
+count is `scripts/layering_baseline.json`, not this paragraph). Nine of the
 24 new edges are only `personality._logger` and five more are `__init__` imports that had
 to become absolute; lowering the logger into `core` would remove nine of them at once,
 and that is the obvious next step. The debt is now **visible instead of implied**.
 
-**The "i18n-first" precondition this note used to attach to the move was empty.**
-Verified by running a real `I18nManager`, not by reading the loader: the package ships 15
-translation files that are never loaded — the lookup expects a literal `location/` path
-segment that does not exist — so its messages already came out in English. There was no
-live i18n to preserve, and the move did not need to wait for the i18n relocation.
+**The "i18n-first" precondition this note used to attach to the move was empty AT THE
+TIME.** Verified by running a real `I18nManager`, not by reading the loader: the package
+shipped 15 translation files that were never loaded — the lookup expected a literal
+`location/` path segment that did not exist — so its messages already came out in English.
+There was no live i18n to preserve, and the move did not need to wait for the i18n
+relocation. **Fixed 30 minutes later the same night** (0eb6c7b9, #938): all 11 components
+load today, verified live.
 
 **Related — base config path SSOT (MC-129):** the base server config `personality/server.toml`
 triples as the BASE config layer, the repo-root marker, and the runtime write target. The

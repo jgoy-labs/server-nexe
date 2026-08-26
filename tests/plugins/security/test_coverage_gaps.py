@@ -35,9 +35,10 @@ class TestSecurityManifestNoOpLimiter:
         from plugins.security.manifest import (
             get_module_instance,
         )
+        from core.version import __version__
         instance = get_module_instance()
         assert instance.metadata.name == "security"
-        assert instance.metadata.version == "0.9.1"
+        assert instance.metadata.version == __version__
 
     def test_security_module_get_info(self):
         from plugins.security.module import SecurityModule

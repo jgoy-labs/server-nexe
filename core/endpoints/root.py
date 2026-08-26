@@ -18,6 +18,7 @@ from core.i18n_utils import translate
 from core.uptime import uptime_str
 from core.state_watcher import watcher
 from core.operational_state import (
+  STATUS_HEALTHY,
   STATUS_MISSING,
   ModuleSignal,
   OperationalState,
@@ -324,7 +325,7 @@ async def server_status(
     # Until now a subsystem could fail at startup and the only trace was a
     # line in the boot log the user never reads.
     "operational_state": watcher.state.value,
-    "impaired_subsystems": sorted({s.name for s in watcher.last_signals}),
+    "impaired_subsystems": sorted({s.name for s in watcher.last_signals if s.status != STATUS_HEALTHY}),
   }
 
 @router.get("/health/circuits", summary="Circuit breaker status (Ollama) (API key required)", response_model=dict, operation_id="circuit_status")

@@ -23,11 +23,11 @@ expires: null
 
 | Metrica | Valor |
 |---------|-------|
-| Total de funciones de test recopiladas | **7694** |
-| Ultima ejecucion completa pasados | **7432** |
+| Total de funciones de test recopiladas | **8392** |
+| Ultima ejecucion completa pasados | **8118** |
 | **Cobertura real global** | **~85%** (baseline honesta, sin inflar) |
 
-Nota: cifras de la ejecucion del 2026-07-04 (v1.0.7). La diferencia entre recopilados (7694) y pasados (7432) corresponde a tests deseleccionados u omitidos por marcadores (integration/e2e/slow) en la ejecucion estandar.
+Nota: cifras de la ejecucion del 2026-08-25 (v1.0.7). La diferencia entre recopilados (8392) y pasados (8118) corresponde a tests deseleccionados u omitidos por marcadores (integration/e2e/slow) en la ejecucion estandar (235 deseleccionados, 37 omitidos, 2 xfailed).
 
 > **Nota de honestidad sobre cobertura:** Badges historicos han reportado 97.4%, 91.1% o 93% en fases concretas de los tests masivos. Esos numeros correspondian a subconjuntos especificos (baseline de una fase, funcional contra servidor en vivo) y no al global del proyecto. La **cobertura real global del codigo**, medida con `pytest --cov` sobre todo el codebase, es **~85%**. Este es el valor que usamos como referencia.
 >

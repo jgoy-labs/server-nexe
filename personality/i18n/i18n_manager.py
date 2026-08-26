@@ -204,9 +204,10 @@ class I18nManager:
     # personality/plugins, personality/personality and personality/memory: none
     # of them exist. Anchored at the repo root, the way ModularI18nManager is
     # given project_root.
-    # 'core' is not in server.toml's additional_paths because the module system
-    # moved down to core/modules/ on 22/08 and the config was not updated.
-    for path_str in ('core', 'plugins', *self._configured_additional_paths()):
+    # #957: 'core' used to be hardcoded here (#920's immediate fix, 23/08) because
+    # server.toml's additional_paths was not updated when the module system moved
+    # down to core/modules/ on 22/08. Now declared in server.toml like the rest.
+    for path_str in ('plugins', *self._configured_additional_paths()):
       base_dir = self._resolve_scan_base(path_str)
       if base_dir.is_dir():
         self._load_module_translations(base_dir, language)

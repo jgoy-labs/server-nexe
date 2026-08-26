@@ -11,6 +11,8 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Dict, Any
 
+from core.version import __version__
+
 MODULE_ID = "embeddings"
 
 # ── SSOT: Embedding model defaults ──────────────────────────────────────
@@ -23,7 +25,7 @@ DEFAULT_VECTOR_SIZE = 768
 MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "embeddings",
-  "version": "0.9.1",
+  "version": __version__,
   "description": "Multilingual embedding and vectorization system with multi-level caching",
   "author": "J.Goy",
   "category": "memory.core",

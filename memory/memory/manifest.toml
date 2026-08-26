@@ -122,9 +122,10 @@ docs = "memory/memory/docs"
 tests = "memory/memory/tests"
 
 # ─────────────────────────────────────────────────────────────
-# STORAGE DECLARATIONS (Auto-Clean)
+# STORAGE DECLARATIONS
 # Cada path que Memory escriu a storage/ ha d'estar declarat aquí.
-# El sistema Auto-Clean només gestiona paths declarats.
+# #886/#954: descriptiu, no operatiu — no hi ha cap motor Auto-Clean que
+# ho llegeixi avui; és l'espec que implementarà el futur plugin trasher.
 # ─────────────────────────────────────────────────────────────
 
 [module.storage]
@@ -151,7 +152,3 @@ retention_days = 30
 action = "ROTATE"
 max_files = 100
 description = "Ledger de transaccions - rotació a 100 fitxers màxim"
-
-[module.storage.protection]
-# Fitxers que MAI s'han de tocar
-protected_patterns = ["*.db", "current_context.json", "metadata.json"]

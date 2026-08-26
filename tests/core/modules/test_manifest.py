@@ -196,3 +196,11 @@ class TestGetRouterAndMetadata:
         assert "name" in MODULE_METADATA
         assert "version" in MODULE_METADATA
         assert "router" in MODULE_METADATA
+
+    def test_metadata_version_tracks_the_product_version(self):
+        """#941: a hardcoded value here silently drifts from the real
+        version — the key existed, but nothing checked it still meant
+        anything."""
+        from core.modules.manifest import MODULE_METADATA
+        from core.version import __version__
+        assert MODULE_METADATA["version"] == __version__

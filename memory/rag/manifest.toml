@@ -144,9 +144,10 @@ tests = "memory/rag/tests"
 ui = "memory/rag/ui"
 
 # ─────────────────────────────────────────────────────────────
-# STORAGE DECLARATIONS (Auto-Clean)
+# STORAGE DECLARATIONS
 # Cada path que RAG escriu a storage/ ha d'estar declarat aquí.
-# El sistema Auto-Clean només gestiona paths declarats.
+# #886/#954: descriptiu, no operatiu — no hi ha cap motor Auto-Clean que
+# ho llegeixi avui; és l'espec que implementarà el futur plugin trasher.
 # ─────────────────────────────────────────────────────────────
 
 [module.storage]
@@ -171,7 +172,3 @@ type = "index_metadata"
 format = "json"
 action = "PERMANENT"
 description = "Metadades dels índexs vectorials - MAI esborrar"
-
-[module.storage.protection]
-# Fitxers que MAI s'han de tocar - TOT és crític per RAG
-protected_patterns = ["*.faiss", "*.index", "*.db", "*.json", "*.bin"]

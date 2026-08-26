@@ -407,7 +407,11 @@ async def _try_precomputed_kb(memory, default_root, lang, log) -> bool:
                     memory=memory, kb=_kb, lang=lang, log=log,
                 )
             elif not _outcome.ok:
-                log(f"[INFO] precomputed KB skipped: {_outcome.reason}")
+                logger.warning(
+                    "precomputed KB skipped (%s): falling back to a full ingest for lang=%s",
+                    _outcome.reason, lang,
+                )
+                log(f"[WARN] precomputed KB skipped: {_outcome.reason}")
     except Exception as e:
         log(f"[INFO] precomputed KB error, falling back: {e}")
     return False

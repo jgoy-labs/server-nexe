@@ -126,6 +126,3 @@ retention_days = 90
 action = "ARCHIVE"
 archive_to = "storage/archives/security/{year}-{month}/"
 description = "Security logs - compliance 90 dies"
-
-[module.storage.protection]
-protected_patterns = ["*.db", "api_keys.json", "*.key"]

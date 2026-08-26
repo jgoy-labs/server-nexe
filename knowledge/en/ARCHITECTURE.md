@@ -229,8 +229,9 @@ server-nexe/
 │
 ├── personality/                  # System configuration
 │   ├── server.toml               # Main config (prompts, modules, models)
-│   ├── i18n/                     # I18n manager + translations (ca/es/en)
-│   └── module_manager/           # SINGLE SOURCE OF TRUTH for all modules
+│   └── i18n/                     # I18n manager + translations (ca/es/en)
+│
+├── core/modules/                 # SINGLE SOURCE OF TRUTH for all modules
 │
 ├── installer/                    # Installers (macOS + Windows NSIS)
 │   ├── swift-wizard/             # SwiftUI wizard (13 Swift files, 6 screens)

@@ -164,7 +164,7 @@ modules_path = "plugins"
 manifests_path = "personality/manifests"
 startup_delay = 1.0
 max_concurrent_loads = 3
-additional_paths = [ "personality", "memory",]
+additional_paths = [ "core", "personality", "memory",]
 
 [personality.i18n]
 enabled = true

@@ -55,9 +55,17 @@ def _stub_mlx_vlm():
 
 
 def _build_node():
-    """Build a MLXChatNode with a fake config (no real model load)."""
+    """Build a MLXChatNode with a fake config (no real model load).
+
+    max_kv_size is declared explicitly rather than left to MagicMock: since
+    #845 the VLM prompt builder reads it, and an auto-invented attribute is
+    neither None nor a number, so it reached the budget arithmetic and raised
+    TypeError. These tests are about thinking propagation — they want no
+    context ceiling, and now they say so.
+    """
     cfg = MagicMock()
     cfg.model_path = "/tmp/_fake_model_path"  # nosemgrep: hardcode.absolute_path
+    cfg.max_kv_size = None
     node = MLXChatNode.__new__(MLXChatNode)
     node.config = cfg
     return node

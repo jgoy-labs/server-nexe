@@ -9,9 +9,11 @@ Description: Central facade of the server-nexe module management system.
              the registry are infrastructure — core's lifespan depends on them
              — not a persona/i18n concern. The package lived under personality/
              because it predated the core/personality split, and moved here
-             together with the layering baseline it inflates: 80 -> 101 edges,
-             reconciled in the same commit. Nine of the new ones are only
-             personality._logger, the obvious next thing to pull down.
+             together with the layering baseline it inflates: 80 -> 100 edges
+             (#938: was 101 at the move, one dropped since by 62b713f3 without
+             this text being touched — check scripts/layering_baseline.json
+             for the live count, not this docstring). Nine of the new ones
+             are only personality._logger, the obvious next thing to pull down.
 
              It is NOT called a kernel: no privilege boundary, no scheduling,
              no isolation — plugins run in this process. The isolation lives in
@@ -19,10 +21,12 @@ Description: Central facade of the server-nexe module management system.
              docs/NEXE_ARCHITECTURAL_DECISIONS.md.
 
              The "i18n-first" condition the old note attached to this move
-             turned out to be empty: the package ships 15 translation files
-             that never load (verified by running a real I18nManager, not by
-             reading the code), so get_message always falls back to English.
-             Nothing i18n-shaped was at risk here.
+             turned out to be empty AT THE TIME: the package shipped 15
+             translation files that never loaded, so get_message always fell
+             back to English. Fixed 30 minutes later the same night
+             (0eb6c7b9, #938) — all 11 components load today (verified by
+             running a real I18nManager). Nothing i18n-shaped was at risk
+             at the time of THIS move either way.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

@@ -30,7 +30,7 @@ nexe go
 
 ## Running tests
 
-The test suite collects **7694 tests**.
+The test suite collects **8392 tests**.
 
 ```bash
 # Fast unit tests (default gate — no external services needed)

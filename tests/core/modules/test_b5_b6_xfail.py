@@ -1,5 +1,8 @@
 """
-TDD xfail — : B5 (get_health hasattr guard) + B6 (stop_module state ERROR)
+Regression tests — B5 (get_health hasattr guard) + B6 (stop_module state
+ERROR). Both bugs are fixed; these tests assert the fixed behavior directly
+and pass today (#954). Filename kept for history; no pytest.mark.xfail here
+— they are not expected to fail.
 """
 import asyncio
 import importlib
@@ -61,11 +64,12 @@ def mm(tmp_path):
 class TestB5GetHealthHashattrGuard:
 
     def test_b5_module_without_get_health_is_registered(self, mm, tmp_path):
-        """xfail: module without get_health() should register with default health.
+        """A module without get_health() registers with default health.
 
-        Current bug: AttributeError is caught by except Exception → continue →
-        module does not appear in loaded_modules. Post-fix with hasattr guard, the module
-        registers with {"status": "ok", "note": "module without get_health()"}.
+        Before the fix: AttributeError was caught by except Exception →
+        continue → the module never appeared in loaded_modules. Fixed with a
+        hasattr guard: the module registers with
+        {"status": "ok", "note": "module without get_health()"}.
         """
         mem_path = tmp_path / "memory" / "embeddings"
         mem_path.mkdir(parents=True)
@@ -100,7 +104,6 @@ class TestB5GetHealthHashattrGuard:
         with patch("importlib.import_module", side_effect=_fake_import):
             result = asyncio.run(mm.load_memory_modules())
 
-        # Post-fix: module MUST be registered; currently FAILS (is discarded)
         assert "test_embeddings_id" in result
 
     def test_b5_antireg_module_with_get_health_is_registered(self, mm, tmp_path):
@@ -147,11 +150,12 @@ class TestB5GetHealthHashattrGuard:
 class TestB6StopModuleStateErrorLeak:
 
     def test_b6_stop_module_error_sets_state_error(self, lm):
-        """xfail: state should be ERROR when stop() raises an exception.
+        """State is ERROR when stop() raises an exception.
 
-        Current bug (line ~308-314 module_lifecycle.py): the except block catches
-        the error, returns False but does NOT update module_info.state. The module
-        stays in state=STOPPING forever. Post-fix: state = ModuleState.ERROR.
+        Before the fix (line ~308-314 module_lifecycle.py): the except block
+        caught the error, returned False but did NOT update module_info.state
+        — the module stayed in state=STOPPING forever. Fixed: state =
+        ModuleState.ERROR.
         """
         mod = _make_module_info("test", state=ModuleState.RUNNING)
         mod.instance = MagicMock()
@@ -161,7 +165,6 @@ class TestB6StopModuleStateErrorLeak:
         result = asyncio.run(lm.stop_module("test"))
 
         assert result is False
-        # Post-fix: state MUST be ERROR; currently FAILS (is STOPPING)
         assert mod.state == ModuleState.ERROR
 
     def test_b6_antireg_stop_module_success_sets_state_stopped(self, lm):

@@ -9,11 +9,13 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+from core.version import __version__
+
 MODULE_ID = "embeddings"
 
 MANIFEST = {
     "name": "embeddings",
-    "version": "0.9.1",
+    "version": __version__,
     "description": "Multilingual embedding and vectorization system",
     "author": "Jordi Goy",
     "type": "memory_core",
