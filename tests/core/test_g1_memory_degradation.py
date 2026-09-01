@@ -5,8 +5,8 @@ never "sense conversa" (the conversation lives in the web_ui session store and
 is written to disk before memory/ is ever touched). The product must therefore
 survive a memory/ that does not even import.
 
-It did not. A single module-level import — core/endpoints/chat_memory.py ->
-memory.memory.constants — was reached from create_app() through
+It did not. A single module-level import — formerly core/endpoints/chat_memory.py
+(removed F-A) -> memory.memory.constants — was reached from create_app() through
 factory.py -> factory_state.py -> endpoints/__init__.py -> v1.py -> chat.py,
 with no guard, while the OPTIONAL routers three screens below in the same v1.py
 were all wrapped in `except ImportError`. The structural import was left bare

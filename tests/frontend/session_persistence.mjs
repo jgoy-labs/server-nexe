@@ -12,13 +12,10 @@
  * the session — so the test proves it can detect the regression.
  */
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import assert from 'node:assert';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const appPath = join(__dirname, '../../plugins/web_ui_module/ui/app.js');
+import { familyPaths } from './lib/load_nexe_ui.mjs';
 
 function makeStorage() {
     const data = new Map();
@@ -66,7 +63,9 @@ function loadNexeUI(storage) {
     sandbox.window = sandbox;
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
-    vm.runInContext(readFileSync(appPath, 'utf8') + '\n;globalThis.__NexeUI = NexeUI;', sandbox);
+    // app.js plus its cluster files (#127): the class is split across them.
+    for (const f of familyPaths()) vm.runInContext(readFileSync(f, 'utf8'), sandbox);
+    vm.runInContext(';globalThis.__NexeUI = NexeUI;', sandbox);
     return sandbox.__NexeUI;
 }
 

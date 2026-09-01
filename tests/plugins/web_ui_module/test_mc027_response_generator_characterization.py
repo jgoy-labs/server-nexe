@@ -355,7 +355,10 @@ class TestInterruptPartialPersist:
         """
         engine = _ChunkStreamEngine(["Hola ", "amic"])
         h = _Harness(intent="chat")
-        h.session.needs_compaction = lambda: True  # force the #859 warning
+        # #965: needs_compaction now takes the engine's window; the stub has to
+        # accept it. What this test pins is the ORDER of persist vs warning,
+        # never how the decision is reached.
+        h.session.needs_compaction = lambda *a, **k: True  # force the #859 warning
         state = _make_server_state(engine=engine)
 
         result = await h.call({"message": "Hola", "stream": True}, server_state=state)

@@ -20,7 +20,7 @@ import pathlib
 
 import pytest
 
-from plugins.web_ui_module.core.session_manager import SessionManager
+from core.sessions import SessionManager
 
 
 @pytest.fixture

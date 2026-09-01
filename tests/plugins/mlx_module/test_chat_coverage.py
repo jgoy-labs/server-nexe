@@ -252,13 +252,13 @@ class TestGenerateBlocking:
         mock_mlx_lm = MagicMock()
         mock_mlx_lm.sample_utils.make_sampler.return_value = mock_sampler
 
-        with patch("plugins.mlx_module.core.chat.compute_system_hash", return_value="hash1"), \
-             patch("plugins.mlx_module.core.chat.prepare_tokens", return_value=([1, 2, 3], [1, 2], [], [])), \
-             patch("plugins.mlx_module.core.chat.lookup_prefix_cache", return_value=(MagicMock(), 1, True)), \
-             patch("plugins.mlx_module.core.chat.determine_tokens_to_process", return_value=([3], 1)), \
-             patch("plugins.mlx_module.core.chat.run_streaming_generation", return_value=("output", MagicMock(), None)), \
-             patch("plugins.mlx_module.core.chat.save_cache_post_generation"), \
-             patch("plugins.mlx_module.core.chat.extract_metrics", return_value={"text": "output", "tokens": 5}), \
+        with patch("core.utils.compute_system_hash", return_value="hash1"), \
+             patch("plugins.mlx_module.core.generate_helpers.prepare_tokens", return_value=([1, 2, 3], [1, 2], [], [])), \
+             patch("plugins.mlx_module.core.generate_helpers.lookup_prefix_cache", return_value=(MagicMock(), 1, True)), \
+             patch("plugins.mlx_module.core.generate_helpers.determine_tokens_to_process", return_value=([3], 1)), \
+             patch("plugins.mlx_module.core.generate_helpers.run_streaming_generation", return_value=("output", MagicMock(), None)), \
+             patch("plugins.mlx_module.core.generate_helpers.save_cache_post_generation"), \
+             patch("plugins.mlx_module.core.generate_helpers.extract_metrics", return_value={"text": "output", "tokens": 5}), \
              patch.dict(sys.modules, {"mlx_lm": mock_mlx_lm, "mlx_lm.sample_utils": mock_mlx_lm.sample_utils}), \
              patch("plugins.mlx_module.core.prompt_cache_manager.get_prompt_cache_manager", return_value=mock_cache_mgr, create=True):
             result = node._generate_blocking("sys", [{"role": "user", "content": "hi"}], [], None, "sess")

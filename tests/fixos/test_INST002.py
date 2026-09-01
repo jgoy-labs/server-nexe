@@ -36,11 +36,13 @@ def test_inst002_unpinned_download_emits_warning_and_completes(installer_app, mo
     """An unpinned model emits a SHA256_NOT_PINNED warning event and, even so,
     the installation reaches `done` (the warning does not abort)."""
     from core.endpoints import installer as inst
+    from core.endpoints import installer_shared
+    from core.endpoints import installer_hf
     import installer.download_verify as dv
 
     monkeypatch.delenv("HF_TOKEN", raising=False)
-    monkeypatch.setattr(inst, "_models_dir", lambda: tmp_path)
-    monkeypatch.setattr(inst, "_check_model_access", lambda repo_id, token=None: {"status": "ok"})
+    monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
+    monkeypatch.setattr(installer_hf, "_check_model_access", lambda repo_id, token=None: {"status": "ok"})
 
     def fake_snap(repo_id, local_dir, tqdm_class=None, **kw):
         from pathlib import Path as _P

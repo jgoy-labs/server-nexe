@@ -21,11 +21,11 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from core.ollama_utils import resolve_ollama_url
-from ..chat_memory import _pending_save_tasks, _save_conversation_to_memory
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
+from ._common import persist_v1_turn
 from .ollama_helpers import auto_num_ctx
-from ._streaming import MAX_STREAM_BYTES
+from ._streaming import MAX_STREAM_BYTES, format_sse_done
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,22 @@ _ollama_tags_cache: dict = {"models": None, "ts": 0.0}
 TAGS_CACHE_TTL = 30  # seconds
 
 # CS7: Configurable stream timeout via env var (default 300s for thinking models)
-_OLLAMA_STREAM_TIMEOUT = float(os.environ.get("NEXE_OLLAMA_STREAM_TIMEOUT", "300"))
+def _ollama_stream_timeout() -> float:
+    """Seconds the /v1 Ollama stream may run. Guarded: this module is imported
+    at boot, so a typo used to be a boot failure (same class as #978)."""
+    raw = os.environ.get("NEXE_OLLAMA_STREAM_TIMEOUT", "300")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        logger.warning("NEXE_OLLAMA_STREAM_TIMEOUT=%r is not a number — using 300", raw)
+        return 300.0
+    if value != value or value <= 0.0:
+        logger.warning("NEXE_OLLAMA_STREAM_TIMEOUT=%r must be positive — using 300", raw)
+        return 300.0
+    return value
 
-_OLLAMA_NUM_CTX = auto_num_ctx()
+
+_OLLAMA_STREAM_TIMEOUT = _ollama_stream_timeout()
 
 _OLLAMA_ERRORS = {
     "ca": {
@@ -149,7 +162,7 @@ def _build_ollama_payload(request, messages: List[Dict], model_name: str) -> dic
     options = {
         "temperature": request.temperature,
         "num_predict": request.max_tokens or int(os.getenv("NEXE_DEFAULT_MAX_TOKENS", "4096")),
-        "num_ctx": _OLLAMA_NUM_CTX
+        "num_ctx": auto_num_ctx(),
     }
     # top_p is opt-in (mirror of temperature): forward only when explicitly set so
     # omitting it preserves Ollama's own default (byte-exact with prior behavior).
@@ -167,7 +180,8 @@ def _build_ollama_payload(request, messages: List[Dict], model_name: str) -> dic
 
 def _ollama_streaming_response(
     url: str, payload: dict, app_state, user_msg,
-    fallback_from: Optional[str], fallback_reason: Optional[str]
+    fallback_from: Optional[str], fallback_reason: Optional[str],
+    session_id: Optional[str] = None,
 ) -> StreamingResponse:
     """Builds and returns the StreamingResponse with fallback headers if applicable."""
     headers = {"X-Nexe-Engine": "ollama"}
@@ -175,7 +189,7 @@ def _ollama_streaming_response(
         headers["X-Nexe-Fallback-From"] = fallback_from
         headers["X-Nexe-Fallback-Reason"] = fallback_reason or "fallback"
     return StreamingResponse(
-        _ollama_stream_generator(url, payload, app_state, user_msg),
+        _ollama_stream_generator(url, payload, app_state, user_msg, session_id=session_id),
         media_type="text/event-stream",
         headers=headers,
     )
@@ -204,7 +218,12 @@ async def _ollama_blocking_response(
                 "choices": [{
                     "index": 0,
                     "message": raw.get("message", {"role": "assistant", "content": ""}),
-                    "finish_reason": "stop" if raw.get("done") else "length",
+                    # A blocking call only returns once generation is over, so
+                    # `done` is always True and cannot tell why it stopped.
+                    # Ollama puts the reason in `done_reason` — the same field
+                    # the UI path reads to offer Continue. Reporting "stop" on a
+                    # ceiling cut makes an OpenAI client drop the tail silently.
+                    "finish_reason": "length" if raw.get("done_reason") == "length" else "stop",
                 }],
                 "usage": {
                     "prompt_tokens": raw.get("prompt_eval_count", 0),
@@ -233,6 +252,7 @@ async def _forward_to_ollama(
     user_msg: Optional[str] = None,
     fallback_from: Optional[str] = None,
     fallback_reason: Optional[str] = None,
+    session_id: Optional[str] = None,
 ):
     """Forward request to local Ollama instance."""
     # MC-089: honour the full cascade (SidecarConfig → NEXE_OLLAMA_HOST →
@@ -243,11 +263,16 @@ async def _forward_to_ollama(
     model_name, _ = await _validate_ollama_model(_ollama_host, model_name)  # raises status_code=404 if not found, 503 if unavailable
     payload = _build_ollama_payload(request, messages, model_name)
     if request.stream:
-        return _ollama_streaming_response(url, payload, app_state, user_msg, fallback_from, fallback_reason)
+        return _ollama_streaming_response(
+            url, payload, app_state, user_msg, fallback_from, fallback_reason, session_id=session_id
+        )
     return await _ollama_blocking_response(url, payload, fallback_from, fallback_reason)
 
-async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user_msg: Optional[str] = None):
-    """OpenAI-compatible streaming generator from Ollama with Auto-Save support."""
+async def _ollama_stream_generator(
+    url: str, payload: dict, app_state=None, user_msg: Optional[str] = None,
+    session_id: Optional[str] = None,
+):
+    """OpenAI-compatible streaming generator from Ollama."""
     response_parts = []
     _response_bytes = 0
 
@@ -291,23 +316,20 @@ async def _ollama_stream_generator(url: str, payload: dict, app_state=None, user
                             yield f"data: {json.dumps(chunk)}\n\n"
 
                         if done:
+                            # Ollama puts the reason in done_reason on the final
+                            # line; the stream used to close with [DONE] alone, so
+                            # a ceiling cut was indistinguishable from a clean stop
+                            # (the blocking path already reads the same field).
+                            yield format_sse_done(
+                                payload.get("model", ""),
+                                "ollama",
+                                finish_reason=data.get("done_reason"),
+                            )
                             yield "data: [DONE]\n\n"
-                            # --- TRIGGER AUTO-SAVE (fire-and-forget) ---
+
                             full_response_text = "".join(response_parts)
-                            if app_state and user_msg and full_response_text.strip():
-                                async def _background_save_ollama():
-                                    for attempt in range(2):
-                                        try:
-                                            await _save_conversation_to_memory(app_state, user_msg, full_response_text)
-                                            return
-                                        except Exception as e:
-                                            if attempt == 0:
-                                                await asyncio.sleep(1)
-                                            else:
-                                                logger.error("Stream Auto-Save failed after retry: %s", e, exc_info=True)
-                                task = asyncio.create_task(_background_save_ollama())
-                                _pending_save_tasks.add(task)
-                                task.add_done_callback(_pending_save_tasks.discard)
+                            persist_v1_turn(app_state, session_id, full_response_text)
+
                             break
 
                     except json.JSONDecodeError as jde:

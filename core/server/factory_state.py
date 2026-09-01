@@ -30,8 +30,6 @@ def setup_app_state(app: FastAPI, i18n: Any, config: dict, project_root: Path, m
   from core.lifespan import get_server_state
   from core.endpoints.modules import configure_dependencies as configure_modules_deps
 
-  from core.module_registry import ModuleRegistry
-  app.state.module_registry = ModuleRegistry()
   app.state.modules = {}
 
   server_state = get_server_state()

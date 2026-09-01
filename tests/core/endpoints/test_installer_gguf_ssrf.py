@@ -22,6 +22,10 @@ import pytest
 
 from core.endpoints import installer as installer_mod
 
+from core.endpoints import installer_gguf
+from core.endpoints import installer_shared
+from core.endpoints import installer_hf
+
 
 class _FakeReq:
     async def is_disconnected(self):
@@ -91,8 +95,8 @@ class _ScriptedClient:
 
 
 def _install(monkeypatch, tmp_path, script):
-    monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
-    monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: None)
+    monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
+    monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: None)
     monkeypatch.delenv("HF_TOKEN", raising=False)
     monkeypatch.setattr("httpx.AsyncClient", _ScriptedClient)
     _ScriptedClient.script = list(script)
@@ -101,7 +105,7 @@ def _install(monkeypatch, tmp_path, script):
 
 def _run(model_id):
     async def _collect():
-        return [ev async for ev in installer_mod._stream_gguf(model_id, _FakeReq())]
+        return [ev async for ev in installer_gguf._stream_gguf(model_id, _FakeReq())]
 
     return asyncio.run(_collect())
 
@@ -125,7 +129,7 @@ def _run(model_id):
     ],
 )
 def test_is_allowed_gguf_url(url, expected):
-    assert installer_mod._is_allowed_gguf_url(url) is expected
+    assert installer_gguf._is_allowed_gguf_url(url) is expected
 
 
 # ── positive: HF https URL downloads and writes bytes ─────────────────────────
@@ -167,7 +171,7 @@ def test_ssrf_internal_target_rejected(monkeypatch, tmp_path):
 
 
 def test_content_length_over_cap_rejected(monkeypatch, tmp_path):
-    monkeypatch.setattr(installer_mod, "_GGUF_MAX_BYTES", 10)
+    monkeypatch.setattr(installer_gguf, "_GGUF_MAX_BYTES", 10)
     _install(monkeypatch, tmp_path, [_Resp(content_length=1000, body=b"x" * 1000)])
     events = _run("https://huggingface.co/org/model/resolve/main/m.gguf")
     assert events[0]["type"] == "error"
@@ -179,7 +183,7 @@ def test_content_length_over_cap_rejected(monkeypatch, tmp_path):
 
 
 def test_streamed_body_over_cap_aborted(monkeypatch, tmp_path):
-    monkeypatch.setattr(installer_mod, "_GGUF_MAX_BYTES", 10)
+    monkeypatch.setattr(installer_gguf, "_GGUF_MAX_BYTES", 10)
     _install(monkeypatch, tmp_path, [_Resp(body=b"x" * 1000)])  # no content-length
     events = _run("https://huggingface.co/org/model/resolve/main/m.gguf")
     assert any(ev.get("code") == "MODEL_TOO_LARGE" for ev in events)
@@ -209,8 +213,8 @@ def test_redirect_off_allowlist_rejected(monkeypatch, tmp_path):
 
 def test_redirect_within_allowlist_followed_and_auth_stripped(monkeypatch, tmp_path):
     monkeypatch.setenv("HF_TOKEN", "hf_secret")  # bearer attached on first hop
-    monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
-    monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: None)
+    monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
+    monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: None)
     monkeypatch.setattr("httpx.AsyncClient", _ScriptedClient)
     redirect = _Resp(
         is_redirect=True,

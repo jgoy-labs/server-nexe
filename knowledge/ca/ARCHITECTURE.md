@@ -175,7 +175,6 @@ server-nexe/
 │   │   ├── chat_schemas.py       # Models Pydantic (Message, ChatCompletionRequest)
 │   │   ├── chat_sanitization.py  # Sanititzacio de tokens SSE, truncament de context
 │   │   ├── chat_rag.py           # Constructor de context RAG (3 col·leccions)
-│   │   ├── chat_memory.py        # Guardar conversa a memoria (MEM_SAVE)
 │   │   ├── chat_engines/         # Generadors per backend
 │   │   │   ├── routing.py        # Logica de seleccio de motor
 │   │   │   ├── ollama.py         # Generador streaming d'Ollama
@@ -378,16 +377,17 @@ Capa d'Embeddings (memory/embeddings/) — generacio de vectors + interficie Qdr
 
 ## Arquitectura de l'endpoint de xat
 
-`POST /v1/chat/completions` es l'endpoint principal, separat en 8 submoduls:
+`POST /v1/chat/completions` es l'endpoint principal, separat en 7 submoduls:
 
 1. **chat_schemas.py** — Models Pydantic (Message, ChatCompletionRequest amb use_rag=True per defecte)
 2. **chat_sanitization.py** — Sanititzacio de tokens SSE (bytes nuls, caracters de control), truncament de context RAG basat en ràtio (MAX_CONTEXT_RATIO=0.3, límit RAG 4000 caràcters)
 3. **chat_rag.py** — Constructor de context RAG: cerca a nexe_documentation (0.4), user_knowledge (0.35), personal_memory (0.3)
-4. **chat_memory.py** — Parseig de MEM_SAVE, guardar conversa a memoria
-5. **chat_engines/routing.py** — Seleccio de motor (auto, ollama, mlx, llama_cpp)
-6. **chat_engines/ollama.py** — Streaming d'Ollama amb suport de thinking tokens
-7. **chat_engines/mlx.py** — Streaming de MLX amb gestio de CancelledError
-8. **chat_engines/llama_cpp.py** — Streaming de llama.cpp
+4. **chat_engines/routing.py** — Seleccio de motor (auto, ollama, mlx, llama_cpp)
+5. **chat_engines/ollama.py** — Streaming d'Ollama amb suport de thinking tokens
+6. **chat_engines/mlx.py** — Streaming de MLX amb gestio de CancelledError
+7. **chat_engines/llama_cpp.py** — Streaming de llama.cpp
+
+Els fets que el model marca amb `[MEM_SAVE:]` es persisteixen al camí de la UI (`memory_helper.py`), no des d'aquest endpoint.
 
 **Marcadors de streaming injectats per l'endpoint de xat:**
 - `[MODEL:name]` — nom del model actiu

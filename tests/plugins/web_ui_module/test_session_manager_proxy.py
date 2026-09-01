@@ -13,8 +13,9 @@ Three bugs chained together:
      module_instance.session_manager into a local, snapshotting the
      crypto-less instance from bug #2.
 
-Fix: a single SessionManager is built only in initialize(); routes read
-through a _SessionManagerProxy with late-binding __getattr__.
+Fix: a single SessionManager is attached on server_state in lifespan
+(initialize() binds to it); routes read through a _SessionManagerProxy
+with late-binding __getattr__.
 
 These tests pin the contract so a future refactor cannot silently
 reintroduce any of the three bugs.
@@ -35,7 +36,7 @@ class TestSessionManagerLateInit:
         assert mod.session_manager is None
 
     def test_initialize_creates_single_session_manager(self):
-        """initialize() creates the one and only SessionManager."""
+        """initialize() binds the one and only SessionManager (core-owned)."""
         mod = WebUIModule()
         ok = asyncio.run(mod.initialize({"config": {}}))
         assert ok is True
@@ -79,7 +80,7 @@ class TestSessionManagerProxy:
         # Simulate a hypothetical rebuild of session_manager (e.g. after a
         # key rotation). The proxy must follow, not keep pointing at the
         # original.
-        from plugins.web_ui_module.core.session_manager import SessionManager
+        from core.sessions import SessionManager
         mod.session_manager = SessionManager()
         assert mod.session_manager is not original
         assert proxy.list_sessions() == mod.session_manager.list_sessions()

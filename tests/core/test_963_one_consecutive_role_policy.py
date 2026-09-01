@@ -63,7 +63,7 @@ class TestBothLayersAgree:
 
     def test_session_history_and_the_mlx_engine_produce_the_same_turns(self):
         from plugins.mlx_module.core.generate_helpers import _merge_same_role
-        from plugins.web_ui_module.core.session_manager import ChatSession
+        from core.sessions import ChatSession
 
         s = ChatSession()
         s.add_message("user", "a")
@@ -82,7 +82,7 @@ class TestBothLayersAgree:
         Swap the canonical function and the engine must follow; if someone
         re-inlines the merge loop, it won't."""
         from plugins.mlx_module.core import generate_helpers
-        from plugins.web_ui_module.core.session_manager import ChatSession
+        from core.sessions import ChatSession
 
         sentinel = [{"role": "user", "content": "SENTINEL"}]
         monkeypatch.setattr(
@@ -90,7 +90,7 @@ class TestBothLayersAgree:
         )
         assert generate_helpers._merge_same_role([{"role": "user", "content": "x"}]) is sentinel
 
-        import plugins.web_ui_module.core.session_manager as sm
+        import core.sessions.session_manager as sm
 
         monkeypatch.setattr(sm, "merge_consecutive_same_role", lambda m: sentinel)
         assert ChatSession().get_context_messages() is sentinel

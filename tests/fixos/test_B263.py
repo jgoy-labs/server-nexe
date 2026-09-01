@@ -112,7 +112,8 @@ class TestWebUiHandlerEndToEnd:
         from unittest.mock import patch as _patch
         from tests.plugins.web_ui_module.test_chat_inner_behavior import _drain
 
-        async def _fake_rag(memory_helper, message, body_arg, attached_doc):
+        async def _fake_rag(memory_helper, message, body_arg, attached_doc,
+                            context_window=None):
             return rag_context, (1 if rag_context else 0), []
 
         with _patch.object(rc, "_build_rag_context", _fake_rag):
@@ -241,7 +242,7 @@ class TestOpenAiRouteParity:
         untrusted → system armat — ha de seguir assertada enlloc."""
 
         async def _ctx(body, app_state, server_lang):
-            return "fets recuperats del document"
+            return "fets recuperats del document", []
 
         monkeypatch.setattr(openai_chat, "_fetch_rag_context", _ctx)
         monkeypatch.setattr(
@@ -275,7 +276,7 @@ class TestOpenAiRouteParity:
         regla igualment (contra HEAD: només amb context → RED)."""
 
         async def _no_ctx(body, app_state, server_lang):
-            return ""
+            return "", []
 
         monkeypatch.setattr(openai_chat, "_fetch_rag_context", _no_ctx)
         monkeypatch.setattr(

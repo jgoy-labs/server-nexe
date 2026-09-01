@@ -121,10 +121,70 @@ class OllamaChat:
             await ollama_breaker.record_success()
             yield response.json()
 
+    @staticmethod
+    def _starved_by_thinking(chunk: Dict[str, Any], saw_content: bool, saw_thinking: bool) -> bool:
+        """True when this final chunk ends a turn that reasoned and never answered (#984).
+
+        Ollama keeps reasoning in ``message.thinking`` and the answer in
+        ``message.content``, so the two are told apart without parsing tags: a
+        turn that stopped at the ceiling having produced only the former holds
+        nothing the user can read. Measured on qwen3.5:4b, where a trivial
+        question spends ~3100 tokens reasoning and 25 answering.
+        """
+        return (
+            bool(chunk.get("done"))
+            and chunk.get("done_reason") == "length"
+            and saw_thinking
+            and not saw_content
+        )
+
+    async def _generate_with_answer_guarantee(
+        self, httpx, ollama_breaker, url: str, payload: Dict[str, Any],
+        stream: bool, model: str,
+    ):
+        """Yield the turn's chunks, retrying once without thinking if it starved.
+
+        The final chunk of a starved turn is held back rather than forwarded:
+        it carries ``done``, and a consumer that sees it stops listening. If
+        the retry itself fails, that held chunk is released so the turn ends
+        the way it would have without this guarantee — degraded, never hung.
+        """
+        source = self._stream_request if stream else self._direct_request
+        saw_content = saw_thinking = False
+        held = None
+        async for chunk in source(httpx, ollama_breaker, url, payload):
+            message = chunk.get("message") or {}
+            saw_content = saw_content or bool(message.get("content"))
+            saw_thinking = saw_thinking or bool(message.get("thinking"))
+            if self._starved_by_thinking(chunk, saw_content, saw_thinking):
+                held = chunk
+                break
+            yield chunk
+        if held is None:
+            return
+        try:
+            async for chunk in self._retry_without_thinking(
+                httpx, ollama_breaker, url, payload, stream, model,
+                reason="the ceiling ended the turn inside the reasoning (#984)",
+            ):
+                yield chunk
+        except Exception as exc:  # noqa: BLE001 — degrade, never hang the turn
+            await ollama_breaker.record_failure(exc)
+            logger.error(
+                "Chat retry (no-think, #984) failed with model %s: %s — releasing "
+                "the reasoning-only turn", model, repr(exc),
+            )
+            yield held
+
     async def _retry_without_thinking(self, httpx, ollama_breaker, url: str,
-                                      payload: Dict[str, Any], stream: bool, model: str):
-        """Retry the request with think:false after a 400 rejection."""
-        logger.warning("Model %s rejects think:true (400) — retrying without thinking", model)
+                                      payload: Dict[str, Any], stream: bool, model: str,
+                                      reason: str = "the model rejects think:true (400)"):
+        """Retry the request with think:false.
+
+        Two callers: a 400 from a model that cannot think at all, and #984's
+        answer guarantee when reasoning ate the whole ceiling.
+        """
+        logger.warning("Retrying model %s without thinking — %s", model, reason)
         payload["think"] = False
         if stream:
             async for chunk in self._stream_request(httpx, ollama_breaker, url, payload):
@@ -153,12 +213,10 @@ class OllamaChat:
         payload = self._build_payload(model, messages, stream, images=images,
                                       thinking_enabled=thinking_enabled, top_p=top_p)
         try:
-            if stream:
-                async for chunk in self._stream_request(httpx, ollama_breaker, url, payload):
-                    yield chunk
-            else:
-                async for chunk in self._direct_request(httpx, ollama_breaker, url, payload):
-                    yield chunk
+            async for chunk in self._generate_with_answer_guarantee(
+                httpx, ollama_breaker, url, payload, stream, model
+            ):
+                yield chunk
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 400 and payload.get("think"):

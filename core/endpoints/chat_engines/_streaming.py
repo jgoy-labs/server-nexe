@@ -5,8 +5,7 @@ Author: Jordi Goy
 Location: core/endpoints/chat_engines/_streaming.py
 Description: Shared streaming infrastructure for chat engines (MLX, Llama.cpp).
 
-Provides TokenBridge (sync→async token bridging), SSE formatters,
-and background memory save with retry.
+Provides TokenBridge (sync→async token bridging) and SSE formatters.
 
 www.jgoy.net · https://server-nexe.org
 ------------------------------------
@@ -18,7 +17,6 @@ import logging
 import os
 import time
 
-from ..chat_memory import _save_conversation_to_memory
 from ..chat_sanitization import _sanitize_sse_token
 
 logger = logging.getLogger(__name__)
@@ -178,13 +176,44 @@ def format_sse_chunk(token: str, model_name: str, engine_prefix: str) -> str:
     return f"data: {json.dumps(chunk)}\n\n"
 
 
-def format_sse_done(model_name: str, engine_prefix: str, truncated: bool = False) -> str:
+def format_sse_done(
+    model_name: str,
+    engine_prefix: str,
+    truncated: bool = False,
+    finish_reason: str | None = None,
+) -> str:
     """Format the final SSE chunk.
 
     ``finish_reason`` is ``"stop"`` for a clean completion, or ``"length"``
-    (the OpenAI-canonical value for a cut-off response) when the stream was
-    truncated because the bridge queue overflowed (B216). This makes the
-    silent token drop visible to the client.
+    (the OpenAI-canonical value for a cut-off response) in two cases:
+
+    * ``truncated`` — the bridge queue overflowed and tokens were dropped
+      (B216). Kept as-is: the drop must stay visible to the client.
+    * ``finish_reason`` — the ENGINE reports it hit the token ceiling. The
+      blocking path already forwards this (``build_openai_response``); a
+      stream used to throw it away and always close with "stop", so an
+      OpenAI-compatible client (stream=True is the default in LangChain,
+      Open WebUI, aider and Continue) never asked for the tail.
+
+    Anything the engine cannot answer for degrades to "stop": an absent
+    reason is not a truncation.
+
+    The two cases are NOT the same cut, and "length" alone cannot tell them
+    apart, so the chunk also carries ``x_nexe_truncation`` (#989):
+
+    * ``"ceiling"`` — the answer is missing its TAIL. A client that asks for
+      the continuation stitches it in the right place.
+    * ``"overflow"`` — tokens were dropped from the MIDDLE and the ending
+      that arrived is the natural one. Resuming would append new text over
+      an internal hole, producing something that reads as coherent and is
+      not. Such an answer cannot be repaired by continuing it.
+
+    The field is absent on a clean stop, and ``"overflow"`` wins when both
+    happen at once: an internal hole is the damage a client must not paper
+    over, whatever else went on. It is an extension, not OpenAI: it lives at
+    the root of the chunk (where ``system_fingerprint`` lives) so a strict
+    client that validates ``choices`` never sees it, and one that ignores
+    unknown keys behaves exactly as before.
     """
     now = int(time.time())
     final_chunk = {
@@ -195,22 +224,10 @@ def format_sse_done(model_name: str, engine_prefix: str, truncated: bool = False
         "choices": [{
             "index": 0,
             "delta": {},
-            "finish_reason": "length" if truncated else "stop",
+            "finish_reason": "length" if (truncated or finish_reason == "length") else "stop",
         }],
     }
+    cause = "overflow" if truncated else ("ceiling" if finish_reason == "length" else None)
+    if cause:
+        final_chunk["x_nexe_truncation"] = cause
     return f"data: {json.dumps(final_chunk)}\n\n"
-
-
-async def background_memory_save(app_state, user_msg: str, response_text: str):
-    """Fire-and-forget conversation save with one retry."""
-    if not (app_state and user_msg and response_text.strip()):
-        return
-    for attempt in range(2):
-        try:
-            await _save_conversation_to_memory(app_state, user_msg, response_text)
-            return
-        except Exception as e:
-            if attempt == 0:
-                await asyncio.sleep(1)
-            else:
-                logger.error("Stream Auto-Save failed after retry: %s", e, exc_info=True)

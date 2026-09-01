@@ -528,15 +528,19 @@ class TestChatEndpoint:
 
         engine.chat = MagicMock(side_effect=capture_chat)
 
-        rag_results = [{"content": "El meu nom és Jordi", "score": 0.9, "metadata": {}}]
-
         with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
-             patch("core.lifespan.get_server_state") as mock_state:
+             patch("core.lifespan.get_server_state") as mock_state, \
+             patch(
+                 "core.endpoints.chat_rag.build_rag_context",
+                 new=AsyncMock(return_value=("[MEMORIA DE L'USUARI]\nEl meu nom és Jordi", [("personal_memory", 0.9)])),
+             ) as mock_rag:
+            # F-D block 3: /ui/chat's RAG now goes through
+            # core.endpoints.chat_rag.build_rag_context, not
+            # memory_helper.recall_from_memory — patch the real call site,
+            # and check the rag_threshold from the body actually reaches it
+            # (C1 regression: it used to be read and silently dropped).
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
-            hh.recall_from_memory = AsyncMock(return_value={
-                "success": True, "results": rag_results
-            })
             hh.auto_save = AsyncMock(return_value={"success": True, "document_id": None, "message": ""})
             mock_mh.return_value = hh
             state = MagicMock()
@@ -547,6 +551,14 @@ class TestChatEndpoint:
                 json={"message": "Com em dic?", "session_id": sid, "rag_threshold": 0.5}
             )
         assert r.status_code == 200
+        # (>=1, not ==1: this mock engine's non-async .chat makes the real
+        # engine cascade retry a second engine — unrelated to the RAG wiring
+        # this test checks.)
+        assert mock_rag.called, "the RAG engine must be reached, not the dead memory_helper path"
+        assert mock_rag.call_args.kwargs.get("threshold_override") == 0.5, (
+            "the UI's rag_threshold must reach build_rag_context (C1 regression)"
+        )
+        assert any("El meu nom és Jordi" in m.get("content", "") for m in captured_messages)
 
     def test_chat_stream_mode(self, client, auth):
         """Chat in stream mode returns StreamingResponse."""
@@ -641,7 +653,7 @@ class TestStartSessionCleanup:
 
     def test_start_cleanup_task(self):
         """start_session_cleanup_task creates an asyncio.Task."""
-        from plugins.web_ui_module.api.routes import start_session_cleanup_task
+        from core.sessions import start_session_cleanup_task
 
         async def run():
             with patch("asyncio.create_task") as mock_ct:

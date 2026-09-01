@@ -25,6 +25,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from core.endpoints import installer
+from core.endpoints import installer_ollama
+from core.endpoints import installer_shared
 
 BUNDLE = "/Applications/Ollama.app/Contents/Resources/ollama"
 
@@ -46,9 +48,9 @@ def _client() -> TestClient:
 @pytest.fixture(autouse=True)
 def _install_branch(monkeypatch):
     """Force the "not installed yet" branch and free the process-wide lock."""
-    monkeypatch.setattr(installer, "_find_ollama_bin", lambda: None)
-    if installer._ollama_install_lock.locked():
-        installer._ollama_install_lock.release()
+    monkeypatch.setattr(installer_ollama, "_find_ollama_bin", lambda: None)
+    if installer_shared._ollama_install_lock.locked():
+        installer_shared._ollama_install_lock.release()
 
 
 def _slow_install(delay: float, result: str = BUNDLE):
@@ -68,7 +70,7 @@ class TestKeepaliveWhileInstalling:
         pre-fix shape) and this goes RED — zero keepalive events.
         """
         monkeypatch.setattr(installer, "_OLLAMA_INSTALL_KEEPALIVE_S", 0.05)
-        monkeypatch.setattr(installer, "_install_ollama_and_locate", _slow_install(0.35))
+        monkeypatch.setattr(installer_ollama, "_install_ollama_and_locate", _slow_install(0.35))
 
         resp = _client().post("/installer/ollama")
         assert resp.status_code == 200
@@ -82,7 +84,7 @@ class TestKeepaliveWhileInstalling:
         """Same shape as the download keepalive so one client handler covers
         both streams."""
         monkeypatch.setattr(installer, "_OLLAMA_INSTALL_KEEPALIVE_S", 0.05)
-        monkeypatch.setattr(installer, "_install_ollama_and_locate", _slow_install(0.2))
+        monkeypatch.setattr(installer_ollama, "_install_ollama_and_locate", _slow_install(0.2))
 
         events = _events(_client().post("/installer/ollama").text)
         keepalives = [e for e in events if e.get("type") == "keepalive"]
@@ -106,7 +108,7 @@ class TestKeepaliveWhileInstalling:
         waiting are what make the period observable.
         """
         monkeypatch.setattr(installer, "_OLLAMA_INSTALL_KEEPALIVE_S", 30.0)
-        monkeypatch.setattr(installer, "_install_ollama_and_locate", _slow_install(0.02))
+        monkeypatch.setattr(installer_ollama, "_install_ollama_and_locate", _slow_install(0.02))
 
         events = _events(_client().post("/installer/ollama").text)
         assert not [e for e in events if e.get("type") == "keepalive"], events
@@ -117,7 +119,7 @@ class TestContractsPreserved:
 
     def test_done_event_still_carries_the_binary(self, monkeypatch):
         monkeypatch.setattr(installer, "_OLLAMA_INSTALL_KEEPALIVE_S", 0.05)
-        monkeypatch.setattr(installer, "_install_ollama_and_locate", _slow_install(0.15))
+        monkeypatch.setattr(installer_ollama, "_install_ollama_and_locate", _slow_install(0.15))
 
         events = _events(_client().post("/installer/ollama").text)
         done = [e for e in events if e.get("type") == "done"]
@@ -133,29 +135,29 @@ class TestContractsPreserved:
             raise RuntimeError("Ollama install failed: no admin rights")
 
         monkeypatch.setattr(installer, "_OLLAMA_INSTALL_KEEPALIVE_S", 0.05)
-        monkeypatch.setattr(installer, "_install_ollama_and_locate", _boom)
+        monkeypatch.setattr(installer_ollama, "_install_ollama_and_locate", _boom)
 
         events = _events(_client().post("/installer/ollama").text)
         errors = [e for e in events if e.get("type") == "error"]
         assert errors, f"the RuntimeError path lost its error event: {events}"
         assert "no admin rights" in errors[-1]["message"]
         assert not [e for e in events if e.get("type") == "done"]
-        assert not installer._ollama_install_lock.locked(), (
+        assert not installer_shared._ollama_install_lock.locked(), (
             "the install lock leaked on the error path"
         )
 
     def test_already_installed_short_circuit_is_untouched(self, monkeypatch):
-        monkeypatch.setattr(installer, "_find_ollama_bin", lambda: BUNDLE)
+        monkeypatch.setattr(installer_ollama, "_find_ollama_bin", lambda: BUNDLE)
         events = _events(_client().post("/installer/ollama").text)
         assert events == [{"type": "done", "already_installed": True}]
 
     def test_concurrent_install_still_refused(self, monkeypatch):
         monkeypatch.setattr(installer, "_OLLAMA_INSTALL_KEEPALIVE_S", 0.05)
-        monkeypatch.setattr(installer, "_install_ollama_and_locate", _slow_install(0.05))
-        installer._ollama_install_lock.acquire(blocking=False)
+        monkeypatch.setattr(installer_ollama, "_install_ollama_and_locate", _slow_install(0.05))
+        installer_shared._ollama_install_lock.acquire(blocking=False)
         try:
             events = _events(_client().post("/installer/ollama").text)
         finally:
-            installer._ollama_install_lock.release()
+            installer_shared._ollama_install_lock.release()
         assert [e["type"] for e in events] == ["progress", "error"]
         assert "instal" in events[-1]["message"].lower()

@@ -483,12 +483,12 @@ class TestSessionCleanupTask:
     def test_cleanup_loop_is_coroutine(self):
         """_session_cleanup_loop is a coroutine (async def)."""
         import asyncio
-        from plugins.web_ui_module.api.routes import _session_cleanup_loop
+        from core.sessions.cleanup import _session_cleanup_loop
         assert asyncio.iscoroutinefunction(_session_cleanup_loop)
 
     def test_start_cleanup_task_function_exists(self):
         """start_session_cleanup_task() exists and is callable."""
-        from plugins.web_ui_module.api.routes import start_session_cleanup_task
+        from core.sessions import start_session_cleanup_task
         assert callable(start_session_cleanup_task)
 
     def test_cleanup_loop_uses_hourly_interval(self):
@@ -502,7 +502,7 @@ class TestSessionCleanupTask:
         asserts that the value passed is exactly 3600, not just present as a string.
 
         Mutation target: change `asyncio.sleep(3600)` to `asyncio.sleep(60)` in
-        routes.py → captured_seconds == 60 → assert fails → RED.
+        core/sessions/cleanup.py → captured_seconds == 60 → assert fails → RED.
         """
         import asyncio
         from unittest.mock import AsyncMock, MagicMock, patch
@@ -517,10 +517,10 @@ class TestSessionCleanupTask:
         session_mgr.cleanup_inactive.return_value = 0
 
         # Import here so the patch targets the right namespace.
-        import plugins.web_ui_module.api.routes as routes_mod
-        from plugins.web_ui_module.api.routes import _session_cleanup_loop
+        import core.sessions.cleanup as cleanup_mod
+        from core.sessions.cleanup import _session_cleanup_loop
 
-        with patch.object(routes_mod.asyncio, "sleep", _fake_sleep):
+        with patch.object(cleanup_mod.asyncio, "sleep", _fake_sleep):
             try:
                 asyncio.run(_session_cleanup_loop(session_mgr))
             except StopAsyncIteration:
@@ -536,13 +536,13 @@ class TestSessionCleanupTask:
 
     def test_cleanup_loop_calls_cleanup_inactive(self):
         """The loop calls cleanup_inactive() on the session_manager."""
-        from plugins.web_ui_module.api.routes import _session_cleanup_loop
+        from core.sessions.cleanup import _session_cleanup_loop
         source = inspect.getsource(_session_cleanup_loop)
         assert "cleanup_inactive" in source
 
     def test_cleanup_loop_has_max_age_hours(self):
         """cleanup_inactive is called with max_age_hours (session TTL)."""
-        from plugins.web_ui_module.api.routes import _session_cleanup_loop
+        from core.sessions.cleanup import _session_cleanup_loop
         source = inspect.getsource(_session_cleanup_loop)
         assert "max_age_hours" in source
 

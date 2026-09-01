@@ -37,13 +37,17 @@ USER_TOP_P = 0.33
 def _make_node():
     """Build a bare LlamaCppChatNode without touching __init__/ModelPool.
 
-    The four _generate* methods only reference self._STOP_SEQUENCES (a class
-    attribute, present on the bare instance) and — for the VLM pair —
+    The four _generate* methods reference self._STOP_SEQUENCES (a class
+    attribute, present on the bare instance), self.config for the reply
+    ceiling (NEXE_LLAMA_CPP_MAX_TOKENS, #982) and — for the VLM pair —
     self._build_vlm_messages, which we stub per-test.
     """
     from plugins.llama_cpp_module.core.chat import LlamaCppChatNode
+    from plugins.llama_cpp_module.core.config import LlamaCppConfig
 
-    return LlamaCppChatNode.__new__(LlamaCppChatNode)
+    node = LlamaCppChatNode.__new__(LlamaCppChatNode)
+    node.config = LlamaCppConfig(model_path="/tmp/fake.gguf")
+    return node
 
 
 class _SpyModel:

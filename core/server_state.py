@@ -46,10 +46,13 @@ class ServerState:
     self.project_root: Optional[Path] = None
     self.i18n: Optional[Any] = None
     self.module_manager: Optional[Any] = None
-    self.registry: Optional[Any] = None
     self.ollama_process: Optional[Any] = None
     self.qdrant_available: bool = False
     self.crypto_provider: Optional[Any] = None
+    # Process-wide conversation threads. Built in lifespan after encryption
+    # and before plugins, so /v1 can persist a thread without web_ui_module.
+    # Typed Any to keep this module a leaf (no import of core.sessions).
+    self.session_manager: Optional[Any] = None
     self._cleanup_task: Optional[asyncio.Task[Any]] = None
     self._prewarm_task: Optional[asyncio.Task[Any]] = None
     self._session_cleanup_task: Optional[asyncio.Task[Any]] = None

@@ -15,6 +15,7 @@ import os
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 # Load .env automatically when this module is imported
 # (Consistency with llm_router/config.py - redundant but harmless)
@@ -69,9 +70,23 @@ def _read_model_config_json(model_path: str):
     try:
         import json
         with open(Path(model_path) / "config.json") as f:
-            return json.load(f)
+            data = json.load(f)
     except (OSError, ValueError):
         return None
+    # A top-level non-object ([], "x", 42, true) is valid JSON but not a config:
+    # letting it through hands every reader an AttributeError on .get().
+    return data if isinstance(data, dict) else None
+
+
+def _model_text_config(cfg: dict) -> dict:
+    """The nested ``text_config`` when it is a real dict, else the config itself.
+
+    VLM configs nest the text model's params; a malformed config can carry a
+    truthy non-dict there, and ``.get()`` on it raised an AttributeError that
+    reached the chat request on a hot-swap. One guard, shared by every reader.
+    """
+    tc = cfg.get("text_config")
+    return tc if isinstance(tc, dict) and tc else cfg
 
 
 def model_kv_bytes_per_token(model_path: str, *, effective: bool = False) -> int:
@@ -89,7 +104,7 @@ def model_kv_bytes_per_token(model_path: str, *, effective: bool = False) -> int
     cfg = _read_model_config_json(model_path)
     if cfg is None:
         return DEFAULT_KV_BYTES_PER_TOKEN
-    tc = cfg.get("text_config") or cfg  # VLMs nest the text model's params
+    tc = _model_text_config(cfg)
     layers = tc.get("num_hidden_layers")
     kv_heads = tc.get("num_key_value_heads") or tc.get("num_attention_heads")
     head_dim = tc.get("head_dim")
@@ -106,6 +121,27 @@ def model_kv_bytes_per_token(model_path: str, *, effective: bool = False) -> int
     if not (8 * 1024 <= bytes_per_token <= 4 * 1024 * 1024):  # sanity clamp
         return DEFAULT_KV_BYTES_PER_TOKEN
     return bytes_per_token
+
+
+def model_max_positions(model_path: str) -> Optional[int]:
+    """The model's own context limit (``max_position_embeddings``), or None.
+
+    #965: `max_kv_size` answers "how many tokens fit in RAM", which is not the
+    same question as "how many tokens does this model accept". On a big machine
+    with a small model the first is far larger than the second, and planning the
+    conversation around it means the engine rotates its cache and drops the start
+    of the chat with nobody told. The usable window is the smaller of the two.
+    """
+    cfg = _read_model_config_json(model_path)
+    if cfg is None:
+        return None
+    tc = _model_text_config(cfg)
+    value = tc.get("max_position_embeddings")
+    if isinstance(value, bool):
+        return None  # JSON true/false: isinstance(True, int) holds, min(x, True) == 1
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)  # some configs publish 65536.0 — the cap must not silently vanish
+    return value if isinstance(value, int) and value > 0 else None
 
 
 def model_weights_gb(model_path: str):
@@ -129,25 +165,64 @@ def auto_max_kv_size(model_path: str, total_gb=None) -> int:
     per token, rounded down to 4096. Floor 8192 (4096 is PROVEN too small for
     normal conversations); per-tier caps encode "conservative where not
     measured": <12 GB → 16384 (the measured point), <24 GB → 32768, else
-    65536. NEXE_MLX_MAX_KV_SIZE overrides all of this in from_env().
+    65536. #965: the result is additionally capped by the model's own
+    max_position_embeddings — but NEVER below the 8192 floor: with the default
+    reply budget (max_tokens=2048) plus the truncation margin, anything under
+    ~2304 makes truncate_messages_to_budget keep only the last message, so a
+    2048-position model capped literally would turn every conversation into
+    single-turn amnesia. Such models keep the floor and the pre-#965 behaviour
+    (the cache rotates on overflow) instead. NEXE_MLX_MAX_KV_SIZE overrides all
+    of this in from_env().
     """
     if total_gb is None:
         try:
             import psutil
             total_gb = psutil.virtual_memory().total / (1024 ** 3)
         except Exception:
-            return 16384  # safe fallback (the old 65536 was NOT conservative)
-    weights = model_weights_gb(model_path)
-    weights_gb = weights if weights is not None else 3.5
-    budget_gb = total_gb - _OS_RESERVE_GB - _RUNTIME_GB - weights_gb
-    tokens = int(max(0.0, budget_gb) * (1024 ** 3) / model_kv_bytes_per_token(model_path))
-    tokens = (tokens // 4096) * 4096
-    cap = 16384 if total_gb < 12 else (32768 if total_gb < 24 else 65536)
-    result = max(8192, min(cap, tokens))
+            total_gb = None  # fall through: the model cap below must still apply
+    if total_gb is None:
+        result = 16384  # safe fallback (the old 65536 was NOT conservative)
+    else:
+        weights = model_weights_gb(model_path)
+        weights_gb = weights if weights is not None else 3.5
+        budget_gb = total_gb - _OS_RESERVE_GB - _RUNTIME_GB - weights_gb
+        tokens = int(max(0.0, budget_gb) * (1024 ** 3) / model_kv_bytes_per_token(model_path))
+        tokens = (tokens // 4096) * 4096
+        cap = 16384 if total_gb < 12 else (32768 if total_gb < 24 else 65536)
+        result = max(8192, min(cap, tokens))
+    # #965: max_kv_size answers "how many tokens fit in RAM" — the model's own
+    # max_position_embeddings answers "how many tokens does it accept". Capping
+    # HERE (not in whoever reports the window) means every consumer inherits it:
+    # the prompt truncator, the prompt cache and the RAM guard stop planning for
+    # positions the model does not have, and the RAM guard stops over-reserving.
+    # The floor wins over the cap (see docstring): a sub-8192 model limit would
+    # zero the truncator's prompt budget and silently amputate the history.
+    model_limit = model_max_positions(model_path)
+    if model_limit:
+        capped = min(result, max(8192, model_limit))
+        if model_limit < 8192:
+            # The one path where we knowingly plan past the model: the floor
+            # wins to avoid single-turn amnesia, so the cache WILL rotate.
+            # Warned UNCONDITIONALLY — on a small machine RAM alone already
+            # left `result` at the floor, `capped == result`, and gating this
+            # on `capped < result` silenced the warning exactly on the 8 GB
+            # boxes where the rotation bites hardest.
+            logger.warning(
+                "MLXConfig: model limit %d is below the 8192 floor — max_kv_size stays "
+                "at %d and the cache will rotate on overflow",
+                model_limit, capped,
+            )
+        elif capped < result:
+            logger.info(
+                "MLXConfig: auto max_kv_size capped by the model itself: %d -> %d (max_position_embeddings=%d)",
+                result, capped, model_limit,
+            )
+        result = capped
     logger.info(
-        "MLXConfig: auto max_kv_size=%d (RAM=%.0fGB, weights=%s, kv/tok=%dKB)",
-        result, total_gb,
-        f"{weights_gb:.2f}GB" if weights is not None else "unknown→3.5GB",
+        "MLXConfig: auto max_kv_size=%d (RAM=%s, weights=%s, kv/tok=%dKB)",
+        result,
+        f"{total_gb:.0f}GB" if total_gb is not None else "unknown",
+        f"{weights_gb:.2f}GB" if total_gb is not None and weights is not None else "unknown→3.5GB",
         model_kv_bytes_per_token(model_path) // 1024,
     )
     return result
@@ -285,8 +360,21 @@ class MLXConfig:
         # the env var was defined). Hot-swap recalculates for free: every
         # model switch goes through from_env() again.
         _raw_kv = os.getenv("NEXE_MLX_MAX_KV_SIZE")
+        _kv_override = None
+        if _raw_kv:
+            try:
+                _kv_override = int(_raw_kv)
+                if _kv_override <= 0:
+                    logger.warning(
+                        "NEXE_MLX_MAX_KV_SIZE=%r must be positive, auto-sizing instead", _raw_kv
+                    )
+                    _kv_override = None
+            except ValueError:
+                logger.warning(
+                    "NEXE_MLX_MAX_KV_SIZE=%r is not a number, auto-sizing instead", _raw_kv
+                )
         config.max_kv_size = (
-            int(_raw_kv) if _raw_kv else auto_max_kv_size(config.model_path)
+            _kv_override if _kv_override is not None else auto_max_kv_size(config.model_path)
         )
 
         logger.info(

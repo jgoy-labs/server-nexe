@@ -475,7 +475,17 @@ def get_module_allowlist(config: Optional[Dict[str, Any]] = None) -> Optional[se
 
 # Localhost aliases — single source of truth (AI audit hardcode fix)
 # Always includes 127.0.0.1, ::1, localhost. NEXE_LOCALHOST_ALIASES adds extra
-# entries (comma-separated). Used by bootstrap IP allowlist + middleware host checks.
+# entries (comma-separated).
+#
+# #864 (2026-08-28): this list has ONE consumer now — the CLIENT IP comparison
+# in core/endpoints/bootstrap.py, where request.client.host is compared
+# against it. The Host-header check (TrustedHostMiddleware) and the CSRF
+# cookie_secure decision used to read this same list under a different
+# question ("is this a trusted Host header?" / "is the bind host loopback?"),
+# which meant an alias added for bootstrap could silently affect either of
+# those. They now have their own answers: TrustedHostMiddleware reads
+# get_trusted_hosts()/NEXE_TRUSTED_HOSTS below, and cookie_secure asks
+# core.server.runner._host_is_loopback() directly.
 #
 # ::1 is here for the CLIENT IP comparison in core/endpoints/bootstrap.py, where
 # request.client.host is the bare "::1". It can never match a Host header:
@@ -485,15 +495,19 @@ DEFAULT_LOCALHOST_ALIASES = ["127.0.0.1", "::1", "localhost"]  # nosemgrep
 
 
 def get_localhost_aliases() -> list:
-    """Return list of IPs/hostnames considered localhost.
+    """Return list of IPs/hostnames considered localhost for CLIENT IP checks.
 
     The defaults are ALWAYS included; NEXE_LOCALHOST_ALIASES (comma-separated)
     only ADDS to them. It used to replace them, which meant that setting a
-    single alias evicted 127.0.0.1/::1/localhost from both the TrustedHost
-    allow-list and the bootstrap IP allow-list — locking the machine running
-    the server out of its own service, with no hint as to why.
+    single alias evicted 127.0.0.1/::1/localhost from the bootstrap IP
+    allow-list — locking the machine running the server out of its own
+    service, with no hint as to why.
 
     Duplicates are dropped and the order is deterministic (defaults first).
+
+    #864: this used to also feed the Host-header allow-list and the CSRF
+    cookie_secure decision — a value added here for the client-IP use case
+    leaked into those. Use get_trusted_hosts() for Host-header checks.
     """
     aliases = list(DEFAULT_LOCALHOST_ALIASES)
     custom = os.getenv("NEXE_LOCALHOST_ALIASES", "")
@@ -502,6 +516,31 @@ def get_localhost_aliases() -> list:
         if entry and entry not in aliases:
             aliases.append(entry)
     return aliases
+
+
+# Trusted hosts — single source of truth for the Host-HEADER question
+# (TrustedHostMiddleware, DNS-rebinding protection). Separate from
+# get_localhost_aliases()/NEXE_LOCALHOST_ALIASES on purpose (#864): that list
+# answers a different question (client IP for the bootstrap endpoint) and an
+# alias added for it used to leak into this allow-list too.
+DEFAULT_TRUSTED_HOSTS = ["127.0.0.1", "::1", "localhost"]  # nosemgrep
+
+
+def get_trusted_hosts() -> list:
+    """Return list of Host-header values TrustedHostMiddleware should accept.
+
+    The defaults are ALWAYS included; NEXE_TRUSTED_HOSTS (comma-separated)
+    only ADDS to them — same self-lockout protection as get_localhost_aliases().
+
+    Duplicates are dropped and the order is deterministic (defaults first).
+    """
+    hosts = list(DEFAULT_TRUSTED_HOSTS)
+    custom = os.getenv("NEXE_TRUSTED_HOSTS", "")
+    for entry in custom.split(","):
+        entry = entry.strip()
+        if entry and entry not in hosts:
+            hosts.append(entry)
+    return hosts
 
 
 # Network defaults — single source of truth (AI audit hardcode fix Q4)
@@ -586,7 +625,8 @@ if _PYDANTIC_SETTINGS_AVAILABLE:
         admin_api_key: Optional[str] = Field(None, description="API key d'administrador", alias="NEXE_ADMIN_API_KEY")
         csrf_secret: Optional[str] = Field(None, description="Secret per a tokens CSRF", alias="NEXE_CSRF_SECRET")
         approved_modules: Optional[str] = Field(None, description="Mòduls aprovats (comma-separated, requerit en prod)", alias="NEXE_APPROVED_MODULES")
-        localhost_aliases: str = Field("127.0.0.1,::1,localhost", description="Adreces considerades localhost (comma-separated)", alias="NEXE_LOCALHOST_ALIASES")
+        localhost_aliases: str = Field("127.0.0.1,::1,localhost", description="IPs de client considerades localhost pel bootstrap endpoint (comma-separated)", alias="NEXE_LOCALHOST_ALIASES")
+        trusted_hosts: str = Field("127.0.0.1,::1,localhost", description="Host headers acceptats per TrustedHostMiddleware (comma-separated)", alias="NEXE_TRUSTED_HOSTS")
         encryption_enabled: str = Field("auto", description="Activar SQLCIPHER (true|false|auto)", alias="NEXE_ENCRYPTION_ENABLED")
         vpn_allowed_ips: str = Field("", description="IPs VPN permeses per bootstrap (comma-separated)", alias="NEXE_VPN_ALLOWED_IPS")
         master_key: Optional[str] = Field(None, description="Clau mestra per a derivació de claus HKDF", alias="NEXE_MASTER_KEY")

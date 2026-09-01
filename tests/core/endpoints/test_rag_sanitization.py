@@ -108,3 +108,41 @@ class TestSanitizeRagContext:
         text = "Short text"
         result = _sanitize_rag_context(text)
         assert result == "Short text"
+
+    def test_a_live_window_keeps_the_rag_the_8192_default_would_drop(self):
+        """#972: without the live window this always sized against 8192, so a
+        32768-token engine lost most of its RAG before the #965 budget saw it."""
+        text = "R" * 20_000
+        defaulted = _sanitize_rag_context(text)
+        live = _sanitize_rag_context(text, context_window=32768)
+        assert "[...truncat]" in defaulted
+        assert len(defaulted) < 20_000
+        assert live == text
+        assert "[...truncat]" not in live
+
+    def test_an_unusable_window_falls_back_to_the_default(self):
+        text = "R" * 20_000
+        assert _sanitize_rag_context(text, context_window=None) == _sanitize_rag_context(text)
+        assert _sanitize_rag_context(text, context_window=0) == _sanitize_rag_context(text)
+        assert _sanitize_rag_context(text, context_window=True) == _sanitize_rag_context(text)
+
+
+class TestImportTimeEnvTypos:
+    """#978 leftover: these two are read at module import. A typo used to be a
+    boot failure; the helpers must degrade to the documented default."""
+
+    def test_a_non_numeric_default_window_falls_back(self, monkeypatch):
+        from core.endpoints.chat_sanitization import _positive_int_env
+        monkeypatch.setenv("NEXE_DEFAULT_CONTEXT_WINDOW", "8k")
+        assert _positive_int_env("NEXE_DEFAULT_CONTEXT_WINDOW", 8192) == 8192
+        monkeypatch.setenv("NEXE_DEFAULT_CONTEXT_WINDOW", "0")
+        assert _positive_int_env("NEXE_DEFAULT_CONTEXT_WINDOW", 8192) == 8192
+
+    def test_a_non_numeric_ratio_falls_back(self, monkeypatch):
+        from core.endpoints.chat_sanitization import _ratio_env
+        monkeypatch.setenv("NEXE_MAX_CONTEXT_RATIO", "foo")
+        assert _ratio_env("NEXE_MAX_CONTEXT_RATIO", 0.3) == 0.3
+        monkeypatch.setenv("NEXE_MAX_CONTEXT_RATIO", "nan")
+        assert _ratio_env("NEXE_MAX_CONTEXT_RATIO", 0.3) == 0.3
+        monkeypatch.setenv("NEXE_MAX_CONTEXT_RATIO", "1.5")
+        assert _ratio_env("NEXE_MAX_CONTEXT_RATIO", 0.3) == 0.3

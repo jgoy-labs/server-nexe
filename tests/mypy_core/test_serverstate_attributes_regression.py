@@ -81,10 +81,15 @@ def test_serverstate_dynamic_attrs_are_settable_runtime() -> None:
 
 
 def test_serverstate_known_init_attrs_are_present() -> None:
-    """Pins contract on the 9 attributes already existing in __init__ (signature
+    """Pins contract on the 8 attributes already existing in __init__ (signature
     declared at `core/lifespan.py:185-196` — read-only, not implementation).
 
     If dev removes any of these during the scenario/2 fix, the test fails.
+
+    `registry` was removed deliberately by finding #876 (2026-08-28): it was a
+    dead alias for `module_manager.registry` with zero readers under its own
+    name anywhere in the codebase — this pin was updated on purpose, not a
+    collateral refactor.
     """
     from core.lifespan import ServerState
 
@@ -95,7 +100,6 @@ def test_serverstate_known_init_attrs_are_present() -> None:
         "project_root",
         "i18n",
         "module_manager",
-        "registry",
         "ollama_process",
         "qdrant_available",
         "crypto_provider",

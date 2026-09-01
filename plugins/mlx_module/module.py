@@ -138,6 +138,31 @@ class MLXModule:
         except Exception:
             return False
 
+    def get_context_window(self) -> "Optional[int]":
+        """#965: the engine's own answer to "how many tokens fit", in tokens.
+
+        For MLX that is `max_kv_size`, which `auto_max_kv_size()` already sizes
+        from this machine's RAM AND the real weights of the loaded model — the
+        most informed number any engine here can give. Recomputed on every
+        model switch (`from_env()`), so it follows the model that is actually
+        loaded, not the one configured at boot.
+
+        The model's own limit is already folded in: `auto_max_kv_size()` caps
+        the KV budget by `max_position_embeddings`, so every consumer — the
+        prompt truncator, the prompt cache, the RAM guard and this reporter —
+        sees the same number. An explicit `NEXE_MLX_MAX_KV_SIZE` bypasses that
+        cap by design (the user's word wins) and is reported as set.
+
+        Returns None when there is no node yet: the caller falls back to the
+        default window rather than guessing on our behalf.
+        """
+        if self._node is None:
+            return None
+        try:
+            return int(self._node.config.max_kv_size)
+        except (AttributeError, TypeError, ValueError):
+            return None
+
     def switch_model(self, new_config: "MLXConfig") -> bool:
         """Hot-swap the active model to `new_config` if it differs.
 

@@ -16,6 +16,10 @@ from unittest.mock import patch
 
 import pytest
 
+from core.endpoints import installer_mlx
+from core.endpoints import installer_gguf
+from core.endpoints import installer_embedder
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # G1 — _find_ollama_bin detects ~/Applications/Ollama.app
@@ -39,6 +43,7 @@ def test_find_ollama_user_applications_functional(tmp_path):
     """_find_ollama_bin returns ~/Applications binary when it exists and is executable."""
     import core.endpoints.installer as _mod
 
+    from core.endpoints import installer_ollama
     ollama_bin = tmp_path / "Applications" / "Ollama.app" / "Contents" / "Resources" / "ollama"
     ollama_bin.parent.mkdir(parents=True)
     ollama_bin.touch()
@@ -67,11 +72,11 @@ def test_find_ollama_user_applications_functional(tmp_path):
             return False
         return _real_access(p, mode)
 
-    with patch("core.endpoints.installer.shutil.which", return_value=None), \
-         patch("core.endpoints.installer.os.path.expanduser", side_effect=_fake_expanduser), \
-         patch("core.endpoints.installer.os.path.isfile", side_effect=_fake_isfile), \
-         patch("core.endpoints.installer.os.access", side_effect=_fake_access):
-        result = _mod._find_ollama_bin()
+    with patch("core.endpoints.installer_ollama.shutil.which", return_value=None), \
+         patch("core.endpoints.installer_ollama.os.path.expanduser", side_effect=_fake_expanduser), \
+         patch("core.endpoints.installer_ollama.os.path.isfile", side_effect=_fake_isfile), \
+         patch("core.endpoints.installer_ollama.os.access", side_effect=_fake_access):
+        result = installer_ollama._find_ollama_bin()
 
     assert result == str(ollama_bin)
 
@@ -84,7 +89,7 @@ def test_gguf_open_mode_is_wb():
     """_stream_gguf must open the destination file in 'wb' mode, not 'ab'."""
     import inspect
     import core.endpoints.installer as mod
-    src = inspect.getsource(mod._stream_gguf)
+    src = inspect.getsource(installer_gguf._stream_gguf)
     assert '"wb"' in src or "'wb'" in src, "_stream_gguf must use 'wb' open mode"
     assert '"ab"' not in src and "'ab'" not in src, "_stream_gguf must NOT use 'ab' append mode"
 
@@ -100,7 +105,7 @@ def test_stuck_handler_threshold_is_99():
     import inspect
     import core.endpoints.installer as mod
     # Logic was extracted to _get_finalizing_hint for CCN reduction.
-    src = inspect.getsource(mod._get_finalizing_hint)
+    src = inspect.getsource(installer_mlx._get_finalizing_hint)
     assert "pct < 99" in src or "pct >= 99" in src, "Stuck handler threshold must be 99"
     assert "pct < 90" not in src and "pct >= 90" not in src, "Old 90% threshold must not appear"
 
@@ -182,7 +187,7 @@ def test_tracker_initial_poll_empty_dir(tmp_path):
 
 def test_fastembed_model_bytes_only_target_model(tmp_path):
     """_fastembed_model_bytes must count only the specified model's bytes."""
-    from core.endpoints.installer import _fastembed_model_bytes
+    from core.endpoints.installer_embedder import _fastembed_model_bytes
 
     # HF-style layout for target model
     model_id = "xenova/target-model"
@@ -202,7 +207,7 @@ def test_fastembed_model_bytes_only_target_model(tmp_path):
 
 def test_fastembed_model_bytes_missing_model(tmp_path):
     """_fastembed_model_bytes returns 0 when model not in cache."""
-    from core.endpoints.installer import _fastembed_model_bytes
+    from core.endpoints.installer_embedder import _fastembed_model_bytes
 
     result = _fastembed_model_bytes(tmp_path, "xenova/nonexistent-model")
     assert result == 0
@@ -210,7 +215,7 @@ def test_fastembed_model_bytes_missing_model(tmp_path):
 
 def test_fastembed_model_bytes_legacy_layout(tmp_path):
     """_fastembed_model_bytes falls back to legacy flat layout."""
-    from core.endpoints.installer import _fastembed_model_bytes
+    from core.endpoints.installer_embedder import _fastembed_model_bytes
 
     model_id = "org/my-model"
     legacy_dir = tmp_path / "my-model"  # flat layout: just the model name
@@ -225,7 +230,7 @@ def test_stream_embedder_uses_model_specific_bytes():
     """_stream_embedder must use _fastembed_model_bytes, not _fastembed_cache_size_bytes."""
     import inspect
     import core.endpoints.installer as mod
-    src = inspect.getsource(mod._stream_embedder)
+    src = inspect.getsource(installer_embedder._stream_embedder)
     assert "_fastembed_model_bytes" in src, (
         "_stream_embedder must use _fastembed_model_bytes for accurate per-model progress"
     )
@@ -305,7 +310,7 @@ def test_cancel_ev_structural():
     """_stream_mlx must use a cancel_ev (threading.Event) to signal workers."""
     import inspect
     import core.endpoints.installer as mod
-    src = inspect.getsource(mod._stream_mlx)
+    src = inspect.getsource(installer_mlx._stream_mlx)
     assert "cancel_ev" in src, "_stream_mlx must use cancel_ev threading.Event"
     assert "cancel_ev.set()" in src, "_stream_mlx must call cancel_ev.set() on disconnect"
     assert "cancel_ev.is_set()" in src, "_run must check cancel_ev.is_set() before starting"
@@ -316,7 +321,7 @@ def test_cancel_ev_threading_event():
     import threading
     import inspect
     import core.endpoints.installer as mod
-    src = inspect.getsource(mod._stream_mlx)
+    src = inspect.getsource(installer_mlx._stream_mlx)
     assert "_threading.Event()" in src or "threading.Event()" in src, (
         "cancel_ev must be a threading.Event for thread-safe signalling"
     )

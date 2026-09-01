@@ -152,9 +152,8 @@ routes_chat.py — _extract_safe_mem_saves()
     ├─── text net → flux visible (l'usuari no veu el marcador)
     │
     ▼
-chat_memory.py — _save_conversation_to_memory()
-    │  · Crea col·leccio personal_memory si no existeix
-    │  · Comprova duplicats (similitud > 0.80 → descarta)
+memory_helper.py — persist tagged facts to personal_memory
+    │  · Only [MEM_SAVE:] facts the model marked, not the whole turn
     │
     ▼
 Qdrant — col·leccio personal_memory
@@ -233,7 +232,10 @@ Quan RAG troba resultats rellevants, s'injecten al prompt del LLM en 3 categorie
 | Memoria de l'usuari | USER MEMORY | MEMORIA DE L'USUARI | MEMORIA DEL USUARIO | personal_memory |
 
 **Limits de context:**
-- `MAX_CONTEXT_CHARS` = 24000 (configurable via variable d'entorn `NEXE_MAX_CONTEXT_CHARS`)
+- `MAX_CONTEXT_CHARS` es deriva de la finestra de context real del motor que serveix el torn
+  (70% de la finestra, en caracters a ~4 caracters/token). Fins a v1.0.7 era un valor fix de
+  24000 caracters, igual per a un motor de 2048 tokens que per a un de 32768.
+  Substituible amb `NEXE_MAX_CONTEXT_CHARS`.
 - El context RAG es trunca si supera l'espai disponible despres de restar el prompt del sistema, l'historial i el missatge actual
 
 ## Visualitzacio de pesos RAG
@@ -278,7 +280,8 @@ storage/vectors/
 | NEXE_RAG_DOCS_THRESHOLD | 0.4 | Puntuacio minima per a nexe_documentation |
 | NEXE_RAG_KNOWLEDGE_THRESHOLD | 0.35 | Puntuacio minima per a user_knowledge |
 | NEXE_RAG_MEMORY_THRESHOLD | 0.3 | Puntuacio minima per a personal_memory |
-| NEXE_MAX_CONTEXT_CHARS | 24000 | Finestra de context maxima en caracters |
+| NEXE_MAX_CONTEXT_CHARS | auto (70% de la finestra del motor) | Finestra de context maxima en caracters |
+| NEXE_COMPACT_AT_TOKENS | auto (45% de la finestra del motor) | Tokens d'historial a partir dels quals es compacta |
 | NEXE_OLLAMA_EMBED_MODEL | nomic-embed-text | Model d'embedding d'Ollama |
 | NEXE_ENCRYPTION_ENABLED | auto | Activar encriptacio at-rest per a TextStore/SQLCipher |
 

@@ -21,65 +21,11 @@ def _disable_rate_limiter():
     _limiter.enabled = True
 
 
-# ─── Test _save_conversation_to_memory ─────────────────────────────────
-class TestSaveConversationToMemory:
-
-    def test_save_success(self):
-        """Lines 397-427: happy path for save."""
-        from core.endpoints.chat import _save_conversation_to_memory
-
-        mock_memory = AsyncMock()
-        mock_memory.collection_exists = AsyncMock(return_value=True)
-        mock_memory.store = AsyncMock(return_value="doc-123")
-
-        with patch("memory.memory.api.v1.get_memory_api", new=AsyncMock(return_value=mock_memory)):
-            asyncio.run(_save_conversation_to_memory(MagicMock(), "user msg", "assistant msg"))
-
-        mock_memory.store.assert_awaited_once()
-
-    def test_save_creates_collection(self):
-        """Lines 411-412: creates personal_memory collection."""
-        from core.endpoints.chat import _save_conversation_to_memory
-
-        mock_memory = AsyncMock()
-        mock_memory.collection_exists = AsyncMock(return_value=False)
-        mock_memory.create_collection = AsyncMock()
-        mock_memory.store = AsyncMock(return_value="doc-123")
-
-        with patch("memory.memory.api.v1.get_memory_api", new=AsyncMock(return_value=mock_memory)):
-            asyncio.run(_save_conversation_to_memory(MagicMock(), "user", "assistant"))
-
-        mock_memory.create_collection.assert_awaited_once()
-
-    def test_save_metrics_failure(self):
-        """Lines 432-433: metrics update failure is caught."""
-        from core.endpoints.chat import _save_conversation_to_memory
-
-        mock_memory = AsyncMock()
-        mock_memory.collection_exists = AsyncMock(return_value=True)
-        mock_memory.store = AsyncMock(return_value="doc-123")
-
-        with patch("memory.memory.api.v1.get_memory_api", new=AsyncMock(return_value=mock_memory)), \
-             patch.dict("sys.modules", {"core.metrics.registry": MagicMock(MEMORY_OPERATIONS=MagicMock(labels=MagicMock(side_effect=Exception("fail"))))}):
-            asyncio.run(_save_conversation_to_memory(MagicMock(), "user", "assistant"))
-
-        # The metrics failure must be swallowed: the conversation is still stored.
-        mock_memory.store.assert_awaited_once()
-
-    def test_save_exception_logged(self):
-        """Lines 435-436: exception in save is caught and logged."""
-        from core.endpoints.chat import _save_conversation_to_memory
-
-        with patch("memory.memory.api.v1.get_memory_api", new=AsyncMock(side_effect=Exception("fail"))):
-            # Should not raise
-            asyncio.run(_save_conversation_to_memory(MagicMock(), "user", "assistant"))
-
-
 # ─── Test _ollama_stream_generator uncovered branches ──────────────────
 class TestOllamaStreamGenerator:
 
-    def test_stream_auto_save_failure(self):
-        """Lines 582-583: auto-save failure in streaming is caught."""
+    def test_stream_completes_with_done(self):
+        """Streaming Ollama still closes with [DONE] after a content chunk."""
         from core.endpoints.chat import _ollama_stream_generator
 
         ollama_lines = [
@@ -102,9 +48,7 @@ class TestOllamaStreamGenerator:
 
         app_state = MagicMock()
 
-        with patch("httpx.AsyncClient", return_value=mock_client), \
-             patch("core.endpoints.chat._save_conversation_to_memory",
-                   new=AsyncMock(side_effect=Exception("save failed"))):
+        with patch("httpx.AsyncClient", return_value=mock_client):
             gen = _ollama_stream_generator("http://localhost/api/chat", {}, app_state, "test msg")
             chunks = asyncio.run(_collect_async_gen(gen))
             assert any("[DONE]" in c for c in chunks)
@@ -245,8 +189,8 @@ class TestMlxStreamGenerator:
         chunks = asyncio.run(_collect_async_gen(gen))
         assert any("[DONE]" in c for c in chunks)
 
-    def test_mlx_stream_auto_save_failure(self):
-        """Lines 698-699: auto-save failure in MLX streaming."""
+    def test_mlx_stream_completes_with_done(self):
+        """MLX streaming still closes with [DONE] after emitting tokens."""
         from core.endpoints.chat import _mlx_stream_generator
 
         mock_mlx = AsyncMock()
@@ -260,12 +204,10 @@ class TestMlxStreamGenerator:
         mock_mlx.chat = fake_chat
         app_state = MagicMock()
 
-        with patch("core.endpoints.chat._save_conversation_to_memory",
-                   new=AsyncMock(side_effect=Exception("save fail"))):
-            gen = _mlx_stream_generator(mock_mlx, [{"role": "user", "content": "hi"}],
-                                        "system", "model", app_state=app_state, user_msg="hi")
-            chunks = asyncio.run(_collect_async_gen(gen))
-            assert any("[DONE]" in c for c in chunks)
+        gen = _mlx_stream_generator(mock_mlx, [{"role": "user", "content": "hi"}],
+                                    "system", "model", app_state=app_state, user_msg="hi")
+        chunks = asyncio.run(_collect_async_gen(gen))
+        assert any("[DONE]" in c for c in chunks)
 
     def test_mlx_stream_exception(self):
         """Lines 710-713: MLX streaming exception yields error chunk."""
@@ -295,8 +237,8 @@ class TestLlamaCppStreamGenerator:
         chunks = asyncio.run(_collect_async_gen(gen))
         assert any("[DONE]" in c for c in chunks)
 
-    def test_llama_cpp_stream_auto_save_failure(self):
-        """Lines 1011-1012: auto-save failure in llama.cpp streaming."""
+    def test_llama_cpp_stream_completes_with_done(self):
+        """llama.cpp streaming still closes with [DONE] after emitting tokens."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
         mock_llama = AsyncMock()
@@ -310,12 +252,10 @@ class TestLlamaCppStreamGenerator:
         mock_llama.chat = fake_chat
         app_state = MagicMock()
 
-        with patch("core.endpoints.chat._save_conversation_to_memory",
-                   new=AsyncMock(side_effect=Exception("save fail"))):
-            gen = _llama_cpp_stream_generator(mock_llama, [{"role": "user", "content": "hi"}],
-                                              "system", "model", app_state=app_state, user_msg="hi")
-            chunks = asyncio.run(_collect_async_gen(gen))
-            assert any("[DONE]" in c for c in chunks)
+        gen = _llama_cpp_stream_generator(mock_llama, [{"role": "user", "content": "hi"}],
+                                          "system", "model", app_state=app_state, user_msg="hi")
+        chunks = asyncio.run(_collect_async_gen(gen))
+        assert any("[DONE]" in c for c in chunks)
 
     def test_llama_cpp_stream_exception(self):
         """Lines 1014-1017: llama.cpp streaming exception."""
@@ -472,25 +412,6 @@ class TestChatCompletionsRagBranches:
                    new=AsyncMock(return_value={"choices": [{"message": {"content": "hi"}}]})), \
              patch.dict("sys.modules", {"core.metrics.registry": None}):
             result = asyncio.run(chat_completions(request, req, bg))
-            assert result is not None
-
-    def test_chat_memory_save_failure(self):
-        """Lines 379-380: memory save scheduling failure."""
-        from core.endpoints.chat import chat_completions, ChatCompletionRequest, Message
-        from fastapi import BackgroundTasks
-
-        mock_bg = MagicMock(spec=BackgroundTasks)
-        mock_bg.add_task = MagicMock(side_effect=Exception("bg fail"))
-
-        req = _make_request()
-        request = ChatCompletionRequest(
-            messages=[Message(role="user", content="hello")],
-            use_rag=False, stream=False, engine="ollama"
-        )
-
-        with patch("core.endpoints.chat._forward_to_ollama",
-                   new=AsyncMock(return_value={"choices": [{"message": {"content": "response"}}]})):
-            result = asyncio.run(chat_completions(request, req, mock_bg))
             assert result is not None
 
     def test_streaming_response_adds_headers(self):
@@ -664,15 +585,6 @@ class TestMC114ExcInfo:
     str(e) loses where the failure came from. Each path must log with
     exc_info=True so the traceback reaches the logs."""
 
-    def test_stream_auto_save_failure_has_exc_info(self, caplog):
-        from core.endpoints.chat_engines._streaming import background_memory_save
-        with patch("core.endpoints.chat_engines._streaming._save_conversation_to_memory",
-                   new=AsyncMock(side_effect=RuntimeError("save boom"))), \
-             patch("core.endpoints.chat_engines._streaming.asyncio.sleep", new=AsyncMock()):
-            with caplog.at_level(logging.ERROR):
-                asyncio.run(background_memory_save(MagicMock(), "hi", "there"))
-        assert _has_exc_info(caplog, "Stream Auto-Save failed after retry")
-
     def test_mlx_stream_exception_has_exc_info(self, caplog):
         from core.endpoints.chat import _mlx_stream_generator
         mock_mlx = AsyncMock()
@@ -709,30 +621,3 @@ class TestMC114ExcInfo:
             with caplog.at_level(logging.ERROR):
                 asyncio.run(build_rag_context("hello", MagicMock(), "en"))
         assert _has_exc_info(caplog, "RAG Error")
-
-    def test_save_conversation_error_has_exc_info(self, caplog):
-        from core.endpoints.chat_memory import _save_conversation_to_memory
-        with patch("core.endpoints.chat_memory._filter_rag_injection",
-                   side_effect=RuntimeError("filter boom")):
-            with caplog.at_level(logging.ERROR):
-                asyncio.run(_save_conversation_to_memory(MagicMock(), "u", "a"))
-        assert _has_exc_info(caplog, "Error saving conversation to memory")
-
-    def test_schedule_memory_save_error_has_exc_info(self, caplog):
-        from core.endpoints.chat import _schedule_episodic_memory
-        bt = MagicMock()
-        bt.add_task = MagicMock(side_effect=RuntimeError("queue full"))
-        response = {"choices": [{"message": {"content": "hi"}}]}
-        with caplog.at_level(logging.ERROR):
-            _schedule_episodic_memory(response, bt, MagicMock(), "q")
-        assert _has_exc_info(caplog, "Failed to schedule memory save")
-
-    def test_ollama_auto_save_error_has_exc_info_in_source(self):
-        # The ollama auto-save is a fire-and-forget background task → not
-        # deterministically drivable in a unit test. Its logic is byte-identical
-        # to _streaming.background_memory_save (covered behaviourally above);
-        # guard that this copy keeps the stack trace too.
-        import inspect
-        import core.endpoints.chat_engines.ollama as om
-        src = inspect.getsource(om)
-        assert 'logger.error("Stream Auto-Save failed after retry: %s", e, exc_info=True)' in src

@@ -13,7 +13,7 @@ www.jgoy.net · https://server-nexe.org
 import inspect
 
 from plugins.web_ui_module.api import routes_chat
-from plugins.web_ui_module.core.session_manager import ChatSession
+from core.sessions import ChatSession
 
 
 # ── The fix itself: _think_only_placeholder ──────────────────────────────────

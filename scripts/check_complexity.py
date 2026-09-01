@@ -19,6 +19,12 @@ CCN >= 15. Every divergence is UPWARD — this counter never reports less than
 lizard. The known cause is `and`/`or` inside f-strings, which we count as
 decision points and lizard does not.
 
+Re-calibrated 2026-08-27 over 2605 functions in 445 files: zero divergences
+downward, 16 upward of 1-2 points, same known cause. The count went 2514 ->
+2605 because that same measurement is what exposed finding #968 — the walk
+that FINDS the functions was missing 43 of them, so they were never calibrated
+against anything.
+
 Known divergence, in our favour: lizard does not support `match` statements
 (3.10+) and scores a `match` with N cases as 1; we count the cases. There are
 zero `match` statements in production code today, so it changes nothing yet —
@@ -31,7 +37,9 @@ Counting rule (McCabe): start at 1, then
   +(n-1) for a BoolOp with n operands  (`a and b and c` = +2)
   +(1 + len(ifs)) per comprehension clause
 Bodies of nested `def`s are NOT counted in their parent — they are reported as
-their own entry, qualified (`parent.child`), exactly like lizard does. Lambdas
+their own entry, qualified (`parent.child`), exactly like lizard does. That
+holds wherever the def is written, a `try` or an `if` included: see
+`_iter_functions`, which is the part #968 got wrong. Lambdas
 ARE counted in the enclosing function: neither this gate nor lizard gives them
 an entry of their own, so skipping them would hide their decisions entirely.
 
@@ -61,6 +69,7 @@ from __future__ import annotations
 import ast
 import json
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -111,12 +120,51 @@ def _ccn(fn: ast.AST) -> int:
     return total
 
 
-def _scan() -> dict[str, int]:
-    """Every function at or above THRESHOLD, keyed `path::Qualified.name`.
+def _iter_functions(node: ast.AST, prefix: str = "") -> Iterator[tuple[str, ast.AST]]:
+    """Every def in the tree, paired with its qualified name.
+
+    Descends through EVERY node, not only defs and classes. A function defined
+    inside an `if` / `try` / `with` / `for` is a function like any other, and
+    until 2026-08-27 this walk never reached it: 43 of them were invisible to
+    the gate (finding #968), and their decisions counted nowhere — not as an
+    entry of their own, and not towards the parent, which skips nested bodies
+    on purpose. This repo hits the case constantly because optional
+    dependencies are guarded: the whole of `OllamaNode` lives inside a
+    `try: import httpx`, and so does `NexeSettings`. None of the 43 was at or
+    above the threshold when the hole was found (the highest was CCN 11) — but
+    none of them would have failed the gate at CCN 40 either, which is the
+    exact failure this gate exists to prevent.
+    """
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, _FUNCTION_NODES):
+            qualified = f"{prefix}{child.name}"
+            yield qualified, child
+            yield from _iter_functions(child, f"{qualified}.")
+        elif isinstance(child, ast.ClassDef):
+            yield from _iter_functions(child, f"{prefix}{child.name}.")
+        else:
+            yield from _iter_functions(child, prefix)
+
+
+def _scan_tree(rel: str, tree: ast.AST, found: dict[str, int]) -> None:
+    """Record every function of one parsed file at or above THRESHOLD.
+
+    Split out of `_scan()` so discovery can be tested on a source string: what
+    #968 broke is WHICH functions are found, and proving that from `_scan()`
+    alone would mean writing a file into the repo for the gate to pick up.
 
     A duplicate key (a @property and its setter share a qualified name — there
     is exactly one such pair in this repo) keeps the higher of the two.
     """
+    for qualified, fn in _iter_functions(tree):
+        ccn = _ccn(fn)
+        if ccn >= THRESHOLD:
+            key = f"{rel}::{qualified}"
+            found[key] = max(found.get(key, 0), ccn)
+
+
+def _scan() -> dict[str, int]:
+    """Every product function at or above THRESHOLD, keyed `path::Qualified.name`."""
     found: dict[str, int] = {}
     for path in sorted(ROOT.rglob("*.py")):
         rel_parts = path.relative_to(ROOT).parts
@@ -126,21 +174,7 @@ def _scan() -> dict[str, int]:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except (SyntaxError, UnicodeDecodeError):
             continue
-        rel = path.relative_to(ROOT).as_posix()
-
-        def visit(node: ast.AST, prefix: str) -> None:
-            for child in ast.iter_child_nodes(node):
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    qualified = f"{prefix}{child.name}"
-                    ccn = _ccn(child)
-                    if ccn >= THRESHOLD:
-                        key = f"{rel}::{qualified}"
-                        found[key] = max(found.get(key, 0), ccn)
-                    visit(child, f"{qualified}.")
-                elif isinstance(child, ast.ClassDef):
-                    visit(child, f"{prefix}{child.name}.")
-
-        visit(tree, "")
+        _scan_tree(path.relative_to(ROOT).as_posix(), tree, found)
     return found
 
 

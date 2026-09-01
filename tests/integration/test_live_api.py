@@ -18,7 +18,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import os
-import time
+
 import pytest
 import requests
 
@@ -303,13 +303,7 @@ class TestChatCompletions:
 
     @pytest.mark.skipif(not API_KEY, reason="NEXE_TEST_API_KEY not configured")
     def test_chat_with_rag(self):
-        """POST /v1/chat/completions use_rag=true → 200
-
-        Note: waits 5s for the background RAG auto-save from the previous call
-        to finish. Without the wait, concurrent MLX calls cause a Metal crash
-        (_MTLCommandBuffer addCompletedHandler assert) on Apple Silicon.
-        """
-        time.sleep(5)  # Wait for background auto-save to finish
+        """POST /v1/chat/completions use_rag=true → 200"""
         payload = {
             "model": os.getenv("NEXE_TEST_MODEL", "default"),
             "messages": [{"role": "user", "content": "Respon amb 'ok'"}],
@@ -325,11 +319,9 @@ class TestChatCompletions:
                 timeout=60
             )
         except requests.exceptions.ConnectionError:
-            pytest.xfail(
-                "Servidor caigut durant test_chat_with_rag. "
-                "Bug conegut: crides MLX concurrents (background RAG auto-save + nova inferència) "
-                "provoquen crash Metal en Apple Silicon (_MTLCommandBuffer assertion). "
-                "Solució: incrementar el sleep o desactivar RAG auto-save als tests."
+            pytest.fail(
+                "Servidor caigut durant test_chat_with_rag "
+                f"({BASE_URL}/v1/chat/completions)."
             )
         assert r.status_code == 200
         data = r.json()

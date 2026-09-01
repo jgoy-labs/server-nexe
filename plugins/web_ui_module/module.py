@@ -19,7 +19,7 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter
 from core.modules.protocol import ModuleMetadata, HealthResult, HealthStatus
 
-from .core.session_manager import SessionManager
+from core.sessions import SessionManager
 from .core.file_handler import FileHandler
 
 logger = logging.getLogger(__name__)
@@ -43,11 +43,12 @@ class WebUIModule:
         self._initialized = False
         self._init_lock = asyncio.Lock()
         self._router = None
-        # SessionManager is created in initialize() once crypto_provider is
-        # available. Creating it here without crypto followed by a replacement
-        # later generated two divergent instances (bug: the router could
-        # capture the old reference without crypto, leaving .enc sessions
-        # invisible in the UI and saving new ones unencrypted).
+        # The instance lives on server_state (lifespan builds it after
+        # encryption, before plugins). Creating one here without crypto
+        # followed by a replacement later generated two divergent instances
+        # (bug: the router could capture the old reference without crypto,
+        # leaving .enc sessions invisible in the UI and saving new ones
+        # unencrypted). initialize() binds to the core instance.
         self.session_manager: Optional[SessionManager] = None
         # Paths — available immediately for create_router
         self._plugin_dir = Path(__file__).parent
@@ -90,43 +91,13 @@ class WebUIModule:
                 return False
 
             try:
-                # Create the one and only SessionManager, with crypto if available.
-                # In production we MUST get a crypto_provider — otherwise sessions
-                # would be persisted as plaintext .json on disk (incident 2026-05-13:
-                # 80 plain .json sessions appeared because crypto was missing here).
-                crypto = None
-                try:
-                    from core.lifespan import get_server_state
-                    crypto = get_server_state().crypto_provider
-                except Exception:
-                    crypto = None
-                if crypto is None:
-                    import os as _os
-                    _env = _os.environ.get("NEXE_ENV", "production").lower()
-                    if _env == "production":
-                        raise RuntimeError(
-                            "WebUIModule.initialize: crypto_provider is None in production "
-                            "mode. Encryption-at-rest must be initialized by lifespan_crypto "
-                            "before web_ui_module init runs. Aborting to prevent plaintext "
-                            "session storage."
-                        )
-                    else:
-                        logger.warning(
-                            "WebUIModule: crypto_provider is None in %s mode — "
-                            "sessions will be stored as plaintext .json on disk. "
-                            "Set NEXE_ENV=production or ensure lifespan_crypto runs first.",
-                            _env,
-                        )
-                # Resolve sessions dir via get_data_dir() so sidecar mode
-                # writes to NEXE_DATA_DIR/sessions (writable Application Support)
-                # instead of "storage/sessions" relative to cwd (which may be /
-                # under Tauri parent → Errno 30 read-only file system).
-                from core.paths.helpers import get_data_dir
-                sessions_dir = get_data_dir("sessions")
-                self.session_manager = SessionManager(
-                    storage_path=str(sessions_dir),
-                    crypto_provider=crypto,
-                )
+                # Consume the process-wide SessionManager. Lifespan attaches
+                # it after encryption; if a test reaches initialize() without
+                # going through lifespan, attach_session_manager builds the
+                # same singleton (never a plugin-private instance).
+                from core.server_state import get_server_state
+                from core.sessions import attach_session_manager
+                self.session_manager = attach_session_manager(get_server_state())
 
                 # Resolve API base URL
                 self.api_base_url = self._resolve_api_base_url(context)
@@ -163,7 +134,7 @@ class WebUIModule:
             status=HealthStatus.HEALTHY,
             message="Web UI active",
             details={
-                "sessions": len(self.session_manager.list_sessions()),  # type: ignore[union-attr]  # invariant: _initialized=True ⟹ session_manager set (initialize L84 abans de L96)
+                "sessions": len(self.session_manager.list_sessions()),  # type: ignore[union-attr]  # invariant: _initialized=True ⟹ session_manager set
                 "ui_dir": str(self.ui_dir)
             }
         )

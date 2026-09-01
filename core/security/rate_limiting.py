@@ -9,96 +9,23 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from fastapi import Request
-from slowapi.util import get_remote_address
 from typing import Any, DefaultDict, Dict
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 import asyncio
-import os
-
-DEFAULT_RATE_LIMITS = {
-  "global": os.getenv("NEXE_RATE_LIMIT_GLOBAL", "100/minute"),
-
-  "public": os.getenv("NEXE_RATE_LIMIT_PUBLIC", "30/minute"),
-
-  "authenticated": os.getenv("NEXE_RATE_LIMIT_AUTHENTICATED", "300/minute"),
-
-  "admin": os.getenv("NEXE_RATE_LIMIT_ADMIN", "100/minute"),
-
-  "health": os.getenv("NEXE_RATE_LIMIT_HEALTH", "1000/minute"),
-}
-
-def get_api_key_identifier(request: Request) -> str:
-  """
-  Get rate limit key based on API key
-
-  Used for rate limiting per API key instead of per IP.
-  Useful when multiple clients share same IP (Nexe, proxy).
-
-  Args:
-    request: FastAPI Request object
-
-  Returns:
-    API key or IP address if no key provided
-  """
-  api_key = request.headers.get("x-api-key", "")
-
-  if api_key:
-    import hashlib
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
-    return f"apikey:{key_hash}"
-
-  return f"ip:{get_remote_address(request)}"
-
-def get_composite_identifier(request: Request) -> str:
-  """
-  Get composite identifier (IP + API key)
-
-  Most restrictive: limits per IP AND per API key combination.
-  Prevents both IP-based and key-based abuse.
-
-  Args:
-    request: FastAPI Request object
-
-  Returns:
-    Composite identifier
-  """
-  ip = get_remote_address(request)
-  api_key = request.headers.get("x-api-key", "")
-
-  if api_key:
-    import hashlib
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
-    return f"composite:{ip}:{key_hash}"
-
-  return f"composite:{ip}:nokey"
-
-def get_endpoint_identifier(request: Request) -> str:
-  """
-  Get identifier including endpoint path
-
-  Allows different limits for different endpoints.
-
-  Args:
-    request: FastAPI Request object
-
-  Returns:
-    Endpoint-specific identifier
-  """
-  ip = get_remote_address(request)
-  path = request.url.path
-
-  path = path.rstrip("/")
-
-  return f"endpoint:{ip}:{path}"
 
 # MC-103 dead-code sweep: the limiter objects (global/by_key/composite/by_endpoint)
 # defined here were imported only by core/dependencies.py. The advanced ones were
 # already unwired (MC-123/124) and the per-IP `limiter` now lives in core itself,
-# so all four are dead and have been removed. The identifier helpers above and
-# RateLimitTracker below stay (still used / tested). DEFAULT_RATE_LIMITS is kept as
-# the documented rate-limit configuration.
+# so all four are dead and have been removed.
+#
+# #877 dead-code sweep (2026-08-28): DEFAULT_RATE_LIMITS, the identifier helpers
+# (get_api_key_identifier/get_composite_identifier/get_endpoint_identifier),
+# rate_limit_tracker and start_rate_limit_cleanup_task all had zero production
+# call-sites (only their own tests exercised them) — none of them is wired to
+# core/dependencies.py's `limiter` or any endpoint. Removed. RateLimitTracker
+# stays: plugins/security/checks/rate_limit_check.py instantiates it as a
+# real availability check.
 
 class RateLimitTracker:
   """
@@ -202,16 +129,3 @@ class RateLimitTracker:
       ]
       for key in expired:
         del self._counters[key]
-
-rate_limit_tracker = RateLimitTracker()
-
-async def start_rate_limit_cleanup_task():
-  """
-  Background task to cleanup expired rate limit counters
-
-  Should be started when application starts.
-  Runs every hour to prevent memory buildup.
-  """
-  while True:
-    await asyncio.sleep(3600)
-    await rate_limit_tracker.cleanup_expired()

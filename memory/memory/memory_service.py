@@ -469,8 +469,8 @@ class MemoryService:
 
         #897: "clear all memory" in the UI told the user "ja no recordo res
         sobre tu" while only the Qdrant RAG collection was dropped. Everything
-        written through this service — the preferred write path for chat
-        autosave (core/endpoints/chat_memory.py) — lived on in memory_v1.db.
+        written through this service (CLI, /memory/store, workflow nodes)
+        lived on in memory_v1.db.
 
         Unlike `forget()` this leaves NO tombstone: a tombstone of a full wipe
         would be a record of exactly what the user asked us to forget.

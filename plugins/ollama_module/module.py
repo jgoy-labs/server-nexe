@@ -209,6 +209,22 @@ class OllamaModule:
             "type": self.metadata.module_type,
         }
 
+    def get_context_window(self) -> Optional[int]:
+        """#965: the engine's own answer to "how many tokens fit", in tokens.
+
+        For Ollama that is `num_ctx`, sized from system RAM by `auto_num_ctx()`
+        — the same helper this module already sends in the chat payload
+        (core/chat.py), so what we report is what we actually ask Ollama for.
+
+        Unlike MLX and llama.cpp there is no `_node` to hold config: the value
+        depends on the machine, not on a loaded model, so it can always answer.
+        """
+        try:
+            from core.endpoints.chat_engines.ollama_helpers import auto_num_ctx
+            return int(auto_num_ctx())
+        except Exception:
+            return None
+
     def _t(self, key: str, fallback: str, **kwargs) -> str:
         """Helper to translate with fallback."""
         if not self.i18n:

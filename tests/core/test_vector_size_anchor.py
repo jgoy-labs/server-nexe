@@ -1,10 +1,12 @@
 """#888 — the vector width lives in core, and must not drift from memory/.
 
-``core/endpoints/chat_memory.py`` is reached at import time from
-``create_app()``. When it imported ``memory.memory.constants`` the whole
-memory package (MemoryModule, MemoryAPI, embeddings) came with it, so a broken
+``create_app()`` used to reach ``core/endpoints/chat_memory.py`` at import
+time. When that file imported ``memory.memory.constants`` the whole memory
+package (MemoryModule, MemoryAPI, embeddings) came with it, so a broken
 memory/ meant NO server at all — not even /health or /ui. The constant now
-lives in ``core.memory_access``.
+lives in ``core.memory_access``. The autosave module is gone (F-A); the
+constant stays in core so a broken memory/ still cannot take down the
+server. ``tests/core/test_g1_memory_degradation.py`` is the runtime gate.
 
 Moving a value out of its home package buys resilience and costs a second
 source of truth. That is only acceptable while something fails when the two
@@ -35,27 +37,6 @@ def test_core_vector_size_matches_the_memory_re_export():
 
     assert CORE_VECTOR_SIZE == RE_EXPORT, (
         f"core ({CORE_VECTOR_SIZE}) != memory.memory.constants ({RE_EXPORT})"
-    )
-
-
-def test_chat_memory_does_not_import_memory_at_module_level():
-    """The import that broke create_app() must not come back (#888).
-
-    Textual check on purpose: by the time this test runs the module is already
-    imported, so asserting on the loaded object would pass either way.
-    """
-    from pathlib import Path
-
-    src = (Path(__file__).resolve().parents[2]
-           / "core" / "endpoints" / "chat_memory.py").read_text()
-    module_level = [
-        line for line in src.splitlines()
-        if line.startswith(("from memory", "import memory"))
-    ]
-    assert not module_level, (
-        "core/endpoints/chat_memory.py imports memory/ at module level again: "
-        f"{module_level}. create_app() is reached through this file — see "
-        "tests/core/test_g1_memory_degradation.py"
     )
 
 

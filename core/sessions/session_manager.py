@@ -2,13 +2,14 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy
-Location: plugins/web_ui_module/session_manager.py
-Description: Chat session manager for the web UI (RAM memory)
+Location: core/sessions/session_manager.py
+Description: Chat session manager — conversation threads live in core, not in any UI plugin.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import os
 import re
 import uuid
 import json
@@ -27,10 +28,26 @@ logger = logging.getLogger(__name__)
 class ChatSession:
     """Individual chat session with message history and automatic compaction."""
 
-    # Compacting: every COMPACT_EVERY messages, summarize the older ones
-    COMPACT_EVERY = 10          # Fallback: by number of messages
+    # Compacting is decided by SIZE against the engine's real context window
+    # (see needs_compaction). #965: it used to be decided by message COUNT —
+    # COMPACT_EVERY = 10, i.e. five turns — with a 12000-char size check that in
+    # practice never fired, because ten short messages are ~50 chars. So a
+    # conversation of one-liners compacted every five turns on a machine whose
+    # model could hold 32768 tokens.
+    COMPACT_EVERY = 200         # Hard guard only, never the trigger
     COMPACT_KEEP = 6
-    MAX_CONTEXT_CHARS = 12000   # ~3000 tokens, safe for 4K-8K context models
+    # Fraction of the window the history may take before we summarise. The rest
+    # is the answer, the system prompt, RAG and any attached document — none of
+    # which _estimate_context_chars() counts.
+    #
+    # MUST stay clearly below context_budget.PROMPT_BUDGET_RATIO, which caps the
+    # whole prompt. Both were 0.7 at first: the history was then allowed to grow
+    # to the entire prompt budget, so `available_chars` turned negative exactly
+    # when a conversation reached compaction size and RAG and attached documents
+    # were silently dropped — on every engine, at every window size. The gap
+    # between the two ratios is what pays for the system prompt (~4700 chars),
+    # the retrieved context and the user message.
+    COMPACT_AT_RATIO = 0.45
 
     def __init__(self, session_id: str = None):  # type: ignore[assignment]  # no_implicit_optional
         self.id = session_id or str(uuid.uuid4())
@@ -138,10 +155,60 @@ class ChatSession:
         total += sum(len(m.get("content") or "") for m in self.messages)
         return total
 
-    def needs_compaction(self) -> bool:
-        """Return True if the session needs compaction (by token count or message count)."""
-        if self._estimate_context_chars() > self.MAX_CONTEXT_CHARS:
+    def _estimate_context_tokens(self) -> int:
+        """Rough token count of what the history will cost the model."""
+        from core.endpoints.chat_sanitization import CHARS_PER_TOKEN_ESTIMATE
+        return self._estimate_context_chars() // CHARS_PER_TOKEN_ESTIMATE
+
+    def compaction_threshold_tokens(self, max_context_tokens: int = None) -> int:  # type: ignore[assignment]  # no_implicit_optional
+        """Token count at which this session starts summarising its history.
+
+        `NEXE_COMPACT_AT_TOKENS` overrides everything, for when you want to pin
+        the number regardless of the engine.
+        """
+        explicit = os.environ.get("NEXE_COMPACT_AT_TOKENS")
+        if explicit:
+            try:
+                value = int(explicit)
+                if value > 0:
+                    return value
+                # 0 would mean "compact on every single turn", and compaction is
+                # a full LLM summarisation in the critical path (~100 s on 8 GB).
+                logger.warning(
+                    "NEXE_COMPACT_AT_TOKENS=%r must be positive, sizing from the engine", explicit
+                )
+            except ValueError:
+                logger.warning(
+                    "NEXE_COMPACT_AT_TOKENS=%r is not a number, sizing from the engine instead",
+                    explicit,
+                )
+        if not max_context_tokens or max_context_tokens <= 0:
+            from core.endpoints.chat_sanitization import DEFAULT_CONTEXT_WINDOW
+            max_context_tokens = DEFAULT_CONTEXT_WINDOW
+        return int(max_context_tokens * self.COMPACT_AT_RATIO)
+
+    def needs_compaction(self, max_context_tokens: int = None) -> bool:  # type: ignore[assignment]  # no_implicit_optional
+        """Return True if the history should be summarised before the next turn.
+
+        #965: decided by SIZE against the serving engine's real context window,
+        not by message count. `max_context_tokens` is what that engine reported;
+        without it the documented default window is used.
+
+        The COMPACT_KEEP guard comes FIRST and is not a detail. `compact_session`
+        summarises `get_messages_to_compact()`, which is empty at or below
+        COMPACT_KEEP — so a session that is over the size threshold with six or
+        fewer messages (one big pasted document, say) would answer True here
+        forever, emit [WILL_COMPACT:1] on every single turn, and show the user
+        "I am summarising the conversation" before a compaction that never
+        happens. Saying True while there is nothing to compact is crying wolf.
+        """
+        if len(self.messages) <= self.COMPACT_KEEP:
+            return False
+        if self._estimate_context_tokens() > self.compaction_threshold_tokens(max_context_tokens):
             return True
+        # Hard guard for the pathological case the size check cannot see: a very
+        # long tail of tiny messages, each costing almost nothing but all of them
+        # together making the history unwieldy.
         return len(self.messages) >= self.COMPACT_EVERY
 
     def get_messages_to_compact(self) -> List[Dict[str, str]]:
@@ -381,7 +448,7 @@ class SessionManager:
         Production safety contract (added 2026-05-13 after empirical incident
         where 80 plaintext .json sessions appeared in storage/sessions/ on a
         production server because the SessionManager was constructed with
-        crypto_provider=None — see plugins/web_ui_module/module.py and
+        crypto_provider=None — see core/sessions/attach.py and
         tests/plugins/web_ui_module/test_session_manager_proxy.py for the
         related regression chain).
 
@@ -394,12 +461,12 @@ class SessionManager:
         below is INTENTIONALLY caught by this method's own outer `except` and
         logged (critical for the refusal marker, error for the catch); it does
         NOT propagate to the caller. This is a redundant defense-in-depth
-        barrier: the primary guard is WebUIModule.initialize, which aborts
-        plugin startup in production without crypto, so this branch is normally
-        unreachable in production. The contract (logged + no plaintext file on
-        disk, no exception bubbling up) is asserted by
-        tests/.../test_session_manager_production_safety.py. The in-memory
-        session is preserved either way (the dict assignment in
+        barrier: the primary guard is attach_session_manager (called from
+        lifespan after encryption), which aborts startup in production without
+        crypto, so this branch is normally unreachable in production. The
+        contract (logged + no plaintext file on disk, no exception bubbling up)
+        is asserted by tests/.../test_session_manager_production_safety.py. The
+        in-memory session is preserved either way (the dict assignment in
         create_session/update_session already happened by the time we get here).
 
         In development/test, keep the .json fallback so existing test fixtures
@@ -428,7 +495,7 @@ class SessionManager:
                     logger.critical(
                         "Refusing to write plaintext .json session %s in production "
                         "(crypto_provider missing). Encryption-at-rest is mandatory; "
-                        "see core.lifespan_crypto and plugins.web_ui_module.module.",
+                        "see core.lifespan_crypto and core.sessions.attach.",
                         session.id,
                     )
                     raise RuntimeError(
@@ -533,14 +600,24 @@ class SessionManager:
             return self.create_session(session_id)
 
     def delete_session(self, session_id: str) -> bool:
-        """Delete a session. (Bug 16: protected by RLock)"""
+        """Delete a session. (Bug 16: protected by RLock)
+
+        Manual deletion (this method) had no log trail while the automatic
+        cleanup_inactive() below does — an operator could not tell a session
+        vanished by user action from one that was silently lost. Logged
+        outside the lock: same reasoning as cleanup_inactive.
+        """
         self._validate_session_id(session_id)
         with self._sessions_lock:
             if session_id in self._sessions:
                 del self._sessions[session_id]
                 self._delete_session_from_disk(session_id)
-                return True
-            return False
+                deleted = True
+            else:
+                deleted = False
+        if deleted:
+            logger.info("Session %s deleted", session_id)
+        return deleted
 
     def list_sessions(self) -> List[dict]:
         """List all sessions (metadata only). (Bug 16: snapshot within RLock)"""

@@ -11,7 +11,6 @@ www.jgoy.net · https://server-nexe.org
 ------------------------------------
 """
 
-import asyncio
 import logging
 from fastapi import APIRouter, Depends
 
@@ -35,28 +34,6 @@ from .routes_memory import register_memory_routes
 logger = logging.getLogger(__name__)
 
 
-# ── Session cleanup ──────────────────────────────────────────────
-
-async def _session_cleanup_loop(session_mgr):
-    """Background loop that removes inactive sessions every hour."""
-    while True:
-        await asyncio.sleep(3600)
-        try:
-            removed = session_mgr.cleanup_inactive(max_age_hours=24)
-            if removed:
-                logger.info("Session cleanup: %d sessions removed", removed)
-        except Exception as e:
-            logger.warning("Session cleanup failed: %s", e)
-
-
-def start_session_cleanup_task(session_mgr):
-    """Start session cleanup background task. Call from lifespan startup.
-
-    Returns the asyncio.Task so the caller can cancel it on shutdown (N04).
-    """
-    return asyncio.create_task(_session_cleanup_loop(session_mgr))
-
-
 # ── Router factory ───────────────────────────────────────────────
 
 class _SessionManagerProxy:
@@ -64,10 +41,9 @@ class _SessionManagerProxy:
 
     create_router() is invoked by the loader *before* initialize() runs
     (see core/modules/manifest_base._get_module). At that time the plugin
-    has not yet created its real SessionManager. Capturing
-    module_instance.session_manager as a local would snapshot None (or a
-    pre-crypto placeholder), and the routes would never see the real
-    manager built in initialize().
+    has not yet bound the core SessionManager. Capturing
+    module_instance.session_manager as a local would snapshot None, and
+    the routes would never see the instance bound in initialize().
 
     This proxy re-reads module_instance.session_manager on every attribute
     access, so the routes always hit the current live instance.
@@ -98,7 +74,7 @@ def create_router(module_instance) -> APIRouter:
     """
     # Late-binding proxy so route closures always read the live
     # session_manager, even though the loader calls create_router()
-    # before initialize() builds it.
+    # before initialize() binds the core instance.
     session_mgr = _SessionManagerProxy(module_instance)
     file_handler = module_instance.file_handler
     _module_ref = module_instance

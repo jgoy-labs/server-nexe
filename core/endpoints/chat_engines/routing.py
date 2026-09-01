@@ -40,6 +40,27 @@ def _get_preferred_engine(app_state) -> Optional[str]:
     config = getattr(app_state, "config", {}) or {}
     return config.get("plugins", {}).get("models", {}).get("preferred_engine")
 
+_ENGINE_MODULE_KEYS = {
+    "ollama": "ollama_module",
+    "mlx": "mlx_module",
+    "llama_cpp": "llama_cpp_module",
+}
+
+
+def get_engine_module(engine: str, app_state):
+    """The live module instance serving ``engine``, or None.
+
+    #965: the engine-name → module-key mapping lives here and only here.
+    ``_engine_available`` below already called itself the single source of truth
+    for what runs; anything else that needs the live module (the context-window
+    resolver, for one) asks through this instead of keeping its own copy of the
+    three names.
+    """
+    modules = getattr(app_state, "modules", {}) or {}
+    key = _ENGINE_MODULE_KEYS.get(engine)
+    return modules.get(key) if key else None
+
+
 def _engine_available(engine: str, app_state) -> bool:
     """Check whether the given engine is loaded AND serviceable (node-aware).
 
@@ -52,14 +73,11 @@ def _engine_available(engine: str, app_state) -> bool:
     downstream). This is the single source of truth shared by chat routing and
     ``/status`` (root.py), so the two can never disagree on what runs.
     """
-    modules = getattr(app_state, "modules", {}) or {}
     if engine == "ollama":
+        modules = getattr(app_state, "modules", {}) or {}
         return "ollama_module" in modules
-    if engine == "mlx":
-        instance = modules.get("mlx_module")
-        return instance is not None and getattr(instance, "_node", None) is not None
-    if engine == "llama_cpp":
-        instance = modules.get("llama_cpp_module")
+    if engine in ("mlx", "llama_cpp"):
+        instance = get_engine_module(engine, app_state)
         return instance is not None and getattr(instance, "_node", None) is not None
     return False
 

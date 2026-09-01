@@ -175,7 +175,6 @@ server-nexe/
 │   │   ├── chat_schemas.py       # Pydantic models (Message, ChatCompletionRequest)
 │   │   ├── chat_sanitization.py  # SSE token sanitization, context truncation
 │   │   ├── chat_rag.py           # RAG context builder (3 collections)
-│   │   ├── chat_memory.py        # Save conversation to memory (MEM_SAVE)
 │   │   ├── chat_engines/         # Per-backend generators
 │   │   │   ├── routing.py        # Engine selection logic
 │   │   │   ├── ollama.py         # Ollama streaming generator
@@ -378,16 +377,17 @@ Embeddings Layer (memory/embeddings/) — vector generation + Qdrant interface
 
 ## Chat Endpoint Architecture
 
-`POST /v1/chat/completions` is the main endpoint, split into 8 submodules:
+`POST /v1/chat/completions` is the main endpoint, split into 7 submodules:
 
 1. **chat_schemas.py** — Pydantic models (Message, ChatCompletionRequest with use_rag=True default)
 2. **chat_sanitization.py** — SSE token sanitization (null bytes, control chars), ratio-based RAG context truncation (MAX_CONTEXT_RATIO=0.3, RAG cap 4000 chars)
 3. **chat_rag.py** — RAG context builder: searches nexe_documentation (0.4), user_knowledge (0.35), personal_memory (0.3)
-4. **chat_memory.py** — MEM_SAVE parsing, save conversation to memory
-5. **chat_engines/routing.py** — Engine selection (auto, ollama, mlx, llama_cpp)
-6. **chat_engines/ollama.py** — Ollama streaming with thinking token support
-7. **chat_engines/mlx.py** — MLX streaming with CancelledError handling
-8. **chat_engines/llama_cpp.py** — llama.cpp streaming
+4. **chat_engines/routing.py** — Engine selection (auto, ollama, mlx, llama_cpp)
+5. **chat_engines/ollama.py** — Ollama streaming with thinking token support
+6. **chat_engines/mlx.py** — MLX streaming with CancelledError handling
+7. **chat_engines/llama_cpp.py** — llama.cpp streaming
+
+Facts the model tags with `[MEM_SAVE:]` are persisted on the UI path (`memory_helper.py`), not from this endpoint.
 
 **Streaming markers injected by chat endpoint:**
 - `[MODEL:name]` — active model name

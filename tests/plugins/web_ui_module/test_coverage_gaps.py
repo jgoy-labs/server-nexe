@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from plugins.web_ui_module.core.session_manager import ChatSession, SessionManager
+from core.sessions import ChatSession, SessionManager
 from plugins.web_ui_module.core.file_handler import FileHandler
 
 
@@ -353,7 +353,7 @@ class TestWebUIManifestGaps:
         assert len(result["tags"]) > 0
 
     def test_session_manager_instance(self):
-        """WebUIModule.session_manager is None at __init__, built in initialize().
+        """WebUIModule.session_manager is None at __init__, bound in initialize().
 
         The placeholder is None on purpose — creating a SessionManager in
         __init__ without a crypto_provider and then replacing it in
@@ -380,8 +380,8 @@ class TestWebUIManifestGaps:
         assert router_public.prefix == "/ui"
 
     def test_start_session_cleanup_task(self):
-        """start_session_cleanup_task is callable (now in api/routes.py)."""
-        from plugins.web_ui_module.api.routes import start_session_cleanup_task
+        """start_session_cleanup_task is callable (lives in core.sessions)."""
+        from core.sessions import start_session_cleanup_task
         assert callable(start_session_cleanup_task)
 
 
@@ -391,7 +391,7 @@ class TestSessionEncFilePermissions:
     def test_enc_file_has_chmod_600(self, tmp_path):
         """.enc file written by SessionManager must have permissions 0o600."""
         from unittest.mock import MagicMock
-        from plugins.web_ui_module.core.session_manager import SessionManager
+        from core.sessions import SessionManager
 
         mock_crypto = MagicMock()
         mock_crypto.encrypt.return_value = b"encrypted_data"
@@ -411,7 +411,7 @@ class TestSessionEncFilePermissions:
     def test_enc_file_chmod_oserror_no_crash(self, tmp_path):
         """If chmod raises OSError → it is not propagated (log warning, continue)."""
         from unittest.mock import MagicMock, patch
-        from plugins.web_ui_module.core.session_manager import SessionManager
+        from core.sessions import SessionManager
         from pathlib import Path
 
         mock_crypto = MagicMock()

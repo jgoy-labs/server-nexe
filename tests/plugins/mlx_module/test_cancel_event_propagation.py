@@ -158,7 +158,7 @@ class TestExecuteForwardsCancelEvent:
         fake_loop.run_in_executor = fake_run_in_executor
 
         with patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=fake_loop), \
-             patch("plugins.mlx_module.core.chat._detect_vlm_capability", return_value=False):
+             patch("plugins.mlx_module.core.model_loader._detect_vlm_capability", return_value=False):
             await node.execute({
                 "system": "",
                 "messages": [{"role": "user", "content": "hi"}],
@@ -202,7 +202,7 @@ class TestExecuteForwardsCancelEvent:
         fake_loop.run_in_executor = fake_run_in_executor
 
         with patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=fake_loop), \
-             patch("plugins.mlx_module.core.chat._detect_vlm_capability", return_value=False):
+             patch("plugins.mlx_module.core.model_loader._detect_vlm_capability", return_value=False):
             await node.execute({
                 "system": "",
                 "messages": [{"role": "user", "content": "hi"}],

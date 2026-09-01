@@ -31,7 +31,10 @@ import pytest
 pytest.importorskip("mlx_lm", reason="mlx-lm is Apple-Silicon only")
 
 # Module under test (string path reused by the lazy patches below).
-_MOD = "plugins.mlx_module.core.chat"
+# #966: el cami de text viu a text_runner i els helpers a generate_helpers.
+# Cada patch apunta al LLOC DE DEFINICIO, que val per a qualsevol consumidor.
+_MOD = "plugins.mlx_module.core.generate_helpers"
+_RUNNER = "plugins.mlx_module.core.text_runner"
 
 
 def _make_node(*, top_p_default: float = 0.9, temperature: float = 0.7):
@@ -89,7 +92,7 @@ def _run_inner(node, *, top_p):
         )
         # Module-level helpers imported into chat.py namespace.
         stack.enter_context(
-            patch(f"{_MOD}.compute_system_hash", return_value="0" * 64)
+            patch("core.utils.compute_system_hash", return_value="0" * 64)
         )
         stack.enter_context(
             patch(
@@ -116,7 +119,7 @@ def _run_inner(node, *, top_p):
             patch(f"{_MOD}.extract_metrics", return_value={"text": "hi"})
         )
         # Force the config.json read to fail → model_type="" branch, no real IO.
-        stack.enter_context(patch(f"{_MOD}.open", side_effect=OSError, create=True))
+        stack.enter_context(patch(f"{_RUNNER}.open", side_effect=OSError, create=True))
 
         node._generate_blocking_inner(
             system="sys",

@@ -85,7 +85,10 @@ from .lifespan_modules import (  # noqa: E402  # after warnings filter
 )
 from .lifespan_crypto import _startup_encryption  # noqa: E402  # after warnings filter
 from .lifespan_qdrant import _startup_qdrant, _shutdown_qdrant  # noqa: E402  # after warnings filter
-from .lifespan_sessions import _startup_session_cleanup  # noqa: E402  # after warnings filter
+from .lifespan_sessions import (  # noqa: E402  # after warnings filter
+    _startup_session_cleanup,
+    _startup_session_manager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +377,7 @@ async def _startup_init(app: FastAPI) -> None:
             logger.warning("Parent watchdog: failed to start in sidecar mode: %s", exc)
 
     await _startup_encryption(server_state)
+    await _startup_session_manager(server_state)
     _start_qdrant_or_degrade()
 
 

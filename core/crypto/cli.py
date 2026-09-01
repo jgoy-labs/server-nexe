@@ -107,7 +107,7 @@ def encrypt_all(force):
         json_files = list(sessions_path.glob("*.json"))
         if json_files:
             click.echo(f"Encrypting {len(json_files)} session file(s)...")
-            from plugins.web_ui_module.core.session_manager import SessionManager
+            from core.sessions import SessionManager
             # SessionManager auto-migrates .json → .enc on init.
             SessionManager(
                 storage_path=str(sessions_path),

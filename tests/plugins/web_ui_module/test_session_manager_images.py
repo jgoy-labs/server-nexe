@@ -12,7 +12,7 @@ import os
 
 import pytest
 
-from plugins.web_ui_module.core.session_manager import ChatSession, SessionManager
+from core.sessions import ChatSession, SessionManager
 
 
 SMALL_B64 = base64.b64encode(b"fake-jpg-bytes").decode("ascii")

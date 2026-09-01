@@ -24,11 +24,26 @@ def auto_num_ctx() -> int:
     """
     explicit = os.environ.get("NEXE_OLLAMA_NUM_CTX")
     if explicit:
-        return int(explicit)
+        try:
+            value = int(explicit)
+            if value > 0:
+                return value
+            import logging
+            logging.getLogger(__name__).warning(
+                "NEXE_OLLAMA_NUM_CTX=%r must be positive, auto-detecting instead", explicit)
+        except ValueError:
+            # This runs at module import (ollama.py): a typo here used to be a
+            # boot failure, not a bad window. Fall through to detection.
+            import logging
+            logging.getLogger(__name__).warning(
+                "NEXE_OLLAMA_NUM_CTX=%r is not a number, auto-detecting instead", explicit)
     try:
         import psutil
         ram_gb = psutil.virtual_memory().total / (1024 ** 3)
-    except ImportError:
+    except Exception:
+        # ImportError, but also psutil importing and then failing: a broken RAM
+        # probe must degrade to the safe rung, never raise (the Ollama call
+        # runs at module import — an exception here is a boot failure).
         return 4096
     if ram_gb >= 64:
         return 32768

@@ -102,9 +102,9 @@ server-nexe listens on loopback only. Two independent checks hold that line:
 - **Socket bind.** Starting on a non-loopback host requires `NEXE_ALLOW_PUBLIC_BIND=1`; without that opt-in the server refuses to start (`core/server/runner.py`). **IPv6 binds are always refused**, `::1` included: the `Host` header filter cannot match a bracketed IPv6 authority, so the server would answer HTTP 400 to everything. Use `127.0.0.1`.
 - **`Host` header.** `TrustedHostMiddleware` answers 400 to any request whose `Host` is not on the allow-list (DNS-rebinding defence). The default list is `127.0.0.1`, `::1` and `localhost`.
 
-`NEXE_LOCALHOST_ALIASES` (comma-separated) **adds** names to that list and to the client-IP allow-list for bootstrap token regeneration. The three defaults are never dropped: setting an alias cannot lock you out of your own machine. Note that `::1` only ever takes effect in the client-IP check — it can never match a `Host` header.
+`NEXE_TRUSTED_HOSTS` (comma-separated) **adds** names to the `Host` header allow-list. `NEXE_LOCALHOST_ALIASES` (comma-separated) **adds** IPs to the client-IP allow-list for bootstrap token regeneration. They are two separate lists: an alias set for the bootstrap check does not widen the `Host` list. The three defaults are never dropped from either list: setting an alias cannot lock you out of your own machine. Note that `::1` only ever takes effect in the client-IP check — it can never match a `Host` header.
 
-The variable opens nothing on its own: reaching the server from outside also requires the public bind.
+These variables open nothing on their own: reaching the server from outside also requires the public bind.
 
 ## Security Headers (OWASP)
 

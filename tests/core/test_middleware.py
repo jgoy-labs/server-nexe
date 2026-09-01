@@ -93,7 +93,7 @@ class TestSetupTrustedHosts:
     def test_zero_host_not_added(self):
         """0.0.0.0 must not be added to allowed_hosts"""
         from core.middleware import setup_trusted_hosts
-        from core.config import get_localhost_aliases
+        from core.config import get_trusted_hosts
         app = FastAPI()
         config = {"core": {"server": {"host": "0.0.0.0"}}}
         setup_trusted_hosts(app, config)
@@ -103,8 +103,8 @@ class TestSetupTrustedHosts:
         mw = app.user_middleware[0]
         allowed = mw.kwargs["allowed_hosts"]
         assert "0.0.0.0" not in allowed
-        # localhost aliases are always present regardless of the bind host
-        for alias in get_localhost_aliases():
+        # trusted hosts are always present regardless of the bind host
+        for alias in get_trusted_hosts():
             assert alias in allowed
 
 

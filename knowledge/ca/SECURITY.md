@@ -102,9 +102,9 @@ server-nexe escolta nomes a loopback. Dues comprovacions independents ho sostene
 - **Bind del socket.** Arrencar amb un host fora de loopback exigeix `NEXE_ALLOW_PUBLIC_BIND=1`; sense aquest opt-in el servidor es nega a arrencar (`core/server/runner.py`). Els binds **IPv6 es refusen sempre**, tambe `::1`: el filtre de la capcalera `Host` no pot casar una adreca IPv6 entre claudators i el servidor respondria HTTP 400 a tot. Feu servir `127.0.0.1`.
 - **Capcalera `Host`.** `TrustedHostMiddleware` respon 400 a qualsevol peticio amb un `Host` que no sigui de la llista (defensa contra DNS rebinding). Per defecte la llista es `127.0.0.1`, `::1` i `localhost`.
 
-`NEXE_LOCALHOST_ALIASES` (coma-separada) **afegeix** noms a aquesta llista i a la d'IPs de client autoritzades a regenerar el bootstrap token. Els tres valors per defecte no es perden mai: posar un alies no us pot deixar fora de la vostra propia maquina. Nota: `::1` nomes es efectiu a la comprovacio d'IP de client — no pot casar mai una capcalera `Host`.
+`NEXE_TRUSTED_HOSTS` (coma-separada) **afegeix** noms a la llista de la capcalera `Host`. `NEXE_LOCALHOST_ALIASES` (coma-separada) **afegeix** IPs a la llista de client autoritzades a regenerar el bootstrap token. Son dues llistes separades: un alies posat per al bootstrap no amplia la llista de `Host`. Els tres valors per defecte no es perden mai en cap de les dues: posar un alies no us pot deixar fora de la vostra propia maquina. Nota: `::1` nomes es efectiu a la comprovacio d'IP de client — no pot casar mai una capcalera `Host`.
 
-Aquesta variable no obre res per si sola: per arribar al servidor des de fora cal, a mes, el bind public.
+Aquestes variables no obren res per si soles: per arribar al servidor des de fora cal, a mes, el bind public.
 
 ## Capcaleres de seguretat (OWASP)
 

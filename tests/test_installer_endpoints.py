@@ -158,36 +158,36 @@ class TestSafeModelBasename:
     """Basename guard helper used by _resolve_model_path and the streamers."""
 
     def test_rejects_dot(self):
-        from core.endpoints.installer import _safe_model_basename
+        from core.endpoints.installer_shared import _safe_model_basename
 
         with pytest.raises(ValueError, match="invalid model_id"):
             _safe_model_basename(".")
 
     def test_rejects_double_dot(self):
-        from core.endpoints.installer import _safe_model_basename
+        from core.endpoints.installer_shared import _safe_model_basename
 
         with pytest.raises(ValueError, match="invalid model_id"):
             _safe_model_basename("..")
 
     def test_rejects_trailing_slash(self):
-        from core.endpoints.installer import _safe_model_basename
+        from core.endpoints.installer_shared import _safe_model_basename
 
         with pytest.raises(ValueError, match="invalid model_id"):
             _safe_model_basename("mlx-community/")
 
     def test_rejects_org_dotdot(self):
-        from core.endpoints.installer import _safe_model_basename
+        from core.endpoints.installer_shared import _safe_model_basename
 
         with pytest.raises(ValueError, match="invalid model_id"):
             _safe_model_basename("mlx-community/..")
 
     def test_accepts_org_name(self):
-        from core.endpoints.installer import _safe_model_basename
+        from core.endpoints.installer_shared import _safe_model_basename
 
         assert _safe_model_basename("mlx-community/gemma-3-4b-it-4bit") == "gemma-3-4b-it-4bit"
 
     def test_accepts_bare_name(self):
-        from core.endpoints.installer import _safe_model_basename
+        from core.endpoints.installer_shared import _safe_model_basename
 
         assert _safe_model_basename("gemma3:4b") == "gemma3:4b"
 
@@ -221,27 +221,27 @@ class TestResolveModelPath:
     """Path traversal guard on _resolve_model_path."""
 
     def test_rejects_double_dot_model_id(self):
-        from core.endpoints.installer import _resolve_model_path
+        from core.endpoints.installer_shared import _resolve_model_path
 
         with pytest.raises(ValueError, match="invalid model_id"):
             _resolve_model_path("mlx", "..")
 
     def test_rejects_single_dot_model_id(self):
-        from core.endpoints.installer import _resolve_model_path
+        from core.endpoints.installer_shared import _resolve_model_path
 
         with pytest.raises(ValueError, match="invalid model_id"):
             _resolve_model_path("gguf", ".")
 
     def test_rejects_trailing_slash_model_id(self):
         """model_id ending in '/' yields an empty basename — invalid."""
-        from core.endpoints.installer import _resolve_model_path
+        from core.endpoints.installer_shared import _resolve_model_path
 
         with pytest.raises(ValueError, match="invalid model_id"):
             _resolve_model_path("mlx", "mlx-community/")
 
     def test_rejects_double_dot_at_end_path_traversal(self, tmp_path, monkeypatch):
         """Basename '..' would resolve to the parent of models_dir."""
-        from core.endpoints.installer import _resolve_model_path
+        from core.endpoints.installer_shared import _resolve_model_path
 
         monkeypatch.setenv("NEXE_DATA_DIR", str(tmp_path))
         # 'mlx-community/..' -> basename '..'; the early check catches this.
@@ -250,14 +250,14 @@ class TestResolveModelPath:
 
     def test_local_rejects_nonexistent_folder(self):
         """engine='local' with a folder that does not exist → ValueError (→400)."""
-        from core.endpoints.installer import _resolve_model_path
+        from core.endpoints.installer_shared import _resolve_model_path
 
         with pytest.raises(ValueError, match="local models folder not found"):
             _resolve_model_path("local", "/no/such/models/folder/xyz")
 
     def test_local_accepts_existing_dir(self, tmp_path):
         """engine='local' with an existing dir returns its resolved path."""
-        from core.endpoints.installer import _resolve_model_path
+        from core.endpoints.installer_shared import _resolve_model_path
 
         folder = tmp_path / "my-models"
         folder.mkdir()
@@ -265,7 +265,7 @@ class TestResolveModelPath:
         assert resolved == str(folder.resolve())
 
     def test_accepts_normal_mlx_model_id(self, tmp_path, monkeypatch):
-        from core.endpoints.installer import _resolve_model_path
+        from core.endpoints.installer_shared import _resolve_model_path
 
         monkeypatch.setenv("NEXE_DATA_DIR", str(tmp_path))
         out = _resolve_model_path("mlx", "mlx-community/gemma-3-4b-it-4bit")
@@ -306,12 +306,12 @@ class TestDownloadValidation:
         async def _no_preflight(engine, model_id):
             return None
 
-        monkeypatch.setattr("core.endpoints.installer._stream_gguf", _fake_stream)
-        monkeypatch.setattr("core.endpoints.installer._stream_ollama", _fake_stream)
+        monkeypatch.setattr("core.endpoints.installer_gguf._stream_gguf", _fake_stream)
+        monkeypatch.setattr("core.endpoints.installer_ollama._stream_ollama", _fake_stream)
         # El preflight HF real fa XARXA: amb connexió viva, "test-model" → 404
         # → error event i el test flaquejava segons l'estat de HF. El contracte
         # d'aquest test és el dispatch per engine, no l'accés a HF.
-        monkeypatch.setattr("core.endpoints.installer._preflight_hf_access", _no_preflight)
+        monkeypatch.setattr("core.endpoints.installer_hf._preflight_hf_access", _no_preflight)
         resp = client.get(f"/installer/download?engine={engine}&model_id=test-model")
         assert resp.status_code == 200
         body = resp.text

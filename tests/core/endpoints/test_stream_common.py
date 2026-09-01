@@ -13,9 +13,6 @@ import asyncio
 import json
 
 import pytest
-from unittest.mock import AsyncMock, patch
-
-MODULE = "core.endpoints.chat_engines._streaming"
 
 
 class TestTokenBridge_BasicFlow:
@@ -110,64 +107,3 @@ class TestSSEFormat_FinalChunk:
         assert data["choices"][0]["finish_reason"] == "stop"
         assert data["choices"][0]["delta"] == {}
         assert data["id"].startswith("llamacpp-stream-")
-
-
-class TestBackgroundMemorySaver_Success:
-
-    @pytest.mark.asyncio
-    async def test_save_ok_no_error(self):
-        from core.endpoints.chat_engines._streaming import background_memory_save
-
-        with patch(f"{MODULE}._save_conversation_to_memory", new_callable=AsyncMock) as mock_save:
-            await background_memory_save(object(), "user msg", "response text")
-            mock_save.assert_called_once()
-
-
-class TestBackgroundMemorySaver_RetryOnce:
-
-    @pytest.mark.asyncio
-    async def test_first_failure_retries_then_succeeds(self):
-        from core.endpoints.chat_engines._streaming import background_memory_save
-
-        call_count = 0
-
-        async def flaky_save(*_a, **_kw):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                raise RuntimeError("transient")
-
-        with patch(f"{MODULE}._save_conversation_to_memory", side_effect=flaky_save):
-            await background_memory_save(object(), "user msg", "response text")
-            assert call_count == 2
-
-
-class TestBackgroundMemorySaver_GiveUp:
-
-    @pytest.mark.asyncio
-    async def test_two_failures_logs_error(self):
-        from core.endpoints.chat_engines._streaming import background_memory_save
-
-        with patch(f"{MODULE}._save_conversation_to_memory", side_effect=RuntimeError("permanent")):
-            with patch(f"{MODULE}.logger") as mock_logger:
-                await background_memory_save(object(), "user msg", "response text")
-                mock_logger.error.assert_called_once()
-
-
-class TestBackgroundMemorySaver_Skip:
-
-    @pytest.mark.asyncio
-    async def test_empty_response_skips(self):
-        from core.endpoints.chat_engines._streaming import background_memory_save
-
-        with patch(f"{MODULE}._save_conversation_to_memory", new_callable=AsyncMock) as mock_save:
-            await background_memory_save(object(), "user msg", "   ")
-            mock_save.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_no_app_state_skips(self):
-        from core.endpoints.chat_engines._streaming import background_memory_save
-
-        with patch(f"{MODULE}._save_conversation_to_memory", new_callable=AsyncMock) as mock_save:
-            await background_memory_save(None, "user msg", "response")
-            mock_save.assert_not_called()

@@ -77,6 +77,18 @@ class TestSanitizeRagContext:
         result = _sanitize_rag_context(context)
         assert result == context
 
+    def test_live_window_is_forwarded_from_the_v1_injector(self):
+        """#972: /v1 must pass the engine window into the sanitizer, not just
+        into the later trim. Otherwise a 32768 engine still lost the RAG."""
+        from core.endpoints.chat import _inject_rag_context_into_messages
+        from core.endpoints.chat_sanitization import wrap_untrusted_context
+        long = "R" * 20_000
+        messages = [{"role": "user", "content": "hola"}]
+        _inject_rag_context_into_messages(messages, long, "en", effective_ctx_window=32768)
+        joined = " ".join(m.get("content", "") for m in messages)
+        assert "R" * 1000 in joined
+        assert joined.count("R") >= 20_000
+
 
 class TestMessageSchema:
     def test_message_creation(self):

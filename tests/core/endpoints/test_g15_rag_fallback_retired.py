@@ -36,7 +36,7 @@ class TestG15NoSilentRagDegradation:
         with patch("memory.memory.api.v1.get_memory_api",
                    new=AsyncMock(side_effect=RuntimeError("api down"))):
             with caplog.at_level(logging.WARNING, logger="core.endpoints.chat_rag"):
-                result = await chat_rag.build_rag_context("hola", MagicMock(), "ca")
+                result, _rag_items = await chat_rag.build_rag_context("hola", MagicMock(), "ca")
 
         assert result == ""
         warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
@@ -63,7 +63,7 @@ class TestG15NoSilentRagDegradation:
         with patch("memory.memory.api.v1.get_memory_api",
                    new=AsyncMock(return_value=memory)):
             with patch.object(chat_rag.logger, "warning") as warned:
-                result = await chat_rag.build_rag_context("hola", MagicMock(), "ca")
+                result, _rag_items = await chat_rag.build_rag_context("hola", MagicMock(), "ca")
 
         assert result == ""
         assert not warned.called, (

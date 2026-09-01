@@ -74,7 +74,7 @@ def test_session_swap_attack_blocked(tmp_path, crypto):
     encrypt → AESGCM raises InvalidTag → SessionManager catches it, increments
     `_corrupted_sessions_count`, and the swapped sessions are NOT loaded.
     """
-    from plugins.web_ui_module.core.session_manager import SessionManager, ChatSession
+    from core.sessions import SessionManager, ChatSession
 
     storage = tmp_path / "sessions"
     storage.mkdir()

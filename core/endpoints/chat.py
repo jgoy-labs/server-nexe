@@ -27,12 +27,10 @@ from .chat_sanitization import (
     append_rag_security_rule,
     _sanitize_rag_context,
     _sanitize_sse_token,
-    _estimate_tokens,
     untrusted_context_turns,
     wrap_untrusted_context,
     MAX_RAG_CONTEXT_LENGTH,
     MAX_CHAT_INPUT_LENGTH,
-    MAX_CONTEXT_RATIO,
     DEFAULT_CONTEXT_WINDOW,
     CHARS_PER_TOKEN_ESTIMATE,
 )
@@ -44,7 +42,6 @@ from .chat_rag import (
     RAG_KNOWLEDGE_THRESHOLD,
     RAG_MEMORY_THRESHOLD,
 )
-from .chat_memory import _save_conversation_to_memory, _pending_save_tasks
 from .chat_engines.routing import (
     _normalize_engine,
     _get_preferred_engine,
@@ -61,14 +58,13 @@ from .chat_engines.ollama import (
 )
 from .chat_engines.mlx import _forward_to_mlx, _mlx_stream_generator
 from .chat_engines.llama_cpp import _forward_to_llama_cpp, _llama_cpp_stream_generator
-from .chat_engines._common import derive_session_id
+from .chat_engines._common import derive_session_id, mirror_v1_conversation, persist_v1_turn
+from core.chat_prompt import build_system_prompt_with_time, time_context_line
 from core.dependencies import limiter
 from core.lang_detect import (
     detect_user_lang_or_none as _detect_lang_or_none,
     fallback_lang as _fallback_lang,
     natural_text_len,
-    prepend_language_directive,
-    append_language_reminder,
 )
 
 logger = logging.getLogger(__name__)
@@ -194,75 +190,164 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
             _msg.content = validate_string_input(_msg.content, max_length=MAX_CHAT_INPUT_LENGTH, context="chat")
 
 
-async def _fetch_rag_context(body: ChatCompletionRequest, app_state: Any, server_lang: str) -> str:
-    """Retrieve RAG context text for the last user message, if RAG is enabled."""
+async def _fetch_rag_context(
+    body: ChatCompletionRequest, app_state: Any, server_lang: str
+) -> tuple[str, list[tuple[str, float]]]:
+    """Retrieve RAG context text for the last user message, if RAG is enabled.
+
+    Returns (context_text, rag_items) — rag_items is [(collection, score), ...]
+    for the results actually used; empty when RAG is off or found nothing.
+    """
     if not body.use_rag:
-        return ""
+        return "", []
     last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
     if not last_user_msg:
-        return ""
+        return "", []
     # MC-109/111: the user's message must not land in plain in the log file.
     logger.info("RAG Search for: %s", redact_user_content(last_user_msg))
-    return await build_rag_context(last_user_msg, app_state, server_lang)
+    return await build_rag_context(
+        last_user_msg, app_state, server_lang,
+        collections=body.rag_collections, threshold_override=body.rag_threshold,
+    )
 
 
 def _ensure_system_message(messages: list, app_state: Any, server_lang: str) -> None:
-    """Prepend a system message to messages list if none is present (in-place)."""
+    """Prepend a system message to messages list if none is present (in-place).
+
+    F-D block 2: the system prompt now carries the same natural-language
+    date phrase the UI route has always had (``build_system_prompt_with_time``,
+    ``core/chat_prompt.py``) — /v1 previously had none, so an API
+    conversation never knew today's date.
+    """
     if not (messages and messages[0]['role'] == 'system'):
-        nexe_prompt = prepend_language_directive(_get_system_prompt(app_state, server_lang), server_lang)
-        nexe_prompt = append_language_reminder(nexe_prompt, server_lang)
+        nexe_prompt = build_system_prompt_with_time(
+            _get_system_prompt(app_state, server_lang), server_lang
+        )
         messages.insert(0, {"role": "system", "content": nexe_prompt})
 
 
-def get_effective_context_window(engine: str) -> int:
+def get_effective_context_window(engine: str, app_state: Any = None) -> int:
     """MC-090: the RAG token budget must reflect the context window the serving
     engine actually uses, not a fixed 8192.
 
-    For **Ollama** that is ``auto_num_ctx()`` (e.g. 4096 on a 16GB machine),
-    capped at the configured budget so we never plan for more than the engine
-    can hold (the silent-truncation bug) nor more than the user asked for. Other
-    engines keep ``DEFAULT_CONTEXT_WINDOW`` for 1.0.7 — MLX's ``max_kv_size`` is
-    a KV-cache budget, not a context window, so adjusting it is deferred (1.1.0).
+    #965: this now asks the live engine through its own ``get_context_window()``
+    instead of special-casing Ollama here, and the old
+    ``min(auto_num_ctx(), DEFAULT_CONTEXT_WINDOW)`` cap is gone. That cap read as
+    "never more than the user asked for", but nothing sets
+    ``NEXE_DEFAULT_CONTEXT_WINDOW`` anywhere in the product — so in practice it
+    meant "always 8192", and a 128 GB machine planned its RAG budget for a
+    quarter of the window its model could hold. MLX and llama.cpp were not
+    adjusted at all before this; now all three answer for themselves.
+
+    ``app_state`` is optional: without it there is no live module to ask and the
+    documented default stands.
     """
-    if engine and engine.lower() == "ollama":
-        try:
-            from .chat_engines.ollama_helpers import auto_num_ctx
-            return min(auto_num_ctx(), DEFAULT_CONTEXT_WINDOW)
-        except Exception as exc:
-            # Never let context-window detection (e.g. a bad NEXE_OLLAMA_NUM_CTX
-            # or a psutil hiccup) break the chat request — fall back to default.
-            logger.warning("Could not resolve Ollama context window, using default: %s", exc)
-            return DEFAULT_CONTEXT_WINDOW
-    return DEFAULT_CONTEXT_WINDOW
+    from core.context_window import resolve_context_window
+    return resolve_context_window(engine, app_state)
 
 
 def _trim_rag_context(safe_context: str, messages: list, effective_ctx_window: int = None) -> str:
-    """Trim RAG context to fit within the available token budget.
+    """Trim RAG context to what the turn's budget actually leaves for it.
 
     ``effective_ctx_window`` (MC-090) is the real context window of the serving
     engine; when None it falls back to ``DEFAULT_CONTEXT_WINDOW`` (back-compat).
+
+    F-D block 4. This is the SECOND of two limits, not the only one: the
+    caller has already run ``_sanitize_rag_context``, whose ceiling of
+    ``max(4000, window x MAX_CONTEXT_RATIO x 4)`` both doors share and which
+    this does not replace. What this used to be was a redundant re-application
+    of that same 30% ratio, plus a 256-token emergency brake that cut the
+    context to a magic 1000 chars. Neither looked at the turn as a whole: no
+    room was reserved for anything else, so an oversized history shipped to
+    the engine untouched while the retrieved context — the part that had a
+    limit — took the blame. llama.cpp answers an oversized prompt with a
+    ValueError, not a truncation.
+
+    Now the retrieved context is also bounded by what the turn has left
+    (``compute_context_budget``, the same function /ui/chat uses): the prompt
+    gets PROMPT_BUDGET_RATIO of the window, 500 chars are held back for the
+    answer, and what remains after the system prompt, the history and the
+    message bounds the RAG payload. Where the old code cut to 1000 chars it
+    now drops the context and says so — an answer that does not fit is not
+    made to fit by keeping a thousand characters of it.
+
+    What is bounded is the PAYLOAD, not the block that reaches the prompt:
+    the wrapper (nonce'd delimiters plus an assistant ack turn) is not counted,
+    so the assembled prompt runs a few hundred chars past the budget it just
+    computed. Filed as #999 rather than fixed here, because the wrapper is
+    shared and counting it changes what /ui/chat ships too. The other half of
+    that overrun WAS ours and is fixed: the security rule is now appended
+    before the budget is taken, as /ui/chat has always done.
+
+    ``history_ratio=0`` on purpose. That floor exists to stop a big attached
+    document from crowding out earlier turns (Bug 32), and this path has no
+    documents — ``document_chars`` is always 0 here. Reserving a share of the
+    budget for a history that is complete (the client sent all of it; it will
+    not grow inside this request) reserves it for nobody.
+
+    No numbers in this docstring, deliberately. Three earlier versions of it
+    quoted measured tables and all three drifted — one described a budget
+    difference as lost retrieval, one counted a path production does not take,
+    one left out a 490-char rule it named in the same sentence. The figures
+    live in tests/core/test_fd_block4_budget_shared.py, where they are
+    executable and fail when they stop being true.
     """
+    # Deferred import, same reason context_budget defers core.context_window:
+    # core/endpoints/__init__.py eagerly pulls .v1 -> .chat, so a module-level
+    # import here closes a cycle the moment anything imports core.context_budget
+    # first (core.context_budget -> chat_sanitization -> core.endpoints.__init__
+    # -> .chat -> core.context_budget, still half-initialised).
+    from core.context_budget import (
+        compute_context_budget,
+        resolve_max_context_chars,
+    )
+
     ctx_window = effective_ctx_window if effective_ctx_window is not None else DEFAULT_CONTEXT_WINDOW
-    total_messages_text = "".join(m.get('content', '') for m in messages)
-    used_tokens = _estimate_tokens(total_messages_text)
-    max_rag_tokens = int(ctx_window * MAX_CONTEXT_RATIO)
-    rag_tokens = _estimate_tokens(safe_context)
 
-    if rag_tokens > max_rag_tokens:
-        max_chars = max_rag_tokens * CHARS_PER_TOKEN_ESTIMATE
-        safe_context = safe_context[:max_chars]
-        logger.info("RAG context trimmed to fit context window: %s -> %s est. tokens", rag_tokens, max_rag_tokens)
+    # Same split the UI route feeds the budget: the system prompt, the history
+    # before this turn, and the message being answered.
+    system_chars = sum(len(m.get('content', '') or '') for m in messages if m.get('role') == 'system')
+    _non_system = [m for m in messages if m.get('role') != 'system']
+    message_chars = len(_non_system[-1].get('content', '') or '') if _non_system else 0
+    history_chars = sum(len(m.get('content', '') or '') for m in _non_system[:-1])
 
-    remaining_budget = ctx_window - used_tokens - _estimate_tokens(safe_context)
-    if remaining_budget < 256:
-        safe_context = safe_context[:1000]
-        logger.warning("RAG context aggressively trimmed — only %s tokens remaining for response", remaining_budget)
+    budget = compute_context_budget(
+        max_context_chars=resolve_max_context_chars(window_tokens=ctx_window),
+        system_chars=system_chars,
+        history_chars=history_chars,
+        message_chars=message_chars,
+        document_chars=0,
+        history_ratio=0.0,  # no documents on this path — see the docstring
+        response_buffer=500,
+    )
+    available_chars = budget["available_chars"]
+
+    if available_chars <= 0:
+        # #965's lesson: silent context loss is the bug. The UI route warns here
+        # too (_inject_context_into_messages) — same event, same visibility.
+        logger.warning(
+            "Dropping retrieved context: budget exhausted (available_chars=%d, history=%d)",
+            available_chars, history_chars,
+        )
+        return ""
+
+    if len(safe_context) > available_chars:
+        logger.info(
+            "RAG context trimmed to the turn budget: %d -> %d chars", len(safe_context), available_chars
+        )
+        safe_context = safe_context[:available_chars]
 
     return safe_context
 
 
-def _inject_rag_context_into_messages(messages: list, context_text: str, server_lang: str, effective_ctx_window: int = None) -> None:
+def _inject_rag_context_into_messages(messages: list, context_text: str, server_lang: str, effective_ctx_window: int = None) -> bool:
     """Inject RAG context as its own turn pair before the last user message (in-place).
+
+    Returns whether anything was actually injected. The caller reports RAG as
+    active from that, not from having retrieved something: since F-D block 4
+    the turn's budget can leave no room at all, and a server that answers
+    "X-Nexe-RAG-Status: active" after dropping the context is telling the
+    client the model saw sources it never saw.
 
     B030 (RT-01): the retrieved content is wrapped in nonce'd delimiters with a
     data-not-instructions intro, and the system message gets the static RAG
@@ -275,9 +360,16 @@ def _inject_rag_context_into_messages(messages: list, context_text: str, server_
     instead of the document speaking with the user's voice.
     """
     if not (context_text and messages):
-        return
-    safe_context = _sanitize_rag_context(context_text)
+        return False
+    safe_context = _sanitize_rag_context(context_text, effective_ctx_window)
     safe_context = _trim_rag_context(safe_context, messages, effective_ctx_window)
+    if not safe_context:
+        # F-D block 4: the trim can now come back empty (the turn's budget is
+        # spent), where before it always kept at least a slice. Injecting the
+        # turn pair anyway would hand the model a "use this retrieved
+        # information:" block with nothing in it — and cost a prefix-cache miss
+        # to say nothing. _trim_rag_context has already logged why.
+        return False
     _labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])
     _instruction = _labels["intro"]
     wrapped = wrap_untrusted_context(f"{_instruction}\n{safe_context}", server_lang)
@@ -285,9 +377,13 @@ def _inject_rag_context_into_messages(messages: list, context_text: str, server_
         if messages[i]['role'] == 'user':
             messages[i:i] = untrusted_context_turns(wrapped, server_lang)
             break
+    else:
+        # No user turn to insert before: nothing was injected.
+        return False
     # #851: la regla de seguretat s'arma INCONDICIONALMENT al caller
     # (_build_rag_and_system_prompt) — aquí només corria amb context i
     # partia el namespace de la caché de prefix entre torns amb/sense RAG.
+    return True
 
 
 async def _build_rag_and_system_prompt(
@@ -299,38 +395,92 @@ async def _build_rag_and_system_prompt(
     used to size the RAG token budget; None falls back to DEFAULT_CONTEXT_WINDOW.
 
     Returns:
-        Tuple of (messages, raw_context_text).
+        Tuple of (messages, injected_context_text). The second value is the
+        retrieved text ONLY when it actually reached the prompt: since F-D
+        block 4 the turn's budget can drop it, and this returns "" then. It
+        drives X-Nexe-RAG-Status, so it has to mean "the model was given
+        this", not "retrieval found this".
     """
-    context_text = await _fetch_rag_context(body, app_state, server_lang)
+    context_text, _rag_items = await _fetch_rag_context(body, app_state, server_lang)
 
     messages = [m.model_dump() for m in body.messages]
 
     _ensure_system_message(messages, app_state, server_lang)
 
-    _inject_rag_context_into_messages(messages, context_text, server_lang, effective_ctx_window)
-
     # #851: static data-not-instructions rule, UNCONDITIONAL (parity with the
     # web UI route via the shared helper) — a conditional suffix split the
     # prefix-cache namespace between RAG and non-RAG turns.
+    #
+    # Armed BEFORE the injection, which is the order /ui/chat has always used
+    # (_finalize_system_prompt runs, and only then is system_chars measured).
+    # Arming it afterwards left the rule — 457 to 514 chars depending on the
+    # language — outside the system_chars the turn budget is computed from, so
+    # /v1 planned a prompt ~490 chars smaller than the one it then sent. At a
+    # 2048 window that was most of the overrun. Unlike the wrapper overhead
+    # (#999), this half was ours alone: the UI never had it.
     if messages and messages[0]['role'] == 'system':
         messages[0]['content'] = append_rag_security_rule(messages[0]['content'], server_lang)
 
-    return messages, context_text
+    _injected = _inject_rag_context_into_messages(messages, context_text, server_lang, effective_ctx_window)
+
+    # F-D block 1: clock on demand — parity with the UI route. Never the
+    # system prompt (would poison the prefix cache for the whole
+    # conversation); only this turn's user message diverges in the cache.
+    if messages and messages[-1]['role'] == 'user':
+        _time_line = time_context_line(messages[-1]['content'], server_lang)
+        if _time_line:
+            messages[-1]['content'] = f"{_time_line}\n\n{messages[-1]['content']}"
+
+    # The second value drives X-Nexe-RAG-Status: report what the model was
+    # actually given, not what retrieval found.
+    return messages, (context_text if _injected else "")
 
 
 async def _dispatch_to_engine(
     engine: str, messages: list[dict], body: ChatCompletionRequest,
-    request: Request, app_state: Any, last_user_msg: Optional[str]
+    request: Request, app_state: Any, last_user_msg: Optional[str], session_id: Optional[str] = None
 ) -> Any:
-    """Route the chat request to the resolved backend engine (Ollama, MLX, or llama.cpp)."""
+    """Route the chat request to the resolved backend engine (Ollama, MLX, or llama.cpp).
+
+    ``session_id`` (F-C) is only threaded to Ollama here: MLX and llama.cpp
+    derive it themselves from the RAW client request (they need it either
+    way), so passing it again would just be a second, redundant derivation.
+    """
     if engine.lower() == "ollama":
-        return await _forward_to_ollama(messages, body, app_state, last_user_msg)
+        return await _forward_to_ollama(messages, body, app_state, last_user_msg, session_id=session_id)
     elif engine.lower() == "mlx":
         return await _forward_to_mlx(messages, body, request)
     elif engine.lower() in ["llama_cpp", "llama.cpp", "llamacpp"]:
         return await _forward_to_llama_cpp(messages, body, request)
     else:
-        return await _forward_to_ollama(messages, body, app_state, last_user_msg)
+        return await _forward_to_ollama(messages, body, app_state, last_user_msg, session_id=session_id)
+
+
+def _persist_v1_turn_from_response(
+    response: Any, background_tasks: BackgroundTasks, app_state: Any, session_id: str
+) -> None:
+    """Queue the assistant's reply to be mirrored into its /v1 session (F-C).
+
+    Covers the non-streaming request/response shape only. A streaming
+    response persists its own turn inside the SSE generator, at the point
+    the full text becomes available (mirrors the pre-F-A
+    ``_schedule_episodic_memory``, now targeting the session mirror instead
+    of episodic memory).
+    """
+    if isinstance(response, StreamingResponse):
+        return
+    try:
+        content = ""
+        if isinstance(response, dict):
+            choices = response.get("choices", [])
+            if choices:
+                content = choices[0].get("message", {}).get("content", "")
+            if not content:
+                content = response.get("message", {}).get("content", "")
+        if content:
+            background_tasks.add_task(persist_v1_turn, app_state, session_id, content)
+    except Exception as e:
+        logger.error("Failed to schedule /v1 session mirror: %s", e, exc_info=True)
 
 
 def _record_engine_metrics(engine: str, engine_status: str, start_time: float) -> None:
@@ -341,31 +491,6 @@ def _record_engine_metrics(engine: str, engine_status: str, start_time: float) -
         CHAT_ENGINE_DURATION.labels(engine=engine).observe(time.time() - start_time)
     except Exception as e:
         logger.debug("Chat engine metrics update failed: %s", e)
-
-
-def _schedule_episodic_memory(
-    response: Any, background_tasks: BackgroundTasks,
-    app_state: Any, last_user_msg: Optional[str]
-) -> None:
-    """Queue a background task to save the conversation turn to episodic memory."""
-    if not isinstance(response, StreamingResponse):
-        try:
-            content = ""
-            if isinstance(response, dict):
-                choices = response.get("choices", [])
-                if choices:
-                    content = choices[0].get("message", {}).get("content", "")
-            if not content and isinstance(response, dict):
-                content = response.get("message", {}).get("content", "")
-            if content and last_user_msg:
-                background_tasks.add_task(
-                    _save_conversation_to_memory,
-                    app_state,
-                    last_user_msg,
-                    content
-                )
-        except Exception as e:
-            logger.error("Failed to schedule memory save: %s", e, exc_info=True)
 
 
 def _inject_response_headers(
@@ -409,25 +534,39 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
 
     last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
 
+    # F-C: one thread id per conversation, derived from the client's raw
+    # request (X-Session-Id when sent, else the first user message). Shared
+    # by the sticky-language cache below (unchanged use) and the new session
+    # mirror, so both agree on which conversation this is.
+    session_id = derive_session_id(request, body.messages)
+
     # Reply language follows the user's message (not just the install language),
     # sticky per session so a short ack cannot rewrite the system prompt from
     # token 0 halfway through a conversation (#854).
-    _server_lang = _resolve_request_lang(derive_session_id(request), last_user_msg or "")
+    _server_lang = _resolve_request_lang(session_id, last_user_msg or "")
+
+    # F-C: mirror what the client sent as a session — /v1 conversations become
+    # a thread visible from the UI/Tauri/mobile, same as a chat started there.
+    # The client is the source of truth; this rewrites the mirror, it never
+    # reads it back to decide what to send the engine.
+    mirror_v1_conversation(request.app.state, session_id, body.messages)
 
     # MC-090: size the RAG budget to the engine's real context window (Ollama).
-    _effective_ctx = get_effective_context_window(engine)
+    _effective_ctx = get_effective_context_window(engine, request.app.state)
     messages, context_text = await _build_rag_and_system_prompt(body, request.app.state, _server_lang, _effective_ctx)
 
     response = None
     try:
-        response = await _dispatch_to_engine(engine, messages, body, request, request.app.state, last_user_msg)
+        response = await _dispatch_to_engine(
+            engine, messages, body, request, request.app.state, last_user_msg, session_id
+        )
     except Exception:
         engine_status = "error"
         raise
     finally:
         _record_engine_metrics(engine, engine_status, start_time)
 
-    _schedule_episodic_memory(response, background_tasks, request.app.state, last_user_msg)
+    _persist_v1_turn_from_response(response, background_tasks, request.app.state, session_id)
 
     return _inject_response_headers(response, engine, context_text, preferred_fallback)
 
@@ -444,9 +583,7 @@ __all__ = [
     # Re-exported from .chat_sanitization
     "_sanitize_rag_context",
     "_sanitize_sse_token",
-    "_estimate_tokens",
     "MAX_RAG_CONTEXT_LENGTH",
-    "MAX_CONTEXT_RATIO",
     "DEFAULT_CONTEXT_WINDOW",
     "CHARS_PER_TOKEN_ESTIMATE",
     # Re-exported from .chat_rag
@@ -456,9 +593,6 @@ __all__ = [
     "RAG_DOCS_THRESHOLD",
     "RAG_KNOWLEDGE_THRESHOLD",
     "RAG_MEMORY_THRESHOLD",
-    # Re-exported from .chat_memory
-    "_save_conversation_to_memory",
-    "_pending_save_tasks",
     # Re-exported from .chat_engines.routing
     "_normalize_engine",
     "_get_preferred_engine",

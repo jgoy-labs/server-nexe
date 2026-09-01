@@ -386,7 +386,7 @@ class TestMLXExecuteBifurcation:
         fake_loop = MagicMock()
         fake_loop.run_in_executor = fake_run_in_executor
 
-        with patch("plugins.mlx_module.core.chat._detect_vlm_capability", return_value=True), \
+        with patch("plugins.mlx_module.core.model_loader._detect_vlm_capability", return_value=True), \
              patch("plugins.mlx_module.core.chat.asyncio.get_running_loop", return_value=fake_loop):
             result = await node.execute({
                 "system": "",

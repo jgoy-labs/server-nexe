@@ -82,7 +82,7 @@ class TestRT09BootstrapTokenPurge:
 
 class TestRT10SessionIdValidation:
     def test_traversal_ids_rejected(self):
-        from plugins.web_ui_module.core.session_manager import SessionManager
+        from core.sessions import SessionManager
         for bad in (
             "../../../../etc/passwd",
             "..",
@@ -97,7 +97,7 @@ class TestRT10SessionIdValidation:
             assert SessionManager.is_valid_session_id(bad) is False, repr(bad)
 
     def test_legit_ids_accepted(self):
-        from plugins.web_ui_module.core.session_manager import SessionManager
+        from core.sessions import SessionManager
         for good in (
             "0c9b2f64-8a4e-4f1b-9d2c-1a2b3c4d5e6f",
             "sess_test-1",

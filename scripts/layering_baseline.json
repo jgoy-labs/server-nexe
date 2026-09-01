@@ -66,8 +66,9 @@
   "plugins/llama_cpp_module/manifest.py -> core.modules.manifest_base",
   "plugins/llama_cpp_module/module.py -> core.modules.protocol",
   "plugins/mlx_module/api/routes.py -> core.security.auth",
-  "plugins/mlx_module/core/chat.py -> core.utils",
   "plugins/mlx_module/core/generate_helpers.py -> core.chat_history",
+  "plugins/mlx_module/core/text_runner.py -> core",
+  "plugins/mlx_module/core/vlm_runner.py -> core.utils",
   "plugins/mlx_module/manifest.py -> core.modules.manifest_base",
   "plugins/mlx_module/module.py -> core.modules.protocol",
   "plugins/ollama_module/api/routes.py -> core.security.auth",
@@ -94,6 +95,8 @@
   "plugins/web_ui_module/api/routes.py -> core.rag_header",
   "plugins/web_ui_module/api/routes_auth.py -> core.runtime_state",
   "plugins/web_ui_module/api/routes_auth.py -> core.security.auth_config",
+  "plugins/web_ui_module/api/routes_chat.py -> core.chat_prompt",
+  "plugins/web_ui_module/api/routes_chat.py -> core.context_budget",
   "plugins/web_ui_module/api/routes_chat.py -> core.dependencies",
   "plugins/web_ui_module/api/routes_chat.py -> core.endpoints.chat_sanitization",
   "plugins/web_ui_module/api/routes_chat.py -> core.lang_detect",
@@ -111,10 +114,10 @@
   "plugins/web_ui_module/api/routes_static.py -> core.version",
   "plugins/web_ui_module/core/memory_helper.py -> core.endpoints.chat_sanitization",
   "plugins/web_ui_module/core/memory_helper.py -> core.memory_access",
-  "plugins/web_ui_module/core/session_manager.py -> core.chat_history",
   "plugins/web_ui_module/manifest.py -> core.modules.manifest_base",
   "plugins/web_ui_module/messages.py -> core.dependencies",
-  "plugins/web_ui_module/module.py -> core.modules.protocol"
+  "plugins/web_ui_module/module.py -> core.modules.protocol",
+  "plugins/web_ui_module/module.py -> core.sessions"
  ],
- "reason": "#963: both chat layers now import the ONE canonical consecutive-same-role policy from core.chat_history, replacing two divergent private copies. plugins->core is the sanctioned direction; this trades 2 frozen edges for deleting a duplicated policy."
+ "reason": "F-D block 4: context_budget moves to core/, so the plugin's edge into it is now plugin->core (the allowed direction) and its old edge out of the plugin disappears"
 }

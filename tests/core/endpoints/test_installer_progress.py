@@ -186,10 +186,11 @@ class TestStreamMlxRealProgress:
         a final percent==100, AND that the events are not the legacy
         evenly-spaced +3% pattern."""
         from core.endpoints import installer as installer_mod
-        from core.endpoints.installer import _stream_mlx
+        from core.endpoints import installer_shared
+        from core.endpoints.installer_mlx import _stream_mlx
 
         # Redirect models_dir to tmp_path so the test doesn't touch real cache.
-        monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
+        monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
 
         # Fake snapshot_download: writes a few files to the dest dir,
         # spaced ~50ms apart, to simulate streaming bytes.

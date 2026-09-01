@@ -14,6 +14,7 @@ See `scripts/check_complexity.py` for the counting rule and for its calibration
 against lizard (2429/2456 functions exact, never below lizard).
 """
 import ast
+import importlib.util
 import json
 import subprocess
 import sys
@@ -24,6 +25,14 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "check_complexity.py"
 BASELINE = ROOT / "scripts" / "complexity_baseline.json"
+
+
+def _gate_module():
+    """Load the gate as a module, to exercise its internals directly."""
+    spec = importlib.util.spec_from_file_location("_cc_gate", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _run(*args: str) -> subprocess.CompletedProcess:
@@ -103,6 +112,118 @@ class TestCounter:
 
     def test_comprehension_with_filter_counts_both(self) -> None:
         assert self._ccn_of("def f(xs):\n    return [x for x in xs if x]\n") == 3
+
+
+class TestDiscovery:
+    """WHICH functions the gate can see — the other half of the counter.
+
+    Finding #968: the walk recursed only into defs and classes, so a def
+    written inside an `if` / `try` / `with` / `for` was never reached. 43 of
+    them in this repo, every method of `OllamaNode` and of `NexeSettings`
+    among them, because both classes live inside a `try: import ...` guard for
+    an optional dependency. They counted NOWHERE — not as an entry of their
+    own, and not towards the parent, which skips nested bodies on purpose.
+    None of the 43 was above the threshold the day it was found (highest CCN
+    11), but none would have failed the gate at CCN 40 either.
+
+    What `_scan_tree` records is what `main()` compares against the baseline,
+    so "recorded here" is "can fail the gate there" —
+    `test_a_new_function_above_the_threshold_fails_the_gate` closes that half.
+    """
+
+    @staticmethod
+    def _names(source: str) -> set[str]:
+        return {q for q, _ in _gate_module()._iter_functions(ast.parse(source))}
+
+    @staticmethod
+    def _scanned(source: str) -> dict[str, int]:
+        found: dict[str, int] = {}
+        _gate_module()._scan_tree("fake.py", ast.parse(source), found)
+        return found
+
+    def test_a_function_inside_a_try_is_found(self) -> None:
+        src = (
+            "try:\n"
+            "    import httpx\n"
+            "    def guarded():\n"
+            "        return httpx\n"
+            "except ImportError:\n"
+            "    guarded = None\n"
+        )
+        assert "guarded" in self._names(src)
+
+    @pytest.mark.parametrize(
+        "header",
+        [
+            "if TYPE_CHECKING:",
+            "with suppress(ImportError):",
+            "for _ in range(1):",
+            "while True:",
+        ],
+    )
+    def test_a_function_inside_any_block_is_found(self, header: str) -> None:
+        assert "buried" in self._names(f"{header}\n    def buried():\n        pass\n")
+
+    def test_a_method_of_a_class_inside_a_try_keeps_its_qualified_name(self) -> None:
+        # The real shape of plugins/ollama_module/.../ollama_node.py.
+        src = (
+            "try:\n"
+            "    class Node:\n"
+            "        def execute(self):\n"
+            "            pass\n"
+            "except ImportError:\n"
+            "    Node = None\n"
+        )
+        assert "Node.execute" in self._names(src)
+
+    def test_a_complex_function_inside_a_try_reaches_the_baseline(self) -> None:
+        """The regression #968 asks for: buried debt must be recordable."""
+        body = "".join(
+            f"        if x == {i}:\n            return {i}\n" for i in range(16)
+        )
+        src = f"try:\n    def guarded(x):\n{body}        return None\nexcept ImportError:\n    guarded = None\n"
+
+        found = self._scanned(src)
+
+        assert found.get("fake.py::guarded") == 17, (
+            "a CCN 17 function inside a try must be recorded — before #968 it "
+            "was invisible and could have grown to any value unseen"
+        )
+
+    def test_a_def_inside_a_try_does_not_count_towards_its_parent(self) -> None:
+        # Discovery and counting have to agree: now that the buried def gets an
+        # entry of its own, its decisions must NOT also land on the parent.
+        module = _gate_module()
+        src = (
+            "def outer(x):\n"
+            "    try:\n"
+            "        def inner(y):\n"
+            "            if y:\n"
+            "                return 1\n"
+            "            return 0\n"
+            "    except ImportError:\n"
+            "        inner = None\n"
+            "    return inner\n"
+        )
+        outer = ast.parse(src).body[0]
+
+        assert module._ccn(outer) == 2, "1 + the except handler, not the inner if"
+        assert self._names(src) == {"outer", "outer.inner"}
+
+    def test_the_gate_can_see_itself(self) -> None:
+        # `_scan.visit` was on the invisible list: the gate did not measure its
+        # own walk. It is module-level now, so this asserts the shape stays.
+        assert "_iter_functions" in self._names(SCRIPT.read_text(encoding="utf-8"))
+
+    def test_the_real_ollama_node_case_is_visible(self) -> None:
+        path = ROOT / "plugins/ollama_module/workflow/nodes/ollama_node.py"
+        if not path.exists():  # pragma: no cover - the file moved, not a gate bug
+            pytest.skip("ollama_node.py moved; the #968 case is covered by the unit tests above")
+        names = self._names(path.read_text(encoding="utf-8"))
+        assert "OllamaNode._execute_streaming" in names, (
+            "the whole class is inside `try: import httpx` — this is the real "
+            "case that made #968 worth fixing"
+        )
 
 
 class TestGateActuallyBites:

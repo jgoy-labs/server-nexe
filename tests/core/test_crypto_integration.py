@@ -44,7 +44,7 @@ class TestSessionManagerCrypto:
 
     def test_session_manager_accepts_crypto(self, tmp_path):
         """SessionManager constructor accepts crypto_provider kwarg."""
-        from plugins.web_ui_module.core.session_manager import SessionManager
+        from core.sessions import SessionManager
 
         mock_crypto = MagicMock()
         sm = SessionManager(
@@ -55,7 +55,7 @@ class TestSessionManagerCrypto:
 
     def test_session_manager_none_crypto_default(self, tmp_path):
         """SessionManager works without crypto (backwards compat)."""
-        from plugins.web_ui_module.core.session_manager import SessionManager
+        from core.sessions import SessionManager
 
         sm = SessionManager(storage_path=str(tmp_path / "sessions"))
         assert sm._crypto is None

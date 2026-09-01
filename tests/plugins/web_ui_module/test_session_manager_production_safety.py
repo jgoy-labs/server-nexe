@@ -14,10 +14,11 @@ Description: Regression guards for the production-mode safety contract added
      .json file when self._crypto is None AND NEXE_ENV=production. Behaviour
      in development/test is unchanged (.json fallback kept).
 
-  2. WebUIModule.initialize MUST raise when get_server_state().crypto_provider
-     returns None AND NEXE_ENV=production, before constructing the
-     SessionManager. This stops the plugin from coming up in a state that
-     would silently leak chat content to disk.
+  2. attach_session_manager MUST raise when server_state.crypto_provider
+     is None AND NEXE_ENV=production, before constructing the
+     SessionManager. Lifespan calls this after encryption; the UI plugin
+     consumes the same instance. This stops the server from coming up in
+     a state that would silently leak chat content to disk.
 
   Together they make the failure mode loud-and-early instead of silent-and-
   late, and they keep the existing dev/test ergonomics.
@@ -30,7 +31,7 @@ import asyncio
 
 import pytest
 
-from plugins.web_ui_module.core.session_manager import SessionManager, ChatSession
+from core.sessions import SessionManager, ChatSession
 from plugins.web_ui_module.module import WebUIModule
 
 
@@ -83,10 +84,11 @@ class TestSaveSessionProductionRefusesPlaintext:
         assert list(tmp_path.glob("*.json")) == []
 
 
-class TestWebUIModuleProductionRequiresCrypto:
-    """WebUIModule.initialize must fail loud in production without crypto."""
+class TestAttachSessionManagerProductionRequiresCrypto:
+    """attach_session_manager (and therefore WebUIModule.initialize) must
+    fail loud in production without crypto."""
 
-    def test_production_without_crypto_aborts_init(self, monkeypatch, caplog):
+    def test_production_without_crypto_aborts_init(self, monkeypatch, caplog, tmp_path):
         """get_server_state().crypto_provider=None + NEXE_ENV=production →
         initialize() returns False AND session_manager stays None AND a
         critical error is logged. lifespan_modules will then drop this
@@ -96,9 +98,10 @@ class TestWebUIModuleProductionRequiresCrypto:
 
         class _StubState:
             crypto_provider = None
+            session_manager = None
 
         monkeypatch.setattr(
-            "core.lifespan.get_server_state", lambda: _StubState()
+            "core.server_state.get_server_state", lambda: _StubState()
         )
 
         mod = WebUIModule()
@@ -112,15 +115,22 @@ class TestWebUIModuleProductionRequiresCrypto:
             for r in caplog.records
         )
 
-    def test_development_without_crypto_initializes_with_warning(self, monkeypatch):
+    def test_development_without_crypto_initializes_with_warning(
+        self, monkeypatch, tmp_path
+    ):
         """In dev, missing crypto is tolerated (back-compat)."""
         monkeypatch.setenv("NEXE_ENV", "development")
 
         class _StubState:
             crypto_provider = None
+            session_manager = None
 
         monkeypatch.setattr(
-            "core.lifespan.get_server_state", lambda: _StubState()
+            "core.server_state.get_server_state", lambda: _StubState()
+        )
+        monkeypatch.setattr(
+            "core.paths.helpers.get_data_dir",
+            lambda name="": tmp_path / name if name else tmp_path,
         )
 
         mod = WebUIModule()

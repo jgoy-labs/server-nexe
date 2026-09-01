@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_utc": "2026-08-25T20:20:29Z",
+  "generated_utc": "2026-08-31T14:47:33Z",
   "prefix_format_version": "1.0",
   "vector_dim": 768,
   "vector_dtype": "float32",
@@ -11,22 +11,22 @@
   "chunker_source_sha256": "f7d3cc436561af6da07385f61263673df0914e4b5b3fbf81d9265a5eefbab053",
   "langs": {
     "ca": {
-      "chunks": 330,
-      "source_sha256": "5670a3b3528eacd062fbe4bdefe818019979b9c232f811967500af6a046dbc74",
-      "vectors_sha256": "048a9bd78e8473c990df5f3c2e9fab1b5a36c657a5df945a45fb2284126daf53",
-      "metadata_sha256": "e81c5876657adf4335b74bd98c43a191989de070709e86094701508c53bda194"
+      "chunks": 333,
+      "source_sha256": "464bd1fc822f59e390efd2965c93836fb2e9204d6e8e1a2662de3b7711e37422",
+      "vectors_sha256": "5249d8a37c607fcc8a7cbe241010481ea0cc4e252038f16f8178d834c70a0c6c",
+      "metadata_sha256": "eb81a743950d18a3ee6915ca4cd7d7c0eaf0840b4bbc84de82d3a5ed0acd7ce5"
     },
     "en": {
-      "chunks": 319,
-      "source_sha256": "fb14929b4fc7f1c3b7ed179a6fb9aca33ad67e833d9f9c1b2b030258d8a1b69a",
-      "vectors_sha256": "110c1b8f21c6467df0581ac40c77f43ff05414df9fdfb0d704360142649a3573",
-      "metadata_sha256": "90b6b10bd0ce9f884e82fda4db96f33bbb8458b06acde6eb3a1fc885bd47833f"
+      "chunks": 322,
+      "source_sha256": "6d240a373975aa8c7df1b2e6d96d885da53271b6b3cf6c6d6479b6492510fb45",
+      "vectors_sha256": "a0cb7381a7258b555c7b28d97d5997f7ac0ee4ad5b3784506a18b7f6283d5daa",
+      "metadata_sha256": "fda16748c05264ea3d6ad6330bc635512fd854467de425bacb123d871ddfc688"
     },
     "es": {
-      "chunks": 337,
-      "source_sha256": "335dd0918b5aefc7c20ca4e506f20c2bb8116fd72a3b49b6ab9e072003b6c959",
-      "vectors_sha256": "b6895cce3e56735dd9bb1b8d770122108ed707890d102b763b0724a822f89248",
-      "metadata_sha256": "5bc4ec01b93cdabc4faeb7611aaebb5bf72acc6bfadd9589faa60ef67d55bb24"
+      "chunks": 340,
+      "source_sha256": "25f4ea695cd0adeb2dc304e7b2ec58c92705a4cee421322d5c6c2c1fe3ca870d",
+      "vectors_sha256": "fd97ccc4d7daad8d212c402de720a24cd67e164dce40c9c783e375ebbae7d811",
+      "metadata_sha256": "66c8628d941bb5dabeeb364a8c8c895ff256bc1034d87caf8a024e31c82faae8"
     }
   }
 }

@@ -115,14 +115,25 @@ class TestCliUiSharedPipeline:
         assert "/ui/chatXYZ" not in server_paths, "control: un path fals no ha de casar"
 
     def test_web_ui_frontend_uses_same_endpoint(self):
-        """El frontend del web UI (app.js) també POSTeja a /ui/chat → mateix camí."""
+        """El frontend del web UI també POSTeja a /ui/chat → mateix camí.
+
+        Es mira TOTA la família de scripts (app.js + nexe-*.js), no només
+        app.js: des del split del #127 la crida viu a nexe-chat.js, i un guard
+        que només mirés app.js passaria a no vigilar res sense dir-ho.
+        """
         import plugins.web_ui_module as wu
-        app_js = Path(wu.__file__).parent / "ui" / "app.js"
-        text = app_js.read_text(encoding="utf-8")
+        ui_dir = Path(wu.__file__).parent / "ui"
+        familia = sorted(ui_dir.glob("nexe-*.js")) + [ui_dir / "app.js"]
         # String literal real (no una menció en comentari): el frontend fa fetch
         # a /ui/chat amb una crida fetchWithCsrf('/ui/chat', ...).
-        assert ("'/ui/chat'" in text) or ('"/ui/chat"' in text), (
-            "app.js ha de fer fetch al string literal /ui/chat (mateix endpoint que el CLI)"
+        amb_endpoint = [
+            f.name for f in familia
+            if "'/ui/chat'" in f.read_text(encoding="utf-8")
+            or '"/ui/chat"' in f.read_text(encoding="utf-8")
+        ]
+        assert amb_endpoint, (
+            "cap script del web UI fa fetch al string literal /ui/chat "
+            f"(mateix endpoint que el CLI). Mirats: {[f.name for f in familia]}"
         )
 
     def test_legacy_chat_paths_stay_removed(self):

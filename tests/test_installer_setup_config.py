@@ -408,6 +408,7 @@ class TestSha256CheckFailClosed:
     def _run(self):
         import asyncio
         from core.endpoints import installer as inst_mod
+        from core.endpoints import installer_shared
         return asyncio.run(inst_mod._sha256_check("gguf", "repo/model.gguf"))
 
     def test_unexpected_error_returns_error_event(self, monkeypatch):
@@ -421,7 +422,8 @@ class TestSha256CheckFailClosed:
         monkeypatch.setattr(dv, "verify_download_integrity", _boom)
         # Avoid touching the real model dir during the gguf branch.
         from core.endpoints import installer as inst_mod
-        monkeypatch.setattr(inst_mod, "_resolve_model_path", lambda e, m: "/nonexistent")
+        from core.endpoints import installer_shared
+        monkeypatch.setattr(installer_shared, "_resolve_model_path", lambda e, m: "/nonexistent")
 
         result = self._run()
         assert result is not None, (
@@ -441,7 +443,8 @@ class TestSha256CheckFailClosed:
 
         monkeypatch.setattr(dv, "verify_download_integrity", lambda *a, **k: False)
         from core.endpoints import installer as inst_mod
-        monkeypatch.setattr(inst_mod, "_resolve_model_path", lambda e, m: "/nonexistent")
+        from core.endpoints import installer_shared
+        monkeypatch.setattr(installer_shared, "_resolve_model_path", lambda e, m: "/nonexistent")
 
         result = self._run()
         assert result is not None, "unpinned digest must surface a warning (INST-002), not be silent"

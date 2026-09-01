@@ -324,9 +324,12 @@ def test_generate_vlm_actually_applies_the_untrimmable_guard():
         seen["cache_at_generation"] = getattr(cs, "cache", "absent")
         return "resposta", SimpleNamespace(prompt_tokens=171, generation_tokens=10)
 
-    with patch.object(MLXChatNode, "_get_model", return_value=(object(), object())), \
-         patch.object(MLXChatNode, "_prepare_vlm_prompt", return_value="prompt nou"), \
-         patch.object(MLXChatNode, "_run_vlm_streaming", side_effect=fake_streaming), \
+    # #966: els cossos VLM viuen a MLXVisionRunner; MLXChatNode nomes hi delega,
+    # aixi que el patch ha d'anar al runner. Assercions sense tocar.
+    from plugins.mlx_module.core.vlm_runner import MLXVisionRunner
+    with patch.object(MLXVisionRunner, "_get_model", return_value=(object(), object())), \
+         patch.object(MLXVisionRunner, "_prepare_vlm_prompt", return_value="prompt nou"), \
+         patch.object(MLXVisionRunner, "_run_vlm_streaming", side_effect=fake_streaming), \
          patch(
              "plugins.mlx_module.core.vlm_cache_manager.get_vlm_cache_manager"
          ) as fake_mgr:
@@ -373,7 +376,7 @@ def test_vlm_kv_instrumentation_logs_enforcement_verdict(caplog):
             def make_cache():
                 return []
 
-    with caplog.at_level(logging.INFO, logger="plugins.mlx_module.core.chat"):
+    with caplog.at_level(logging.INFO, logger="plugins.mlx_module.core.vlm_runner"):
         with patch("mlx_vlm.stream_generate", fake_stream):
             _fresh_node()._run_vlm_streaming(
                 model=_ModelWithOwnCache(),
@@ -390,7 +393,7 @@ def test_vlm_kv_instrumentation_logs_enforcement_verdict(caplog):
     assert "NOT enforced" in owned[0].getMessage()
 
     caplog.clear()
-    with caplog.at_level(logging.INFO, logger="plugins.mlx_module.core.chat"):
+    with caplog.at_level(logging.INFO, logger="plugins.mlx_module.core.vlm_runner"):
         with patch("mlx_vlm.stream_generate", fake_stream):
             _fresh_node()._run_vlm_streaming(
                 model=object(),  # sense language_model.make_cache → enforced
@@ -622,7 +625,7 @@ def test_vlm_path_passes_the_configured_limit():
     Mutation guard: drop the argument at the call site and this goes RED.
     """
     import inspect
-    from plugins.mlx_module.core import chat as chat_mod
+    from plugins.mlx_module.core import vlm_runner as chat_mod  # #966: el cami VLM viu aqui
 
     # Whitespace-normalised: the call is wrapped across lines, and a formatter
     # rewrapping it must not fail the guard.

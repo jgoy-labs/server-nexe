@@ -102,9 +102,9 @@ server-nexe escucha solo en loopback. Dos comprobaciones independientes lo sosti
 - **Bind del socket.** Arrancar con un host fuera de loopback exige `NEXE_ALLOW_PUBLIC_BIND=1`; sin ese opt-in el servidor se niega a arrancar (`core/server/runner.py`). Los binds **IPv6 se rechazan siempre**, tambien `::1`: el filtro de la cabecera `Host` no puede casar una direccion IPv6 entre corchetes y el servidor responderia HTTP 400 a todo. Usa `127.0.0.1`.
 - **Cabecera `Host`.** `TrustedHostMiddleware` responde 400 a cualquier peticion cuyo `Host` no este en la lista (defensa contra DNS rebinding). Por defecto la lista es `127.0.0.1`, `::1` y `localhost`.
 
-`NEXE_LOCALHOST_ALIASES` (separada por comas) **anade** nombres a esa lista y a la de IPs de cliente autorizadas a regenerar el bootstrap token. Los tres valores por defecto nunca se pierden: poner un alias no puede dejarte fuera de tu propia maquina. Nota: `::1` solo es efectivo en la comprobacion de IP de cliente — nunca puede casar una cabecera `Host`.
+`NEXE_TRUSTED_HOSTS` (separada por comas) **anade** nombres a la lista de la cabecera `Host`. `NEXE_LOCALHOST_ALIASES` (separada por comas) **anade** IPs a la lista de cliente autorizadas a regenerar el bootstrap token. Son dos listas separadas: un alias puesto para el bootstrap no amplia la lista de `Host`. Los tres valores por defecto nunca se pierden en ninguna de las dos: poner un alias no puede dejarte fuera de tu propia maquina. Nota: `::1` solo es efectivo en la comprobacion de IP de cliente — nunca puede casar una cabecera `Host`.
 
-Esta variable no abre nada por si sola: para llegar al servidor desde fuera hace falta ademas el bind publico.
+Estas variables no abren nada por si solas: para llegar al servidor desde fuera hace falta ademas el bind publico.
 
 ## Cabeceras de seguridad (OWASP)
 

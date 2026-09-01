@@ -14,8 +14,9 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import assert from 'node:assert';
 
+import { familyPaths } from './lib/load_nexe_ui.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const appPath = join(__dirname, '../../plugins/web_ui_module/ui/app.js');
 
 /** Loads the real NexeUI class with browser globals stubbed out. */
 function loadNexeUI() {
@@ -55,14 +56,16 @@ function loadNexeUI() {
     sandbox.window = sandbox;
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
-    vm.runInContext(readFileSync(appPath, 'utf8') + '\n;globalThis.__NexeUI = NexeUI;', sandbox);
+    // app.js plus its cluster files (#127): the class is split across them.
+    for (const f of familyPaths()) vm.runInContext(readFileSync(f, 'utf8'), sandbox);
+    vm.runInContext(';globalThis.__NexeUI = NexeUI;', sandbox);
     return sandbox.__NexeUI;
 }
 
 function makeInstance(NexeUI) {
     const inst = Object.create(NexeUI.prototype);
     inst._compactNotice = null;
-    inst._willCompactNext = false;
+    inst._willCompactNextForSession = null;
     return inst;
 }
 
@@ -141,4 +144,37 @@ for (const state of ['streaming', 'idle', 'error']) {
     );
 }
 
-console.log('compact_notice: 7 checks passed');
+// ── 6. #127 follow-up: a signal for a DIFFERENT session must not fire ──────
+// A bare boolean flag would survive switching conversations and wrongly
+// announce "compacting" on a chat that has nothing to compact — reproduces
+// the bug: the server flagged session A, the user is now on session B.
+{
+    const ui = makeInstance(NexeUI);
+    ui.currentSessionId = 'sessionB';
+    ui._willCompactNextForSession = 'sessionA';
+    assert.strictEqual(
+        ui._consumePendingCompactNotice(), false,
+        'a WILL_COMPACT signal for a different session must not fire here',
+    );
+    assert.strictEqual(
+        ui._willCompactNextForSession, null,
+        'the stale signal must be consumed, not left to fire on a THIRD turn',
+    );
+}
+
+// ── 7. Same session: the signal DOES fire, and is consumed (one-shot) ──────
+{
+    const ui = makeInstance(NexeUI);
+    ui.currentSessionId = 'sessionA';
+    ui._willCompactNextForSession = 'sessionA';
+    assert.strictEqual(
+        ui._consumePendingCompactNotice(), true,
+        'a WILL_COMPACT signal for the CURRENT session must fire',
+    );
+    assert.strictEqual(
+        ui._consumePendingCompactNotice(), false,
+        'and only once — a second call with nothing pending must not re-fire',
+    );
+}
+
+console.log('compact_notice: 9 checks passed');

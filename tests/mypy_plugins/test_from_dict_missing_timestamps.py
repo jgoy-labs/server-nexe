@@ -25,7 +25,7 @@ def test_from_dict_missing_created_at_does_not_raise():
 
     Pre-fix: TypeError ('NoneType'). Post-fix: fallback datetime.now(utc).
     """
-    from plugins.web_ui_module.core.session_manager import ChatSession
+    from core.sessions import ChatSession
 
     data = {
         "id": "test-c6-no-created-at",
@@ -48,7 +48,7 @@ def test_from_dict_missing_last_activity_does_not_raise():
 
     Pre-fix: TypeError. Post-fix: fallback datetime.now(utc).
     """
-    from plugins.web_ui_module.core.session_manager import ChatSession
+    from core.sessions import ChatSession
 
     data = {
         "id": "test-c6-no-last-activity",
@@ -72,7 +72,7 @@ def test_from_dict_complete_dict_preserved():
     Pins that the dev fix does not alter the behaviour of the normal case (correctly
     serialized session). Passes pre-fix and post-fix.
     """
-    from plugins.web_ui_module.core.session_manager import ChatSession
+    from core.sessions import ChatSession
 
     data = {
         "id": "test-c6-complete",

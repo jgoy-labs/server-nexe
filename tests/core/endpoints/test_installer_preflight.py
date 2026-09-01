@@ -17,6 +17,8 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from core.endpoints import installer_gguf
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -124,6 +126,8 @@ class TestGatedSseError:
         the download; it emits a single SSE error with code=GATED_NO_TOKEN
         and the HF URL so the frontend can render an action link."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
 
         # Force HF_TOKEN absent so the gated path is hit
         monkeypatch.delenv("HF_TOKEN", raising=False)
@@ -132,7 +136,7 @@ class TestGatedSseError:
         def fake_check(repo_id, token=None):
             return {"status": "gated_no_access", "url": f"https://huggingface.co/{repo_id}"}
 
-        monkeypatch.setattr(installer_mod, "_check_model_access", fake_check)
+        monkeypatch.setattr(installer_hf, "_check_model_access", fake_check)
 
         with TestClient(app_with_installer) as client:
             with client.stream(
@@ -157,12 +161,14 @@ class TestGatedSseError:
 
     def test_not_found_emits_structured_error(self, app_with_installer, monkeypatch):
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
 
         def fake_check(repo_id, token=None):
             return {"status": "not_found"}
 
-        monkeypatch.setattr(installer_mod, "_check_model_access", fake_check)
+        monkeypatch.setattr(installer_hf, "_check_model_access", fake_check)
 
         with TestClient(app_with_installer) as client:
             with client.stream(
@@ -181,8 +187,10 @@ class TestGatedSseError:
         """When access is ok, _stream_mlx proceeds and emits progress
         events as usual (mocked snapshot_download to keep this fast)."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
-        monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
+        monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
 
         def fake_check(repo_id, token=None):
             return {"status": "ok"}
@@ -192,7 +200,7 @@ class TestGatedSseError:
             from pathlib import Path as _P
             (_P(local_dir) / "config.json").write_bytes(b"{}")
 
-        monkeypatch.setattr(installer_mod, "_check_model_access", fake_check)
+        monkeypatch.setattr(installer_hf, "_check_model_access", fake_check)
         monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snap)
 
         with TestClient(app_with_installer) as client:
@@ -225,6 +233,8 @@ class TestEnsureHfTokenInEnv:
         """Common case: the env already holds HF_TOKEN → return it and NEVER
         consult the Keychain. Mutation 'always read Keychain' → spy called → red."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.setenv("HF_TOKEN", "hf_env_value")
         calls = {"n": 0}
 
@@ -232,8 +242,8 @@ class TestEnsureHfTokenInEnv:
             calls["n"] += 1
             return "hf_should_not_be_used"
 
-        monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", spy)
-        assert asyncio.run(installer_mod._ensure_hf_token_in_env()) == "hf_env_value"
+        monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", spy)
+        assert asyncio.run(installer_hf._ensure_hf_token_in_env()) == "hf_env_value"
         assert calls["n"] == 0, "Keychain must not be consulted when the env holds the token"
 
     def test_env_missing_recovers_from_keychain_and_reinjects(self, monkeypatch):
@@ -242,9 +252,11 @@ class TestEnsureHfTokenInEnv:
         snapshot_download/preflight pick it up. Mutation 'drop the Keychain
         fallback' → returns None, env stays empty → red."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
-        monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: "hf_recovered")
-        token = asyncio.run(installer_mod._ensure_hf_token_in_env())
+        monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: "hf_recovered")
+        token = asyncio.run(installer_hf._ensure_hf_token_in_env())
         assert token == "hf_recovered"
         assert os.environ.get("HF_TOKEN") == "hf_recovered", "must re-inject into env"
 
@@ -252,9 +264,11 @@ class TestEnsureHfTokenInEnv:
         """No token in env nor Keychain → None and env untouched (legitimate
         no-token case must still flow to gated_no_access, no regression)."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
-        monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: None)
-        assert asyncio.run(installer_mod._ensure_hf_token_in_env()) is None
+        monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: None)
+        assert asyncio.run(installer_hf._ensure_hf_token_in_env()) is None
         assert "HF_TOKEN" not in os.environ
 
     def test_keychain_read_timeout_is_swallowed(self, monkeypatch):
@@ -267,18 +281,20 @@ class TestEnsureHfTokenInEnv:
         single-worker _dl_executor thread is freed immediately and does not
         poison the next test (the executor is shared at module scope)."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         import threading
         monkeypatch.delenv("HF_TOKEN", raising=False)
-        monkeypatch.setattr(installer_mod, "_HF_KEYCHAIN_READ_TIMEOUT", 0.1, raising=False)
+        monkeypatch.setattr(installer_hf, "_HF_KEYCHAIN_READ_TIMEOUT", 0.1, raising=False)
         release = threading.Event()
 
         def hang():
             release.wait(timeout=10)  # blocks until the test releases it
             return "hf_never"
 
-        monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", hang)
+        monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", hang)
         try:
-            token = asyncio.run(installer_mod._ensure_hf_token_in_env())
+            token = asyncio.run(installer_hf._ensure_hf_token_in_env())
             assert token is None
             assert "HF_TOKEN" not in os.environ
         finally:
@@ -295,10 +311,12 @@ class TestB253MidFlowRecovery:
         dead-ending on GATED_NO_TOKEN. Mutation 'drop the Keychain fallback' →
         token is None → gated_no_access → GATED_NO_TOKEN → red."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
-        monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
+        monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
         # token survives in the Keychain (step3 best-effort persist)
-        monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: "hf_kc_token")
+        monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: "hf_kc_token")
 
         # capture the token that actually reaches the access check, and grant
         # access ONLY if a (non-None) token reaches it
@@ -314,7 +332,7 @@ class TestB253MidFlowRecovery:
             from pathlib import Path as _P
             (_P(local_dir) / "config.json").write_bytes(b"{}")
 
-        monkeypatch.setattr(installer_mod, "_check_model_access", fake_check)
+        monkeypatch.setattr(installer_hf, "_check_model_access", fake_check)
         monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snap)
 
         with TestClient(app_with_installer) as client:
@@ -341,9 +359,11 @@ class TestB253MidFlowRecovery:
         """Same recovery must hold for engine=gguf (the other HF-hosted engine
         _preflight_hf_access covers), not only mlx."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
-        monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
-        monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: "hf_kc_gguf")
+        monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
+        monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: "hf_kc_gguf")
         seen = {"token": "SENTINEL"}
 
         def fake_check(repo_id, token=None):
@@ -351,11 +371,11 @@ class TestB253MidFlowRecovery:
             return {"status": "ok"} if token else {
                 "status": "gated_no_access", "url": f"https://huggingface.co/{repo_id}"}
 
-        monkeypatch.setattr(installer_mod, "_check_model_access", fake_check)
+        monkeypatch.setattr(installer_hf, "_check_model_access", fake_check)
         # short-circuit the gguf streamer after the preflight has run
         async def fake_stream_gguf(model_id, request):
             yield {"type": "done", "model_id": model_id}
-        monkeypatch.setattr(installer_mod, "_stream_gguf", fake_stream_gguf)
+        monkeypatch.setattr(installer_gguf, "_stream_gguf", fake_stream_gguf)
         monkeypatch.setattr(installer_mod, "_sha256_check", lambda *a, **k: _noop_coro())
 
         with TestClient(app_with_installer) as client:
@@ -377,16 +397,18 @@ class TestB253MidFlowRecovery:
         still surfaces GATED_NO_TOKEN (we did not paper over the legitimate
         no-token case)."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
-        monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
-        monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: None)
+        monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
+        monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: None)
 
         def fake_check(repo_id, token=None):
             if token:
                 return {"status": "ok"}
             return {"status": "gated_no_access", "url": f"https://huggingface.co/{repo_id}"}
 
-        monkeypatch.setattr(installer_mod, "_check_model_access", fake_check)
+        monkeypatch.setattr(installer_hf, "_check_model_access", fake_check)
 
         with TestClient(app_with_installer) as client:
             with client.stream(
@@ -406,8 +428,10 @@ class TestB253MidFlowRecovery:
         the download) must also recover the token from the Keychain so it reports
         access=ok instead of gated_no_access after a mid-flow restart."""
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
-        monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: "hf_kc_pf")
+        monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: "hf_kc_pf")
         seen = {"token": "SENTINEL"}
 
         def fake_check(repo_id, token=None):
@@ -415,8 +439,8 @@ class TestB253MidFlowRecovery:
             return {"status": "ok"} if token else {
                 "status": "gated_no_access", "url": f"https://huggingface.co/{repo_id}"}
 
-        monkeypatch.setattr(installer_mod, "_check_model_access", fake_check)
-        monkeypatch.setattr(installer_mod, "_dry_run_plan", lambda repo_id, token=None: {
+        monkeypatch.setattr(installer_hf, "_check_model_access", fake_check)
+        monkeypatch.setattr(installer_hf, "_dry_run_plan", lambda repo_id, token=None: {
             "total_bytes": 0, "cached_bytes": 0, "files_count": 0})
 
         with TestClient(app_with_installer) as client:
@@ -443,16 +467,16 @@ class TestB257RepoIdHelpers:
         ("https://huggingface.co/onlyorg", None),                       # too short
     ])
     def test_hf_repo_id_from_url(self, url, expected):
-        from core.endpoints.installer import _hf_repo_id_from_url
+        from core.endpoints.installer_hf import _hf_repo_id_from_url
         assert _hf_repo_id_from_url(url) == expected
 
     def test_preflight_repo_id_passthrough_for_mlx(self):
         """mlx model_ids are already repo_ids (no URL scheme) → returned as-is."""
-        from core.endpoints.installer import _preflight_repo_id
+        from core.endpoints.installer_hf import _preflight_repo_id
         assert _preflight_repo_id("ns/test-model") == "ns/test-model"
 
     def test_preflight_repo_id_derives_for_gguf_url(self):
-        from core.endpoints.installer import _preflight_repo_id
+        from core.endpoints.installer_hf import _preflight_repo_id
         assert _preflight_repo_id(
             "https://huggingface.co/Org/Model/resolve/main/m.gguf") == "Org/Model"
 
@@ -464,6 +488,8 @@ class TestB257GgufPreflight:
 
     def test_preflight_gguf_derives_repo_id_for_hf_url(self, app_with_installer, monkeypatch):
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
         seen = {"repo_id": "SENTINEL"}
 
@@ -471,8 +497,8 @@ class TestB257GgufPreflight:
             seen["repo_id"] = repo_id
             return {"status": "ok"}
 
-        monkeypatch.setattr(installer_mod, "_check_model_access", fake_check)
-        monkeypatch.setattr(installer_mod, "_dry_run_plan", lambda repo_id, token=None: {
+        monkeypatch.setattr(installer_hf, "_check_model_access", fake_check)
+        monkeypatch.setattr(installer_hf, "_dry_run_plan", lambda repo_id, token=None: {
             "total_bytes": 0, "cached_bytes": 0, "files_count": 0})
 
         url = "https://huggingface.co/TheOrg/Some-Model-GGUF/resolve/main/model.Q4_K_M.gguf"
@@ -485,6 +511,8 @@ class TestB257GgufPreflight:
 
     def test_preflight_gguf_non_hf_url_skips_hf_probe(self, app_with_installer, monkeypatch):
         from core.endpoints import installer as installer_mod
+        from core.endpoints import installer_shared
+        from core.endpoints import installer_hf
         monkeypatch.delenv("HF_TOKEN", raising=False)
         called = {"n": 0}
 
@@ -492,7 +520,7 @@ class TestB257GgufPreflight:
             called["n"] += 1
             return {"status": "ok"}
 
-        monkeypatch.setattr(installer_mod, "_check_model_access", fake_check)
+        monkeypatch.setattr(installer_hf, "_check_model_access", fake_check)
 
         url = "https://example.com/models/model.Q4_K_M.gguf"
         with TestClient(app_with_installer) as client:

@@ -55,5 +55,12 @@ def test_normal_static_asset_still_served(client):
     """Regression: guarding uploads must not break normal (public) static serving."""
     r = client.get("/ui/static/app.js")
     assert r.status_code == 200
-    # ties the two WS5 fixes together: the served asset carries the WS5-02 escapeAttr fix
+    assert "class NexeUI" in r.text
+
+    # ties the two WS5 fixes together: the served asset carries the WS5-02
+    # escapeAttr fix. It moved to nexe-render.js when app.js was split (#127),
+    # so this also proves the cluster files are reachable through the same
+    # route — a split file the static handler would not serve is a blank page.
+    r = client.get("/ui/static/nexe-render.js")
+    assert r.status_code == 200
     assert "escapeAttr" in r.text

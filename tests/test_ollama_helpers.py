@@ -116,6 +116,18 @@ class TestBuildOllamaPayload:
         # None preserves the prior byte-exact payload: no top_p key at all.
         assert "top_p" not in payload["options"]
 
+    def test_num_ctx_follows_the_live_ladder_not_a_frozen_import(self, monkeypatch):
+        """The /v1 path used to freeze auto_num_ctx() at import; the web UI
+        asked live. After a change of NEXE_OLLAMA_NUM_CTX they disagreed."""
+        from core.endpoints.chat_engines.ollama import _build_ollama_payload
+        request = MagicMock(stream=False, temperature=0.7, max_tokens=512, top_p=None)
+        monkeypatch.setenv("NEXE_OLLAMA_NUM_CTX", "16384")
+        payload = _build_ollama_payload(request, [], "llama3.2")
+        assert payload["options"]["num_ctx"] == 16384
+        monkeypatch.setenv("NEXE_OLLAMA_NUM_CTX", "4096")
+        payload = _build_ollama_payload(request, [], "llama3.2")
+        assert payload["options"]["num_ctx"] == 4096
+
 
 # ─── _ollama_streaming_response ──────────────────────────────────────────────
 

@@ -96,7 +96,7 @@ async def test_no_engine_raises_503_not_200(monkeypatch):
     from starlette.requests import Request as StarletteRequest
 
     from plugins.web_ui_module.api.routes_chat import register_chat_routes
-    from plugins.web_ui_module.core.session_manager import ChatSession
+    from core.sessions import ChatSession
 
     registry = MagicMock()
     registry.list_modules.return_value = []

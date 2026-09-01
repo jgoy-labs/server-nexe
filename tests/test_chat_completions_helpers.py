@@ -2,7 +2,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import BackgroundTasks
 from fastapi.responses import StreamingResponse
 
 from core.endpoints.chat import (
@@ -10,7 +9,6 @@ from core.endpoints.chat import (
     _dispatch_to_engine,
     _inject_response_headers,
     _record_engine_metrics,
-    _schedule_episodic_memory,
     _validate_chat_request,
 )
 from core.endpoints.chat_schemas import ChatCompletionRequest, Message
@@ -95,10 +93,82 @@ class TestBuildRagAndSystemPrompt:
         body = _make_body(use_rag=True, messages=[Message(role="user", content="query")])
         app_state = MagicMock()
         app_state.config = {}
-        with patch("core.endpoints.chat.build_rag_context", new=AsyncMock(return_value="rag_text")) as mock_rag:
+        with patch("core.endpoints.chat.build_rag_context", new=AsyncMock(return_value=("rag_text", []))) as mock_rag:
             messages, context = await _build_rag_and_system_prompt(body, app_state, "en")
         mock_rag.assert_called_once()
         assert context == "rag_text"
+
+    # ── F-D blocks 1-2: /v1 now shares the UI's date phrase + on-demand clock ──
+    # (core/chat_prompt.py). Before this, /v1's system prompt had NEITHER —
+    # an API conversation never knew today's date and could not answer "what
+    # time is it". Drives the real endpoint helper, not a copy of the phrase.
+
+    async def test_system_prompt_carries_the_date_phrase(self):
+        from datetime import datetime, timezone, timedelta
+        from unittest.mock import patch as _patch
+        import datetime as _datetime_mod
+
+        body = _make_body(use_rag=False)
+        app_state = MagicMock()
+        app_state.config = {}
+        fixed = datetime(2026, 5, 21, 21, 52, 22, tzinfo=timezone(timedelta(hours=2)))
+        mock_cls = MagicMock()
+        mock_cls.now.return_value.astimezone.return_value = fixed
+        with _patch.object(_datetime_mod, "datetime", mock_cls):
+            messages, _ = await _build_rag_and_system_prompt(body, app_state, "ca")
+        assert "dijous, 21 de maig de 2026" in messages[0]["content"], (
+            "F-D: /v1's system prompt must carry the same natural-language "
+            f"date phrase the UI has always had. Got: {messages[0]['content']!r}"
+        )
+
+    async def test_matches_the_ui_route_exactly(self):
+        """Parity gate (F-D): /v1 and /ui/chat produce the byte-identical
+        date phrase for the same language and instant, because both call
+        the ONE shared core.chat_prompt — not two copies that can drift,
+        the exact bug #854/B007 patterns exist to prevent."""
+        from datetime import datetime, timezone, timedelta
+        from unittest.mock import patch as _patch
+        import datetime as _datetime_mod
+        from plugins.web_ui_module.api.routes_chat import _build_system_prompt_with_time
+
+        body = _make_body(use_rag=False)
+        app_state = MagicMock()
+        app_state.config = {}
+        fixed = datetime(2026, 8, 27, 9, 0, 0, tzinfo=timezone(timedelta(hours=2)))
+        mock_cls = MagicMock()
+        mock_cls.now.return_value.astimezone.return_value = fixed
+
+        with _patch.object(_datetime_mod, "datetime", mock_cls):
+            v1_messages, _ = await _build_rag_and_system_prompt(body, app_state, "es")
+            ui_prompt, _ = _build_system_prompt_with_time("hola", lang_hint="es")
+
+        # Both start from a DIFFERENT base prompt (server.toml vs the English
+        # fallback), so compare only the shared tail: date phrase onward.
+        assert "Hoy es " in v1_messages[0]["content"]
+        assert "Hoy es " in ui_prompt
+        v1_date = v1_messages[0]["content"].split("Hoy es ", 1)[1]
+        ui_date = ui_prompt.split("Hoy es ", 1)[1]
+        assert v1_date.split("\n")[0] == ui_date.split("\n")[0]
+
+    async def test_asking_the_time_injects_the_clock_into_the_turn_not_the_system(self):
+        body = _make_body(use_rag=False, messages=[Message(role="user", content="quina hora és?")])
+        app_state = MagicMock()
+        app_state.config = {}
+        messages, _ = await _build_rag_and_system_prompt(body, app_state, "ca")
+        assert "Hora actual del sistema" in messages[-1]["content"], (
+            "F-D: /v1 must answer clock questions on demand, like the UI — "
+            f"got: {messages[-1]['content']!r}"
+        )
+        assert "Hora actual del sistema" not in messages[0]["content"], (
+            "the clock must never poison the system prompt / prefix cache"
+        )
+
+    async def test_normal_message_gets_no_clock_injected(self):
+        body = _make_body(use_rag=False, messages=[Message(role="user", content="hola, com va?")])
+        app_state = MagicMock()
+        app_state.config = {}
+        messages, _ = await _build_rag_and_system_prompt(body, app_state, "ca")
+        assert messages[-1]["content"] == "hola, com va?"
 
 
 # ─── _dispatch_to_engine ─────────────────────────────────────────────────────
@@ -150,34 +220,6 @@ class TestRecordEngineMetrics:
         }):
             _record_engine_metrics("ollama", "success", 0.0)
         mock_requests.labels.assert_called_once_with(engine="ollama", status="success")
-
-
-# ─── _schedule_episodic_memory ───────────────────────────────────────────────
-
-class TestScheduleEpisodicMemory:
-    def test_streaming_response_skipped(self):
-        response = MagicMock(spec=StreamingResponse)
-        bt = MagicMock(spec=BackgroundTasks)
-        _schedule_episodic_memory(response, bt, MagicMock(), "query")
-        bt.add_task.assert_not_called()
-
-    def test_dict_response_with_content_schedules_task(self):
-        response = {"choices": [{"message": {"content": "resposta"}}]}
-        bt = MagicMock(spec=BackgroundTasks)
-        _schedule_episodic_memory(response, bt, MagicMock(), "query")
-        bt.add_task.assert_called_once()
-
-    def test_dict_response_without_content_no_task(self):
-        response = {"choices": [{"message": {"content": ""}}]}
-        bt = MagicMock(spec=BackgroundTasks)
-        _schedule_episodic_memory(response, bt, MagicMock(), "query")
-        bt.add_task.assert_not_called()
-
-    def test_no_last_user_msg_no_task(self):
-        response = {"choices": [{"message": {"content": "resposta"}}]}
-        bt = MagicMock(spec=BackgroundTasks)
-        _schedule_episodic_memory(response, bt, MagicMock(), None)
-        bt.add_task.assert_not_called()
 
 
 # ─── _inject_response_headers ────────────────────────────────────────────────

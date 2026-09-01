@@ -16,7 +16,6 @@ from typing import AsyncGenerator, Dict, Any, Optional
 from dataclasses import dataclass
 import asyncio
 import inspect
-import functools
 import logging
 import os as _os
 import re as _re
@@ -50,11 +49,16 @@ except ImportError:
     def detect_jailbreak_attempt(s, *a, **k):  # type: ignore[misc, no-redef]
         return False
 from core.log_redact import redact_user_content
+from core.chat_prompt import time_context_line
 from core.endpoints.chat_sanitization import (
     _sanitize_rag_context,
     append_rag_security_rule,
-    untrusted_context_turns,
-    wrap_untrusted_context,
+)
+from core.context_budget import (  # noqa: F401 — re-exported for tests and callers
+    compute_context_budget,
+    resolve_history_ratio,
+    resolve_max_context_chars,
+    _inject_context_into_messages,
 )
 from plugins.web_ui_module.core.harmony_filter import HarmonyStreamFilter
 from plugins.web_ui_module.core.latex_sanitizer import LatexStreamBuffer, latex_to_unicode
@@ -484,65 +488,6 @@ def _is_valid_mem_save_text(text: str, user_input: str = "") -> bool:
         if _user_clean and (_lowered == _user_clean or (len(_user_clean) > 10 and _user_clean in _lowered)):
             return False
     return True
-
-
-def compute_context_budget(
-    max_context_chars: int,
-    system_chars: int,
-    history_chars: int,
-    message_chars: int,
-    document_chars: int,
-    history_ratio: float = 0.30,
-    response_buffer: int = 500,
-):
-    """
-    Bug 32 — Calculates the context budget preserving a minimum for history.
-
-    Args:
-        max_context_chars: total context window capacity (in chars).
-        system_chars: characters in the system prompt.
-        history_chars: actual characters in the current history.
-        message_chars: characters in the current user message.
-        document_chars: characters of the document to inject (0 if none).
-        history_ratio: fraction of context reserved as minimum for history (0..0.9).
-        response_buffer: chars reserved for the model response.
-
-    Returns:
-        dict with:
-          - history_reserve: minimum chars reserved for history
-          - history_effective: actual chars the history will occupy (not truncated)
-          - available_chars: chars available for document/RAG
-          - doc_truncated_pct: % of the document that was cut (0 if none)
-          - doc_kept_chars: chars of the document that are sent
-    """
-    history_ratio = max(0.0, min(0.9, history_ratio))
-    # `history_reserve` is actually
-    # the "minimum floor" reserved for history. The real history
-    # (`history_effective`) can grow above this floor if messages
-    # are long. We keep the public name (env var
-    # NEXE_HISTORY_CONTEXT_RATIO and returned dict key) but
-    # document the exact meaning here to avoid future confusion.
-    history_floor = int(max_context_chars * history_ratio)
-    history_reserve = history_floor  # alias for backwards compatibility
-    history_effective = max(history_chars, history_floor)
-    available_chars = max_context_chars - system_chars - history_effective - message_chars - response_buffer
-
-    doc_truncated_pct = 0
-    doc_kept_chars = 0
-    if document_chars > 0 and available_chars > 0:
-        if document_chars > available_chars:
-            doc_kept_chars = available_chars
-            doc_truncated_pct = round((1 - available_chars / document_chars) * 100)
-        else:
-            doc_kept_chars = document_chars
-
-    return {
-        "history_reserve": history_reserve,
-        "history_effective": history_effective,
-        "available_chars": available_chars,
-        "doc_truncated_pct": doc_truncated_pct,
-        "doc_kept_chars": doc_kept_chars,
-    }
 
 
 def _extract_safe_mem_saves(text: str, user_input: str = "") -> list:
@@ -1634,58 +1579,15 @@ async def _switch_engine_model(engine, engine_name: str, body: dict, model_name:
         _switch_llama_cpp_model(engine, local_path)
 
 
-def _build_rag_items_tuple(relevant_results) -> list[tuple[str, float]]:
-    """Extract (source_collection, score) pairs from RAG recall results."""
-    return [
-        (r.get("metadata", {}).get("source_collection", "?"), r.get("score", 0))
-        for r in relevant_results
-    ]
-
-
-def _filter_relevant_results(recall_results, rag_threshold, log) -> tuple[list, list, list]:
-    """Retorna (doc_items, knowledge_items, memory_items)."""
-    relevant = [r for r in recall_results if r.get("score", 0) >= rag_threshold]
-    doc_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") == "nexe_documentation"]
-    knowledge_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") == "user_knowledge"]
-    memory_items = [r for r in relevant if r.get("metadata", {}).get("source_collection") not in ("user_knowledge", "nexe_documentation")]
-    return doc_items, knowledge_items, memory_items
-
-
-def _format_rag_sections_by_language(doc_items, knowledge_items, memory_items, lang_key) -> str:
-    """Format RAG results into labelled sections in the server's active language."""
-    _rag_labels = {
-        "ca": ("DOCUMENTACIO DEL SISTEMA", "DOCUMENTACIO TECNICA", "MEMORIA DE L'USUARI"),
-        "es": ("DOCUMENTACION DEL SISTEMA", "DOCUMENTACION TECNICA", "MEMORIA DEL USUARIO"),
-        "en": ("SYSTEM DOCUMENTATION", "TECHNICAL DOCUMENTATION", "USER MEMORY"),
-    }
-    _labels = _rag_labels.get(lang_key, _rag_labels["en"])
-    rag_context = ""
-    if doc_items:
-        rag_context += f"\n\n[{_labels[0]}]\n" + "".join(f"- {r['content']}\n" for r in doc_items)
-    if knowledge_items:
-        rag_context += f"\n\n[{_labels[1]}]\n" + "".join(f"- {r['content']}\n" for r in knowledge_items)
-    if memory_items:
-        rag_context += f"\n\n[{_labels[2]}]\n" + "".join(f"- {r['content']}\n" for r in memory_items)
-    return rag_context
-
-
-@functools.lru_cache(maxsize=1)
-def _system_rag_limit() -> int:
-    """RAG recall limit derived from total system RAM.
-
-    MC-003: virtual_memory().total is invariant at runtime, so cache it instead
-    of recomputing it via psutil on every chat request.
-    """
-    try:
-        import psutil
-        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
-        return 3 if ram_gb < 12 else 5
-    except Exception:
-        return 5
-
-
-async def _build_rag_context(memory_helper, message: str, body: dict, attached_doc) -> tuple:
+async def _build_rag_context(memory_helper, message: str, body: dict, attached_doc, context_window=None) -> tuple:
     """Recall from memory and build the RAG context string.
+
+    F-D block 3: delegates retrieval to core.endpoints.chat_rag.build_rag_context
+    — the same per-collection thresholds, dedup and RAM-derived limit `/v1`
+    uses, instead of a second implementation with a single flat threshold and
+    no dedup. `memory_helper` is unused now (kept in the signature: the one
+    call site passes it and nothing else needs changing); the core function
+    resolves its own MemoryAPI.
 
     Returns (rag_context, rag_count, rag_items) where rag_items is a list of
     (collection, score) tuples. Returns empty values when an attached doc is
@@ -1694,44 +1596,38 @@ async def _build_rag_context(memory_helper, message: str, body: dict, attached_d
     if attached_doc:
         return "", 0, []
 
-    rag_context = ""
-    rag_count = 0
-    rag_items: list = []
     _log = logging.getLogger(__name__)
 
     try:
+        # Deferred import: a plugin must not pull core's memory-adjacent
+        # modules at import time (#471 layering; memory/ is DEGRADABLE by
+        # decision — the chat must come up without it), same pattern as the
+        # ask_engine_window import a few lines up in _build_turn_context.
+        from core.endpoints.chat_rag import build_rag_context
+        from core.lifespan import get_server_state
+
         _active_colls = body.get("rag_collections")
         _log.info("RAG: attempting recall (collections=%s)", _active_colls or "all")
-        _rag_limit = _system_rag_limit()
-        recall_result = await memory_helper.recall_from_memory(
-            message, limit=_rag_limit, collections=_active_colls, session_id=None,
+        # Same NEXE_LANG the section labels have always used here — sticky
+        # per-message language isn't resolved yet at this point in the turn
+        # (_build_turn_system_prompt runs after this), unlike /v1 which
+        # already has it. Not changed by this block: scope is thresholds,
+        # dedup and the limit, not when language gets resolved.
+        _server_lang = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
+        _threshold_override = body.get("rag_threshold")
+        rag_context, rag_items = await build_rag_context(
+            message, get_server_state(), _server_lang, collections=_active_colls,
+            threshold_override=float(_threshold_override) if _threshold_override is not None else None,
         )
-        if recall_result["success"] and recall_result["results"]:
-            rag_threshold = float(body.get("rag_threshold", 0.35))
-            _log.info("RAG pre-filter: %s results, threshold=%s", len(recall_result["results"]), rag_threshold)
-            doc_items, knowledge_items, memory_items = _filter_relevant_results(
-                recall_result["results"], rag_threshold, _log
-            )
-            relevant = doc_items + knowledge_items + memory_items
-            if relevant:
-                rag_count = len(relevant)
-                _lang_key = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
-                rag_context = _format_rag_sections_by_language(
-                    doc_items, knowledge_items, memory_items, _lang_key
-                )
-                rag_context = _sanitize_rag_context(rag_context)
-                rag_items = _build_rag_items_tuple(relevant)
-                _log.info("RAG: %s relevant memories (score >= %s)", rag_count, rag_threshold)
-                for item in relevant:
-                    score = item.get("score", 0)
-                    col = item.get("metadata", {}).get("source_collection", "?")
-                    _log.info("  RAG [%s] score=%.2f -> %r", col, score, item["content"][:80].replace("\n", " "))
-        elif not recall_result["success"]:
-            _log.warning("RAG: recall failed — %s", recall_result.get("message", "unknown"))
-        else:
-            _log.info("RAG: no results for query (success=True, results=[])")
+        rag_context = _sanitize_rag_context(rag_context, context_window)
+        rag_count = len(rag_items)
+        if rag_count:
+            _log.info("RAG: %s relevant memories", rag_count)
+            for col, score in rag_items:
+                _log.info("  RAG [%s] score=%.2f", col, score)
     except Exception as e:
         _log.warning("RAG lookup failed: %s", e)
+        return "", 0, []
 
     return rag_context, rag_count, rag_items
 
@@ -1878,7 +1774,7 @@ async def _yield_atomize_and_save_mem_saves(
     count_out.append(_mem_saved_count)
 
 
-def _build_document_context(attached_doc: dict) -> tuple[str, int, int]:
+def _build_document_context(attached_doc: dict, context_window=None) -> tuple[str, int, int]:
     """Build document_context string from an attached_doc dict.
 
     Returns (document_context, shown, total_chunks).
@@ -1905,7 +1801,7 @@ def _build_document_context(attached_doc: dict) -> tuple[str, int, int]:
         else:
             document_context += f"[Document complet: ~{est_pages_total} pagines]\n\n"
         document_context += f"{doc_content}\n"
-    document_context = _sanitize_rag_context(document_context)
+    document_context = _sanitize_rag_context(document_context, context_window)
     logger.info(
         "Using attached document: %s (parts %d/%d, %d chars)",
         attached_doc['filename'], shown, total_chunks, len(doc_content),
@@ -1913,94 +1809,10 @@ def _build_document_context(attached_doc: dict) -> tuple[str, int, int]:
     return document_context, shown, total_chunks
 
 
-# Bug B iter-2 (2026-05-21 nit): natural-language date phrase localised
-# to the user's language. Replaces the iter-1 "Now: Thursday 2026-05-21
-# ..." technical header, which small MLX models (Qwen3-4B-4bit empirically
-# returned date -1 and omitted the weekday) interpreted as metadata rather
-# than a fact to copy. A natural conversational phrase is much more likely
-# to be reproduced verbatim by the model. Hardcoded maps (no setlocale)
-# keep this thread-safe under asyncio interleaving.
-_WEEKDAYS_BY_LANG: dict[str, list[str]] = {
-    "ca": ["dilluns", "dimarts", "dimecres", "dijous", "divendres", "dissabte", "diumenge"],
-    "es": ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"],
-    "en": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-}
-_MONTHS_BY_LANG: dict[str, list[str]] = {
-    # Index 0 is an empty sentinel — datetime.month is 1..12.
-    "ca": ["", "gener", "febrer", "març", "abril", "maig", "juny",
-           "juliol", "agost", "setembre", "octubre", "novembre", "desembre"],
-    "es": ["", "enero", "febrero", "marzo", "abril", "mayo", "junio",
-           "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
-    "en": ["", "January", "February", "March", "April", "May", "June",
-           "July", "August", "September", "October", "November", "December"],
-}
-_DATE_PHRASE_BY_LANG: dict[str, str] = {
-    # B007: DAY granularity only — the phrase lives inside the system prompt,
-    # which is the head of every tokenized prompt. Any faster-changing value
-    # (hh:mm:ss) makes identity_hash and the token prefix change every second,
-    # so no prefix cache (MLX trie/VLM state, llama.cpp ModelPool, Ollama's
-    # internal cache) can ever hit. Clock questions are answered on demand via
-    # _time_context_line() injected into that single turn instead.
-    "ca": "Avui és {dow}, {day} de {month} de {year}.",
-    "es": "Hoy es {dow}, {day} de {month} de {year}.",
-    "en": "Today is {dow}, {month} {day}, {year}.",
-}
-
-# B007/D-A: the current time is read from the system ONLY when the user asks
-# for it, and travels inside that turn's user message (ephemeral — the session
-# persists the raw message, so the cache diverges only on that turn).
-_TIME_INTENT_RE = _re.compile(
-    r"(quina\s+hora|hora\s+(és|es\s+ara|tenim)"
-    r"|qu[eé]\s+hora"
-    r"|what(\s+is|'s)?\s+the\s+time|what\s+time|current\s+time)",
-    _re.IGNORECASE,
-)
-_TIME_PHRASE_BY_LANG: dict[str, str] = {
-    "ca": "[Hora actual del sistema: {hm} ({tz}) — llegida ara mateix]",
-    "es": "[Hora actual del sistema: {hm} ({tz}) — leída ahora mismo]",
-    "en": "[Current system time: {hm} ({tz}) — read just now]",
-}
-
-
-def _time_context_line(message: str, lang: str, _now=None) -> str:
-    """Return a one-line current-time note when the user asks the time, else ''.
-
-    Injected as a prefix of that turn's user message (never the system prompt),
-    so the prefix cache only diverges on the turn that actually needs the clock.
-    """
-    if not message or not _TIME_INTENT_RE.search(message):
-        return ""
-    if _now is None:
-        from datetime import datetime as _dt
-        _now = _dt.now().astimezone()
-    base = lang if lang in _TIME_PHRASE_BY_LANG else "en"
-    return _TIME_PHRASE_BY_LANG[base].format(
-        hm=_now.strftime("%H:%M"), tz=_now.strftime("%Z")
-    )
-
-
-def _format_now_natural(_now, _lang: str) -> str:
-    """Build a natural-language date phrase in the user's language.
-
-    Normalises BCP-47 variants (``ca-ES`` → ``ca``, ``en-US`` → ``en``) to
-    match how the rest of the chat pipeline resolves language. Unknown
-    languages fall back to English. ``_now`` must be a timezone-aware
-    ``datetime`` (caller already does ``.astimezone()``).
-    """
-    base = _lang.split("-")[0].lower() if _lang else "en"
-    if base not in _DATE_PHRASE_BY_LANG:
-        base = "en"
-    dow = _WEEKDAYS_BY_LANG[base][_now.weekday()]
-    month = _MONTHS_BY_LANG[base][_now.month]
-    # B007: day granularity only — no time-of-day here, ever (see the guard
-    # test test_b007_system_prompt_stable.py; the clock goes via
-    # _time_context_line on demand).
-    return _DATE_PHRASE_BY_LANG[base].format(
-        dow=dow,
-        day=_now.day,
-        month=month,
-        year=_now.year,
-    )
+# F-D blocks 1-2 (2026-08-31): the natural-language date phrase, the
+# on-demand clock line, and the system-prompt-with-time orchestrator moved
+# to core/chat_prompt.py — /v1 shares the exact same code now instead of
+# never having a date at all. See _build_turn_system_prompt below.
 
 
 def _build_system_prompt_with_time(
@@ -2009,24 +1821,20 @@ def _build_system_prompt_with_time(
     """Read system prompt from server.toml, adapt to the user's language and
     inject current datetime.
 
-    The reply language follows the *message* (detected by lingua, any of 75
-    languages), not just the install language (``NEXE_LANG``): the matching
-    ca/es/en prompt variant is selected (others fall back to the English base)
-    and a CRITICAL directive (English, names the language) is prepended **and**
-    reinforced at the end so small models reply in the user's language. Falls
-    back to ``NEXE_LANG`` when detection is unavailable/ambiguous.
+    Thin wrapper kept at this name for the one call site below: resolves the
+    base prompt (server.toml) and hands it to the shared
+    ``core.chat_prompt.build_system_prompt_with_time`` for the date phrase
+    and language reinforcement — the part that used to be duplicated here.
+
+    ``lang_hint`` (#850) is always sent by the call site (the sticky
+    per-session language); it is required, not detected from ``message``,
+    matching the only way this has ever actually been called in production.
 
     Returns (system_prompt, lang).
     """
-    from core.lang_detect import (
-        detect_user_lang,
-        prepend_language_directive,
-        append_language_reminder,
-    )
+    from core.chat_prompt import build_system_prompt_with_time
+    from core.lang_detect import detect_user_lang
     import os as _os_inner
-    # lang_hint (#850): el call-site resol l'idioma sticky de la sessió i el
-    # passa; sense hint el comportament és EXACTAMENT l'anterior (contracte
-    # b007: canvi d'idioma = invalidació legítima).
     _lang = lang_hint or detect_user_lang(message, fallback=_os_inner.getenv("NEXE_LANG", "en"))
     try:
         from core.lifespan import get_server_state
@@ -2034,123 +1842,8 @@ def _build_system_prompt_with_time(
         base_system_prompt = _get_system_prompt(get_server_state(), _lang)
     except Exception:
         base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
-    base_system_prompt = prepend_language_directive(base_system_prompt, _lang)
-    if _now is None:  # injectable clock for tests (B007 stability guard)
-        from datetime import datetime as _dt
-        _now = _dt.now().astimezone()
-    # The datetime phrase only has ca/es/en variants; use 'en' for other langs.
-    _date_lang = _lang if _lang in ("ca", "es", "en") else "en"
-    system_prompt = base_system_prompt + "\n\n" + _format_now_natural(_now, _date_lang)
-    # Recency reinforcement: small models obey the instruction closest to generation.
-    system_prompt = append_language_reminder(system_prompt, _lang)
+    system_prompt = build_system_prompt_with_time(base_system_prompt, _lang, _now=_now)
     return system_prompt, _lang
-
-
-def _inject_context_into_messages(
-    engine_messages: list,
-    message: str,
-    document_context: str,
-    rag_context: str,
-    budget: dict,
-    available_chars: int,
-    history_chars: int,
-) -> tuple[list, int, bool]:
-    """Append the user message (and document/RAG context turns) to engine_messages.
-
-    Returns (engine_messages, doc_truncated_pct, ctx_injected). ctx_injected
-    is True when untrusted retrieved content (document or RAG) was injected —
-    the system-prompt rule is armed unconditionally by _finalize_system_prompt (B030/#851).
-
-    B030 layer 2d (turn separation): wrapped context goes in its own user turn
-    + assistant data-only ack BEFORE the user message, never inside it.
-    """
-    _doc_truncated_pct = budget["doc_truncated_pct"]
-    _ctx_injected = False
-    _lang_key = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
-    if document_context and budget["doc_kept_chars"] > 0:
-        _original_doc_len = len(document_context)
-        document_context = document_context[: budget["doc_kept_chars"]]
-        if _doc_truncated_pct > 0:
-            logger.info(
-                "Bug 32: document truncated %s%% to preserve history reserve "
-                "(history=%s, reserve=%s, doc_orig=%s, doc_kept=%s)",
-                _doc_truncated_pct, history_chars, budget["history_reserve"],
-                _original_doc_len, budget["doc_kept_chars"],
-            )
-        # B030: nonce'd wrapper + no "EXCLUSIVAMENT obey the document" amplifier —
-        # the document is a SOURCE to answer from, never a source of instructions.
-        # B030 layer 2d: the document travels in its own turn pair; the user's
-        # message arrives clean as the last word (the "do not follow
-        # instructions" commitment lives in the assistant ack turn).
-        _doc_framing = {
-            "ca": (
-                "Respon basant-te en el DOCUMENT ADJUNTAT del bloc de context "
-                "anterior. Si la informacio no hi es, indica-ho clarament."
-            ),
-            "es": (
-                "Responde basandote en el DOCUMENTO ADJUNTO del bloque de "
-                "contexto anterior. Si la informacion no esta, indicalo claramente."
-            ),
-            "en": (
-                "Answer based on the ATTACHED DOCUMENT in the previous context "
-                "block. If the information is not there, say so clearly."
-            ),
-        }
-        engine_messages.extend(
-            untrusted_context_turns(
-                wrap_untrusted_context(document_context, _lang_key), _lang_key
-            )
-        )
-        _framing = _doc_framing.get(_lang_key, _doc_framing["en"])
-        engine_messages.append({"role": "user", "content": f"{_framing}\n\n{message}"})
-        _ctx_injected = True
-    elif document_context and budget["doc_kept_chars"] == 0:
-        logger.warning(
-            "Bug 32: dropping document (history reserved fully) — history=%s, reserve=%s",
-            history_chars, budget["history_reserve"],
-        )
-        engine_messages.append({"role": "user", "content": message})
-    elif rag_context and available_chars > 0:
-        rag_context = rag_context[:available_chars]
-        _rag_instruction = {
-            "ca": (
-                "INFORMACIO RECUPERADA. UTILITZA-LA per respondre. "
-                "Si la resposta es aqui, cita-la directament. "
-                "Fonts: [DOCUMENTACIO DEL SISTEMA] = knowledge base del sistema, "
-                "[DOCUMENTACIO TECNICA] = documents pujats per l'usuari, "
-                "[MEMORIA DE L'USUARI] = coses que l'usuari t'ha dit abans. "
-                "Quan et preguntin d'on saps algo, indica la font correcta. "
-                "MAI diguis que ho saps pel teu entrenament si la info ve d'aqui:"
-            ),
-            "es": (
-                "INFORMACION RECUPERADA. UTILIZALA para responder. "
-                "Si la respuesta esta aqui, citala directamente. "
-                "Fuentes: [DOCUMENTACION DEL SISTEMA] = knowledge base del sistema, "
-                "[DOCUMENTACION TECNICA] = documentos subidos por el usuario, "
-                "[MEMORIA DEL USUARIO] = cosas que el usuario te dijo antes. "
-                "Cuando te pregunten de donde sabes algo, indica la fuente correcta. "
-                "NUNCA digas que lo sabes por tu entrenamiento si la info viene de aqui:"
-            ),
-            "en": (
-                "RETRIEVED INFORMATION. USE IT to answer. "
-                "If the answer is here, cite it directly. "
-                "Sources: [SYSTEM DOCUMENTATION] = system knowledge base, "
-                "[TECHNICAL DOCUMENTATION] = documents uploaded by the user, "
-                "[USER MEMORY] = things the user told you before. "
-                "When asked where you know something from, indicate the correct source. "
-                "NEVER say you know it from training if the info comes from here:"
-            ),
-        }
-        _instr = _rag_instruction.get(_lang_key, _rag_instruction["en"])
-        # B030 layer 2d: trusted source legend OUTSIDE the untrusted delimiters,
-        # both in their own turn pair; the user's message arrives clean.
-        context_block = f"{_instr}\n{wrap_untrusted_context(rag_context, _lang_key)}"
-        engine_messages.extend(untrusted_context_turns(context_block, _lang_key))
-        engine_messages.append({"role": "user", "content": message})
-        _ctx_injected = True
-    else:
-        engine_messages.append({"role": "user", "content": message})
-    return engine_messages, _doc_truncated_pct, _ctx_injected
 
 
 def _inject_image_block(messages: list) -> list:
@@ -2673,7 +2366,11 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
             # even produced response headers, so there is no stream to speak on.
             # The turn that fills the window warns about the one after it, and
             # the client can say so the instant the user hits send.
-            if ctx.session.needs_compaction():
+            # #965: same window the next turn's compaction will measure against,
+            # or the warning and the compaction could disagree. Deferred import:
+            # a plugin must not pull core at import time (layering gate, #471).
+            from core.context_window import ask_engine_window
+            if ctx.session.needs_compaction(ask_engine_window(ctx.engine)):
                 yield "\x00[WILL_COMPACT:1]\x00"
 
         # Stream finished cleanly — release the disconnect
@@ -2748,13 +2445,22 @@ async def _build_turn_context(
         attached_doc = session.get_and_clear_attached_document()
         session_mgr._save_session_to_disk(session)
 
+        # #972: the sanitizer used to size against DEFAULT_CONTEXT_WINDOW
+        # (8192) and throw away the rest before the #965 budget saw it.
+        # Deferred import: a plugin must not pull core at import time (layering
+        # gate, #471) — same pattern as the WILL_COMPACT site.
+        from core.context_window import ask_engine_window
+        _window = ask_engine_window(engine)
+
         document_context = ""
         if attached_doc:
-            document_context, _shown, _total_chunks = _build_document_context(attached_doc)
+            document_context, _shown, _total_chunks = _build_document_context(
+                attached_doc, context_window=_window,
+            )
 
         # 3. Get Memory Context (RAG) - ALWAYS search, not just with patterns
         rag_context, rag_count, _rag_items = await _build_rag_context(
-            memory_helper, message, body, attached_doc,
+            memory_helper, message, body, attached_doc, context_window=_window,
         )
 
     return TurnContext(
@@ -2802,9 +2508,14 @@ def _build_turn_system_prompt(
 
 
 def _assemble_engine_messages(
-    turn: TurnContext, system_prompt: str, _lang: str, message: str, session, _continue: bool
+    turn: TurnContext, system_prompt: str, _lang: str, message: str, session, _continue: bool,
+    engine=None,
 ) -> tuple[list, int]:
     """Engine payload: history, context budget, injection, on-demand clock.
+
+    `engine` (#965) is the live engine module, asked how many tokens it can hold
+    so the budget follows the model and the machine instead of a flat 24000
+    chars. Optional: without it the documented default window is used.
 
     Returns (messages, doc_truncated_pct).
     """
@@ -2821,11 +2532,12 @@ def _assemble_engine_messages(
     # Reserve a minimum slice of the model context for conversation history
     # so that a huge attached document never wipes out previous turns.
     # Configurable via NEXE_HISTORY_CONTEXT_RATIO (default 0.30 = 30%).
-    MAX_CONTEXT_CHARS = int(_os.environ.get("NEXE_MAX_CONTEXT_CHARS", "24000"))
-    try:
-        _history_ratio = float(_os.environ.get("NEXE_HISTORY_CONTEXT_RATIO", "0.30"))
-    except ValueError:
-        _history_ratio = 0.30
+    # #965: the total no longer comes from a flat env default — it is sized from
+    # the window the serving engine actually has.
+    MAX_CONTEXT_CHARS = resolve_max_context_chars(engine)
+    # #977: read through core's _ratio_env like its two sibling ratios, instead
+    # of a bare float() that let nan/inf through to become the 0.9 clamp.
+    _history_ratio = resolve_history_ratio()
 
     system_chars = len(system_prompt)
     history_chars = sum(len(m.get("content", "")) for m in context_messages)
@@ -2875,7 +2587,7 @@ def _assemble_engine_messages(
     # Never the system prompt (it would poison the prefix cache
     # for the whole conversation); the session keeps the raw
     # message, so only this turn diverges in the cache.
-    _time_line = _time_context_line(message, _lang)
+    _time_line = time_context_line(message, _lang)
     if _time_line and engine_messages and engine_messages[-1]["role"] == "user":
         engine_messages[-1]["content"] = (
             f"{_time_line}\n\n{engine_messages[-1]['content']}"
@@ -3056,6 +2768,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     )
                     messages, _doc_truncated_pct = _assemble_engine_messages(
                         _turn, system_prompt, _lang, message, session, _continue,
+                        engine,
                     )
                     response_chunks: list[str] = []
 

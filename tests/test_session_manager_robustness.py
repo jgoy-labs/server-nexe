@@ -16,7 +16,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from plugins.web_ui_module.core.session_manager import SessionManager, ChatSession
+from core.sessions import SessionManager, ChatSession
 
 
 def _make_failing_crypto():

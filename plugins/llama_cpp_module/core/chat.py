@@ -246,7 +246,7 @@ class LlamaCppChatNode:
         start_time = time.time()
         response = model.create_chat_completion(
             messages=all_messages,
-            max_tokens=max_tokens if max_tokens is not None else 2048,
+            max_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
             temperature=temperature if temperature is not None else 0.7,
             top_p=top_p if top_p is not None else 0.9,
             stop=self._STOP_SEQUENCES,
@@ -292,7 +292,7 @@ class LlamaCppChatNode:
 
         for chunk in model.create_chat_completion(
             messages=all_messages,
-            max_tokens=max_tokens if max_tokens is not None else 2048,
+            max_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
             temperature=temperature if temperature is not None else 0.7,
             top_p=top_p if top_p is not None else 0.9,
             stream=True,
@@ -408,7 +408,7 @@ class LlamaCppChatNode:
         start_time = time.time()
         response = model.create_chat_completion(
             messages=all_messages,
-            max_tokens=max_tokens if max_tokens is not None else 2048,
+            max_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
             temperature=temperature if temperature is not None else 0.7,
             top_p=top_p if top_p is not None else 0.9,
             stop=self._STOP_SEQUENCES,
@@ -452,7 +452,7 @@ class LlamaCppChatNode:
 
         for chunk in model.create_chat_completion(
             messages=all_messages,
-            max_tokens=max_tokens if max_tokens is not None else 2048,
+            max_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
             temperature=temperature if temperature is not None else 0.7,
             top_p=top_p if top_p is not None else 0.9,
             stream=True,

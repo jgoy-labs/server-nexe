@@ -73,3 +73,11 @@ class TestGetLocalhostAliases:
         # Should NOT include empty strings
         assert "" not in result
         assert result == DEFAULT_LOCALHOST_ALIASES
+
+    def test_trusted_hosts_no_longer_affects_localhost_aliases(self, monkeypatch):
+        """#864: the two env vars must not leak into each other anymore."""
+        monkeypatch.delenv("NEXE_LOCALHOST_ALIASES", raising=False)
+        monkeypatch.setenv("NEXE_TRUSTED_HOSTS", "some-remote-host")
+        result = get_localhost_aliases()
+        assert "some-remote-host" not in result
+        assert result == DEFAULT_LOCALHOST_ALIASES

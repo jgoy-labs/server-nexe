@@ -5,13 +5,18 @@ The wizard writes the user's engine + model selection to a JSON file. The
 sidecar reads it at startup and configures env vars accordingly. This is the
 single source of truth — no other layer holds onboarding state.
 
-Location: $NEXE_DATA_DIR/onboarding.json (sidecar mode injects NEXE_DATA_DIR =
-<app_data_dir>/sidecar/data — see nexe-app lib.rs — so the real on-disk path is
-…/com.nexe.app/sidecar/data/onboarding.json; nexe-app's reset_installation
-removes exactly that path).
-Fallback (no NEXE_DATA_DIR — legacy/standalone only, note NO /data/ segment):
+Location: resolved via core.paths.helpers.get_data_dir() — the SAME helper
+every other stateful subsystem uses (sessions, memory, vectors), so onboarding
+state lives next to them instead of following its own path scheme:
+  - Sidecar (NEXE_DATA_DIR injected by Tauri, see nexe-app lib.rs):
+    <app_data_dir>/sidecar/data/onboarding.json (nexe-app's reset_installation
+    removes exactly that path).
+  - Standalone (no NEXE_DATA_DIR): {project_root}/storage/data/onboarding.json.
+
+Legacy fallback (pre-unification standalone path, no /data/ segment): if the
+canonical path above has no file, load() migrates a file found at the OLD
+standalone location so no existing onboarding is lost:
   - macOS:   ~/Library/Application Support/com.nexe.app/sidecar/onboarding.json
-             (legacy literal preserved for backward compat with v0.9 Macs)
   - Linux:   platformdirs.user_data_dir("nexe-app", "nexe")/sidecar/onboarding.json
              ($XDG_DATA_HOME or ~/.local/share/nexe-app/sidecar/onboarding.json)
 
@@ -101,26 +106,37 @@ class OnboardingState:
     def _state_file() -> Path:
         """Return the canonical path to onboarding.json.
 
-        Linux portability (2026-05-22): the original
-        default was the Mac-only literal
-        ``~/Library/Application Support/com.nexe.app/sidecar/onboarding.json``
+        Delegates to core.paths.helpers.get_data_dir(), the same helper every
+        other stateful subsystem uses (SessionManager, memory, vectors) to
+        resolve sidecar vs standalone. Before this, onboarding_state had its
+        own path scheme that diverged from get_data_dir() in standalone mode
+        (Library/Application Support vs {project_root}/storage/data) — the
+        two could disagree on whether onboarding had ever been completed.
+        See _legacy_state_file() for the old standalone path, migrated by
+        load() so no existing installation loses its onboarding state.
+        """
+        from core.paths.helpers import get_data_dir
+        return get_data_dir() / "onboarding.json"
+
+    @staticmethod
+    def _legacy_state_file() -> Path | None:
+        """Pre-unification standalone path (no NEXE_DATA_DIR), or None if
+        NEXE_DATA_DIR is set (sidecar mode never used this path — it always
+        had NEXE_DATA_DIR, so there is nothing to migrate from).
+
+        Linux portability (2026-05-22): the original default was the Mac-only
+        literal ``~/Library/Application Support/com.nexe.app/sidecar/onboarding.json``
         with no platform gate, which on Linux produced an out-of-place
-        ``~/Library/...`` tree. We now branch on ``platform.system()``:
-          - macOS  → original literal preserved (zero risk for existing Mac
-                     installs — same path, same file).
+        ``~/Library/...`` tree. We branch on ``platform.system()``:
+          - macOS  → original literal preserved.
           - Linux  → ``platformdirs.user_data_dir("nexe-app", "nexe")`` =
                      ``$XDG_DATA_HOME`` or ``~/.local/share/nexe-app``.
           - other  → falls back to platformdirs for sanity.
-        ``NEXE_DATA_DIR`` still wins over the default (sidecar bundle mode).
         """
         import platform as _platform
-        data_dir = os.environ.get("NEXE_DATA_DIR")
-        if data_dir:
-            return Path(data_dir).expanduser() / "onboarding.json"
+        if os.environ.get("NEXE_DATA_DIR"):
+            return None
         if _platform.system() == "Darwin":
-            # Preserved literal — DO NOT change without a migration story
-            # for existing Mac installs that already have onboarding.json
-            # at this exact path.
             return (
                 Path.home()
                 / "Library"
@@ -135,10 +151,42 @@ class OnboardingState:
             / "onboarding.json"
         )
 
+    @staticmethod
+    def _migrate_legacy_state_file(canonical: Path) -> None:
+        """One-time migration: a standalone install that completed onboarding
+        before OnboardingState delegated to get_data_dir() has its
+        onboarding.json at the old path (_legacy_state_file()). Copy it to
+        the canonical path so that install does not have to redo the wizard.
+        No-op in sidecar mode (_legacy_state_file() returns None there — it
+        never used that path) and when there is nothing to migrate.
+        """
+        legacy = OnboardingState._legacy_state_file()
+        if legacy is None or legacy == canonical or not legacy.is_file():
+            return
+        try:
+            canonical.parent.mkdir(parents=True, exist_ok=True)
+            raw = legacy.read_bytes()
+            with tempfile.NamedTemporaryFile(
+                dir=canonical.parent, prefix=".onboarding.", suffix=".tmp", delete=False
+            ) as fh:
+                fh.write(raw)
+                fh.flush()
+                os.fsync(fh.fileno())
+                tmp_path = Path(fh.name)
+            os.replace(tmp_path, canonical)
+            logger.info(
+                "onboarding_state: migrated legacy state file %s -> %s",
+                legacy, canonical,
+            )
+        except OSError as exc:
+            logger.warning("onboarding_state: legacy migration failed: %s", exc)
+
     @classmethod
     def load(cls) -> OnboardingState | None:
         """Return the persisted state, or None if not completed / unreadable."""
         path = cls._state_file()
+        if not path.exists():
+            cls._migrate_legacy_state_file(path)
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except FileNotFoundError:

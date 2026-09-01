@@ -108,6 +108,24 @@ OpenAI-compatible chat completion with RAG and streaming support.
 - `[THINKING]` / `[/THINKING]` — thinking tokens (Ollama models like qwen3.5)
 - `[DOC_TRUNCATED:XX%]` — percentage of document discarded due to context limit (new 2026-04-02)
 
+**End of stream — why the answer stopped** (new 2026-08-31):
+
+The last chunk before `[DONE]` carries `finish_reason`, like the non-streaming path: `"stop"` when
+the answer ended on its own, `"length"` when it was cut. If the engine does not report one it
+degrades to `"stop"` — an absent reason is not a truncation.
+
+A cut answer can be cut in two ways that demand opposite reactions, and the chunk tells them apart
+with `x_nexe_truncation` (at the root of the chunk; our own extension, not OpenAI):
+
+- `"ceiling"` — the model hit the token ceiling: **the tail is missing**. Asking for the
+  continuation and appending it is correct.
+- `"overflow"` — tokens were dropped **from the middle** while generation carried on (the SSE queue
+  filled up), and the ending that arrived is the natural one. **Do not ask for the continuation**:
+  it would append new text over an internal hole, and the result would read as coherent without
+  being so. Such an answer cannot be repaired by continuing it.
+
+The field is **absent** when nothing was cut. If both happen at once, `"overflow"` wins.
+
 **`[ATTACHED IMAGE]` block:** When a message includes an image (VLM backend), the chat endpoint injects an `[ATTACHED IMAGE]` block that **prioritises the image over the RAG context**. The model processes the image directly and RAG is relegated to secondary context, preventing retrieved documents from distracting from the visual description.
 
 ### System Info

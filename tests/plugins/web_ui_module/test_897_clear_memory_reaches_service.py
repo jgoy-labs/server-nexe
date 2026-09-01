@@ -66,6 +66,35 @@ class TestClearMemoryWipesBothStores:
         )
 
     @pytest.mark.asyncio
+    async def test_an_empty_wipe_dict_is_not_success(self, monkeypatch):
+        """forget_everything() returns {} when the service is not running.
+        That is 'never reached', not 'wiped nothing'. success:True here is
+        the original #897 confirmation-vs-delete, now only on this path."""
+        from plugins.web_ui_module.core import memory_helper as mh
+
+        api = _FakeApi()
+
+        class _View(MemoryView):
+            async def forget_everything(self, user_id: str = "default"):
+                return {}
+
+        async def _fake_view(plugin_id, **kwargs):
+            return _View(api, plugin_id=plugin_id)
+
+        monkeypatch.setattr(mh, "get_memory_view", _fake_view)
+        helper = mh.MemoryHelper()
+        monkeypatch.setattr(helper, "get_memory_api", lambda: _coro(api))
+
+        result = await helper.clear_memory(confirm=True)
+
+        assert result["success"] is False, (
+            "must not tell the user the facts are gone when MemoryService did not run"
+        )
+        assert api.deleted == ["personal_memory"], (
+            "the RAG half may still have run; the failure is that facts were not reached"
+        )
+
+    @pytest.mark.asyncio
     async def test_without_confirmation_nothing_is_touched(self, monkeypatch):
         """The 2-turn confirm gate stays in front of a now-bigger deletion."""
         from plugins.web_ui_module.core import memory_helper as mh

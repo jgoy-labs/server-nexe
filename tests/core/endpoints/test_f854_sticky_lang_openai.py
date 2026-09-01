@@ -294,21 +294,29 @@ class TestSystemPromptStableAcrossTurns:
         assert systems[1] == systems[3], "the English session flipped"
         assert systems[0] != systems[1], "both sessions collapsed onto one language"
 
-    def test_session_key_falls_back_to_the_api_key_without_the_header(self, monkeypatch):
-        """No X-Session-Id: the key is derived exactly like the prefix cache
-        the engines use (derive_session_id), so stickiness and cache agree."""
+    def test_session_key_falls_back_to_the_first_user_message_without_the_header(self, monkeypatch):
+        """No X-Session-Id (F-C, 31/08): the key is derived from the first
+        user message, not the API key. An OpenAI client resends the full
+        history on every call, so the first message stays constant while a
+        real conversation grows — stickiness and the engines' prefix cache
+        (derive_session_id) still agree, now on the F-C id."""
         monkeypatch.setenv("NEXE_PRIMARY_API_KEY", API_KEY)
         monkeypatch.setenv("NEXE_LANG", "en")
         capture = _OllamaCapture()
         client = TestClient(_make_app(), raise_server_exceptions=False)
 
+        first = "hola, què em pots explicar del temps d'avui?"
+        history = [{"role": "user", "content": first}]
+
         with patch("httpx.AsyncClient", return_value=capture), \
              patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no memory")):
-            for text in ("hola, què em pots explicar del temps d'avui?", "gràcies!"):
+            for text in (first, "gràcies!"):
+                if history[-1]["content"] != text:
+                    history.append({"role": "user", "content": text})
                 client.post(
                     "/chat/completions",
                     json={
-                        "messages": [{"role": "user", "content": text}],
+                        "messages": history,
                         "engine": "ollama", "stream": False, "use_rag": False,
                     },
                     headers={"X-Api-Key": API_KEY, "Content-Type": "application/json"},
@@ -321,6 +329,37 @@ class TestSystemPromptStableAcrossTurns:
         assert len(systems) == 2 and systems[0] == systems[1]
         assert len(ce._SESSION_LANG) == 1
         assert next(iter(ce._SESSION_LANG)).startswith("sess_")
+
+    def test_different_first_messages_without_header_get_different_sessions(self, monkeypatch):
+        """F-C accepted limit: a call that does NOT resend the conversation's
+        first message (a client that truncates history, or two genuinely
+        unrelated single-shot calls) is a new thread, not a collision on the
+        API key. The cost is an extra session, never a merged conversation."""
+        monkeypatch.setenv("NEXE_PRIMARY_API_KEY", API_KEY)
+        monkeypatch.setenv("NEXE_LANG", "en")
+        capture = _OllamaCapture()
+        client = TestClient(_make_app(), raise_server_exceptions=False)
+
+        with patch("httpx.AsyncClient", return_value=capture), \
+             patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no memory")):
+            # Both independently detectable (unlike a bare "gràcies!"), so each
+            # single-shot call seeds its own _SESSION_LANG entry regardless of
+            # id — isolating what's under test: two ids, not detection noise.
+            for text in (
+                "hola, què em pots explicar del temps d'avui?",
+                "hello, could you explain today's weather?",
+            ):
+                client.post(
+                    "/chat/completions",
+                    json={
+                        "messages": [{"role": "user", "content": text}],
+                        "engine": "ollama", "stream": False, "use_rag": False,
+                    },
+                    headers={"X-Api-Key": API_KEY, "Content-Type": "application/json"},
+                )
+
+        assert len(ce._SESSION_LANG) == 2
+        assert all(k.startswith("sess_") for k in ce._SESSION_LANG)
 
 
 def test_env_default_still_applies_to_a_brand_new_session(monkeypatch):

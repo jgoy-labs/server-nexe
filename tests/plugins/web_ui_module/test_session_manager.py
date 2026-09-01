@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from plugins.web_ui_module.core.session_manager import ChatSession, SessionManager
+from core.sessions import ChatSession, SessionManager
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -161,6 +161,26 @@ class TestSessionManagerCRUD:
     def test_delete_nonexistent_returns_false(self, sm):
         assert sm.delete_session("ghost") is False
 
+    def test_delete_session_is_logged(self, sm, caplog):
+        """Manual deletion had no log trail while cleanup_inactive() did — an
+        operator could not tell a session vanished by user action from one
+        silently lost. The id must be traceable in the log."""
+        import logging
+        s = sm.create_session()
+        sid = s.id
+        with caplog.at_level(logging.INFO, logger="core.sessions.session_manager"):
+            assert sm.delete_session(sid) is True
+        assert any(sid in r.message for r in caplog.records), (
+            f"deleting session {sid} must be logged with its id"
+        )
+
+    def test_delete_nonexistent_not_logged(self, sm, caplog):
+        """Deleting a session that does not exist is a no-op — nothing to log."""
+        import logging
+        with caplog.at_level(logging.INFO, logger="core.sessions.session_manager"):
+            assert sm.delete_session("ghost") is False
+        assert caplog.records == []
+
     def test_list_sessions_count(self, sm):
         sm.create_session()
         sm.create_session()
@@ -257,15 +277,25 @@ class TestChatSessionCompacting:
         self._fill_session(s, 4)
         assert s.needs_compaction() is False
 
-    def test_needs_compaction_true_at_threshold(self):
+    def test_short_messages_do_not_compact_however_many_turns(self):
+        """#965, the bug this fixes: ten tiny messages (five turns) used to trip
+        COMPACT_EVERY = 10 and summarise a conversation costing ~12 tokens."""
+        s = ChatSession()
+        self._fill_session(s, 10)
+        assert s.needs_compaction(8192) is False
+        assert s.needs_compaction(32768) is False
+
+    def test_the_hard_guard_still_catches_a_very_long_tail(self):
+        """COMPACT_EVERY survives as a guard, not a trigger: a huge run of tiny
+        messages costs little in tokens but still makes the history unwieldy."""
         s = ChatSession()
         self._fill_session(s, ChatSession.COMPACT_EVERY)
-        assert s.needs_compaction() is True
+        assert s.needs_compaction(32768) is True
 
     def test_needs_compaction_true_above_threshold(self):
         s = ChatSession()
         self._fill_session(s, ChatSession.COMPACT_EVERY + 4)
-        assert s.needs_compaction() is True
+        assert s.needs_compaction(32768) is True
 
     def test_get_messages_to_compact_empty_when_few(self):
         s = ChatSession()
@@ -491,7 +521,7 @@ class TestCorruptedSessionsDiagnosis:
         other_crypto_bad.write_bytes(_os.urandom(64))
 
         with caplog.at_level(logging.ERROR,
-                             logger="plugins.web_ui_module.core.session_manager"):
+                             logger="core.sessions.session_manager"):
             SessionManager(storage_path=str(tmp_path), crypto_provider=crypto)
 
         error_messages = [r for r in caplog.records if r.levelno >= logging.ERROR]

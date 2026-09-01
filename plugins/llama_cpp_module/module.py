@@ -152,6 +152,22 @@ class LlamaCppModule:
         except Exception:
             return False
 
+    def get_context_window(self) -> "Optional[int]":
+        """#965: the engine's own answer to "how many tokens fit", in tokens.
+
+        For llama.cpp that is `n_ctx`, which since #965 is sized from RAM by
+        `auto_n_ctx()` instead of the flat 8192 it used to be.
+
+        Returns None when there is no node yet: the caller falls back to the
+        default window rather than guessing on our behalf.
+        """
+        if self._node is None:
+            return None
+        try:
+            return int(self._node.config.n_ctx)
+        except (AttributeError, TypeError, ValueError):
+            return None
+
     def switch_model(self, new_config: "LlamaCppConfig") -> bool:
         """Hot-swap the active model to `new_config` if it differs.
 

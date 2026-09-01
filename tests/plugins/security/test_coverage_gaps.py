@@ -381,13 +381,6 @@ class TestRateLimitingGaps:
         assert len(tracker._counters) <= 6
         tracker.MAX_TRACKED_IDENTIFIERS = original_max
 
-    @pytest.mark.asyncio
-    async def test_cleanup_expired_task_exists(self):
-        """Line 338: start_rate_limit_cleanup_task is an async function."""
-        from core.security.rate_limiting import start_rate_limit_cleanup_task
-        import inspect
-        assert inspect.iscoroutinefunction(start_rate_limit_cleanup_task)
-
 
 # ═══════════════════════════════════════════════════════════════
 # security/sanitizer/health.py — lines 56-58

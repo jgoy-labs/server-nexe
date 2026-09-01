@@ -477,19 +477,19 @@ def setup_trusted_hosts(app: FastAPI, config: Dict[str, Any]) -> None:
     app: FastAPI application instance
     config: Configuration dictionary
   """
-  from core.config import DEFAULT_HOST, get_localhost_aliases
+  from core.config import DEFAULT_HOST, get_trusted_hosts
   server_config = config.get('core', {}).get('server', {})
   host = server_config.get('host', DEFAULT_HOST)
 
   # Base allowed hosts: always include localhost variants (Q4.4 DRY fix)
-  allowed = set(get_localhost_aliases())
+  allowed = set(get_trusted_hosts())
 
   # If server binds to a custom host/domain, allow it too
   if host and host not in ("0.0.0.0", ""):  # nosec B104: comparing to "0.0.0.0" string, not binding to it (allow-list construction for TrustedHostMiddleware)
     allowed.add(host)
 
   # in sidecar mode, SidecarConfig.trusted_hosts can add aliases
-  # custom (NEXE_LOCALHOST_ALIASES). Union amb el set actual per no perdre defaults.
+  # custom (NEXE_TRUSTED_HOSTS). Union amb el set actual per no perdre defaults.
   try:
     from core.sidecar_config import get_sidecar_config
     sidecar_cfg = get_sidecar_config()

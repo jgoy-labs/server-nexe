@@ -3,95 +3,16 @@
 Server Nexe
 Author: Jordi Goy
 Location: plugins/security/tests/test_rate_limiting.py
-Description: Tests for RateLimitTracker, rate limiting identifiers and helpers.
+Description: Tests for RateLimitTracker.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
 import pytest
-import asyncio
-import hashlib
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
 
-from core.security.rate_limiting import (
-    RateLimitTracker,
-    get_api_key_identifier,
-    get_composite_identifier,
-    get_endpoint_identifier,
-    DEFAULT_RATE_LIMITS,
-)
-
-
-def make_mock_request(api_key: str = "", ip: str = "127.0.0.1", path: str = "/health"):
-    """Helper: creates a FastAPI Request mock."""
-    request = MagicMock()
-    headers_mock = MagicMock()
-    headers_mock.get = lambda k, default="": api_key if k == "x-api-key" else default
-    request.headers = headers_mock
-    request.client = MagicMock()
-    request.client.host = ip
-    request.url = MagicMock()
-    request.url.path = path
-    return request
-
-
-class TestGetApiKeyIdentifier:
-    """Tests for get_api_key_identifier."""
-
-    def test_with_api_key_returns_hash_prefix(self):
-        request = make_mock_request(api_key="my-secret-key")
-        result = get_api_key_identifier(request)
-        assert result.startswith("apikey:")
-        expected_hash = hashlib.sha256("my-secret-key".encode()).hexdigest()[:16]
-        assert result == f"apikey:{expected_hash}"
-
-    def test_without_api_key_returns_ip(self):
-        with patch("core.security.rate_limiting.get_remote_address", return_value="192.168.1.1"):
-            request = make_mock_request(api_key="")
-            result = get_api_key_identifier(request)
-        assert result.startswith("ip:")
-
-    def test_different_keys_different_identifiers(self):
-        req1 = make_mock_request(api_key="key-1")
-        req2 = make_mock_request(api_key="key-2")
-        id1 = get_api_key_identifier(req1)
-        id2 = get_api_key_identifier(req2)
-        assert id1 != id2
-
-
-class TestGetCompositeIdentifier:
-    """Tests for get_composite_identifier."""
-
-    def test_with_api_key_includes_hash(self):
-        with patch("core.security.rate_limiting.get_remote_address", return_value="10.0.0.1"):
-            request = make_mock_request(api_key="test-key")
-            result = get_composite_identifier(request)
-        assert result.startswith("composite:")
-        assert "10.0.0.1" in result
-
-    def test_without_api_key_includes_nokey(self):
-        with patch("core.security.rate_limiting.get_remote_address", return_value="10.0.0.1"):
-            request = make_mock_request(api_key="")
-            result = get_composite_identifier(request)
-        assert result == "composite:10.0.0.1:nokey"
-
-
-class TestGetEndpointIdentifier:
-    """Tests for get_endpoint_identifier."""
-
-    def test_includes_path(self):
-        with patch("core.security.rate_limiting.get_remote_address", return_value="127.0.0.1"):
-            request = make_mock_request(path="/health")
-            result = get_endpoint_identifier(request)
-        assert result == "endpoint:127.0.0.1:/health"
-
-    def test_strips_trailing_slash(self):
-        with patch("core.security.rate_limiting.get_remote_address", return_value="127.0.0.1"):
-            request = make_mock_request(path="/health/")
-            result = get_endpoint_identifier(request)
-        assert result == "endpoint:127.0.0.1:/health"
+from core.security.rate_limiting import RateLimitTracker
 
 
 class TestRateLimitTracker:
@@ -172,23 +93,16 @@ class TestRateLimitTracker:
         assert len(tracker._counters) <= tracker.MAX_TRACKED_IDENTIFIERS + 1
 
 
-class TestDefaultRateLimits:
-    """Tests for the DEFAULT_RATE_LIMITS table."""
-
-    def test_default_rate_limits_exist(self):
-        assert "global" in DEFAULT_RATE_LIMITS
-        assert "public" in DEFAULT_RATE_LIMITS
-        assert "authenticated" in DEFAULT_RATE_LIMITS
-        assert "admin" in DEFAULT_RATE_LIMITS
-        assert "health" in DEFAULT_RATE_LIMITS
-
-
 class TestDeadHelpersRemoved:
     """A-001: dead decorator factories and the never-registered
     add_rate_limit_headers middleware were removed because they had no
     production call-sites (only docstring examples + tests exercised them).
     Re-adding them without wiring them to real endpoints/middleware would
     resurrect the misleading 'X-RateLimit-* headers: OK' boot log.
+
+    #877 (2026-08-28): DEFAULT_RATE_LIMITS, the 3 identifier helpers,
+    rate_limit_tracker and start_rate_limit_cleanup_task joined this list —
+    same story, zero production call-sites.
     """
 
     @pytest.mark.parametrize(
@@ -200,6 +114,12 @@ class TestDeadHelpersRemoved:
             "rate_limit_health",
             "add_rate_limit_headers",
             "get_rate_limit_stats",
+            "DEFAULT_RATE_LIMITS",
+            "get_api_key_identifier",
+            "get_composite_identifier",
+            "get_endpoint_identifier",
+            "rate_limit_tracker",
+            "start_rate_limit_cleanup_task",
         ],
     )
     def test_dead_helper_is_absent(self, name):
@@ -209,23 +129,3 @@ class TestDeadHelpersRemoved:
             f"{name} was removed as dead code (no production call-site); "
             "wire it to a real endpoint/middleware before re-adding it."
         )
-
-
-class TestStartRateLimitCleanupTask:
-    """Tests for start_rate_limit_cleanup_task."""
-
-    def test_cleanup_task_can_be_cancelled(self):
-        """Verifies that the background task can be cancelled."""
-        from core.security.rate_limiting import start_rate_limit_cleanup_task
-
-        async def run_with_timeout():
-            task = asyncio.create_task(start_rate_limit_cleanup_task())
-            # Let it start then cancel
-            await asyncio.sleep(0)
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-
-        asyncio.run(run_with_timeout())

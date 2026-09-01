@@ -16,12 +16,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from core.chat_prompt import format_now_natural, time_context_line
 from core.utils import compute_system_hash
-from plugins.web_ui_module.api.routes_chat import (
-    _build_system_prompt_with_time,
-    _format_now_natural,
-    _time_context_line,
-)
+from plugins.web_ui_module.api.routes_chat import _build_system_prompt_with_time
 
 # A timezone-aware anchor, mid-afternoon so +1h stays inside the same day.
 T0 = datetime(2026, 7, 23, 13, 2, 1, tzinfo=timezone.utc)
@@ -35,9 +32,9 @@ class TestDayGranularity:
 
     @pytest.mark.parametrize("lang", ["ca", "es", "en"])
     def test_same_day_same_phrase(self, lang):
-        p0 = _format_now_natural(T0, lang)
-        p1 = _format_now_natural(T0 + timedelta(seconds=1), lang)
-        p2 = _format_now_natural(T0 + timedelta(hours=3), lang)
+        p0 = format_now_natural(T0, lang)
+        p1 = format_now_natural(T0 + timedelta(seconds=1), lang)
+        p2 = format_now_natural(T0 + timedelta(hours=3), lang)
         assert p0 == p1 == p2, (
             "the date phrase changed within the same day — the prefix cache "
             "can never hit again (B007)"
@@ -46,7 +43,7 @@ class TestDayGranularity:
     @pytest.mark.parametrize("lang", ["ca", "es", "en"])
     def test_no_time_of_day_in_phrase(self, lang):
         """Anti-regression guard: reintroducing hh:mm anywhere fails here."""
-        phrase = _format_now_natural(T0, lang)
+        phrase = format_now_natural(T0, lang)
         assert not _TIME_OF_DAY_RE.search(phrase), (
             f"time-of-day leaked into the date phrase ({phrase!r}) — this is "
             "the exact B007 poison; the clock must go via _time_context_line"
@@ -106,7 +103,7 @@ class TestOnDemandClock:
         ],
     )
     def test_time_question_gets_the_clock(self, lang, message):
-        line = _time_context_line(message, lang, _now=T0)
+        line = time_context_line(message, lang, _now=T0)
         assert "13:02" in line, f"no clock injected for {message!r}"
 
     @pytest.mark.parametrize(
@@ -119,10 +116,10 @@ class TestOnDemandClock:
         ],
     )
     def test_normal_message_gets_no_clock(self, message):
-        assert _time_context_line(message, "ca", _now=T0) == ""
+        assert time_context_line(message, "ca", _now=T0) == ""
 
     def test_unknown_language_falls_back_to_english(self):
-        line = _time_context_line("what time is it?", "de", _now=T0)
+        line = time_context_line("what time is it?", "de", _now=T0)
         assert "13:02" in line and "Current system time" in line
 
     def test_clock_never_touches_the_system_prompt(self):

@@ -219,10 +219,37 @@ def test_save_overwrites_previous_state(tmp_data_dir: Path) -> None:
     assert loaded.model_id == "mlx-community/qwen-3b"
 
 
-def test_fallback_path_when_data_dir_unset(
+def test_state_file_delegates_to_get_data_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Without NEXE_DATA_DIR, the state file lives under the platform's data dir:
+    """_state_file() is get_data_dir() / "onboarding.json" — the same helper
+    SessionManager and memory use, so onboarding lives next to them instead
+    of following its own path scheme (sidecar via NEXE_DATA_DIR, standalone
+    via {project_root}/storage/data)."""
+    from core.paths.helpers import get_data_dir
+
+    monkeypatch.setenv("NEXE_DATA_DIR", str(tmp_path))
+    assert OnboardingState._state_file() == get_data_dir() / "onboarding.json"
+    assert OnboardingState._state_file() == tmp_path / "onboarding.json"
+
+    monkeypatch.delenv("NEXE_DATA_DIR", raising=False)
+    assert OnboardingState._state_file() == get_data_dir() / "onboarding.json"
+
+
+def test_legacy_state_file_none_in_sidecar_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """_legacy_state_file() is None when NEXE_DATA_DIR is set — sidecar mode
+    always had NEXE_DATA_DIR, so it never used the legacy standalone path;
+    there is nothing to migrate from."""
+    monkeypatch.setenv("NEXE_DATA_DIR", str(tmp_path))
+    assert OnboardingState._legacy_state_file() is None
+
+
+def test_legacy_state_file_path_standalone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without NEXE_DATA_DIR, the legacy path is the platform's data dir:
     macOS → ~/Library/Application Support/com.nexe.app/...; other → platformdirs
     (~/.local/share/nexe-app on Linux). The test mirrors the code's own branch so
     it passes on every OS (Mac dev + Linux CI)."""
@@ -247,7 +274,63 @@ def test_fallback_path_when_data_dir_unset(
             / "sidecar"
             / "onboarding.json"
         )
-    assert OnboardingState._state_file() == expected
+    assert OnboardingState._legacy_state_file() == expected
+
+
+def test_load_migrates_legacy_state_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A standalone install that completed onboarding before OnboardingState
+    delegated to get_data_dir() has its onboarding.json at the old path.
+    load() must migrate it to the canonical path transparently, so that
+    install does not have to redo the wizard."""
+    from core.paths.detection import reset_repo_root_cache
+
+    monkeypatch.delenv("NEXE_DATA_DIR", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    # get_repo_root() caches its result (lru_cache) and requires the full
+    # marker-file layout to accept NEXE_HOME — mirrors
+    # tests/core/paths/test_paths.py::test_nexe_home_env_var_used. The cache
+    # is reset both before (to pick up NEXE_HOME here) and after via
+    # try/finally (so this test's tmp_path root does not leak into tests
+    # that run afterwards in the same session).
+    monkeypatch.setenv("NEXE_HOME", str(tmp_path))
+    (tmp_path / "personality").mkdir()
+    (tmp_path / "personality" / "server.toml").write_text("title = 'Test'")
+    (tmp_path / "plugins").mkdir()
+    (tmp_path / "core").mkdir()
+    (tmp_path / "memory").mkdir()
+    reset_repo_root_cache()
+    try:
+        legacy = OnboardingState._legacy_state_file()
+        legacy.parent.mkdir(parents=True, exist_ok=True)
+        legacy.write_text(
+            json.dumps(
+                {
+                    "version": SCHEMA_VERSION,
+                    "engine": "ollama",
+                    "model_id": "gemma3:4b",
+                    "model_path": "gemma3:4b",
+                    "completed_at": "2026-01-01T00:00:00+00:00",
+                    "has_token": False,
+                    "lang": "en",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        canonical = OnboardingState._state_file()
+        assert not canonical.exists()
+        loaded = OnboardingState.load()
+        assert loaded is not None
+        assert loaded.engine == "ollama"
+        assert canonical.is_file(), "migration must write the canonical path"
+        assert json.loads(canonical.read_text(encoding="utf-8"))["engine"] == "ollama"
+
+        # Second load() is a no-op migration (canonical already exists) and still works.
+        assert OnboardingState.load() is not None
+    finally:
+        reset_repo_root_cache()
 
 
 # ── MC-022 / MC-043: persistable-engine consistency (latent KeyError mine) ──

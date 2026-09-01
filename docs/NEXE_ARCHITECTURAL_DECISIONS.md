@@ -75,3 +75,50 @@ deliberately so the runtime can be built on top of it rather than re-derived.
 > Reviewers/auditors: "no production callers" here is **not** dead code — it is
 > pre-wired scaffolding for ADR-001. Verify against this note before flagging
 > `module_lifecycle` / `system_lifecycle` / `personality/loading/` for removal.
+
+## ADR-006 — Context window: the engine answers, one resolver asks, two ratios that must not collide
+
+**The live engine is the only authority on its own context window.** Each engine
+module implements `get_context_window()` (`ollama_module`, `mlx_module`,
+`llama_cpp_module`) and answers from its own memory story: Ollama sizes by RAM, MLX
+by RAM *and* real model weights, llama.cpp by RAM via `auto_n_ctx()` (#965 — it was
+the only engine with a flat 8192 default). Adding a fourth engine means teaching that
+engine, not editing core.
+
+**One resolver, `core/context_window.py::resolve_context_window`, is the single place
+that asks.** It never invents a number: when nothing live can answer (no module, a
+pre-contract module, one that raised) it falls back to `DEFAULT_CONTEXT_WINDOW`.
+Detection is a convenience — it must never be the reason a chat turn fails.
+
+**MLX: the model's own limit is applied inside `auto_max_kv_size()`, not to the
+reported number.** `max_position_embeddings` caps the RAM-derived value, and the 8192
+floor wins over the cap (a 2048-position model must degrade, not drive the budget
+negative). Because the cap lives in the calculation, every consumer — truncator,
+cache, RAM guard — inherits the same value.
+
+**The turn budget and the compaction trigger split the same total from different
+files, and their ratios must not collide.** `PROMPT_BUDGET_RATIO = 0.7`
+(`core/context_budget.py` — it lived in `plugins/web_ui_module/core/` until F-D
+block 4 moved it, so that `/v1` budgets a turn with the same arithmetic; the two
+routes still differ in their history floor and in what they do when the budget
+is spent) is the share of the window the
+assembled prompt may use; `ChatSession.COMPACT_AT_RATIO = 0.45`
+(`session_manager.py`) is where compaction triggers — by tokens against the live
+window, not every N turns (`COMPACT_EVERY = 200` is a hard guard only, never the
+trigger). When both were 0.7, history filled the whole prompt budget exactly when a
+conversation reached compaction size, the available context went negative, and RAG
+and documents were silently dropped on every engine — while every unit test stayed
+green, because each tested one piece and none tested the interaction.
+
+**Invariant, defended by mutation tests: the assembled prompt never exceeds the
+engine's window.** llama.cpp does not truncate an oversized prompt — it raises
+`ValueError` and the turn dies. For the same reason no artificial floor may inflate
+a small engine's budget (`MIN_BUDGET_WINDOW_TOKENS` was tried and reverted: at
+n_ctx=2048 it turned degradation into a crash). Degrading always beats dying.
+
+Open edges are tracked as findings, not here: per-engine enforcement at assembly
+(#976), the degenerate truncation branch when the budget reaches ≤0 (#979), and
+the wrapper around retrieved context — nonce'd delimiters plus an assistant ack
+turn — which the budget does not count, so the assembled prompt runs slightly
+past it (#999). `NEXE_HISTORY_CONTEXT_RATIO` (#977) is closed: it is validated
+like its siblings now, and it applies to `/ui/chat` only.

@@ -42,6 +42,12 @@ class ChatCompletionRequest(BaseModel):
     engine: Optional[str] = Field(default="auto", max_length=50)
     stream: bool = False
     use_rag: bool = True  # RAG enabled by default - searches nexe_documentation + personal_memory
+    # F-D block 3: same toggle the UI has always had — None searches every
+    # collection (unchanged default); a list restricts the search to those.
+    rag_collections: Optional[List[str]] = Field(default=None, max_length=20)
+    # F-D block 3: same per-turn override the UI's RAG slider has always had —
+    # None keeps the 3 tuned per-collection thresholds.
+    rag_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)  # Validated range
     top_p: Optional[float] = Field(default=None, gt=0.0, le=1.0)  # Nucleus sampling (OpenAI-compat; gt=0 excludes the degenerate empty-nucleus value that engines treat divergently)
     max_tokens: Optional[int] = Field(default=None, ge=1, le=32000)  # Prevent DoS via huge values

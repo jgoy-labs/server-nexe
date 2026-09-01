@@ -502,70 +502,6 @@ class TestChatCompletionsEndpoint:
         assert "nexe_fallback" in data
 
 
-# ─── TestSaveConversationToMemory ─────────────────────────────────────────────
-
-class TestSaveConversationToMemory:
-
-    def test_saves_to_personal_memory(self):
-        from core.endpoints.chat import _save_conversation_to_memory
-
-        mock_memory = AsyncMock()
-        mock_memory.collection_exists = AsyncMock(return_value=True)
-        mock_memory.store = AsyncMock(return_value="conv-id-123")
-
-        app_state = MagicMock()
-
-        with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_memory)):
-            asyncio.run(_save_conversation_to_memory(app_state, "Hello", "Response"))
-
-        mock_memory.store.assert_called_once()
-        call_kwargs = mock_memory.store.call_args
-        assert "personal_memory" in str(call_kwargs)
-
-    def test_creates_collection_if_not_exists(self):
-        from core.endpoints.chat import _save_conversation_to_memory
-
-        mock_memory = AsyncMock()
-        mock_memory.collection_exists = AsyncMock(return_value=False)
-        mock_memory.create_collection = AsyncMock()
-        mock_memory.store = AsyncMock(return_value="id")
-
-        app_state = MagicMock()
-
-        with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_memory)):
-            asyncio.run(_save_conversation_to_memory(app_state, "Hi", "OK"))
-
-        mock_memory.create_collection.assert_called_once()
-
-    def test_handles_memory_api_failure_gracefully(self):
-        from core.endpoints.chat import _save_conversation_to_memory
-
-        app_state = MagicMock()
-
-        with patch("memory.memory.api.v1.get_memory_api", AsyncMock(side_effect=Exception("DB error"))):
-            # Should not raise
-            asyncio.run(_save_conversation_to_memory(app_state, "Hi", "OK"))
-
-    def test_updates_metrics_on_success(self):
-        from core.endpoints.chat import _save_conversation_to_memory
-
-        mock_memory = AsyncMock()
-        mock_memory.collection_exists = AsyncMock(return_value=True)
-        mock_memory.store = AsyncMock(return_value="id")
-
-        mock_counter = MagicMock()
-        mock_counter.labels = MagicMock(return_value=mock_counter)
-        mock_counter.inc = MagicMock()
-
-        app_state = MagicMock()
-
-        with patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_memory)), \
-             patch("core.metrics.registry.MEMORY_OPERATIONS", mock_counter):
-            asyncio.run(_save_conversation_to_memory(app_state, "User msg", "Assistant msg"))
-
-        mock_counter.labels.assert_called_with(operation="autosave")
-
-
 # ─── TestForwardToOllama ──────────────────────────────────────────────────────
 
 class TestForwardToOllama:
@@ -903,8 +839,7 @@ class TestOllamaStreamGenerator:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.stream = MagicMock(return_value=mock_stream)
 
-        with patch("httpx.AsyncClient", return_value=mock_client), \
-             patch("core.endpoints.chat._save_conversation_to_memory", AsyncMock()):
+        with patch("httpx.AsyncClient", return_value=mock_client):
             chunks = self._collect(_ollama_stream_generator(
                 "http://localhost:11434/api/chat",
                 {"model": "llama3.2", "messages": [], "stream": True},
@@ -985,8 +920,7 @@ class TestOllamaStreamGenerator:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.stream = MagicMock(return_value=mock_stream)
 
-        with patch("httpx.AsyncClient", return_value=mock_client), \
-             patch("core.endpoints.chat._save_conversation_to_memory", AsyncMock()):
+        with patch("httpx.AsyncClient", return_value=mock_client):
             chunks = self._collect(_ollama_stream_generator(
                 "http://localhost:11434/api/chat",
                 {"model": "llama3.2", "messages": [], "stream": True},
@@ -1023,8 +957,7 @@ class TestOllamaStreamGenerator:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.stream = MagicMock(return_value=mock_stream)
 
-        with patch("httpx.AsyncClient", return_value=mock_client), \
-             patch("core.endpoints.chat._save_conversation_to_memory", AsyncMock()):
+        with patch("httpx.AsyncClient", return_value=mock_client):
             chunks = self._collect(_ollama_stream_generator(
                 "http://localhost:11434/api/chat",
                 {},
@@ -1355,8 +1288,7 @@ class TestMLXStreamGenerator:
         mlx_module = AsyncMock()
         mlx_module.chat = fake_chat
 
-        with patch("core.endpoints.chat._save_conversation_to_memory", AsyncMock()):
-            chunks = self._collect(_mlx_stream_generator(
+        chunks = self._collect(_mlx_stream_generator(
                 mlx_module=mlx_module,
                 user_messages=[{"role": "user", "content": "Hi"}],
                 system_msg="You are Nexe",
@@ -1379,8 +1311,7 @@ class TestMLXStreamGenerator:
         mlx_module = AsyncMock()
         mlx_module.chat = fake_chat
 
-        with patch("core.endpoints.chat._save_conversation_to_memory", AsyncMock()):
-            chunks = self._collect(_mlx_stream_generator(
+        chunks = self._collect(_mlx_stream_generator(
                 mlx_module=mlx_module,
                 user_messages=[],
                 system_msg="",
@@ -1447,8 +1378,7 @@ class TestLlamaCppStreamGenerator:
         llama_module = AsyncMock()
         llama_module.chat = fake_chat
 
-        with patch("core.endpoints.chat._save_conversation_to_memory", AsyncMock()):
-            chunks = self._collect(_llama_cpp_stream_generator(
+        chunks = self._collect(_llama_cpp_stream_generator(
                 llama_module=llama_module,
                 user_messages=[{"role": "user", "content": "Hi"}],
                 system_msg="You are Nexe",
@@ -1471,8 +1401,7 @@ class TestLlamaCppStreamGenerator:
         llama_module = AsyncMock()
         llama_module.chat = fake_chat
 
-        with patch("core.endpoints.chat._save_conversation_to_memory", AsyncMock()):
-            chunks = self._collect(_llama_cpp_stream_generator(
+        chunks = self._collect(_llama_cpp_stream_generator(
                 llama_module=llama_module,
                 user_messages=[],
                 system_msg="",

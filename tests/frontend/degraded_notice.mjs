@@ -18,6 +18,8 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import assert from 'node:assert';
 
+import { familyPaths } from './lib/load_nexe_ui.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const uiDir = join(__dirname, '../../plugins/web_ui_module/ui');
 
@@ -76,10 +78,9 @@ function loadUI(lang) {
     // i18n.js first, exactly as index.html loads it: a classic script whose
     // top-level const lands in the context and is visible to app.js.
     vm.runInContext(readFileSync(join(uiDir, 'i18n.js'), 'utf8'), sandbox);
-    vm.runInContext(
-        readFileSync(join(uiDir, 'app.js'), 'utf8') + '\n;globalThis.__NexeUI = NexeUI;',
-        sandbox,
-    );
+    // app.js plus its cluster files (#127): the class is split across them.
+    for (const f of familyPaths()) vm.runInContext(readFileSync(f, 'utf8'), sandbox);
+    vm.runInContext(';globalThis.__NexeUI = NexeUI;', sandbox);
 
     // Bypass the constructor's DOM wiring: only the banner method is exercised.
     const ui = Object.create(sandbox.__NexeUI.prototype);

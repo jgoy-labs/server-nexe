@@ -4,11 +4,14 @@ LlamaCppConfig - Centralised configuration for llama-cpp-python.
 
 All options can be configured via environment variables:
 - NEXE_LLAMA_CPP_MODEL: Path to the .gguf file
-- NEXE_LLAMA_CPP_N_CTX: Context window (default: 8192)
+- NEXE_LLAMA_CPP_N_CTX: Context window (default: auto-detected from RAM, see auto_n_ctx)
 - NEXE_LLAMA_CPP_N_BATCH: Batch size for generation (default: 512) - HIGHER = FASTER
 - NEXE_LLAMA_CPP_GPU_LAYERS: Layers on GPU, -1=all (default: -1)
 - NEXE_LLAMA_CPP_THREADS: CPU threads (default: auto = os.cpu_count(), fallback 8)
 - NEXE_LLAMA_CPP_MAX_SESSIONS: Maximum active sessions (default: 1)
+- NEXE_LLAMA_CPP_MAX_TOKENS: Reply ceiling in tokens (default: 2048) — mirrors
+  NEXE_MLX_MAX_TOKENS. Was a literal at the two call sites with no way to raise
+  it, which a reasoning model can spend entirely before answering (#982/#984).
 - NEXE_LLAMA_CPP_CHAT_FORMAT: Chat format (default: chatml)
 - NEXE_LLAMA_CPP_USE_MLOCK: Keep model in RAM (default: true)
 - NEXE_LLAMA_CPP_USE_MMAP: Memory-map the model (default: true)
@@ -20,6 +23,51 @@ from dataclasses import dataclass
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def auto_n_ctx() -> int:
+    """Auto-detect n_ctx based on system RAM.
+
+    Override with NEXE_LLAMA_CPP_N_CTX, which always wins.
+
+    #965: llama.cpp was the only engine with a flat default (8192) while Ollama
+    had auto_num_ctx() and MLX had auto_max_kv_size(). On a 128 GB machine that
+    fixed value throws away most of the window the model can actually hold.
+
+    The RAM tiers are deliberately IDENTICAL to
+    core/endpoints/chat_engines/ollama_helpers.py::auto_num_ctx — Ollama is
+    llama.cpp underneath, so the same machine has the same memory reality on
+    both paths, and two different ladders would only mean the engine you picked
+    silently changed how much context you got.
+    """
+    explicit = os.environ.get("NEXE_LLAMA_CPP_N_CTX")
+    if explicit:
+        try:
+            value = int(explicit)
+            if value > 0:
+                return value
+            logger.warning(
+                "NEXE_LLAMA_CPP_N_CTX=%r must be positive, auto-detecting instead", explicit)
+        except ValueError:
+            logger.warning(
+                "NEXE_LLAMA_CPP_N_CTX=%r is not a number, auto-detecting instead", explicit)
+    try:
+        import psutil
+        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+    except Exception:
+        # ImportError, but also psutil importing and then failing: a broken RAM
+        # probe must degrade to the safe rung, never raise — this runs inside
+        # from_env(), i.e. at engine init and on every model hot-swap.
+        return 4096
+    if ram_gb >= 64:
+        return 32768
+    elif ram_gb >= 32:
+        return 16384
+    elif ram_gb >= 24:
+        return 8192
+    elif ram_gb >= 16:
+        return 4096
+    return 2048
 
 
 @dataclass
@@ -46,6 +94,7 @@ class LlamaCppConfig:
     n_gpu_layers: int = -1
     n_threads: int = 0  # 0 = auto (llama.cpp will use all cores)
     max_sessions: int = 2  # 2 by default: allows system_hash change without reload
+    max_tokens: int = 2048  # reply ceiling; the request may still override per turn
     chat_format: str = "chatml"  # chatml is compatible with Phi-3.5, Llama 3, Salamandra
     use_mlock: bool = True
     use_mmap: bool = True
@@ -99,11 +148,12 @@ class LlamaCppConfig:
 
         config = cls(
             model_path=model_path,
-            n_ctx=int(os.getenv("NEXE_LLAMA_CPP_N_CTX", "8192")),
+            n_ctx=auto_n_ctx(),
             n_batch=int(os.getenv("NEXE_LLAMA_CPP_N_BATCH", "512")),
             n_gpu_layers=int(os.getenv("NEXE_LLAMA_CPP_GPU_LAYERS", "-1")),
             n_threads=int(os.getenv("NEXE_LLAMA_CPP_THREADS", str(os.cpu_count() or 8))),
             max_sessions=int(os.getenv("NEXE_LLAMA_CPP_MAX_SESSIONS", "2")),
+            max_tokens=int(os.getenv("NEXE_LLAMA_CPP_MAX_TOKENS", "2048")),
             chat_format=os.getenv("NEXE_LLAMA_CPP_CHAT_FORMAT", "chatml"),
             use_mlock=os.getenv("NEXE_LLAMA_CPP_USE_MLOCK", "true").lower() == "true",
             use_mmap=os.getenv("NEXE_LLAMA_CPP_USE_MMAP", "true").lower() == "true",

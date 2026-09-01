@@ -175,7 +175,6 @@ server-nexe/
 │   │   ├── chat_schemas.py       # Modelos Pydantic (Message, ChatCompletionRequest)
 │   │   ├── chat_sanitization.py  # Sanitizacion de tokens SSE, truncamiento de contexto
 │   │   ├── chat_rag.py           # Constructor de contexto RAG (3 colecciones)
-│   │   ├── chat_memory.py        # Guardar conversacion en memoria (MEM_SAVE)
 │   │   ├── chat_engines/         # Generadores por backend
 │   │   │   ├── routing.py        # Logica de seleccion de engine
 │   │   │   ├── ollama.py         # Generador streaming Ollama
@@ -378,16 +377,17 @@ Capa Embeddings (memory/embeddings/) — generacion de vectores + interfaz Qdran
 
 ## Arquitectura del endpoint de chat
 
-`POST /v1/chat/completions` es el endpoint principal, dividido en 8 submodulos:
+`POST /v1/chat/completions` es el endpoint principal, dividido en 7 submodulos:
 
 1. **chat_schemas.py** — Modelos Pydantic (Message, ChatCompletionRequest con use_rag=True por defecto)
 2. **chat_sanitization.py** — Sanitizacion de tokens SSE (bytes nulos, caracteres de control), truncamiento de contexto RAG basado en ratio (MAX_CONTEXT_RATIO=0.3, límite RAG 4000 caracteres)
 3. **chat_rag.py** — Constructor de contexto RAG: busca en nexe_documentation (0.4), user_knowledge (0.35), personal_memory (0.3)
-4. **chat_memory.py** — Parsing de MEM_SAVE, guardar conversacion en memoria
-5. **chat_engines/routing.py** — Seleccion de engine (auto, ollama, mlx, llama_cpp)
-6. **chat_engines/ollama.py** — Streaming Ollama con soporte de thinking tokens
-7. **chat_engines/mlx.py** — Streaming MLX con manejo de CancelledError
-8. **chat_engines/llama_cpp.py** — Streaming llama.cpp
+4. **chat_engines/routing.py** — Seleccion de engine (auto, ollama, mlx, llama_cpp)
+5. **chat_engines/ollama.py** — Streaming Ollama con soporte de thinking tokens
+6. **chat_engines/mlx.py** — Streaming MLX con manejo de CancelledError
+7. **chat_engines/llama_cpp.py** — Streaming llama.cpp
+
+Los hechos que el modelo marca con `[MEM_SAVE:]` se persisten en el camino de la UI (`memory_helper.py`), no desde este endpoint.
 
 **Marcadores de streaming inyectados por el endpoint de chat:**
 - `[MODEL:name]` — nombre del modelo activo

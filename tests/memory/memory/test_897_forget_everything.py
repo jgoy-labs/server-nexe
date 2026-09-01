@@ -4,10 +4,10 @@ Server Nexe
 Author: Jordi Goy
 Location: tests/memory/memory/test_897_forget_everything.py
 Description: #897 — "clear all memory" told the user «ja no recordo res sobre
-            tu» while only the Qdrant RAG collection was dropped. Chat autosave
-            PREFERS MemoryService (core/endpoints/chat_memory.py:40), so what
-            survived in memory_v1.db was precisely what had really been stored:
-            profile facts, episodes and staging rows.
+            tu» while only the Qdrant RAG collection was dropped. Writes through
+            MemoryService (CLI, /memory/store, workflow nodes) live in
+            memory_v1.db, so what survived was precisely what had really been
+            stored: profile facts, episodes and staging rows.
 
             Decision (Jordi, 26/08/2026): erase everything, so the sentence
             becomes true.

@@ -22,7 +22,7 @@ from fastapi import APIRouter
 from starlette.datastructures import State
 from starlette.requests import Request as StarletteRequest
 
-from plugins.web_ui_module.core.session_manager import ChatSession
+from core.sessions import ChatSession
 
 
 @pytest.fixture(autouse=True)

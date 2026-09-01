@@ -14,6 +14,10 @@ import pytest
 
 from core.endpoints import installer as installer_mod
 
+from core.endpoints import installer_gguf
+from core.endpoints import installer_shared
+from core.endpoints import installer_hf
+
 
 # ── _is_hf_hub_url: only HF hosts, anchored so look-alikes don't match ─────────
 
@@ -33,7 +37,7 @@ from core.endpoints import installer as installer_mod
     ],
 )
 def test_is_hf_hub_url(url, expected):
-    assert installer_mod._is_hf_hub_url(url) is expected
+    assert installer_hf._is_hf_hub_url(url) is expected
 
 
 # ── _stream_gguf: header attached only for HF + token present ──────────────────
@@ -83,19 +87,19 @@ class _FakeReq:
 
 
 def _run_stream(model_id, monkeypatch, tmp_path):
-    monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
+    monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
     monkeypatch.setattr("httpx.AsyncClient", _FakeClient)
     _FakeClient.captured = {}
 
     async def _collect():
-        return [ev async for ev in installer_mod._stream_gguf(model_id, _FakeReq())]
+        return [ev async for ev in installer_gguf._stream_gguf(model_id, _FakeReq())]
 
     asyncio.run(_collect())
     return _FakeClient.captured["headers"]
 
 
 def test_gguf_attaches_bearer_for_hf_url_with_token(monkeypatch, tmp_path):
-    monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: None)
+    monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: None)
     monkeypatch.setenv("HF_TOKEN", "hf_gtok")
     headers = _run_stream(
         "https://huggingface.co/TheBloke/x/resolve/main/m.gguf", monkeypatch, tmp_path
@@ -106,15 +110,15 @@ def test_gguf_attaches_bearer_for_hf_url_with_token(monkeypatch, tmp_path):
 def test_gguf_rejects_non_hf_url(monkeypatch, tmp_path):
     """SSRF guard (NEXE-SRV-WS2-01): a non-HF host is rejected BEFORE any fetch,
     so a token can never even reach it and no bytes are written."""
-    monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: None)
+    monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: None)
     monkeypatch.setenv("HF_TOKEN", "hf_gtok")  # token IS available
-    monkeypatch.setattr(installer_mod, "_models_dir", lambda: tmp_path)
+    monkeypatch.setattr(installer_shared, "_models_dir", lambda: tmp_path)
     monkeypatch.setattr("httpx.AsyncClient", _FakeClient)
     _FakeClient.captured = {}
 
     async def _collect():
         return [
-            ev async for ev in installer_mod._stream_gguf(
+            ev async for ev in installer_gguf._stream_gguf(
                 "https://example.com/models/m.gguf", _FakeReq()
             )
         ]
@@ -129,7 +133,7 @@ def test_gguf_rejects_non_hf_url(monkeypatch, tmp_path):
 def test_gguf_no_bearer_when_no_token(monkeypatch, tmp_path):
     """HF URL but no token anywhere → no header (public GGUF still downloads)."""
     monkeypatch.delenv("HF_TOKEN", raising=False)
-    monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: None)
+    monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: None)
     headers = _run_stream(
         "https://huggingface.co/x/resolve/main/m.gguf", monkeypatch, tmp_path
     )
@@ -140,7 +144,7 @@ def test_gguf_recovers_token_from_keychain_for_hf_url(monkeypatch, tmp_path):
     """B253 synergy: env lost the token (restart) but it's in the Keychain → the
     HF GGUF download still authenticates."""
     monkeypatch.delenv("HF_TOKEN", raising=False)
-    monkeypatch.setattr(installer_mod, "_read_hf_token_from_keychain", lambda: "hf_kc")
+    monkeypatch.setattr(installer_hf, "_read_hf_token_from_keychain", lambda: "hf_kc")
     headers = _run_stream(
         "https://huggingface.co/x/resolve/main/m.gguf", monkeypatch, tmp_path
     )

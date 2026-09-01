@@ -1,4 +1,4 @@
-"""Tests for core/endpoints/chat_memory.py — coverage gaps.
+"""Tests for _filter_rag_injection — coverage gaps.
 
 T47 (reforçat): prova que la neutralització de marcadors de prompt-injection
 funciona de debò, no només que la funció és callable.
@@ -8,8 +8,9 @@ from core.endpoints.chat_sanitization import _filter_rag_injection
 
 
 class TestPromptInjectionNeutralization:
-    """Verifica que _filter_rag_injection, usada per _save_conversation_to_memory
-    ABANS de persistir a memòria, neutralitza realment els marcadors d'injecció.
+    """Verifica que _filter_rag_injection neutralitza realment els marcadors
+    d'injecció abans que el text es persistís (els cinc consumidors vius:
+    ingest_knowledge, ingest_docs, memory_helper ×2, routes_files).
 
     Control de seguretat: sense la neutralització, un missatge hostil amb
     [/INST], <|system|> o [MEM_DELETE: ...] s'emmagatzema verbatim i en la

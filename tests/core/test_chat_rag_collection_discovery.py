@@ -130,7 +130,7 @@ class TestBuildRagContextSearchesDiscoveredCollections:
             "memory.memory.api.v1.get_memory_api", AsyncMock(return_value=memory),
         )
 
-        context = await chat_rag_module.build_rag_context("what's on my agenda?", app_state=None, server_lang="en")
+        context, _rag_items = await chat_rag_module.build_rag_context("what's on my agenda?", app_state=None, server_lang="en")
         assert "Meeting with Jordi at 10am" in context
 
     @pytest.mark.asyncio

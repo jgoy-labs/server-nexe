@@ -20,7 +20,7 @@ import pytest
 
 import plugins.web_ui_module.api.routes_chat as rc
 from core.utils import compute_system_hash
-from plugins.web_ui_module.core.session_manager import ChatSession
+from core.sessions import ChatSession
 
 _FIXED_NOW = _dt.datetime(2026, 7, 30, 13, 2, 7).astimezone()
 

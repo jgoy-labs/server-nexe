@@ -87,7 +87,11 @@ async def compact_session(session, engine, session_manager):
         engine: LLM engine with chat() method
         session_manager: SessionManager for save_to_disk
     """
-    if not session.needs_compaction():
+    # #965: ask the engine that is about to serve the turn how much it can hold,
+    # so the same history compacts on a 4096-token model and does not on a 32768.
+    from core.context_window import ask_engine_window
+
+    if not session.needs_compaction(ask_engine_window(engine)):
         return
 
     to_compact = session.get_messages_to_compact()

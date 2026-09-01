@@ -10,11 +10,12 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
+import functools
 import hashlib
 import logging
 import os
 import unicodedata
-from typing import Any
+from typing import Any, Optional
 
 from core.memory_access import (
     DOCS_COLLECTION,
@@ -37,15 +38,47 @@ RAG_MEMORY_THRESHOLD = float(os.environ.get('NEXE_RAG_MEMORY_THRESHOLD', '0.3'))
 _UNKNOWN_COLLECTION_PARAMS = (RAG_KNOWLEDGE_THRESHOLD, 3, None)
 
 
-def _rag_params_for(name: str, server_lang: str) -> tuple[float, int, dict | None]:
-    """(threshold, top_k, filter_metadata) for one collection, by name."""
+@functools.lru_cache(maxsize=1)
+def system_rag_limit() -> int:
+    """How many results (across all collections, after dedup) make the
+    context (F-D block 3 — ported from the UI route, which alone had this).
+
+    RAM-derived: virtual_memory().total is invariant at runtime, so cache it
+    instead of recomputing via psutil on every chat request.
+    """
+    try:
+        import psutil
+        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+        return 3 if ram_gb < 12 else 5
+    except Exception:
+        return 5
+
+
+def _rag_params_for(
+    name: str, server_lang: str, threshold_override: Optional[float] = None
+) -> tuple[float, int, dict | None]:
+    """(threshold, top_k, filter_metadata) for one collection, by name.
+
+    ``threshold_override`` (F-D block 3, ported from the UI's per-turn
+    ``rag_threshold`` — a slider in app.js persisted to localStorage, also a
+    CLI flag): applies the SAME threshold to every collection, same as the
+    single flat threshold the UI's old implementation had — only the tuned
+    per-collection top_k/filter stay untouched. ``None`` (the default) keeps
+    the 3 tuned thresholds.
+    """
     if name == DOCS_COLLECTION:
-        return (RAG_DOCS_THRESHOLD, 3, None)
+        return (threshold_override if threshold_override is not None else RAG_DOCS_THRESHOLD, 3, None)
     if name == KNOWLEDGE_COLLECTION:
-        return (RAG_KNOWLEDGE_THRESHOLD, 3, {"lang": server_lang})
+        return (
+            threshold_override if threshold_override is not None else RAG_KNOWLEDGE_THRESHOLD,
+            3, {"lang": server_lang},
+        )
     if name == MEMORY_COLLECTION:
-        return (RAG_MEMORY_THRESHOLD, 2, None)
-    return _UNKNOWN_COLLECTION_PARAMS
+        return (threshold_override if threshold_override is not None else RAG_MEMORY_THRESHOLD, 2, None)
+    return (
+        threshold_override if threshold_override is not None else _UNKNOWN_COLLECTION_PARAMS[0],
+        _UNKNOWN_COLLECTION_PARAMS[1], _UNKNOWN_COLLECTION_PARAMS[2],
+    )
 
 
 # MC-001's docs→knowledge→memory order (not SYSTEM_COLLECTIONS's docs→memory→
@@ -109,7 +142,11 @@ async def build_rag_context(
     last_user_msg: str,
     app_state: Any,
     server_lang: str,
-) -> str:
+    *,
+    collections: Optional[list[str]] = None,
+    limit: Optional[int] = None,
+    threshold_override: Optional[float] = None,
+) -> tuple[str, list[tuple[str, float]]]:
     """
     Build RAG context from MemoryAPI collections, with fallback to RAG module.
 
@@ -117,9 +154,22 @@ async def build_rag_context(
         last_user_msg: The last user message to search for
         app_state: FastAPI app state
         server_lang: Server language code (e.g. "ca", "en")
+        collections: F-D block 3 (ported from the UI's per-turn toggle) — when
+            given, search ONLY these collection names instead of discovering
+            everything. ``None`` (the default) searches everything, same as
+            before this parameter existed.
+        limit: how many results (after dedup) make the context. ``None``
+            defaults to :func:`system_rag_limit` (RAM-derived, ported from
+            the UI, which alone had this before F-D block 3).
+        threshold_override: F-D block 3 (ported from the UI's per-turn
+            ``rag_threshold`` — a slider in app.js, also a CLI flag).
+            Applies the same threshold to every collection. ``None`` (the
+            default) keeps the 3 tuned per-collection thresholds.
 
     Returns:
-        Context text string (empty if no results)
+        (context_text, rag_items) — rag_items is [(collection, score), ...]
+        for the results actually used, for a caller that wants to show or
+        save which sources answered (message stats, RAG toggle counts).
     """
     # NFKC-normalize the query to mirror the ingest path.
     # Documents are NFKC-normalized at ingest via MemoryService.remember().
@@ -127,16 +177,23 @@ async def build_rag_context(
     last_user_msg = unicodedata.normalize("NFKC", last_user_msg)
 
     context_text = ""
+    rag_items: list[tuple[str, float]] = []
 
     try:
         try:
             from memory.memory.api.v1 import get_memory_api
             memory = await get_memory_api()
 
-            # #896: discover collections instead of a hardcoded 3-item list, so
-            # a plugin's own collection is searched too, not silently skipped.
-            names = await _discover_collection_names(memory)
-            collections = [(name, *_rag_params_for(name, server_lang)) for name in names]
+            # F-D block 3: an explicit toggle searches only those collections;
+            # #896's discovery (a plugin's own collection included) stays the
+            # default when no toggle narrows it. `is not None` (not truthiness):
+            # an empty list means "the user disabled every source", which must
+            # search nothing — not fall through to "no restriction" (privacy
+            # regression: personal_memory would answer despite the toggle).
+            names = list(collections) if collections is not None else await _discover_collection_names(memory)
+            search_plan = [
+                (name, *_rag_params_for(name, server_lang, threshold_override)) for name in names
+            ]
 
             # MC-001: embed the (already NFKC-normalized) query ONCE and reuse it
             # for every collection instead of recomputing the identical embedding
@@ -152,17 +209,20 @@ async def build_rag_context(
             # docs→knowledge→memory ordering that dedup/context rely on.
             per_collection = await asyncio.gather(*(
                 _search_collection(memory, name, last_user_msg, threshold, top_k, filter_md, query_embedding)
-                for name, threshold, top_k, filter_md in collections
+                for name, threshold, top_k, filter_md in search_plan
             ))
             all_results: list = []
             for results in per_collection:
                 all_results.extend(results)
 
             if all_results:
-                context_text = _build_context_from_results(all_results)
+                _effective_limit = limit if limit is not None else system_rag_limit()
+                unique = _deduplicate_results(all_results)[:_effective_limit]
+                context_text = _format_results(unique, server_lang)
+                rag_items = [(getattr(r, "collection", "?"), getattr(r, "score", 0.0)) for r in unique]
                 logger.info(
                     "RAG Context found (MemoryAPI): %d chars, %d results",
-                    len(context_text), len(all_results),
+                    len(context_text), len(unique),
                 )
         except Exception as mem_err:
             # #899: aquí hi queia `_rag_module_fallback` (el RAG legacy,
@@ -181,7 +241,7 @@ async def build_rag_context(
         logger.error("RAG Error: %s", e, exc_info=True)
         # Continue without context rather than failing
 
-    return context_text
+    return context_text, rag_items
 
 
 # ─── Private helpers ─────────────────────────────────────────────────────────
@@ -228,11 +288,30 @@ def _deduplicate_results(results: list) -> list:
     return unique
 
 
-def _build_context_from_results(all_results: list) -> str:
-    """Deduplicate and format up to 5 results into the context string."""
-    unique = _deduplicate_results(all_results)
-    parts = []
-    for r in unique[:5]:
+def _format_results(results: list, server_lang: str = "en") -> str:
+    """Format already-deduplicated, already-limited results into labelled,
+    per-collection sections.
+
+    The system prompt (server.toml, ca/es/en) tells the model to look for
+    [DOCUMENTACIO DEL SISTEMA]/[MEMORIA DE L'USUARI]/etc. — those section
+    markers must actually be in the context, or the model can deny having
+    information it does have. `_RAG_CONTEXT_LABELS` already carries these
+    labels (used elsewhere only for its "intro" key); this is the other use.
+    `[Font: source]` stays per-item inside each section for traceability.
+    """
+    labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])
+    buckets: dict[str, list[str]] = {"docs": [], "knowledge": [], "memory": []}
+    for r in results:
+        collection = getattr(r, "collection", None)
+        key = (
+            "docs" if collection == DOCS_COLLECTION
+            else "memory" if collection == MEMORY_COLLECTION
+            else "knowledge"
+        )
         source = getattr(r, 'metadata', {}).get('source', 'unknown') if hasattr(r, 'metadata') else 'unknown'
-        parts.append(f"[Font: {source}]\n{r.text}")
-    return "\n\n".join(parts)
+        buckets[key].append(f"[Font: {source}]\n{r.text}")
+    sections = [
+        f"[{labels[key]}]\n" + "\n\n".join(buckets[key])
+        for key in ("docs", "knowledge", "memory") if buckets[key]
+    ]
+    return "\n\n".join(sections)

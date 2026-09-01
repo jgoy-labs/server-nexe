@@ -67,20 +67,6 @@ async def load_memory_modules(app, server_state, _translate):
             app.state.modules.setdefault(module_id, instance)
             if getattr(instance, "name", None):
                 app.state.modules.setdefault(instance.name, instance)
-            try:
-                capabilities = []
-                if hasattr(instance, "manifest"):
-                    capabilities = list(instance.manifest.get("capabilities", []))
-                if hasattr(app.state, "module_registry"):
-                    app.state.module_registry.register(
-                        name=getattr(instance, "name", module_id),
-                        instance=instance,
-                        module_id=module_id,
-                        capabilities=capabilities,
-                        priority=10,
-                    )
-            except Exception as e:
-                logger.debug("Module registry update skipped: %s", e)
 
     except Exception as e:
         msg = _translate(server_state.i18n, "core.server.memory_error",
@@ -341,14 +327,13 @@ async def _shutdown_memory_service(app, server_state) -> None:
 
 
 async def _startup_module_discovery(app, server_state, _translate) -> None:
-    """Discover modules via ModuleManager and populate server_state.registry."""
+    """Discover modules via ModuleManager."""
     try:
         if not server_state.module_manager:
             msg = _translate(server_state.i18n, "core.server.module_manager_unavailable", "ModuleManager not available")
             logger.warning(msg)
             return
 
-        server_state.registry = server_state.module_manager.registry
         msg = _translate(server_state.i18n, "core.server.module_manager_ready", "ModuleManager already initialized")
         logger.info(msg)
 

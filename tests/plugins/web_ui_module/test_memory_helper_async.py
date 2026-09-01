@@ -819,20 +819,35 @@ class TestClearMemory:
     def test_success_clears_collection(self):
         mem = make_memory_mock(collection_exists=True)
         helper = MemoryHelper()
+        # #897: success also requires a live MemoryService wipe ({} = never
+        # reached, not "wiped zero rows") — stub a view that really ran.
+        view = MagicMock()
+        view.forget_everything = AsyncMock(return_value={"profile": 1, "episodic": 2})
 
         with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
-            result = asyncio.run(helper.clear_memory(confirm=True))
+            with patch(
+                "plugins.web_ui_module.core.memory_helper.get_memory_view",
+                AsyncMock(return_value=view),
+            ):
+                result = asyncio.run(helper.clear_memory(confirm=True))
 
         assert result["success"] is True
         mem.delete_collection.assert_called_once()
         mem.create_collection.assert_called_once()
+        view.forget_everything.assert_awaited_once()
 
     def test_collection_not_exists_still_succeeds(self):
         mem = make_memory_mock(collection_exists=False)
         helper = MemoryHelper()
+        view = MagicMock()
+        view.forget_everything = AsyncMock(return_value={"profile": 0})
 
         with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
-            result = asyncio.run(helper.clear_memory(confirm=True))
+            with patch(
+                "plugins.web_ui_module.core.memory_helper.get_memory_view",
+                AsyncMock(return_value=view),
+            ):
+                result = asyncio.run(helper.clear_memory(confirm=True))
 
         assert result["success"] is True
         mem.delete_collection.assert_not_called()

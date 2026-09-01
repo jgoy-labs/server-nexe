@@ -108,6 +108,24 @@ Chat completion compatible amb OpenAI amb suport RAG i streaming.
 - `[THINKING]` / `[/THINKING]` — thinking tokens (models Ollama com qwen3.5)
 - `[DOC_TRUNCATED:XX%]` — percentatge de document descartat per limit de context (nou 2026-04-02)
 
+**Final del flux — per que s'ha aturat la resposta** (nou 2026-08-31):
+
+L'ultim chunk abans de `[DONE]` porta `finish_reason`, com al cami no-streaming: `"stop"` si la
+resposta ha acabat sola i `"length"` si ha quedat tallada. Quan el motor no ho reporta es degrada
+a `"stop"` — una absencia no es un truncament.
+
+Una resposta tallada pot ser-ho de dues maneres que demanen reaccions oposades, i el chunk les
+distingeix amb `x_nexe_truncation` (a l'arrel del chunk, extensio propia, no OpenAI):
+
+- `"ceiling"` — el model ha topat amb el sostre de tokens: **falta la cua**. Demanar la
+  continuacio i enganxar-la al final es correcte.
+- `"overflow"` — s'han perdut tokens **del mig** mentre la generacio continuava (cua SSE plena),
+  i el final que ha arribat es el natural. **No demanis la continuacio**: afegiria text nou sobre
+  un forat intern i el resultat semblaria coherent sense ser-ho. Aquesta resposta no es pot
+  reparar continuant-la.
+
+El camp **no hi es** quan no s'ha tallat res. Si passen les dues coses alhora mana `"overflow"`.
+
 **Bloc `[IMATGE ADJUNTA]`:** Quan un missatge inclou una imatge (backend VLM), l'endpoint de xat injecta un bloc `[IMATGE ADJUNTA]` que **prioritza la imatge sobre el context RAG**. El model processa la imatge directament i el RAG queda relegat a context secundari, evitant que documents recuperats distreguin la descripcio visual.
 
 ### Informacio del sistema

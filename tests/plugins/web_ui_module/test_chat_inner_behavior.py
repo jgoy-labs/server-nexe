@@ -21,7 +21,7 @@ from fastapi.responses import StreamingResponse
 from starlette.datastructures import State
 from starlette.requests import Request as StarletteRequest
 
-from plugins.web_ui_module.core.session_manager import ChatSession
+from core.sessions import ChatSession
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -516,9 +516,13 @@ class TestChatLLM:
         """
         engine = _MockOllamaEngine()
         session = _make_session()
-        # One short of the threshold: the turn about to be added crosses it.
-        for i in range(ChatSession.COMPACT_EVERY - 1):
-            session.add_message("user" if i % 2 == 0 else "assistant", f"msg {i}")
+        # #965: the threshold is SIZE against the engine's window, so fill the
+        # history with real weight instead of counting messages. Long enough to
+        # cross 45% (COMPACT_AT_RATIO) of the default 8192-token window (the mock engine reports no
+        # window of its own), and past COMPACT_KEEP so there is something to
+        # compact — a session that cannot compact must not warn that it will.
+        for i in range(ChatSession.COMPACT_KEEP + 2):
+            session.add_message("user" if i % 2 == 0 else "assistant", "paraula " * 2000)
         h = _Harness(intent="chat", session=session)
         state = _make_server_state(engine=engine)
         result = await h.call({"message": "Hola", "stream": True}, server_state=state)

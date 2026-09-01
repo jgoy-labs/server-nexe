@@ -70,9 +70,42 @@ MAX_RAG_CONTEXT_LENGTH = 4000
 # Maximum characters for a single user chat message (input validation)
 MAX_CHAT_INPUT_LENGTH = 8000
 
-# RAG context window control — prevent RAG from overflowing the model's context
-MAX_CONTEXT_RATIO = float(os.environ.get('NEXE_MAX_CONTEXT_RATIO', '0.3'))
-DEFAULT_CONTEXT_WINDOW = int(os.environ.get('NEXE_DEFAULT_CONTEXT_WINDOW', '8192'))
+# RAG context window control — prevent RAG from overflowing the model's context.
+# Parsed with a fallback: this module is imported at boot, so a typo in either
+# env var used to be a boot failure (#978 leftover after the engine overrides
+# were guarded).
+def _positive_int_env(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        logger.warning("%s=%r is not an integer — using %d", name, raw, default)
+        return default
+    if value <= 0:
+        logger.warning("%s=%r must be a positive int — using %d", name, raw, default)
+        return default
+    return value
+
+
+def _ratio_env(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        logger.warning("%s=%r is not a number — using %s", name, raw, default)
+        return default
+    if value != value or value <= 0.0 or value > 1.0:  # NaN or out of (0, 1]
+        logger.warning("%s=%r must be in (0, 1] — using %s", name, raw, default)
+        return default
+    return value
+
+
+MAX_CONTEXT_RATIO = _ratio_env('NEXE_MAX_CONTEXT_RATIO', 0.3)
+DEFAULT_CONTEXT_WINDOW = _positive_int_env('NEXE_DEFAULT_CONTEXT_WINDOW', 8192)
 CHARS_PER_TOKEN_ESTIMATE = 4  # Conservative estimate (~4 chars per token)
 
 def _estimate_tokens(text: str) -> int:
@@ -148,18 +181,22 @@ def _filter_rag_injection(text: str) -> str:
     return filtered
 
 
-def _sanitize_rag_context(context: str) -> str:
+def _sanitize_rag_context(context: str, context_window: int = None) -> str:  # type: ignore[assignment]  # no_implicit_optional
     """
     Sanitize RAG retrieved content before injecting into prompt.
 
     SECURITY: RAG content comes from user-stored data and could contain
     prompt injection attempts. This function:
-    1. Truncates to MAX_RAG_CONTEXT_LENGTH
+    1. Truncates to the live engine window (or DEFAULT_CONTEXT_WINDOW)
     2. Removes known prompt injection patterns
     3. Escapes delimiter characters
 
     Args:
         context: Raw context text from RAG retrieval
+        context_window: token window of the serving engine. #972: without it
+            this always sized against DEFAULT_CONTEXT_WINDOW (8192), so a
+            32768-token engine lost most of its RAG before the #965 budget
+            ever saw it. Callers that know the live window MUST pass it.
 
     Returns:
         Sanitized context safe for prompt injection
@@ -175,12 +212,17 @@ def _sanitize_rag_context(context: str) -> str:
     context = unicodedata.normalize("NFKC", context)
     context = context.translate(_NON_NFKC_BRACKET_MAP)
 
-    # 1. Truncate to prevent context overflow (dynamic based on model context window)
-    max_chars = max(MAX_RAG_CONTEXT_LENGTH, int(DEFAULT_CONTEXT_WINDOW * MAX_CONTEXT_RATIO * CHARS_PER_TOKEN_ESTIMATE))
+    # 1. Truncate to prevent context overflow (dynamic based on the LIVE window)
+    window = (
+        context_window
+        if isinstance(context_window, int) and not isinstance(context_window, bool) and context_window > 0
+        else DEFAULT_CONTEXT_WINDOW
+    )
+    max_chars = max(MAX_RAG_CONTEXT_LENGTH, int(window * MAX_CONTEXT_RATIO * CHARS_PER_TOKEN_ESTIMATE))
     sanitized = context[:max_chars]
     if len(context) > max_chars:
         sanitized += "\n[...truncat]"
-        logger.warning("RAG context truncated from %d to %d chars (window=%d, ratio=%.1f)", len(context), max_chars, DEFAULT_CONTEXT_WINDOW, MAX_CONTEXT_RATIO)
+        logger.warning("RAG context truncated from %d to %d chars (window=%d, ratio=%.1f)", len(context), max_chars, window, MAX_CONTEXT_RATIO)
 
     # 2. Remove prompt injection patterns
     for pattern in _RAG_INJECTION_PATTERNS:

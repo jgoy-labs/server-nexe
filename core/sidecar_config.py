@@ -10,7 +10,7 @@ Wraps the NEXE_* env vars (registered at core.config.NexeSettings) and exposes
 
 - is_sidecar / is_production booleans (derived from env)
 - cors_origins (includes tauri://localhost + http://localhost:1420 when is_sidecar)
-- trusted_hosts (parsed from NEXE_LOCALHOST_ALIASES)
+- trusted_hosts (parsed from NEXE_TRUSTED_HOSTS)
 - Fail-fast on missing required vars when is_sidecar=True
 
 Goal: centralize what was scattered across middleware.py, lifespan_*.py,
@@ -113,7 +113,7 @@ SIDECAR_CORS_ORIGINS: tuple[str, ...] = (
     "http://tauri.localhost",
 )
 
-# Default trusted hosts when NEXE_LOCALHOST_ALIASES is unset.
+# Default trusted hosts when NEXE_TRUSTED_HOSTS is unset.
 DEFAULT_TRUSTED_HOSTS: tuple[str, ...] = ("127.0.0.1", "::1", "localhost")  # nosemgrep
 
 # Default fallbacks for standalone mode (NO NEXE_SIDECAR). D-P catalog.
@@ -222,13 +222,17 @@ def _resolve_cors_origins(is_sidecar: bool, port: int) -> tuple[str, ...]:
 
 
 def _resolve_trusted_hosts() -> tuple[str, ...]:
-    """Return DEFAULT_TRUSTED_HOSTS plus any NEXE_LOCALHOST_ALIASES CSV entries.
+    """Return DEFAULT_TRUSTED_HOSTS plus any NEXE_TRUSTED_HOSTS CSV entries.
 
-    Mirrors core.config.get_localhost_aliases(): the defaults are never dropped,
+    Mirrors core.config.get_trusted_hosts(): the defaults are never dropped,
     so adding an alias cannot lock the local machine out of its own server.
+
+    #864: was NEXE_LOCALHOST_ALIASES — renamed so an alias added for the
+    bootstrap client-IP check (core.config.get_localhost_aliases()) cannot
+    silently widen the sidecar's Host-header allow-list too.
     """
     hosts = list(DEFAULT_TRUSTED_HOSTS)
-    raw = os.environ.get("NEXE_LOCALHOST_ALIASES", "")
+    raw = os.environ.get("NEXE_TRUSTED_HOSTS", "")
     for entry in raw.split(","):
         entry = entry.strip()
         if entry and entry not in hosts:
@@ -315,7 +319,7 @@ class SidecarConfig:
     host: str                 # NEXE_HOST or NEXE_SERVER_HOST or _DEFAULT_HOST
     port: int                 # NEXE_PORT or NEXE_SERVER_PORT or _DEFAULT_PORT
     cors_origins: tuple[str, ...]   # Base + SIDECAR_CORS_ORIGINS when is_sidecar
-    trusted_hosts: tuple[str, ...]  # Parsed from NEXE_LOCALHOST_ALIASES
+    trusted_hosts: tuple[str, ...]  # Parsed from NEXE_TRUSTED_HOSTS
 
     # === Auth ===
     api_key: str              # NEXE_PRIMARY_API_KEY

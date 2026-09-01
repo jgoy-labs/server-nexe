@@ -370,7 +370,7 @@ class TestSessionCleanupLoop:
 
     def test_cleanup_loop_handles_exception(self):
         """Lines 837-839: cleanup_inactive raises exception."""
-        from plugins.web_ui_module.api.routes import _session_cleanup_loop
+        from core.sessions.cleanup import _session_cleanup_loop
 
         async def run():
             mock_sm = MagicMock()
@@ -385,7 +385,7 @@ class TestSessionCleanupLoop:
 
     def test_cleanup_loop_removes_sessions(self):
         """Lines 835-837: successful cleanup removes sessions."""
-        from plugins.web_ui_module.api.routes import _session_cleanup_loop
+        from core.sessions.cleanup import _session_cleanup_loop
 
         async def run():
             mock_sm = MagicMock()
@@ -591,14 +591,16 @@ class TestChatRagContext:
         mm = MagicMock()
         mm.registry = registry
         with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
-             patch("core.lifespan.get_server_state") as mock_state:
+             patch("core.lifespan.get_server_state") as mock_state, \
+             patch(
+                 "core.endpoints.chat_rag.build_rag_context",
+                 new=AsyncMock(return_value=("[DOCUMENTACIO DEL SISTEMA]\nfact1", [("t", 0.85)])),
+             ) as mock_rag:
+            # F-D block 3: /ui/chat's RAG now goes through
+            # core.endpoints.chat_rag.build_rag_context, not
+            # memory_helper.recall_from_memory — patch the real call site.
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
-            hh.recall_from_memory = AsyncMock(return_value={
-                "success": True, "results": [
-                    {"content": "fact1", "score": 0.85, "metadata": {"source_collection": "t"}},
-                ]
-            })
             hh.auto_save = AsyncMock(return_value={"success": True, "document_id": "d1"})
             mock_mh.return_value = hh
             state = MagicMock()
@@ -607,6 +609,10 @@ class TestChatRagContext:
             mock_state.return_value = state
             r = client.post("/ui/chat", headers=auth, json={"message": "Hi", "session_id": sid})
         assert r.status_code == 200
+        # (>=1, not ==1: this mock engine's non-async .chat makes the real
+        # engine cascade retry a second engine — unrelated to the RAG wiring
+        # this test checks.)
+        assert mock_rag.called, "the RAG engine must be reached, not the dead memory_helper path"
 
     def test_rag_lookup_exception(self, client, auth):
         r1 = client.post("/ui/session/new", headers=auth)
@@ -623,10 +629,16 @@ class TestChatRagContext:
         mm = MagicMock()
         mm.registry = registry
         with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
-             patch("core.lifespan.get_server_state") as mock_state:
+             patch("core.lifespan.get_server_state") as mock_state, \
+             patch(
+                 "core.endpoints.chat_rag.build_rag_context",
+                 new=AsyncMock(side_effect=Exception("RAG failed")),
+             ):
+            # F-D block 3: exercise the real _build_rag_context except-branch
+            # (routes_chat.py) by failing the actual call site, not the dead
+            # memory_helper.recall_from_memory path.
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
-            hh.recall_from_memory = AsyncMock(side_effect=Exception("RAG failed"))
             hh.auto_save = AsyncMock(return_value={"success": True, "document_id": None})
             mock_mh.return_value = hh
             state = MagicMock()

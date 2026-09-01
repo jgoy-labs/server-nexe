@@ -17,11 +17,10 @@ from typing import Dict, List, Optional
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 
-from ..chat_memory import _pending_save_tasks
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
-from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, fallback_to_ollama, resolve_loaded_model_name
-from ._streaming import TokenBridge, format_sse_chunk, format_sse_done, SSE_DONE, background_memory_save
+from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, fallback_to_ollama, resolve_loaded_model_name, persist_v1_turn
+from ._streaming import TokenBridge, format_sse_chunk, format_sse_done, SSE_DONE
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +28,9 @@ logger = logging.getLogger(__name__)
 async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionRequest, req: Request):
     """Forward to Llama.cpp module (GGUF models)."""
     last_user_msg = extract_last_user_msg(messages)
+    # F-C: derived from the RAW client request (request.messages), not the
+    # RAG/system-prompt-augmented `messages` param.
+    session_id = derive_session_id(req, request.messages)
 
     try:
         llama_module = None
@@ -38,10 +40,12 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
         if not llama_module or not hasattr(llama_module, 'chat'):
             logger.warning("Llama.cpp module not available (model not configured). Falling back to Ollama.")
             logger.info("To use Llama.cpp: Set NEXE_LLAMA_CPP_MODEL in .env")
-            return await fallback_to_ollama(messages, request, req.app.state, last_user_msg, "llama_cpp", "module_unavailable")
+            return await fallback_to_ollama(
+                messages, request, req.app.state, last_user_msg, "llama_cpp", "module_unavailable",
+                session_id=session_id,
+            )
 
         system_msg, user_messages = separate_messages(messages)
-        session_id = derive_session_id(req)
         # B075-C3: report the model that actually ran, not the client's
         # request.model (llama.cpp runs the single loaded GGUF, ignoring it).
         model_name = resolve_loaded_model_name(llama_module, "llama-cpp-local")
@@ -68,7 +72,10 @@ async def _forward_to_llama_cpp(messages: List[Dict], request: ChatCompletionReq
 
     except Exception as e:
         logger.error("Llama.cpp execution failed: %s. Falling back to Ollama.", e)
-        return await fallback_to_ollama(messages, request, req.app.state, last_user_msg, "llama_cpp", "execution_failed")
+        return await fallback_to_ollama(
+            messages, request, req.app.state, last_user_msg, "llama_cpp", "execution_failed",
+            session_id=session_id,
+        )
 
 async def _llama_cpp_stream_generator(
     llama_module,
@@ -124,14 +131,21 @@ async def _llama_cpp_stream_generator(
             yield SSE_DONE
             return
 
-        yield format_sse_done(model_name, "llamacpp", truncated=bridge._truncated)
+        # The engine's own reason (ceiling cut) travels in bridge.result, which
+        # this path used to drop on the floor — the close always said "stop".
+        # bridge._truncated is a DIFFERENT cut (queue overflow, B216); both
+        # both collapse into "length", so the chunk carries x_nexe_truncation
+        # to tell a missing TAIL from a missing MIDDLE (#989).
+        yield format_sse_done(
+            model_name,
+            "llamacpp",
+            truncated=bridge._truncated,
+            finish_reason=(bridge.result or {}).get("finish_reason"),
+        )
         yield SSE_DONE
 
         full_response_text = bridge.get_response_text()
-        if app_state and user_msg and full_response_text.strip():
-            task = asyncio.create_task(background_memory_save(app_state, user_msg, full_response_text))
-            _pending_save_tasks.add(task)
-            task.add_done_callback(_pending_save_tasks.discard)
+        persist_v1_turn(app_state, session_id, full_response_text)
 
     except asyncio.CancelledError:
         logger.debug("Llama.cpp stream cancelled (client disconnected)")

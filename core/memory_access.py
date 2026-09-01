@@ -35,8 +35,9 @@ SYSTEM_COLLECTIONS = (DOCS_COLLECTION, MEMORY_COLLECTION, KNOWLEDGE_COLLECTION)
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Vector width of the default embedding model. It lives HERE, in core, and not
-# imported from memory/, because core/endpoints/chat_memory.py needs it at
-# import time and that import is reached from create_app() — pulling
+# imported from memory/, because create_app() used to reach it through
+# core/endpoints/chat_memory.py (removed: that module only autosaved
+# conversations to a collection the chat never read). Pulling
 # memory.memory.constants in loads MemoryModule, MemoryAPI and the whole
 # embeddings package, so a broken memory/ left the product with NO server at
 # all (#888). memory/ is DEGRADABLE by decision: the chat must come up without

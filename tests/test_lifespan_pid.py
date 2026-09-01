@@ -279,11 +279,11 @@ async def test_lifespan_shutdown_runs_when_yield_body_raises():
 @pytest.mark.asyncio
 async def test_session_cleanup_task_returns_task():
     """start_session_cleanup_task returns an asyncio.Task (N04)."""
-    from plugins.web_ui_module.api.routes import start_session_cleanup_task
+    from core.sessions import start_session_cleanup_task
 
     mock_mgr = MagicMock()
     # Patch the internal loop so it doesn't do real I/O
-    with patch("plugins.web_ui_module.api.routes._session_cleanup_loop", new=AsyncMock(return_value=None)):
+    with patch("core.sessions.cleanup._session_cleanup_loop", new=AsyncMock(return_value=None)):
         task = start_session_cleanup_task(mock_mgr)
 
     assert isinstance(task, asyncio.Task), (

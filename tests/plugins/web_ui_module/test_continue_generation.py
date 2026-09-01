@@ -213,7 +213,7 @@ class TestPersistMerge:
     def test_merge_survives_get_context_messages(self):
         """Simulates the session contract: the continuation is appended to the
         SAME message, so the reader sees one seamless assistant turn."""
-        from plugins.web_ui_module.core.session_manager import ChatSession
+        from core.sessions import ChatSession
 
         session = ChatSession(session_id="t-1")
         session.add_message("user", "pregunta")
@@ -235,7 +235,7 @@ class TestPersistMerge:
         to continue. Cosmetic rather than destructive, and still wrong — hence
         the in-place merge above.
         """
-        from plugins.web_ui_module.core.session_manager import ChatSession
+        from core.sessions import ChatSession
 
         session = ChatSession(session_id="t-2")
         session.add_message("user", "pregunta")

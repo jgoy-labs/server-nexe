@@ -93,7 +93,7 @@ class SecurityModule:
         """
         try:
             import os
-            from .core.auth_config import is_dev_mode, load_api_keys
+            from core.security.auth_config import is_dev_mode, load_api_keys
 
             if not is_dev_mode():
                 return
@@ -136,7 +136,7 @@ class SecurityModule:
 
             # Check 1: auth config
             try:
-                from .core.auth_config import load_api_keys
+                from core.security.auth_config import load_api_keys
                 keys = load_api_keys()
                 has_keys = keys.has_any_valid_key
                 checks.append({

@@ -1156,15 +1156,28 @@ class MemoryHelper:
                 await memory.create_collection(MEMORY_COLLECTION)
                 logger.info("Memory collection cleared and recreated")
 
-            # #897: the RAG collection is only half of what is stored. Chat
-            # autosave PREFERS MemoryService (core/endpoints/chat_memory.py),
-            # so on a real install the facts, episodes and staging rows in
-            # memory_v1.db are precisely what the user is asking to erase —
-            # and they used to survive a wipe that reported success.
+            # #897: the RAG collection is only half of what is stored.
+            # Writes through MemoryService (CLI, /memory/store, workflow
+            # nodes) live in memory_v1.db — facts, episodes and staging
+            # rows — and they used to survive a wipe that reported success.
             view = await get_memory_view("web_ui_module")
             wiped = await view.forget_everything()
-            if wiped:
-                logger.info("MemoryService stores wiped: %s", wiped)
+            # {} means the porter never reached MemoryService (service missing
+            # / not initialized) — not "wiped zero rows". A non-empty dict,
+            # even of zeros, is a real wipe. Treating {} as success is the
+            # #897 lie on the service-down path: Qdrant is already gone,
+            # memory_v1.db is intact, and the user hears "ja no recordo res".
+            if not wiped:
+                logger.warning(
+                    "MemoryService did not run; personal facts were not wiped"
+                )
+                return {
+                    "success": False,
+                    "message": (
+                        "Memory service is not running; personal facts were not wiped"
+                    ),
+                }
+            logger.info("MemoryService stores wiped: %s", wiped)
 
             return {
                 "success": True,
