@@ -1,0 +1,30 @@
+#!/bin/bash
+# Launcher — auto-relatiu a la pròpia ubicació (robust a futures migracions).
+# Usa el package core.cli.
+#
+# #902 — DUES disposicions, un sol script:
+#   DEV     → el venv del repo, al costat d'aquest fitxer (venv/, NO .venv)
+#   BUNDLE  → dins el sidecar el codi viu a app/ i el venv és el seu GERMÀ
+#             ($SIDECAR_DIR/{app,venv,python-runtime}), o sigui ../venv.
+# Sense la segona branca el llançador viatja al bundle i no arrenca:
+#   ./nexe: line 7: .../app/venv/bin/python3: No such file or directory
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="$DIR${PYTHONPATH:+:$PYTHONPATH}"
+
+PY="$DIR/venv/bin/python3"
+if [ ! -x "$PY" ]; then
+    PY="$DIR/../venv/bin/python3"
+    # Mateixa xarxa de seguretat que nexe-sidecar: si el `home=` relatiu del
+    # pyvenv.cfg falla, un PYTHONHOME explícit manté sys.base_prefix dins el
+    # bundle en comptes de caure al Python del sistema.
+    [ -d "$DIR/../python-runtime" ] && export PYTHONHOME="$DIR/../python-runtime"
+fi
+
+if [ ! -x "$PY" ]; then
+    # Un llançador que no troba el seu Python ha de dir-ho: el mode de fallada
+    # de #902 va ser el silenci, no l'error.
+    echo "nexe: no trobo el Python de l'entorn ($DIR/venv/bin/python3 ni $DIR/../venv/bin/python3)" >&2
+    exit 1
+fi
+
+exec "$PY" -m core.cli "$@"

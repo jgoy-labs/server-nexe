@@ -26,7 +26,10 @@
 # Binaries & build artifacts
 # =====================
 qdrant
-nexe
+# `nexe` (the CLI launcher) is NOT ignored: it is a product script, not a
+# binary. Ignoring it made a clean clone produce a sidecar bundle with no
+# launcher — and no error — because the build copies it from the working
+# tree. It is also on the publish whitelist.
 dist/
 build/
 *.egg-info/
