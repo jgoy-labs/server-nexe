@@ -25,6 +25,9 @@ import pytest
 
 pytestmark = pytest.mark.asyncio
 
+# mlx-lm només existeix a Apple Silicon (requirements-macos.txt).
+pytest.importorskip("mlx_lm", reason="mlx-lm Apple-Silicon-only, absent al CI Linux")
+
 
 class _FakeTokenizer:
     """El mínim que la canonada real demana: encode, apply_chat_template, eos_token_ids."""

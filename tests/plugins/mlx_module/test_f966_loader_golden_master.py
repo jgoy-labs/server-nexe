@@ -27,6 +27,9 @@ from unittest.mock import patch
 
 import pytest
 
+# mlx-lm només existeix a Apple Silicon (requirements-macos.txt).
+pytest.importorskip("mlx_lm", reason="mlx-lm Apple-Silicon-only, absent al CI Linux")
+
 CONFIG_MOD = "plugins.mlx_module.core.config"
 GB = 1024 ** 3
 

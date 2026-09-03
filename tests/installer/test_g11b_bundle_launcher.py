@@ -231,6 +231,17 @@ _needs_git = pytest.mark.skipif(
     reason="sense .git no hi ha repositori a mesurar (tarball, no clon)",
 )
 
+# El mateix raonament, una capa més enllà: `.gitoss-sync` és l'inventari INTERN
+# que decideix què es publica, i per això mateix no es publica. Els dos controls
+# que el llegeixen només poden ser verds a la màquina de dev; al CI del repo
+# públic petaven amb FileNotFoundError i mantenien el gate vermell sense que hi
+# hagués res espatllat (mesurat al run 33781702333, 03/09). Saltar-los allà on
+# el fitxer no existeix no és afluixar el control: allà no hi ha res a mesurar.
+_needs_inventory = pytest.mark.skipif(
+    not (REPO / ".gitoss-sync").exists(),
+    reason="inventari de publicació intern, absent del repositori públic",
+)
+
 
 def _git(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=REPO,  # nosec B603 B607: git from PATH, fixed args
@@ -336,6 +347,7 @@ class TestG11bTheLauncherReachesThePublicClone:
     """
 
     @_needs_git
+    @_needs_inventory
     def test_the_publication_inventory_does_not_exclude_the_launcher(self):
         # El tall ha de ser la SECCIÓ real, no la primera menció: la capçalera
         # del fitxer explica el format i ja escriu «[[exclude]]» dins un
@@ -353,6 +365,7 @@ class TestG11bTheLauncherReachesThePublicClone:
         )
 
     @_needs_git
+    @_needs_inventory
     def test_the_publication_inventory_lists_the_launcher(self):
         """No n'hi ha prou amb no excloure'l: la llista és una ALLOWLIST."""
         text = (REPO / ".gitoss-sync").read_text(encoding="utf-8")
