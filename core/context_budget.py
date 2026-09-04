@@ -309,3 +309,147 @@ def _inject_context_into_messages(
             )
         engine_messages.append({"role": "user", "content": message})
     return engine_messages, _doc_truncated_pct, _ctx_injected
+
+
+# Slack the fit guard keeps between the estimated prompt and the engine's real
+# window. The floor is _TRUNCATION_MARGIN_TOKENS from the MLX plugin, for the
+# same reason: the chat template adds tokens nobody counted here (role headers,
+# BOS, the assistant's opening turn).
+#
+# The 5% is the OTHER error, and it does not scale with a flat number: this file
+# measures in chars at 4 chars/token, and the note above PROMPT_BUDGET_RATIO
+# says why that runs optimistic — Catalan and Spanish are denser, so a prompt
+# estimated at 8000 tokens can really be 8400. With a flat 256, a 32768-token
+# window was guarded to 99.2% of itself by an estimate known to undercount, and
+# the guard would have declared a prompt that fits one that does not.
+PROMPT_FIT_MARGIN_TOKENS = 256
+PROMPT_FIT_MARGIN_RATIO = 0.05
+
+
+_ELISION = "\n\n[…]\n\n"
+
+
+def _trim_turn_content(message: dict, budget_chars: int) -> str:
+    """Cut one turn's text down to ``budget_chars``, losing the least useful part.
+
+    Taking the first N chars is the obvious move and it is wrong for the shape
+    this path actually sees: someone pastes a long text and asks the question
+    UNDERNEATH it. Cutting the tail throws away the question and leaves the
+    model answering nothing in particular — silent, and the user cannot tell.
+    So a user turn keeps its head AND its tail with the cut marked in between.
+
+    An assistant turn is the continue path (FD-S6): the generation has to resume
+    from where it stopped, so what matters there is the END. Its head is what
+    goes.
+    """
+    text = message.get("content") or ""
+    if budget_chars <= 0 or len(text) <= budget_chars:
+        return text[:budget_chars] if budget_chars > 0 else ""
+    if message.get("role") == "assistant":
+        return text[-budget_chars:]
+    room = budget_chars - len(_ELISION)
+    if room <= 0:
+        return text[:budget_chars]
+    head = (room * 7) // 10
+    return text[:head] + _ELISION + text[-(room - head):]
+
+
+def _keep_newest_that_fit(messages: list, remaining: int) -> tuple:
+    """The newest turns that fit in ``remaining`` chars, and what they weigh.
+
+    Walks from the most recent backwards, keeping whole messages while they fit;
+    one that does not is dropped, never cut in half (that would break role
+    alternation and the chat template). The most recent message is evaluated
+    first and always kept — even alone, and even if it alone exceeds the budget,
+    so this never emits zero turns and the caller trims that one turn instead.
+    """
+    kept: list = []
+    running = 0
+    for msg in reversed(messages):
+        cost = len(msg.get("content") or "")
+        if kept and running + cost > remaining:
+            break
+        kept.append(msg)
+        running += cost
+    kept.reverse()
+    return kept, running
+
+
+def fit_prompt_to_window(
+    system: str,
+    messages: list,
+    window_tokens: int,
+    reply_budget_tokens: int = 0,
+) -> tuple:
+    """Drop whole turns, oldest first, until the assembled prompt fits the window.
+
+    #976 / ADR-006's invariant ("the assembled prompt never exceeds the engine's
+    window"), enforced where the prompt is actually assembled instead of trusted
+    to the arithmetic upstream. llama.cpp does not truncate an oversized prompt:
+    it raises ("Requested tokens exceed context window", llama_cpp/llama.py) and
+    the turn dies. MLX truncates inside its plugin (truncate_messages_to_budget)
+    and Ollama truncates server-side; llama.cpp has no enforcement of its own.
+
+    compute_context_budget decides what the turn may KEEP; this checks what was
+    actually ASSEMBLED — for every engine, at both doors. The two can disagree:
+    the budget reasons about the document and the retrieved context, and knows
+    nothing about the history the caller then prepends, the clock line, or the
+    untrusted-context wrapper.
+
+    Contract copied from the MLX helper, and carried out by
+    _keep_newest_that_fit: whole turns go, oldest first, and it never returns
+    zero turns.
+
+    Estimation is by chars (CHARS_PER_TOKEN_ESTIMATE). The core cannot reach a
+    plugin's tokenizer — the layering gate keeps core → plugins at zero — so the
+    margin above is what covers the difference between the estimate and the
+    tokens the engine really counts.
+
+    Returns (messages, trimmed): `trimmed` is True when anything was dropped or
+    cut, so the caller can say so rather than shrinking the prompt in silence.
+    """
+    if not messages:
+        return messages, False
+
+    # A reply reserve bigger than the window is a caller mistake (a client
+    # asking /v1 for max_tokens=8192 on a 2048-token engine); clamp it rather
+    # than letting it drive the budget negative and empty the prompt.
+    reply_reserve = max(0, min(int(reply_budget_tokens or 0), window_tokens // 2))
+    margin = max(PROMPT_FIT_MARGIN_TOKENS, int(window_tokens * PROMPT_FIT_MARGIN_RATIO))
+    budget_chars = (window_tokens - reply_reserve - margin) * CHARS_PER_TOKEN_ESTIMATE
+    remaining = budget_chars - len(system or "")
+
+    if remaining <= 0:
+        # The system prompt alone fills the window. There is no honest trim
+        # here: an empty prompt is useless and a floor would be the same lie
+        # MIN_BUDGET_WINDOW_TOKENS was (see the note above
+        # resolve_max_context_chars). Say it loudly and let the newest turn go
+        # through as it is — the estimate is conservative, so it may still fit.
+        logger.error(
+            "System prompt (%d chars) leaves no room in a %d-token window: "
+            "the turn is sent unfitted and the engine may reject it",
+            len(system or ""), window_tokens,
+        )
+        return messages[-1:], len(messages) > 1
+
+    kept, running = _keep_newest_that_fit(messages, remaining)
+    trimmed = len(kept) < len(messages)
+
+    # The newest turn on its own can still overflow (a document pasted into the
+    # message itself). Cutting its content is the last resort: dropping it would
+    # send no user turn at all, and keeping it whole is the dead turn #976 is
+    # about.
+    if len(kept) == 1 and running > remaining:
+        kept = [dict(kept[0], content=_trim_turn_content(kept[0], remaining))]
+        trimmed = True
+
+    if trimmed:
+        # `running` is what the kept turns weighed BEFORE the last-resort trim;
+        # reporting it would claim 30000 chars were kept when 2468 were.
+        logger.warning(
+            "Prompt did not fit the engine window (%d tok): kept %d of %d turns "
+            "(%d chars of the %d available)",
+            window_tokens, len(kept), len(messages),
+            sum(len(m.get("content") or "") for m in kept), remaining,
+        )
+    return kept, trimmed

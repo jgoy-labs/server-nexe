@@ -39,6 +39,13 @@ class ConfigValidator:
   VALID_ENVIRONMENTS = ['development', 'staging', 'production']
   VALID_LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
   
+  # #1002: keys that were shipped in [plugins.models] and read by nobody.
+  # Warned about, never rejected — an inherited server.toml must keep loading.
+  DEPRECATED_MODEL_KEYS = {
+    'max_tokens': "the answer ceiling comes from the serving engine's own configuration",
+    'context_window': "the window is read from the live engine (get_context_window(), #965)",
+  }
+  
   def __init__(self, i18n_manager=None):
     """
     Initialize validator.
@@ -104,6 +111,8 @@ class ConfigValidator:
     
     path_warnings = self._validate_paths(config)
     warnings.extend(path_warnings)
+    
+    warnings.extend(self._validate_deprecated_keys(config))
     
     return ValidationResult(
       valid=len(errors) == 0,
@@ -236,13 +245,38 @@ class ConfigValidator:
                      key='plugins.models.temperature', value=temp, min='0.0', max='2.0')
           errors.append(msg)
       
-      max_tokens = models.get('max_tokens')
-      if max_tokens is not None:
-        if not isinstance(max_tokens, int) or max_tokens <= 0:
-          errors.append("plugins.models.max_tokens must be a positive integer")
+      # #1002: `plugins.models.max_tokens` used to be type-checked here. It is
+      # not checked any more — validating a key states that the key is read,
+      # and this one never was. It is reported as a deprecation warning by
+      # _validate_deprecated_keys instead, which tolerates it rather than
+      # erroring: it shipped in server.toml until #1002, so it is on disk in
+      # every installation made before then and those files have to keep
+      # loading.
     
     return errors
   
+  def _validate_deprecated_keys(self, config: Dict[str, Any]) -> List[str]:
+    """Warnings for keys still accepted in the file and governing nothing (#1002).
+
+    Returns warnings, never errors. The keys shipped in the default
+    server.toml, so they are on disk in installations made before #1002 and
+    rejecting them would break a config that is otherwise fine. Saying nothing
+    is not an option either: someone who edits `context_window = 8192`
+    expecting an effect gets none, and that silence is the finding.
+    """
+    plugins = config.get('plugins')
+    if not isinstance(plugins, dict):
+      return []
+    models = plugins.get('models')
+    if not isinstance(models, dict):
+      return []
+    return [
+      f"plugins.models.{key} is ignored ({why}). "
+      f"It is no longer part of the shipped server.toml (#1002) — remove it from yours."
+      for key, why in self.DEPRECATED_MODEL_KEYS.items()
+      if key in models
+    ]
+
   def _validate_logging_config(self, logging_config: Dict[str, Any]) -> List[str]:
     """Validate storage.logging sub-section."""
     errors: list[str] = []
@@ -367,6 +401,7 @@ class ConfigValidator:
       errors.extend(self._validate_core_section(config))
     elif section_name == 'plugins':
       errors.extend(self._validate_plugins_section(config))
+      warnings.extend(self._validate_deprecated_keys(config))
     elif section_name == 'storage':
       errors.extend(self._validate_storage_section(config))
     

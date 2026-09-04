@@ -217,33 +217,156 @@ class TestReDosProtection:
     assert detected
 
 class TestLatency:
-  """Tests to verify latency."""
+  """The cost of scanning, as a relation instead of a wall-clock budget.
 
-  def test_sanitize_latency(self):
-    """Verifies that sanitize() is fast (<2ms)."""
+  #1018: these two used to assert `<2ms` and `<1ms` — numbers measured once on
+  one machine. On a shared runner they go red because a neighbour is building,
+  which is a failure that says nothing about this module; and even when green
+  they never checked the property the module actually promises.
+
+  What it promises is a single linear scan. detect_jailbreak and
+  detect_prompt_injection run one combined regex over the text, so quadrupling
+  the input must roughly quadruple the cost, not square it. Both sizes below
+  stay under MAX_SCAN_LENGTH so the head+tail window never trims either run and
+  the whole text is scanned in both — otherwise the cap, not the scan, would be
+  what the ratio measured.
+
+  How it is measured is the load-bearing half, and the first version got it
+  wrong. It timed one size in five long batches, then the other in five more.
+  min() over batches does not normalise for load when the batches have
+  different durations: 50 calls of 4000 chars is ~100 ms of wall clock against
+  ~25 ms for 1000 chars, so the big batch has four times the window to be
+  preempted and, over only five tries, a far smaller chance that any one of
+  them lands clean. The numerator inflated and the denominator did not, so the
+  ratio drifted UP with load — systematically, not randomly: 4.0 idle, 6.1 at
+  1.5x saturation, 7.5 at 2x, which is where a live quadratic regression also
+  reads. Signal and noise met and the gate stopped discriminating.
+
+  So the batches are short and many and they ALTERNATE between the probes:
+  every repeat measures each probe once, back to back, so both see the same
+  load, the same thermal state and the same scheduler mood, and min() then has
+  twenty chances per probe to catch a clean one instead of five. Measured on
+  this tree 2026-09-04 with 32 processes saturating a 16-core machine (2x),
+  20 samples: 4.01-4.11 healthy, against 4.01-9.62 for the old estimator.
+  """
+
+  SMALL_CHARS = 1000
+  BIG_CHARS = 4000
+  _GROWTH = BIG_CHARS / SMALL_CHARS       # 4x the input
+  # A linear scan costs _GROWTH (4x), a quadratic one _GROWTH ** 2 (16x). The
+  # ceiling is half again over linear — 6x — NOT the midpoint to quadratic:
+  # a regression does not have to be textbook O(n^2) to hurt, and the midpoint
+  # (8x) was verified to let a real one through at 6.80. The ceiling is the
+  # number that catches it; keeping the healthy measurement far below it is the
+  # estimator's job, not the ceiling's.
+  MAX_GROWTH = _GROWTH * 1.5
+
+  # is_safe() does strictly less than sanitize(), and lands within ~1% of it
+  # because both are dominated by the same two regex scans. 1.5x is the noise
+  # floor of the pair under load, not a budget.
+  MAX_QUICK_PATH_RATIO = 1.5
+
+  # Short batches, many of them, alternating between probes. 20x10 costs about
+  # the same wall clock as the old 5x50 and is what keeps the ratio at 4.0
+  # under 2x saturation — see the class docstring.
+  BATCH_CALLS = 10
+  BATCHES = 20
+
+  # Benign filler: it must match no pattern, or detection short-circuits and
+  # the two runs stop being comparable.
+  _FILLER = "the quick brown fox jumps over the lazy dog "
+
+  @classmethod
+  def _text(cls, size: int) -> str:
+    text = (cls._FILLER * (size // len(cls._FILLER) + 1))[:size]
+    assert len(text) < MAX_SCAN_LENGTH, "the sample must not hit the scan window"
+    return text
+
+  @classmethod
+  def _interleaved_cost(cls, *probes) -> list[float]:
+    """Cost per call of each `(fn, text)` probe, as a list in the same order.
+
+    Every repeat times every probe once, so the probes are never compared
+    across different stretches of the machine's day — which is the whole
+    point: a ratio between two measurements taken minutes of CPU contention
+    apart measures the contention, not the code. min() over the batches then
+    picks the cleanest run of each, because scheduler noise only ever ADDS
+    time and can never make a batch look faster than it is.
+    """
+    for fn, text in probes:
+      fn(text)  # warm every probe before timing any: the first call of each
+                # pays for lazily built regex state, and paying for it inside
+                # a timed batch would land entirely on whichever probe ran first
+    samples: list[list[float]] = [[] for _ in probes]
+    for _ in range(cls.BATCHES):
+      for bucket, (fn, text) in zip(samples, probes):
+        start = time.perf_counter()
+        for _ in range(cls.BATCH_CALLS):
+          fn(text)
+        bucket.append((time.perf_counter() - start) / cls.BATCH_CALLS)
+    return [min(bucket) for bucket in samples]
+
+  @classmethod
+  def _growth(cls, fn) -> tuple[float, float, float]:
+    small, big = cls._interleaved_cost(
+      (fn, cls._text(cls.SMALL_CHARS)),
+      (fn, cls._text(cls.BIG_CHARS)),
+    )
+    return big / small, small, big
+
+  def test_sanitize_cost_grows_linearly_with_the_input(self):
+    """sanitize() scans, it does not compare every character with every other."""
     sanitizer = SanitizerModule()
 
-    sanitizer.sanitize("warmup")
+    growth, small, big = self._growth(sanitizer.sanitize)
 
-    start = time.perf_counter()
-    for _ in range(100):
-      sanitizer.sanitize("Test text for latency measurement")
-    elapsed = (time.perf_counter() - start) / 100 * 1000
+    assert growth < self.MAX_GROWTH, (
+      f"{self._GROWTH:.0f}x the input cost {growth:.2f}x the time "
+      f"({small * 1000:.3f}ms -> {big * 1000:.3f}ms); a linear scan costs "
+      f"{self._GROWTH:.0f}x and anything near {self._GROWTH ** 2:.0f}x is "
+      "quadratic — a long prompt would then be a denial of service"
+    )
 
-    assert elapsed < 2, f"Latency too high: {elapsed}ms > 2ms"
-
-  def test_is_safe_latency(self):
-    """Verifies that is_safe() is fast (<1ms)."""
+  def test_is_safe_cost_grows_linearly_with_the_input(self):
+    """The quick door runs the same two detectors, so it makes the same promise."""
     sanitizer = SanitizerModule()
 
-    sanitizer.is_safe("warmup")
+    growth, small, big = self._growth(sanitizer.is_safe)
 
-    start = time.perf_counter()
-    for _ in range(100):
-      sanitizer.is_safe("Test text for latency measurement")
-    elapsed = (time.perf_counter() - start) / 100 * 1000
+    assert growth < self.MAX_GROWTH, (
+      f"{self._GROWTH:.0f}x the input cost {growth:.2f}x the time "
+      f"({small * 1000:.3f}ms -> {big * 1000:.3f}ms) — see the sanitize() case"
+    )
 
-    assert elapsed < 1, f"Latency too high: {elapsed}ms > 1ms"
+  def test_is_safe_never_costs_more_than_the_full_sanitize(self):
+    """is_safe() is the short door: same two detectors, no dataclass, no
+    severity pass. It cannot legitimately end up doing MORE work than
+    sanitize().
+
+    On safe text the two land within ~1% of each other today (both are
+    dominated by the same two regex scans), so this is not a claim that
+    is_safe is faster — it is a guard against a change that quietly makes it
+    slower: a third scan, or a rewrite that delegates to sanitize() and then
+    re-checks.
+
+    Interleaved for the same reason as the two above: measuring one door and
+    then the other, in sequence, was observed going red at 2x saturation with
+    both doors healthy — the load simply moved between the two halves of the
+    measurement.
+    """
+    sanitizer = SanitizerModule()
+    text = self._text(self.BIG_CHARS)
+
+    full, quick = self._interleaved_cost(
+      (sanitizer.sanitize, text),
+      (sanitizer.is_safe, text),
+    )
+
+    assert quick < full * self.MAX_QUICK_PATH_RATIO, (
+      f"is_safe() cost {quick * 1000:.3f}ms against sanitize()'s "
+      f"{full * 1000:.3f}ms ({quick / full:.2f}x) — the quick path is doing "
+      "more work than the full one, which is the wrong way round"
+    )
 
 class TestNeedsIntervention:
   """Tests for the needs_intervention flag."""

@@ -163,6 +163,55 @@ class MLXModule:
         except (AttributeError, TypeError, ValueError):
             return None
 
+    def switch_model_by_path(self, local_path) -> bool:
+        """F-D block 5: the module's own answer to "load this model instead".
+
+        Same shape as get_context_window (#965): the caller names what it wants
+        and the module, which owns its config, does it. The env dance that builds
+        that config used to live in the web UI (_switch_mlx_model) and imported
+        MLXConfig from this plugin — code the core could not take over without
+        importing a plugin, which the layering gate forbids.
+
+        runtime_state.set_override (not os.environ) so MLXConfig.from_env() sees
+        the new path without mutating the process env and racing concurrent
+        requests; the previous value is restored either way.
+
+        Returns True when a swap really happened (see switch_model).
+        """
+        from pathlib import Path as _Path
+
+        from core.runtime_state import get_override, set_override
+
+        from plugins.mlx_module.core.config import MLXConfig
+
+        # Validate BEFORE mutating any state (FD-S4, 8 GB M1 2026-07-23): the
+        # models dir held a grouping folder `mlx/` with no config.json, a bare
+        # .exists() let it through, the module switched its global config to the
+        # ghost path, the RAM guard estimated a model that did not exist and the
+        # user got a raw FileNotFoundError. A *failed* gate fell through silently
+        # too: the user kept chatting with the OLD model with no signal at all.
+        # ValueError with "not found" is deliberate — engine_error_to_http maps
+        # it to a clean 404 instead of the engine loop swallowing it as "this
+        # engine failed, try the next".
+        _path = _Path(local_path)
+        if not (_path / "config.json").is_file():
+            raise ValueError(
+                f"Model '{_path.name}' not found: no MLX model (config.json) "
+                f"under the models directory"
+            )
+
+        _prev = get_override("NEXE_MLX_MODEL")
+        try:
+            set_override("NEXE_MLX_MODEL", str(local_path))
+            new_config = MLXConfig.from_env()
+        finally:
+            set_override("NEXE_MLX_MODEL", _prev)
+
+        switched = self.switch_model(new_config)
+        if switched:
+            logger.info("MLX model switched to: %s", local_path)
+        return switched
+
     def switch_model(self, new_config: "MLXConfig") -> bool:
         """Hot-swap the active model to `new_config` if it differs.
 

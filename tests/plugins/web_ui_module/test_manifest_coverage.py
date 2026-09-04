@@ -71,6 +71,23 @@ def client(app):
     return TestClient(app, raise_server_exceptions=False)
 
 
+# F-D block 5: the chat asks the core which engines are live, and the core reads
+# app.state.modules — where plugin_loader._register_plugin_instance puts every
+# loaded plugin's instance. These tests describe their engine through a
+# module-manager mock, one indirection away, so _make_mock_mm below registers it
+# here as well and this fixture makes the dict the app's.
+_LIVE_MODULES: dict = {}
+_ENGINE_KEYS = ("ollama_module", "mlx_module", "llama_cpp_module")
+
+
+@pytest.fixture(autouse=True)
+def _live_modules(app):
+    _LIVE_MODULES.clear()
+    app.state.modules = _LIVE_MODULES
+    yield
+    _LIVE_MODULES.clear()
+
+
 @pytest.fixture
 def auth():
     return {"X-Api-Key": "test-cover-key"}
@@ -189,6 +206,13 @@ class TestChatEngineBranches:
         else:
             del manifest_mod.get_module_instance
 
+        # Register it where the loader would, under every engine key: which one
+        # the turn picks is the cascade's business (an env var in some of these
+        # tests), not this helper's. Nothing is registered when the test is
+        # describing an engine that cannot serve — that is the case under test.
+        if has_get_module and has_chat:
+            _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
+
         reg = MagicMock()
         reg.instance = manifest_mod
 
@@ -199,6 +223,67 @@ class TestChatEngineBranches:
         mm = MagicMock()
         mm.registry = registry
         return mm
+
+    def _distinct_engines(self):
+        """One engine per key, each with its own answer, each with the signature
+        the real module has.
+
+        Two problems with reusing `_make_mock_mm` here. It registers the SAME
+        engine under all three keys, so with one engine everywhere any cascade
+        order returns 200 and the preference these tests exist for is never
+        exercised. And a MagicMock is not a faithful double: the real engines'
+        `chat` is a coroutine, and the route picks the Ollama branch or the
+        in-process one by looking for a `model` parameter — with a MagicMock,
+        mlx and llama_cpp raised "a coroutine was expected" on every run and
+        the turn quietly fell through to the next engine, under a green 200.
+        """
+        class _InProcess:
+            """MLX / llama.cpp shape: chat(messages, system=...), no `model`."""
+
+            def __init__(self, reply):
+                self.reply = reply
+                self._node = object()
+
+            async def chat(self, messages, system="", session_id="default",
+                           stream_callback=None, images=None,
+                           thinking_enabled=False, **kwargs):
+                # The in-process branch feeds a queue from this callback; a
+                # double that ignores it returns nothing the route can read and
+                # the turn falls silently to the next engine — which is what the
+                # first version of this helper did, and what the old `assert
+                # 200` could never have shown.
+                if callable(stream_callback):
+                    stream_callback(self.reply)
+                return {"response": self.reply, "tokens": 1, "prompt_tokens": 0,
+                        "context_used": 0, "tokens_per_second": 0.0,
+                        "system_tokens": 0, "elapsed_ms": 1, "model_used": "fake",
+                        "session_id": session_id, "cache_hit": False, "timing": {}}
+
+            async def is_model_loaded(self, model_name):
+                return True
+
+        class _OllamaShape:
+            """Ollama shape: chat(model, messages, ...)."""
+
+            def __init__(self, reply):
+                self.reply = reply
+
+            async def chat(self, model, messages, stream=False, images=None,
+                           thinking_enabled=False, **kwargs):
+                return {"message": {"content": self.reply}}
+
+            async def is_model_loaded(self, model_name):
+                return True
+
+        engines = {
+            "mlx": _InProcess("resposta-mlx"),
+            "llamacpp": _InProcess("resposta-llamacpp"),
+            "ollama": _OllamaShape("resposta-ollama"),
+        }
+        _LIVE_MODULES["mlx_module"] = engines["mlx"]
+        _LIVE_MODULES["llama_cpp_module"] = engines["llamacpp"]
+        _LIVE_MODULES["ollama_module"] = engines["ollama"]
+        return engines
 
     def test_engine_no_get_module_instance(self, client, auth):
         """Engine has no get_module_instance → skipped → no engine → 503 (#884)."""
@@ -241,14 +326,19 @@ class TestChatEngineBranches:
         assert r.status_code == 503
 
     def test_preferred_engine_mlx(self, client, auth, monkeypatch):
-        """Lines 463-464: preferred_engine=mlx reorders engine list."""
+        """Lines 463-464: preferred_engine=mlx reorders engine list.
+
+        mlx is ALSO the head of the default cascade, so this one cannot tell a
+        honoured preference from a default order — verified by mutation: forcing
+        the plain cascade leaves it green. Its llamacpp sibling below is the
+        discriminating case, and that one goes red.
+        """
         monkeypatch.setenv("NEXE_MODEL_ENGINE", "mlx")
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        engine = MagicMock()
-        engine.chat = MagicMock(return_value={"content": "mlx response"})
-        mm = self._make_mock_mm(engine=engine)
+        mm = self._make_mock_mm()
+        self._distinct_engines()
 
         with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
@@ -262,6 +352,10 @@ class TestChatEngineBranches:
             mock_state.return_value = state
             r = client.post("/ui/chat", headers=auth, json={"message": "Hi", "session_id": sid})
         assert r.status_code == 200
+        assert "resposta-mlx" in r.text, (
+            "NEXE_MODEL_ENGINE=mlx and another engine answered: the preference "
+            "did not reach the cascade"
+        )
 
     def test_preferred_engine_llamacpp(self, client, auth, monkeypatch):
         """Lines 465-466: preferred_engine=llamacpp."""
@@ -269,9 +363,8 @@ class TestChatEngineBranches:
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        engine = MagicMock()
-        engine.chat = MagicMock(return_value={"content": "llamacpp response"})
-        mm = self._make_mock_mm(engine=engine)
+        mm = self._make_mock_mm()
+        self._distinct_engines()
 
         with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
@@ -285,6 +378,9 @@ class TestChatEngineBranches:
             mock_state.return_value = state
             r = client.post("/ui/chat", headers=auth, json={"message": "Hi", "session_id": sid})
         assert r.status_code == 200
+        assert "resposta-llamacpp" in r.text, (
+            "NEXE_MODEL_ENGINE=llamacpp and another engine answered"
+        )
 
 
 class TestChatStreamEngineIntegration:
@@ -293,6 +389,8 @@ class TestChatStreamEngineIntegration:
     def _make_mock_mm(self, engine):
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
 
         reg = MagicMock()
         reg.instance = manifest_mod
@@ -451,6 +549,8 @@ class TestChatAutoSaveRAG:
 
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
 
         reg = MagicMock()
         reg.instance = manifest_mod
@@ -485,6 +585,8 @@ class TestChatRecallIntent:
     def _make_mm(self, engine):
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
         reg = MagicMock()
         reg.instance = manifest_mod
         registry = MagicMock()
@@ -552,6 +654,8 @@ class TestChatEngineNoChat:
         engine = MagicMock(spec=[])
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
         reg = MagicMock()
         reg.instance = manifest_mod
         registry = MagicMock()
@@ -583,6 +687,8 @@ class TestChatRagContext:
         engine.chat = MagicMock(return_value={"response": "with rag"})
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
         reg = MagicMock()
         reg.instance = manifest_mod
         registry = MagicMock()
@@ -621,6 +727,8 @@ class TestChatRagContext:
         engine.chat = MagicMock(return_value={"response": "fallback"})
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
         reg = MagicMock()
         reg.instance = manifest_mod
         registry = MagicMock()
@@ -665,6 +773,8 @@ class TestChatNonStreamingAsyncGen:
         engine.chat = mock_chat
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
         reg = MagicMock()
         reg.instance = manifest_mod
         registry = MagicMock()
@@ -701,6 +811,8 @@ class TestChatCoroutineResult:
         engine.chat = mock_chat
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
         reg = MagicMock()
         reg.instance = manifest_mod
         registry = MagicMock()
@@ -733,6 +845,8 @@ class TestChatAutoSaveWithDocId:
         engine.chat = MagicMock(return_value={"response": "good response"})
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
         reg = MagicMock()
         reg.instance = manifest_mod
         registry = MagicMock()
@@ -765,6 +879,8 @@ class TestChatEngineException:
         engine.chat = MagicMock(side_effect=Exception("engine error"))
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        # F-D block 5: same engine, where the loader puts it.
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
         reg = MagicMock()
         reg.instance = manifest_mod
         registry = MagicMock()

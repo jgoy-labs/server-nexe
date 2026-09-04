@@ -134,9 +134,10 @@ class LlamaCppConfig:
         # storage/models/ (real file or symlink). Pick the first match
         # sorted alphabetically for determinism. Enables the UX
         # "drop a .gguf, restart, it just works" — no env var needed.
-        # Read from runtime_state (live UI override
-        # set by routes_chat._switch_llama_cpp_model) before falling back to
-        # the env var, so no os.environ mutation is needed at the call site.
+        # Read from runtime_state (live override set by this module's own
+        # switch_model_by_path — it was routes_chat._switch_llama_cpp_model
+        # until F-D block 5 moved it here) before falling back to the env var,
+        # so no os.environ mutation is needed at the call site.
         from core.runtime_state import get_with_env_fallback
         model_path = get_with_env_fallback("NEXE_LLAMA_CPP_MODEL", "")
         if not model_path:

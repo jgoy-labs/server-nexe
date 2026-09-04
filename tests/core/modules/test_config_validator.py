@@ -269,10 +269,18 @@ class TestValidatePluginsSection:
         errors = self.validator._validate_plugins_section(config)
         assert errors == []
 
-    def test_invalid_max_tokens(self):
+    def test_max_tokens_is_no_longer_an_error(self):
+        """#1002: the key is read by nobody, so it is not type-checked any more.
+
+        Validating it stated that it governed something. It is reported as a
+        deprecation warning instead — see test_1002_dead_model_config_keys.
+        """
         config = {"plugins": {"models": {"primary": "llama3.2", "max_tokens": -1}}}
         errors = self.validator._validate_plugins_section(config)
-        assert len(errors) > 0
+        assert errors == []
+        assert self.validator._validate_deprecated_keys(config), (
+            "tolerated, but never in silence"
+        )
 
     def test_no_plugins_section(self):
         errors = self.validator._validate_plugins_section({})

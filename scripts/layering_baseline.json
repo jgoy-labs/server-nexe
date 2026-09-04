@@ -57,6 +57,7 @@
   "memory/rag/constants.py -> core.version",
   "memory/rag/header_parser.py -> core.memory_access",
   "memory/rag/health.py -> personality.i18n",
+  "memory/rag/module.py -> core.metrics.registry",
   "memory/rag/module.py -> personality.i18n",
   "memory/rag/router.py -> core.security.auth",
   "memory/shared/health_helpers.py -> personality.i18n",
@@ -119,5 +120,5 @@
   "plugins/web_ui_module/module.py -> core.modules.protocol",
   "plugins/web_ui_module/module.py -> core.sessions"
  ],
- "reason": "F-D block 4: context_budget moves to core/, so the plugin's edge into it is now plugin->core (the allowed direction) and its old edge out of the plugin disappears"
+ "reason": "#1004: RAGModule.search publishes core_rag_searches_total / core_rag_search_duration_seconds, so memory/rag imports the core metrics registry at import time. memory -> core is the allowed direction (18 such edges were already frozen); deferring the import would hide the coupling from this gate without removing it, which is what the gate's own message warns about."
 }

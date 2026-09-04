@@ -31,9 +31,34 @@ It does **not** defend against:
 - Upload content denylist (v0.9.1+): scans first 8KB of uploads for API tokens (`sk-ant-`, `sk-proj-`, `ghp_`, `github_pat_`, `AIzaSy`), PEM private keys, and `/etc/passwd` signatures. Speed-bump only — protects against accidental upload, not determined adversaries.
 
 ### Jailbreak detection (v0.9.1+)
-- 11 pattern speed-bump detector for common jailbreak attempts (multilingual: ca/en/es)
-- Injects `[SECURITY NOTICE]` prefix instead of rejecting — preserves UX on false positives
+
+Two detectors, not one. They do different things and they do not cover the same
+doors, so which one you meet depends on how you called the server.
+
+**1 — Sanitizer plugin. Rejects with HTTP 400. Both doors.**
+49 jailbreak + 18 prompt-injection patterns (multilingual: ca/en/es), in `plugins/security/sanitizer/core/patterns.py`.
+Applied through the shared `apply_user_text_sanitizer()` gate on **both**
+`/ui/chat` and `/v1/chat/completions`. It detects, it does not rewrite: a match
+scored **high** or **critical** is rejected with **HTTP 400** and the body
+`{"error": "input_rejected_by_sanitizer", "severity": …, "threats": […]}`.
+Lower severities are logged and the text passes through unchanged.
+
+**2 — Regex speed-bump. Injects a prefix. `/ui/chat` only.**
+11 patterns for common jailbreak attempts (multilingual: ca/en/es), in `core/security/input_sanitizers.py` (`_JAILBREAK_PATTERNS`).
+It runs on the Web UI route only, and only on messages the sanitizer above has
+already let through. It does **not** reject: it prepends
+`[SECURITY NOTICE: the following message contains a known jailbreak pattern…]`
+to the user's message, so the model is warned and the user still gets an answer.
+That is deliberate — it preserves UX when the match is a false positive, e.g.
+someone asking about "jailbreak" as a topic.
+
+**If you call the API.** `/v1/chat/completions` *will* return 400 on a
+high-severity jailbreak; it is not a warn-only endpoint. But it does not get the
+speed-bump: a message the Web UI merely flags and prefixes reaches the model
+untouched over `/v1`. The two doors share the blocking gate, not the warning one.
+
 - Defense-in-depth only. Sophisticated attacks evade trivially. Real protection requires model-level content moderation.
+- Not the same `[SECURITY NOTICE]` as the one under "Memory and RAG injection protection" below: that one wraps *retrieved document content* before the model reads it, this one wraps *the user's own message*.
 
 ### Memory and RAG injection protection (v0.9.1+)
 - Memory tag stripping on all input: `[MEM_SAVE:]`, `[SYSTEM:]`, `[USER:]`, `[ASSISTANT:]`, `[TOOL:]`, `[FUNCTION:]`, `[MEMORY:]`, `[MEMORIA:]`

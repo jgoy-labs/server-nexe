@@ -71,6 +71,10 @@ def _capturing_engine():
     class _Eng:
         def __init__(self):
             self.systems = []
+            # B260/F-D block 5: an mlx module is only serviceable with a live
+            # `_node`, and the core checks that before dispatching. Without it
+            # this double is a module the chat is right to skip.
+            self._node = object()
 
         async def chat(self, messages, system="", session_id="default",
                        stream_callback=None, **kwargs):

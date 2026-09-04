@@ -10,6 +10,12 @@ with the OLD model with no signal.
 
 Three layers, all backend: routes (clean 404), module (state never mutates),
 scan (ghosts never reach the dropdown).
+
+F-D block 5 moved the first layer twice over: the path resolution went to the
+core (switch_engine_model, which any door could call) and the validation went
+into the engine module itself (switch_model_by_path), because what a model of a
+given kind looks like is that engine's knowledge and the core may not import a
+plugin to ask. The guarantee is unchanged and is still checked at both halves.
 """
 
 import json
@@ -17,7 +23,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from plugins.web_ui_module.api.routes_chat import _switch_engine_model
+from core.endpoints.chat_engines.model_switch import (
+    resolve_local_model_path,
+    switch_engine_model,
+)
 from plugins.web_ui_module.api.routes_auth import _scan_mlx_backend
 
 
@@ -41,36 +50,98 @@ def models_dir(tmp_path, monkeypatch):
     return tmp_path
 
 
-class TestSwitchEngineModel:
+def _mlx_module():
+    """A real MLXModule with a live node — the validation runs for real, and
+    apply_config is what must NOT be reached."""
+    from plugins.mlx_module.module import MLXModule
+
+    module = MLXModule()
+    node = MagicMock()
+    node.config.model_path = "/somewhere/else"
+    module._node = node
+    return module, node
+
+
+def _llama_module():
+    from plugins.llama_cpp_module.module import LlamaCppModule
+
+    module = LlamaCppModule()
+    node = MagicMock()
+    node.config.model_path = "/somewhere/else"
+    module._node = node
+    return module, node
+
+
+class TestTheEngineValidatesBeforeItSwitches:
+    """Layer 1a — the plugin half. Driven on the real module, not a mock of it."""
+
     async def test_ghost_dir_raises_not_found(self, models_dir):
         """The exact 8 GB M1 repro: dir EXISTS but has no config.json."""
-        engine = MagicMock()
+        module, node = _mlx_module()
         with pytest.raises(ValueError, match="not found"):
-            await _switch_engine_model(engine, "mlx_module", {}, "mlx")
-        engine.switch_model.assert_not_called()
+            await switch_engine_model(module, "mlx", "mlx")
+        node.apply_config.assert_not_called()
 
     async def test_missing_path_raises_not_found(self, models_dir):
         """The old silent-skip: user kept chatting with the OLD model."""
-        engine = MagicMock()
+        module, node = _mlx_module()
         with pytest.raises(ValueError, match="not found"):
-            await _switch_engine_model(engine, "mlx_module", {}, "no-such")
+            await switch_engine_model(module, "mlx", "no-such")
+        node.apply_config.assert_not_called()
 
-    async def test_real_model_switches(self, models_dir, monkeypatch):
-        import plugins.web_ui_module.api.routes_chat as rc
-        called = {}
+    async def test_llamacpp_requires_a_gguf_file(self, models_dir):
+        module, node = _llama_module()
+        with pytest.raises(ValueError, match="not found"):
+            await switch_engine_model(module, "llama_cpp", "empty-dir")
+        node.apply_config.assert_not_called()
+
+    async def test_a_real_gguf_gets_through(self, models_dir, monkeypatch):
+        """The positive half. Without it the validation could be inverted —
+        raising on the valid file and letting the ghost through — and every
+        other test here would stay green. It was in the version before F-D
+        block 5 and I dropped it moving the checks into the plugin."""
+        from types import SimpleNamespace
+
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
+
+        module, _node = _llama_module()
         monkeypatch.setattr(
-            rc, "_switch_mlx_model", lambda e, p: called.setdefault("path", p)
+            LlamaCppConfig, "from_env",
+            lambda: SimpleNamespace(model_path=str(models_dir / "some.gguf")),
         )
-        await _switch_engine_model(MagicMock(), "mlx_module", {}, "Qwen-Real")
-        assert called["path"].name == "Qwen-Real"
+        await switch_engine_model(module, "llama_cpp", "some.gguf")
 
-    async def test_llamacpp_requires_a_gguf_file(self, models_dir, monkeypatch):
-        import plugins.web_ui_module.api.routes_chat as rc
-        monkeypatch.setattr(rc, "_switch_llama_cpp_model", lambda e, p: None)
-        with pytest.raises(ValueError, match="not found"):
-            await _switch_engine_model(MagicMock(), "llama_cpp_module", {}, "empty-dir")
-        # a real .gguf passes
-        await _switch_engine_model(MagicMock(), "llama_cpp_module", {}, "some.gguf")
+    async def test_a_real_mlx_model_gets_through(self, models_dir, monkeypatch):
+        from types import SimpleNamespace
+
+        from plugins.mlx_module.core.config import MLXConfig
+
+        module, _node = _mlx_module()
+        monkeypatch.setattr(
+            MLXConfig, "from_env",
+            lambda: SimpleNamespace(model_path=str(models_dir / "Qwen-Real")),
+        )
+        await switch_engine_model(module, "mlx", "Qwen-Real")
+
+
+class TestTheCoreResolvesAndAsks:
+    """Layer 1b — the core half: find the file under the models dir, ask the
+    engine. It knows nothing about what makes a model valid."""
+
+    async def test_a_real_model_reaches_the_engine(self, models_dir):
+        engine = MagicMock()
+        engine.switch_model_by_path.return_value = True
+        assert await switch_engine_model(engine, "mlx", "Qwen-Real") is True
+        assert engine.switch_model_by_path.call_args.args[0].name == "Qwen-Real"
+
+    def test_the_path_is_resolved_under_the_models_dir(self, models_dir):
+        assert resolve_local_model_path("Qwen-Real").parent == models_dir
+
+    async def test_an_engine_without_the_contract_keeps_its_model(self, models_dir):
+        """Ollama picks its model per request, and so would any engine written
+        before this contract. Not being able to switch is not a failed turn."""
+        engine = MagicMock(spec=["chat"])
+        assert await switch_engine_model(engine, "ollama", "whatever") is False
 
 
 class TestModuleBelt:

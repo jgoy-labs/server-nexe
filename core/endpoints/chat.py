@@ -47,6 +47,8 @@ from .chat_engines.routing import (
     _get_preferred_engine,
     _engine_available,
     _resolve_engine,
+    raise_if_terminal,
+    resolve_engine_cascade,
 )
 from .chat_engines.ollama import (
     _forward_to_ollama,
@@ -59,7 +61,7 @@ from .chat_engines.ollama import (
 from .chat_engines.mlx import _forward_to_mlx, _mlx_stream_generator
 from .chat_engines.llama_cpp import _forward_to_llama_cpp, _llama_cpp_stream_generator
 from .chat_engines._common import derive_session_id, mirror_v1_conversation, persist_v1_turn
-from core.chat_prompt import build_system_prompt_with_time, time_context_line
+from core.chat_prompt import EMERGENCY_SYSTEM_PROMPT, build_system_prompt_with_time, time_context_line
 from core.dependencies import limiter
 from core.lang_detect import (
     detect_user_lang_or_none as _detect_lang_or_none,
@@ -163,7 +165,7 @@ def _get_system_prompt(app_state: Any, lang: Optional[str] = None) -> str:
         if prompt:
             return prompt
 
-    return "You are Nexe, an AI assistant. Respond clearly and helpfully."
+    return EMERGENCY_SYSTEM_PROMPT
 
 
 # --- Helper Functions ---
@@ -494,25 +496,125 @@ def _record_engine_metrics(engine: str, engine_status: str, start_time: float) -
 
 
 def _inject_response_headers(
-    response: Any, engine: str, context_text: str, preferred_fallback: Optional[str]
+    response: Any, engine: str, context_text: str, preferred_fallback: Optional[str],
+    fallback_reason: str = "preferred_unavailable",
 ) -> Any:
-    """Add ``X-Nexe-*`` headers (engine, RAG status, fallback) to the response."""
+    """Add ``X-Nexe-*`` headers (engine, RAG status, fallback) to the response.
+
+    ``fallback_reason`` used to be the hardcoded string above, which was true
+    while the only way to end up on another engine was that the one asked for
+    was not live. Since F-D block 5 the cascade also moves on when an engine
+    fails mid-turn, and reporting THAT as "preferred_unavailable" tells the
+    client something that did not happen — the sibling vocabulary
+    (fallback_to_ollama) already calls it "execution_failed".
+    """
     if isinstance(response, StreamingResponse):
         if "X-Nexe-Engine" not in response.headers:
             response.headers["X-Nexe-Engine"] = engine
         response.headers["X-Nexe-RAG-Status"] = "active" if context_text else "inactive"
         if preferred_fallback and "X-Nexe-Fallback-From" not in response.headers:
             response.headers["X-Nexe-Fallback-From"] = preferred_fallback
-            response.headers["X-Nexe-Fallback-Reason"] = "preferred_unavailable"
+            response.headers["X-Nexe-Fallback-Reason"] = fallback_reason
     elif isinstance(response, dict):
         response.setdefault("nexe_engine", engine)
         response.setdefault("nexe_rag_status", "active" if context_text else "inactive")
         if preferred_fallback:
             response.setdefault(
                 "nexe_fallback",
-                {"from": preferred_fallback, "to": engine, "reason": "preferred_unavailable"},
+                {"from": preferred_fallback, "to": engine, "reason": fallback_reason},
             )
     return response
+
+
+def _fit_v1_messages_to_window(
+    messages: list[dict], window_tokens: Optional[int], body: ChatCompletionRequest
+) -> list[dict]:
+    """#976: the prompt this door assembles must fit the engine's window too.
+
+    /ui/chat carries the system prompt beside the turns; /v1 carries it as
+    messages[0] (OpenAI shape). Split it off, fit the turns, put it back — so
+    both doors enforce the same invariant with the same function instead of two
+    lookalikes.
+
+    The reply reserve is what the client asked for (``max_tokens``); a client
+    asking for more than the engine holds is clamped inside the shared function,
+    not here.
+
+    Deferred import for the cycle documented in _inject_rag_context_into_messages.
+    """
+    if not messages:
+        return messages
+    from core.context_budget import fit_prompt_to_window
+
+    system_msg = messages[0] if messages[0].get("role") == "system" else None
+    turns = messages[1:] if system_msg else messages
+    fitted, _trimmed = fit_prompt_to_window(
+        (system_msg.get("content") or "") if system_msg else "",
+        turns,
+        window_tokens or DEFAULT_CONTEXT_WINDOW,
+        reply_budget_tokens=body.max_tokens or 0,
+    )
+    return ([system_msg] + fitted) if system_msg else fitted
+
+
+async def _dispatch_through_cascade(
+    body: ChatCompletionRequest, request: Request, messages: list[dict],
+    last_user_msg: Optional[str], session_id: str, engine: str,
+    preferred_fallback: Optional[str],
+) -> tuple:
+    """Try the resolved engine, then the rest of the cascade. Returns
+    ``(response, engine_that_answered, fallback_from, fallback_reason)``.
+
+    F-D block 5. This door used to dispatch exactly once: whatever the single
+    engine raised became the client's error, while /ui/chat quietly walked down
+    its list and answered. The list and the policy are now the same at both
+    doors (resolve_engine_cascade / should_try_next_engine), and the response
+    headers name the engine that actually answered rather than the one that was
+    picked.
+
+    An HTTPException is never retried — that is how the forwarders report a
+    backend that is down, and it is the answer, not a crash. What IS retried is
+    an engine failing at this moment: a corrupt model, an out-of-memory, a
+    driver. Note the MLX and llama.cpp forwarders still catch their own
+    execution errors first and fall back straight to Ollama (a one-step
+    mechanism that predates this block and skips llama.cpp); this cascade is
+    what catches everything they do not.
+    """
+    cascade = resolve_engine_cascade(body.engine, request.app.state) or [engine]
+    last_exc: Optional[BaseException] = None
+    reason = "preferred_unavailable"
+    for candidate in cascade:
+        start_time = time.time()
+        try:
+            # #976, per engine: the prompt was fitted to the window of the engine
+            # that was RESOLVED, and this loop can hand it to a different one.
+            # Falling back from a 32k engine to a 2048 one with the first one's
+            # prompt is the very crash the fit guard exists to prevent — and it
+            # would only appear on the fallback path, which is the one nobody
+            # exercises. Fitting an already-fitted list to a bigger window
+            # returns it unchanged.
+            attempt_messages = _fit_v1_messages_to_window(
+                messages, get_effective_context_window(candidate, request.app.state), body
+            )
+            response = await _dispatch_to_engine(
+                candidate, attempt_messages, body, request, request.app.state, last_user_msg, session_id
+            )
+        except Exception as exc:
+            _record_engine_metrics(candidate, "error", start_time)
+            raise_if_terminal(exc, candidate)
+            logger.warning("Engine %s failed (%s); trying the next in the cascade", candidate, exc)
+            last_exc = exc
+            # From here on a fallback is not "the one you asked for was not
+            # live" — it is "it was live and it broke".
+            reason = "execution_failed"
+            continue
+        _record_engine_metrics(candidate, "success", start_time)
+        if candidate != engine and not preferred_fallback:
+            preferred_fallback = engine
+        return response, candidate, preferred_fallback, reason
+
+    # Every live engine failed with something retryable.
+    raise last_exc if last_exc is not None else RuntimeError("no engine available")
 
 
 # --- Main Endpoint ---
@@ -529,8 +631,6 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
     _validate_chat_request(body)
 
     engine, preferred_fallback = _resolve_engine(body.engine, request.app.state)
-    start_time = time.time()
-    engine_status = "success"
 
     last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
 
@@ -555,20 +655,19 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
     _effective_ctx = get_effective_context_window(engine, request.app.state)
     messages, context_text = await _build_rag_and_system_prompt(body, request.app.state, _server_lang, _effective_ctx)
 
-    response = None
-    try:
-        response = await _dispatch_to_engine(
-            engine, messages, body, request, request.app.state, last_user_msg, session_id
-        )
-    except Exception:
-        engine_status = "error"
-        raise
-    finally:
-        _record_engine_metrics(engine, engine_status, start_time)
+    # #976: last check before the engine sees it — what the budget planned and
+    # what got assembled are not the same thing.
+    messages = _fit_v1_messages_to_window(messages, _effective_ctx, body)
+
+    response, engine, preferred_fallback, fallback_reason = await _dispatch_through_cascade(
+        body, request, messages, last_user_msg, session_id, engine, preferred_fallback
+    )
 
     _persist_v1_turn_from_response(response, background_tasks, request.app.state, session_id)
 
-    return _inject_response_headers(response, engine, context_text, preferred_fallback)
+    return _inject_response_headers(
+        response, engine, context_text, preferred_fallback, fallback_reason
+    )
 
 
 # Re-exports for backwards compatibility (used by tests and other modules

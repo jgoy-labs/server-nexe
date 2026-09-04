@@ -168,6 +168,39 @@ class LlamaCppModule:
         except (AttributeError, TypeError, ValueError):
             return None
 
+    def switch_model_by_path(self, local_path) -> bool:
+        """F-D block 5: the module's own answer to "load this model instead".
+
+        Mirror of MLXModule.switch_model_by_path, for the same reason: the config
+        is this plugin's, so building it belongs here and not in the caller. The
+        core asks through this name and never imports LlamaCppConfig.
+
+        Returns True when a swap really happened (see switch_model).
+        """
+        from pathlib import Path as _Path
+
+        from core.runtime_state import get_override, set_override
+
+        from plugins.llama_cpp_module.core.config import LlamaCppConfig
+
+        # Same belt as MLX (FD-S4): what a llama.cpp model looks like is this
+        # plugin's knowledge, so the check lives with it.
+        _path = _Path(local_path)
+        if not (_path.is_file() and _path.suffix == ".gguf"):
+            raise ValueError(f"Model '{_path.name}' not found: not a GGUF file")
+
+        _prev = get_override("NEXE_LLAMA_CPP_MODEL")
+        try:
+            set_override("NEXE_LLAMA_CPP_MODEL", str(local_path))
+            new_config = LlamaCppConfig.from_env()
+        finally:
+            set_override("NEXE_LLAMA_CPP_MODEL", _prev)
+
+        switched = self.switch_model(new_config)
+        if switched:
+            logger.info("Llama.cpp model switched to: %s", new_config.model_path)
+        return switched
+
     def switch_model(self, new_config: "LlamaCppConfig") -> bool:
         """Hot-swap the active model to `new_config` if it differs.
 

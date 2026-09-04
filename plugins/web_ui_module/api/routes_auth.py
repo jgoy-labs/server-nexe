@@ -358,9 +358,20 @@ def _collect_llamacpp_gguf_paths(models_dir: "Path") -> "list[dict]":
     return gguf_list
 
 
-# Same cascade as core B260 / routes_chat._resolve_engines("auto").
-# Backend ids (dropdown), not module names.
-_AUTO_BACKEND_CASCADE = ("mlx", "llamacpp", "ollama")
+# The dropdown answers a different question from the chat — which backend to
+# show as active, judged on what the scan listed and whether it is connected,
+# not on whether a module has a live node — but the ORDER is the same order, and
+# it was a third hand-aligned copy of it (its comment still pointed at
+# routes_chat._resolve_engines, deleted in F-D block 5). Derived now, so the day
+# the cascade changes it changes here too.
+# Backend ids (dropdown spelling), not canonical engine names.
+_BACKEND_IDS = {"mlx": "mlx", "llama_cpp": "llamacpp", "ollama": "ollama"}
+
+
+def _auto_backend_cascade() -> tuple:
+    from core.endpoints.chat_engines.routing import ENGINE_CASCADE
+
+    return tuple(_BACKEND_IDS[name] for name in ENGINE_CASCADE if name in _BACKEND_IDS)
 
 
 def _mark_active_backend(backends: list, current_backend: str) -> str:
@@ -373,7 +384,7 @@ def _mark_active_backend(backends: list, current_backend: str) -> str:
     """
     if current_backend == "auto":
         by_id = {b["id"]: b for b in backends}
-        for bid in _AUTO_BACKEND_CASCADE:
+        for bid in _auto_backend_cascade():
             b = by_id.get(bid)
             if b and b.get("connected", True) and b.get("models"):
                 b["active"] = True

@@ -1,18 +1,63 @@
 """D-I phase 2 — UI auto cascade matches the core, no-engine is 503.
 
-ADR-005 D-I / B260: auto is mlx → llama_cpp → ollama. Explicit picks
-keep that engine first. MLX first is skipped by the caller when the
-module is absent (non-Mac). Without any engine the product path must
-not return 200 with an error string in the body.
+ADR-005 D-I / B260: auto is mlx → llama_cpp → ollama. Explicit picks keep that
+engine first. Without any engine the product path must not return 200 with an
+error string in the body.
+
+F-D block 5: the UI no longer has a cascade of its own. It had
+``_resolve_engines``, a second table in module-key spelling whose only alias was
+"llamacpp" and which was not node-aware — so these tests could only check the
+ORDER, never whether an engine in it could actually serve. They now drive
+``resolve_engine_cascade``, the core's, which answers both at once.
+
+One deliberate behaviour change: an explicit pick that is not serviceable now
+falls back through the canonical cascade. Asking for MLX on a machine without it
+used to land on Ollama (the UI table put ollama second for an explicit mlx) and
+now lands on llama.cpp, which is what /v1 and /status have always answered.
 """
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi import HTTPException
 
+from core.endpoints.chat_engines.routing import resolve_engine_cascade
 from plugins.web_ui_module.api.routes_auth import _mark_active_backend
-from plugins.web_ui_module.api.routes_chat import _resolve_engines
+
+_MODULE_KEYS = {"mlx": "mlx_module", "llama_cpp": "llama_cpp_module", "ollama": "ollama_module"}
+
+
+@pytest.fixture(autouse=True)
+def _no_preferred_engine(monkeypatch):
+    """`auto` must mean auto: a preferred engine left in the environment (or in
+    a runtime override) by another test would prepend itself to every cascade."""
+    from core.runtime_state import get_override, set_override
+
+    monkeypatch.delenv("NEXE_MODEL_ENGINE", raising=False)
+    # set_override returns None, so the previous value has to be read first —
+    # restoring what it "returned" would clear the override for whatever ran
+    # before this file.
+    _prev = get_override("NEXE_MODEL_ENGINE")
+    set_override("NEXE_MODEL_ENGINE", None)
+    yield
+    set_override("NEXE_MODEL_ENGINE", _prev)
+
+
+def _state(*live):
+    """An app state where exactly these engines are serviceable.
+
+    mlx and llama_cpp need a live ``_node`` to count (B260) — a registered
+    module with a dead node is precisely what the old UI table could not see.
+    """
+    state = SimpleNamespace(modules={}, config={})
+    for name in live:
+        module = MagicMock()
+        module._node = object()
+        state.modules[_MODULE_KEYS[name]] = module
+    return state
 
 
 def _backend(bid: str, *, models=None, connected=True):
@@ -26,26 +71,50 @@ def _backend(bid: str, *, models=None, connected=True):
 
 
 def test_auto_follows_core_cascade():
-    assert _resolve_engines("auto") == [
-        "mlx_module",
-        "llama_cpp_module",
-        "ollama_module",
+    assert resolve_engine_cascade("auto", _state("mlx", "llama_cpp", "ollama")) == [
+        "mlx",
+        "llama_cpp",
+        "ollama",
     ]
 
 
 def test_explicit_ollama_still_starts_with_ollama():
-    order = _resolve_engines("ollama")
-    assert order[0] == "ollama_module"
-    assert "mlx_module" in order
+    order = resolve_engine_cascade("ollama", _state("mlx", "llama_cpp", "ollama"))
+    assert order[0] == "ollama"
+    assert "mlx" in order
 
 
 def test_explicit_mlx_and_llamacpp_keep_their_head():
-    assert _resolve_engines("mlx")[0] == "mlx_module"
-    assert _resolve_engines("llamacpp")[0] == "llama_cpp_module"
+    everything = _state("mlx", "llama_cpp", "ollama")
+    assert resolve_engine_cascade("mlx", everything)[0] == "mlx"
+    # The alias the UI sends. The old table knew this one spelling and no other;
+    # the core normalises "llamacpp", "llama-cpp" and "llama.cpp" alike.
+    assert resolve_engine_cascade("llamacpp", everything)[0] == "llama_cpp"
+    assert resolve_engine_cascade("llama.cpp", everything)[0] == "llama_cpp"
 
 
 def test_unknown_preferred_uses_cascade_not_ollama_first():
-    assert _resolve_engines("whatever")[0] == "mlx_module"
+    assert resolve_engine_cascade("whatever", _state("mlx", "llama_cpp", "ollama"))[0] == "mlx"
+
+
+def test_an_engine_that_is_not_serviceable_is_not_offered():
+    """What the UI table could not express: mlx present but with a dead node.
+
+    It used to be first in the list regardless, dispatched to, and the turn fell
+    through to whatever the generic handler caught."""
+    state = _state("mlx", "ollama")
+    state.modules["mlx_module"]._node = None
+    assert resolve_engine_cascade("auto", state) == ["ollama"]
+
+
+def test_an_explicit_pick_that_is_dead_falls_through_the_cascade():
+    state = _state("llama_cpp", "ollama")
+    assert resolve_engine_cascade("mlx", state) == ["llama_cpp", "ollama"]
+
+
+def test_nothing_live_is_an_empty_cascade():
+    """The caller answers 503 from this, instead of dispatching blindly."""
+    assert resolve_engine_cascade("auto", _state()) == []
 
 
 def test_auto_dropdown_prefers_mlx_when_present():

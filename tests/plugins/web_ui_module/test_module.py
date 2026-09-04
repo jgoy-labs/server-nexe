@@ -49,6 +49,10 @@ def initialized_module(tmp_path, monkeypatch):
     return mod
 
 
+_LIVE_MODULES: dict = {}
+_ENGINE_KEYS = ("ollama_module", "mlx_module", "llama_cpp_module")
+
+
 @pytest.fixture
 def client(initialized_module, monkeypatch):
     """TestClient with initialized router."""
@@ -61,6 +65,10 @@ def client(initialized_module, monkeypatch):
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.include_router(initialized_module.get_router())
     app.include_router(router_public)
+    # F-D block 5: where the plugin loader registers engine instances, and where
+    # the chat now looks for them. The tests that need one fill this dict.
+    _LIVE_MODULES.clear()
+    app.state.modules = _LIVE_MODULES
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -247,6 +255,7 @@ class TestWebUIModuleEndpoints:
         })
         mock_manifest = MagicMock()
         mock_manifest.get_module_instance.return_value = mock_engine
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, mock_engine))
 
         mock_reg = MagicMock()
         mock_reg.instance = mock_manifest
@@ -328,6 +337,7 @@ class TestWebUIModuleChatErrors:
         mock_engine.chat = AsyncMock(side_effect=Exception("Service unavailable"))
         mock_manifest = MagicMock()
         mock_manifest.get_module_instance.return_value = mock_engine
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, mock_engine))
 
         mock_reg = MagicMock()
         mock_reg.instance = mock_manifest
@@ -393,6 +403,7 @@ class TestWebUIModuleChatErrors:
         mock_engine.chat = MagicMock(return_value=mock_stream())
         mock_manifest = MagicMock()
         mock_manifest.get_module_instance.return_value = mock_engine
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, mock_engine))
 
         mock_reg = MagicMock()
         mock_reg.instance = mock_manifest

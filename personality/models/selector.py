@@ -89,7 +89,10 @@ class ModelSelector:
         models_cfg["primary"] = profile.primary_model
         models_cfg["secondary"] = profile.secondary_model
         models_cfg["embedding"] = profile.embedding_model
-        models_cfg["max_tokens"] = profile.max_tokens
-        models_cfg["context_window"] = profile.context_window
-        
+        # #1002: `max_tokens` and `context_window` are NOT written back. The
+        # profile still carries them (they describe the hardware tier and the
+        # CLI prints them), but nothing reads them out of server.toml — the
+        # window is asked of the live engine (#965). Writing them created a
+        # key that looked authoritative and governed nothing.
+
         return config

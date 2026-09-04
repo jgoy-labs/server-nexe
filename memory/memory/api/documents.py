@@ -35,8 +35,17 @@ def _get_metrics():
       _MEMORY_OPERATIONS = MEMORY_OPERATIONS
       _MEMORY_STORE_SIZE = MEMORY_STORE_SIZE
       _metrics_imported = True
-    except ImportError:
+    except ImportError as exc:
+      # The flag is set either way: this is a one-shot lazy import, so the
+      # warning is emitted once per process and the memory API keeps working
+      # without instrumentation rather than retrying the import per call.
       _metrics_imported = True
+      logger.warning(
+        "Prometheus metrics registry unavailable (%s) — memory operation "
+        "counters and the store-size gauge will not be updated for the rest "
+        "of this process",
+        exc,
+      )
   return _MEMORY_OPERATIONS, _MEMORY_STORE_SIZE
 
 def hex_to_uuid(hex_id: str) -> str:
@@ -452,7 +461,31 @@ async def count_documents(
     info = qdrant.get_collection(collection)
     return info.points_count
 
-  return await loop.run_in_executor(executor, _count)
+  count = await loop.run_in_executor(executor, _count)
+
+  # #1004: MEMORY_STORE_SIZE was imported by this module and then thrown away
+  # at all four write sites (`ops, _ = _get_metrics()`), so the gauge never
+  # left zero. It is published HERE, and only here, because this is the one
+  # place that already holds a REAL point count from Qdrant — so the gauge
+  # costs nothing and is never an estimate.
+  #
+  # Why not at the four write sites: a gauge kept by deltas there would drift,
+  # because TTL expiry (`cleanup_expired`) and bulk `_delete_points` change the
+  # size without passing through any of them; and re-reading `get_collection()`
+  # after every single-document store adds a Qdrant round-trip per write for a
+  # number nobody reads between scrapes — and one that a server-mode Qdrant may
+  # report stale right after an upsert.
+  #
+  # The registry names the label `store_type`; the collection is the only
+  # dimension this layer has, and the collections ARE the stores
+  # (nexe_documentation / user_knowledge / personal_memory — three of them, so
+  # no cardinality problem).
+  _, store_size = _get_metrics()
+  # points_count is Optional in qdrant-client; publishing None would raise.
+  if store_size and isinstance(count, int):
+    store_size.labels(store_type=collection).set(count)
+
+  return count
 
 async def cleanup_expired(
   qdrant: Any,

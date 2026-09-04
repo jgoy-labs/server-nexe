@@ -8,8 +8,9 @@ trencaria el canvi de model en silenci.
 Aquests tests fixen el contracte públic:
   node.apply_config(new_config)  -> reset dels singletons de classe (al plugin)
   module.switch_model(new_config) -> decideix i delega a apply_config
-  routes_chat._switch_*_model(engine, path) -> crida engine.switch_model(...)
-i NO toca cap atribut privat de classe.
+  module.switch_model_by_path(path) -> construeix la config i crida switch_model
+i NO toca cap atribut privat de classe. (F-D bloc 5: l'últim pas vivia a
+routes_chat._switch_{mlx,llama_cpp}_model i ha baixat dins de cada mòdul.)
 """
 from types import SimpleNamespace
 from pathlib import Path
@@ -103,25 +104,64 @@ def test_llama_module_switch_model_delegates():
     assert m.switch_model(cfg_b) is False
 
 
-# ── capa 3: routes_chat delega (anti-regressió de l'encapsulament) ─────────
+# ── capa 3: switch_model_by_path delega (anti-regressió de l'encapsulament) ─
+#
+# F-D block 5: aquestes dues comprovacions vivien sobre `routes_chat._switch_
+# mlx_model` / `_switch_llama_cpp_model`. Les funcions han baixat dins del mòdul
+# de cada motor (`switch_model_by_path`) perquè el nucli no pot importar un
+# plugin per construir-li la config. La garantia és la mateixa i és on toca: qui
+# canvia de model passa pel `switch_model` públic i no toca mai els privats del
+# node.
 
-def test_routes_chat_mlx_delegates_to_public_switch(monkeypatch):
-    from plugins.web_ui_module.api import routes_chat
+def test_mlx_switch_by_path_delegates_to_public_switch(monkeypatch, tmp_path):
     from plugins.mlx_module.core.config import MLXConfig
-    monkeypatch.setattr(MLXConfig, "from_env", lambda: SimpleNamespace(model_path="/models/B"))
-    engine = Mock()
-    engine.switch_model.return_value = True
-    routes_chat._switch_mlx_model(engine, Path("/models/B"))
-    engine.switch_model.assert_called_once()
-    assert engine.switch_model.call_args.args[0].model_path == "/models/B"
+    from plugins.mlx_module.module import MLXModule
+
+    model = tmp_path / "B"
+    model.mkdir()
+    (model / "config.json").write_text("{}")
+    monkeypatch.setattr(MLXConfig, "from_env", lambda: SimpleNamespace(model_path=str(model)))
+
+    module = MLXModule()
+    module.switch_model = Mock(return_value=True)
+    assert module.switch_model_by_path(model) is True
+    module.switch_model.assert_called_once()
+    assert module.switch_model.call_args.args[0].model_path == str(model)
 
 
-def test_routes_chat_llama_delegates_to_public_switch(monkeypatch):
-    from plugins.web_ui_module.api import routes_chat
+def test_llama_switch_by_path_delegates_to_public_switch(monkeypatch, tmp_path):
     from plugins.llama_cpp_module.core.config import LlamaCppConfig
-    monkeypatch.setattr(LlamaCppConfig, "from_env", lambda: SimpleNamespace(model_path="/models/B"))
-    engine = Mock()
-    engine.switch_model.return_value = True
-    routes_chat._switch_llama_cpp_model(engine, Path("/models/B"))
-    engine.switch_model.assert_called_once()
-    assert engine.switch_model.call_args.args[0].model_path == "/models/B"
+    from plugins.llama_cpp_module.module import LlamaCppModule
+
+    model = tmp_path / "B.gguf"
+    model.write_bytes(b"g")
+    monkeypatch.setattr(LlamaCppConfig, "from_env", lambda: SimpleNamespace(model_path=str(model)))
+
+    module = LlamaCppModule()
+    module.switch_model = Mock(return_value=True)
+    assert module.switch_model_by_path(model) is True
+    module.switch_model.assert_called_once()
+    assert module.switch_model.call_args.args[0].model_path == str(model)
+
+
+def test_the_env_override_never_leaks_past_the_switch(monkeypatch, tmp_path):
+    """P0-3: the override that lets from_env() see the new path is restored
+    whether the switch works or blows up, or the next request that names no
+    model inherits this one's."""
+    from core.runtime_state import get_override
+    from plugins.mlx_module.core.config import MLXConfig
+    from plugins.mlx_module.module import MLXModule
+
+    model = tmp_path / "B"
+    model.mkdir()
+    (model / "config.json").write_text("{}")
+
+    def _boom():
+        raise RuntimeError("from_env exploded")
+
+    monkeypatch.setattr(MLXConfig, "from_env", _boom)
+    module = MLXModule()
+    module.switch_model = Mock(return_value=True)
+    with pytest.raises(RuntimeError):
+        module.switch_model_by_path(model)
+    assert get_override("NEXE_MLX_MODEL") is None

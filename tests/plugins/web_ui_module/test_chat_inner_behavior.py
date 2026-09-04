@@ -46,11 +46,41 @@ def _disable_rate_limiter():
     limiter.enabled = original
 
 
-def _mock_request():
+def _app_modules(server_state):
+    """What the plugin loader would have left in ``app.state.modules``.
+
+    F-D block 5: the chat asks the core resolver which engines are live, and the
+    core reads ``app.state.modules`` — where ``plugin_loader._register_plugin_
+    instance`` puts every loaded plugin's instance ("ALWAYS, even without
+    routers"). These tests describe the same engine one indirection away, in the
+    registry mock, so this derives it instead of making every test say it twice.
+
+    Anything unusable (no module manager, a bare MagicMock registry) comes back
+    empty, which is the honest answer: nothing live.
+    """
+    if server_state is None:
+        return {}
+    try:
+        names = [m.name for m in server_state.module_manager.registry.list_modules()]
+    except (AttributeError, TypeError):
+        return {}
+    modules = {}
+    for name in names:
+        registration = server_state.module_manager.registry.get_module(name)
+        getter = getattr(getattr(registration, "instance", None), "get_module_instance", None)
+        if callable(getter):
+            instance = getter()
+            if instance is not None:
+                modules[name] = instance
+    return modules
+
+
+def _mock_request(server_state=None):
     """Create a minimal starlette Request to satisfy isinstance checks."""
     app_mock = MagicMock()
     app_mock.state = State()
     app_mock.state.i18n = None
+    app_mock.state.modules = _app_modules(server_state)
 
     scope = {
         "type": "http",
@@ -166,7 +196,7 @@ class _Harness:
         )
 
     async def call(self, body, server_state=None):
-        req = _mock_request()
+        req = _mock_request(server_state)
         mh_mock = self.mh
 
         base_patches = [
@@ -673,6 +703,11 @@ class _CapturingInProcessEngine:
 
     def __init__(self):
         self.received_kwargs = None
+        # B260/F-D block 5: mlx and llama_cpp are only serviceable with a live
+        # `_node`; the real modules always have one and the core checks it
+        # before dispatching. A double without it is a module the chat is right
+        # to skip, which made this guard assert on a turn that never happened.
+        self._node = object()
 
     async def chat(self, messages, system="", session_id="default",
                    stream_callback=None, images=None, thinking_enabled=True, **kwargs):

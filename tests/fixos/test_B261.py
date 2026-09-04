@@ -12,7 +12,7 @@ Fix: lectura amb `tomllib` (stdlib) + escriptura amb `tomli_w` via
 `core.config.atomic_toml_write` (serialitza abans de tocar disc, backup .bak,
 temp + os.replace atòmic al mateix directori).
 
-Gate del pla mestre 1.0.8: round-trip de les 51 claus del server.toml
+Gate del pla mestre 1.0.8: round-trip de les claus del server.toml
 REAL + igualtat char-a-char dels 6 prompts. Explícitament NO es fa gate de
 paritat toml-vs-tomllib (nota del finding).
 """
@@ -65,17 +65,27 @@ def _load_real() -> dict:
         return tomllib.load(f)
 
 
-class TestRoundTripRealFile:
-    """T1 — gate: les 51 claus del fitxer REAL sobreviuen un round-trip."""
+# 12 taules + 37 fulles. Eren 39 fulles (51 en total) fins al #1002, que va
+# treure `[plugins.models].max_tokens` i `.context_window` del fitxer: eren
+# claus per defecte que no llegia ningú. El nombre és el gate — si baixa sense
+# un finding que ho expliqui, el parser ha tornat a truncar el fitxer (#834).
+_EXPECTED_LEAVES = 37
+_EXPECTED_TOTAL = len(_EXPECTED_TABLES) + _EXPECTED_LEAVES  # 49
 
-    def test_real_file_has_51_keys(self):
+
+class TestRoundTripRealFile:
+    """T1 — gate: totes les claus del fitxer REAL sobreviuen un round-trip."""
+
+    def test_real_file_has_49_keys(self):
         cfg = _load_real()
         tables, leaves = _walk(cfg)
         assert tables == _EXPECTED_TABLES, (
             f"taules inesperades o absents: {tables ^ _EXPECTED_TABLES}"
         )
-        assert len(leaves) == 39, f"esperades 39 fulles, trobades {len(leaves)}"
-        assert len(tables) + len(leaves) == 51
+        assert len(leaves) == _EXPECTED_LEAVES, (
+            f"esperades {_EXPECTED_LEAVES} fulles, trobades {len(leaves)}"
+        )
+        assert len(tables) + len(leaves) == _EXPECTED_TOTAL
 
     def test_round_trip_preserves_everything(self, tmp_path):
         cfg = _load_real()
@@ -130,7 +140,7 @@ class TestProductionReadPath:
         )
         assert not any("Cannot parse TOML" in e for e in result.errors)
 
-    def test_save_config_reload_keeps_51_keys(self, tmp_path):
+    def test_save_config_reload_keeps_every_key(self, tmp_path):
         """load (tomllib) → save_config → reload: cap clau perduda."""
         from core.config import save_config
 
@@ -140,8 +150,8 @@ class TestProductionReadPath:
         with open(out, "rb") as f:
             cfg2 = tomllib.load(f)
         tables, leaves = _walk(cfg2)
-        assert len(tables) + len(leaves) == 51, (
-            f"save_config ha perdut claus: {len(tables) + len(leaves)}/51"
+        assert len(tables) + len(leaves) == _EXPECTED_TOTAL, (
+            f"save_config ha perdut claus: {len(tables) + len(leaves)}/{_EXPECTED_TOTAL}"
         )
         assert cfg2 == cfg
 
@@ -274,11 +284,11 @@ class TestCliWritesAreAtomic:
         assert result.exit_code == 0, result.output
         assert calls and calls[0] == target, "l'escriptura ha d'anar via atomic_toml_write"
 
-        # El repro del finding: després d'--apply, les claus segueixen sent 51.
+        # El repro del finding: després d'--apply, no es perd cap clau.
         with open(target, "rb") as f:
             cfg = tomllib.load(f)
         tables, leaves = _walk(cfg)
-        assert len(tables) + len(leaves) >= 51, (
+        assert len(tables) + len(leaves) >= _EXPECTED_TOTAL, (
             f"--apply ha reduït el server.toml a {len(tables) + len(leaves)} claus "
             "(el #834 en deixava 10 línies)"
         )

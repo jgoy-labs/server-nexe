@@ -11,7 +11,6 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import base64 as _base64
-from pathlib import Path
 from typing import AsyncGenerator, Dict, Any, Optional
 from dataclasses import dataclass
 import asyncio
@@ -51,11 +50,14 @@ except ImportError:
 from core.log_redact import redact_user_content
 from core.chat_prompt import time_context_line
 from core.endpoints.chat_sanitization import (
+    CHARS_PER_TOKEN_ESTIMATE,
+    DEFAULT_CONTEXT_WINDOW,
     _sanitize_rag_context,
     append_rag_security_rule,
 )
 from core.context_budget import (  # noqa: F401 — re-exported for tests and callers
     compute_context_budget,
+    fit_prompt_to_window,
     resolve_history_ratio,
     resolve_max_context_chars,
     _inject_context_into_messages,
@@ -1475,110 +1477,6 @@ async def _handle_nonstreaming_response(
     return response_text, memory_action, mem_deleted_delta
 
 
-def _resolve_engines(preferred_engine: str) -> list:
-    """Return engine priority list for the requested backend.
-
-    D-I phase 2 / B260: ``auto`` follows the core cascade
-    mlx → llama_cpp → ollama. Callers skip engines that are not loaded,
-    so MLX first is a no-op when the module is absent (non-Mac).
-    An explicit pick keeps that engine first.
-    """
-    _cascade = ["mlx_module", "llama_cpp_module", "ollama_module"]
-    _map = {
-        "auto": _cascade,
-        "ollama": ["ollama_module", "mlx_module", "llama_cpp_module"],
-        "mlx": ["mlx_module", "ollama_module", "llama_cpp_module"],
-        "llamacpp": ["llama_cpp_module", "ollama_module", "mlx_module"],
-    }
-    return _map.get(preferred_engine, _cascade)
-
-
-def _switch_mlx_model(engine, local_path) -> None:
-    """Build the new MLX config from the requested path and ask the engine to
-    swap it.
-
-    Uses runtime_state.set_override (not os.environ) so MLXConfig.from_env()
-    sees the new path without mutating the process env and racing concurrent
-    requests. The model-singleton surgery now lives in the plugin
-    (MLXModule.switch_model → MLXChatNode.apply_config); web_ui no longer pokes
-    the node's class-level privates directly (B073).
-    """
-    from core.runtime_state import set_override, get_override
-    _prev = get_override("NEXE_MLX_MODEL")
-    try:
-        set_override("NEXE_MLX_MODEL", str(local_path))
-        from plugins.mlx_module.core.config import MLXConfig
-        new_config = MLXConfig.from_env()
-    finally:
-        set_override("NEXE_MLX_MODEL", _prev)
-    if engine.switch_model(new_config):
-        import logging as _lg
-        _lg.getLogger(__name__).info("MLX model switched to: %s", local_path)
-
-
-def _switch_llama_cpp_model(engine, local_path) -> None:
-    """Build the new llama.cpp config and ask the engine to swap it.
-
-    The pool teardown/rebuild now lives in the plugin
-    (LlamaCppModule.switch_model → LlamaCppChatNode.apply_config); web_ui no
-    longer pokes the node's class-level privates directly (B073).
-    """
-    from core.runtime_state import set_override, get_override
-    _prev = get_override("NEXE_LLAMA_CPP_MODEL")
-    try:
-        set_override("NEXE_LLAMA_CPP_MODEL", str(local_path))
-        from plugins.llama_cpp_module.core.config import LlamaCppConfig
-        new_config = LlamaCppConfig.from_env()  # type: ignore[assignment]
-    finally:
-        set_override("NEXE_LLAMA_CPP_MODEL", _prev)
-    if engine.switch_model(new_config):
-        import logging as _lg
-        _lg.getLogger(__name__).info("Llama.cpp model switched to: %s", new_config.model_path)
-
-
-async def _switch_engine_model(engine, engine_name: str, body: dict, model_name: str) -> None:
-    """Hot-swap the model on the engine when the UI selector sends body['model'].
-
-    Mutates env vars for the minimum time needed to read the new config,
-    then restores them (P0-3 env leak fix). Uses _MODEL_SWITCH_LOCK to
-    serialize concurrent mutations on class-level singletons.
-    """
-    from core.lifespan import get_server_state as _gss
-    # Delegate to get_models_dir() so the lookup chain (NEXE_STORAGE_PATH →
-    # NEXE_DATA_DIR/models → cwd → repo) is centralised and matches
-    # routes_auth._resolve_models_dir(). The previous `NEXE_STORAGE_PATH /
-    # "models"` broke when the env var already points at the models dir
-    # (e.g. a user-selected local models folder).
-    from core.paths.helpers import get_models_dir
-    models_dir = get_models_dir()
-    if not models_dir.is_absolute():
-        models_dir = Path(_gss().project_root) / models_dir  # type: ignore[arg-type]
-    local_path = models_dir / model_name  # type: ignore[operator]
-
-    # Validate BEFORE switching (2026-07-23, 8 GB M1): a bare `.exists()` let
-    # a grouping folder (~/models/mlx — the BACKEND name served as a model by
-    # the old scan) through, the module switched its global state to the ghost
-    # path, the RAM guard estimated a model that did not exist, and the user
-    # got a raw FileNotFoundError. And a *failed* gate fell through silently:
-    # the user kept chatting with the OLD model with no signal at all.
-    # ValueError with "not found" is deliberate: the caller's except-ValueError
-    # maps it to a clean HTTP 404 (raising HTTPException here would be
-    # swallowed by the engine loop's generic `except Exception: continue`).
-    if engine_name == "mlx_module":
-        if not (local_path / "config.json").is_file():
-            raise ValueError(
-                f"Model '{model_name}' not found: no MLX model (config.json) "
-                f"under the models directory"
-            )
-        _switch_mlx_model(engine, local_path)
-    elif engine_name == "llama_cpp_module":
-        if not (local_path.is_file() and local_path.suffix == ".gguf"):
-            raise ValueError(
-                f"Model '{model_name}' not found: not a GGUF file"
-            )
-        _switch_llama_cpp_model(engine, local_path)
-
-
 async def _build_rag_context(memory_helper, message: str, body: dict, attached_doc, context_window=None) -> tuple:
     """Recall from memory and build the RAG context string.
 
@@ -1832,7 +1730,7 @@ def _build_system_prompt_with_time(
 
     Returns (system_prompt, lang).
     """
-    from core.chat_prompt import build_system_prompt_with_time
+    from core.chat_prompt import EMERGENCY_SYSTEM_PROMPT, build_system_prompt_with_time
     from core.lang_detect import detect_user_lang
     import os as _os_inner
     _lang = lang_hint or detect_user_lang(message, fallback=_os_inner.getenv("NEXE_LANG", "en"))
@@ -1841,7 +1739,7 @@ def _build_system_prompt_with_time(
         from core.endpoints.chat import _get_system_prompt
         base_system_prompt = _get_system_prompt(get_server_state(), _lang)
     except Exception:
-        base_system_prompt = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
+        base_system_prompt = EMERGENCY_SYSTEM_PROMPT
     system_prompt = build_system_prompt_with_time(base_system_prompt, _lang, _now=_now)
     return system_prompt, _lang
 
@@ -2593,7 +2491,19 @@ def _assemble_engine_messages(
             f"{_time_line}\n\n{engine_messages[-1]['content']}"
         )
 
-    messages = engine_messages
+    # #976: the last line of defence. The budget above decides what the turn may
+    # KEEP; this checks what was actually ASSEMBLED against the window the engine
+    # reported — history, the clock line and the untrusted-context wrapper all
+    # land after the arithmetic. MLX truncates inside its plugin and Ollama
+    # truncates server-side, but llama.cpp raises and the turn dies, so the
+    # guarantee has to live here, where both doors pass.
+    from core.context_window import ask_engine_window
+    _window_tokens = ask_engine_window(engine) or DEFAULT_CONTEXT_WINDOW
+    messages, _ = fit_prompt_to_window(
+        system_prompt, engine_messages, _window_tokens,
+        # The same 500-char reply reserve compute_context_budget was given above.
+        reply_budget_tokens=500 // CHARS_PER_TOKEN_ESTIMATE,
+    )
     return messages, _doc_truncated_pct
 
 
@@ -2603,15 +2513,13 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
     # Concurrency limiter: max 2 simultaneous chat requests to avoid Ollama overload
     _chat_semaphore = asyncio.Semaphore(2)
 
-    # P0-3 (defense-in-depth): short lock around body.model singleton mutations.
-    # Server-nexe is architecturally mono-user (workers=1, class-level singletons).
-    # This lock guards the rare edge case of two concurrent requests with
-    # different body.model values racing to mutate LlamaCppChatNode._pool /
-    # MLXChatNode._model. For mono-user local use the scenario is effectively
-    # never triggered; the lock exists as a breadcrumb for future multi-user.
-    # Full refactor (multi-pool LRU + config_override) deferred to a future
-    # multi-user design.
-    _MODEL_SWITCH_LOCK = asyncio.Lock()
+    # P0-3's lock around body.model singleton mutations now lives with the
+    # switch it guards (core.endpoints.chat_engines.model_switch), because what
+    # it protects — LlamaCppChatNode._pool / MLXChatNode._model — is
+    # process-global while this function runs once per router. Its reasoning is
+    # unchanged and is written there: server-nexe is architecturally mono-user
+    # (workers=1, class-level singletons), so the race is a breadcrumb for a
+    # future multi-user design rather than something seen in the field.
 
     # -- POST /chat --
     #    ~550 lines: intent detection, RAG, compaction,
@@ -2696,6 +2604,18 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             from core.lifespan import get_server_state
             import os
 
+            # Deferred, like the ask_engine_window import above: a plugin must
+            # not pull core at import time (layering gate, #471).
+            from core.endpoints.chat_engines.model_switch import (
+                model_switch_lock,
+                switch_engine_model,
+            )
+            from core.endpoints.chat_engines.routing import (
+                iter_live_engines,
+                raise_if_terminal,
+                resolve_engine_cascade,
+            )
+
             module_manager = get_server_state().module_manager
             if module_manager is None:
                 raise HTTPException(status_code=503, detail="Service unavailable: module manager not initialized")
@@ -2709,46 +2629,36 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             available_modules = [m.name for m in module_manager.registry.list_modules()]
             logger.info(f"Available modules: {available_modules}")
 
-            # Engine priority based on config
-            engines_to_try = _resolve_engines(preferred_engine)
+            # F-D block 5: which engines to try, and which of them are live,
+            # both come from the core resolver. What was here was a second
+            # engine table with its own alias map ("llamacpp" and nothing else)
+            # and its own five-deep walk (registry → .instance →
+            # get_module_instance() → .chat) — a walk the loader had already
+            # done once at startup, whose result is exactly what
+            # get_engine_module reads. Neither copy was node-aware, so a module
+            # registered with a dead node was dispatched to here while /status
+            # reported it down.
+            #
+            # The names in this loop are the core's canonical ones now ("mlx",
+            # not "mlx_module"). What the user sees does not change: the UI
+            # strips "_module" before upper-casing the MODEL_LOADING label, so
+            # both spellings render "MLX".
+            _cascade = resolve_engine_cascade(preferred_engine, request.app.state)
+            logger.info("Engine cascade for this turn: %s", _cascade)
 
             response_text = None  # type: ignore[assignment]  # Optional[str] by design, initialized None and assigned post-engine
-            for engine_name in engines_to_try:
+            for engine_name, engine in iter_live_engines(_cascade, request.app.state):
                 logger.info(f"Trying engine: {engine_name}")
-                registration = module_manager.registry.get_module(engine_name)
-                if not registration:
-                    logger.warning(f"{engine_name} not registered")
-                    continue
-                if not registration.instance:
-                    logger.warning(f"{engine_name} has no instance")
-                    continue
-
-                manifest_module = registration.instance
-                # Get actual module instance via get_module_instance() function
-                if not hasattr(manifest_module, 'get_module_instance'):
-                    logger.warning(f"{engine_name} has no get_module_instance()")
-                    continue
-
-                engine = manifest_module.get_module_instance()
-                if not engine:
-                    logger.warning(f"{engine_name} get_module_instance() returned None")
-                    continue
-                if not hasattr(engine, 'chat'):
-                    logger.warning(f"{engine_name} has no chat method")
-                    continue
-
                 try:
                     # Resolve local model path if coming from the UI selector.
-                    # _MODEL_SWITCH_LOCK serializes concurrent mutations of
-                    # `body.model` on class-level singletons. Also,
-                    # the env (`NEXE_MLX_MODEL` / `NEXE_LLAMA_CPP_MODEL`) is
-                    # mutated only for the minimum time to build the new config
-                    # via `from_env()` and restored in `finally` to prevent
-                    # the next request that doesn't specify `body.model`
-                    # from inheriting the value from the previous switch (P0-3 env leak).
+                    # The lock serialises concurrent swaps of class-level
+                    # singletons; the env dance that builds the new config
+                    # (mutated for the minimum time and always restored — P0-3
+                    # env leak) now lives inside each engine module, which is
+                    # the only place that knows its own config.
                     if body.get("model"):
-                        async with _MODEL_SWITCH_LOCK:
-                            await _switch_engine_model(engine, engine_name, body, model_name)  # type: ignore[arg-type]
+                        async with model_switch_lock():
+                            await switch_engine_model(engine, engine_name, model_name)
 
                     # Per-session thinking toggle
                     thinking_enabled = getattr(session, "thinking_enabled", False)
@@ -2802,7 +2712,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     # cancelled, so it doesn't need the event.
                     cancel_kwargs = (
                         {"cancel_event": cancel_event}
-                        if engine_name in ("mlx_module", "llama_cpp_module")
+                        if engine_name in ("mlx", "llama_cpp")
                         else {}
                     )
 
@@ -2816,13 +2726,20 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                                   **cancel_kwargs, **sampling_kwargs)
                     else:
                         # MLX/LlamaCpp-style: chat(messages, system=...)
-                        if engine_name in ("mlx_module", "llama_cpp_module"):
+                        if engine_name in ("mlx", "llama_cpp"):
                             # MLX module requires a callback for streaming
                             queue: asyncio.Queue = asyncio.Queue()
 
                             _stream_chunk_count = [0]
 
-                            def stream_cb(token):
+                            # B023: `stream_cb` and `queue_generator` below outlive the
+                            # iteration that built them — the engine task keeps
+                            # running while the cascade may already be on the next
+                            # engine, and a free name would then read THAT engine's
+                            # queue. The defaults pin each closure to the objects of
+                            # its own turn; the bodies are untouched on purpose (hot
+                            # streaming path).
+                            def stream_cb(token, *, _stream_chunk_count=_stream_chunk_count, queue=queue):
                                 # MLXChatNode already marshals this to the main loop, so we can just put in queue
                                 _stream_chunk_count[0] += 1
                                 if _stream_chunk_count[0] <= 3 or _stream_chunk_count[0] % 50 == 0:
@@ -2834,7 +2751,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             # silently ignore the kwarg and REPEAT — hard gate.
                             _continue_kwargs = {}
                             if _continue:
-                                if engine_name != "mlx_module":
+                                if engine_name != "mlx":
                                     raise ValueError(
                                         "continue is only supported on the MLX engine"
                                     )
@@ -2850,7 +2767,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             ))
 
                             # Async generator that yields from queue until task is done
-                            async def queue_generator():
+                            async def queue_generator(*, queue=queue, ml_task=ml_task):
                                 while True:
                                     # Check if queue has items first
                                     if not queue.empty():
@@ -2952,16 +2869,13 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     if response_text:
                         logger.info(f"{engine_name} succeeded!")
                         break
-                except ValueError as e:
-                    error_msg = str(e)
-                    if "not found" in error_msg.lower():
-                        raise HTTPException(status_code=404, detail=error_msg)
-                    raise HTTPException(status_code=400, detail=error_msg)
-                except ConnectionError as e:
-                    raise HTTPException(status_code=503, detail=f"Cannot connect to {engine_name}: {e}")
-                except TimeoutError as e:
-                    raise HTTPException(status_code=504, detail=f"Timeout calling {engine_name}: {e}")
                 except Exception as e:
+                    # F-D block 5: which errors end the turn and which are worth
+                    # another engine is one decision, and it lives in the core
+                    # (engine_error_to_http) instead of four except clauses here
+                    # — /v1 had none of them and turned every engine failure
+                    # into a 500.
+                    raise_if_terminal(e, engine_name)
                     logger.warning(f"{engine_name} failed: {e}")
                     logger.debug("Engine error details:", exc_info=True)
                     continue

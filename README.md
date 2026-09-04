@@ -81,7 +81,7 @@ Server Nexe started as a learning-by-doing experiment: *"What would it take to h
 
 **This entire project — code, tests, audits, documentation — has been built by one person orchestrating different AI models**, both local (MLX, Ollama) and cloud (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), as collaborators. The human decides what to build, designs the architecture, reviews lines and runs tests. The AIs write, audit, and stress-test under human direction.
 
-What began as a prototype has turned into a genuinely useful product: 7694 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
+What began as a prototype has turned into a genuinely useful product: 8711 tests, security audits, encryption at rest, a macOS installer with hardware detection, and a plugin system. It's not done — there's a roadmap full of ideas — but it already does what it set out to do: **run an AI server on your machine, with memory that persists, and zero data leaving your device.**
 
 This is not trying to compete with ChatGPT or Claude. But it can be complementary for less demanding tasks. It's an open-source tool for people who want to own their AI infrastructure. Built by one person in Barcelona, with AI as co-pilot, music, and stubbornness.
 
@@ -159,7 +159,7 @@ Upload `.txt`, `.md` or `.pdf` and they're automatically indexed for RAG. Each d
 <td width="50%">
 
 ### Built to Grow
-7694 tests (~85% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
+8711 tests (~89% coverage), security audits, i18n in 3 languages, comprehensive API. What started as an experiment is being built with production practices.
 
 </td>
 </tr>
@@ -291,7 +291,7 @@ Server Nexe uses a duck typing protocol (NexeModule Protocol) — no class inher
 | **mlx_module** | LLM Backend | Apple Silicon native, prefix caching (trie), Metal GPU |
 | **llama_cpp_module** | LLM Backend | Universal GGUF, LRU ModelPool, CPU/GPU |
 | **ollama_module** | LLM Backend | HTTP bridge to Ollama, auto-start, VRAM cleanup |
-| **security** | Core | Dual-key auth, 6 injection detectors + NFKC, 49 jailbreak patterns, rate limiting, RFC5424 audit logging |
+| **security** | Core | Dual-key auth, 6 injection detectors + NFKC, sanitizer subplugin with 49 jailbreak + 18 injection patterns (`plugins/security/sanitizer/core/patterns.py`), rate limiting, RFC5424 audit logging |
 | **web_ui_module** | Interface | Web chat, sessions, document upload, MEM_SAVE, RAG sanitization, i18n |
 
 ## AI-Ready Documentation
@@ -362,7 +362,7 @@ RAM and disk are the same across platforms (they depend on the model you pick, n
 
 ## Testing
 
-7694 tests collected with ~85% code coverage. CI runs the full suite on every push.
+8711 tests collected with ~89% code coverage. That is the suite CI runs on every push to `main` or `pre-production` and on every pull request to `main`: everything except the `integration`, `e2e`, `slow`, `gpu` and `test_live` markers. The `web_ui_module` integration ones get a job of their own.
 
 ```bash
 # Unit tests (the suite lives under tests/)

@@ -20,7 +20,7 @@ jobs:
   # the current tree (verified locally 2026-07-12), so they gate directly
   # with no baseline. mypy is advisory-only (lax config, unannotated code).
   static-analysis:
-    name: Static analysis (ruff+bandit+vulture gates, mypy advisory)
+    name: Static analysis (ruff+bandit+vulture+complexity gates, mypy advisory)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,6 +48,21 @@ jobs:
       - name: vulture (gate)
         if: ${{ !cancelled() }}
         run: vulture core memory personality plugins installer scripts --min-confidence 80 --exclude "tests/,**/tests/,.venv/,InstallNexe.app/,__pycache__/"
+
+      # #1007: the complexity freeze only ever ran inside the `tests` job's
+      # pytest run (tests/test_complexity_gate.py). That job installs all of
+      # requirements.txt first, and a single collection error anywhere under
+      # tests/ interrupts the whole run before one test executes (pytest exits
+      # 2, "Interrupted: N error during collection"), so the freeze stopped
+      # being enforced for reasons that had nothing to do with complexity.
+      # The script is stdlib-only by design — "this gate has to run in CI with
+      # nothing but the stdlib" — exactly like check_layering.py, which has had
+      # its own job all along. `!cancelled()` is what makes this step genuinely
+      # independent: neither a red ruff/bandit/vulture nor a failed install of
+      # the pinned tools above can hide it, because it needs none of them.
+      - name: complexity freeze (gate)
+        if: ${{ !cancelled() }}
+        run: python scripts/check_complexity.py
 
       - name: mypy (advisory — never blocks)
         if: ${{ !cancelled() }}

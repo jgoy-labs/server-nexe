@@ -67,9 +67,6 @@ def test_plugin_readme_marks_chat_as_removed(plugin_readme, removed_ep):
 def test_security_pattern_count_accurate():
     """B7: the number of patterns in the README matches reality."""
     text = (REPO / "plugins/security/readme/README.md").read_text(encoding="utf-8")
-    assert "69 patrons" not in text, (
-        "README says 69 patterns; reality is 47+18=65"
-    )
 
     from plugins.security.sanitizer.core.patterns import (
         INJECTION_PATTERNS,
@@ -77,6 +74,15 @@ def test_security_pattern_count_accurate():
     )
     n_jailbreak = len(JAILBREAK_PATTERNS)
     n_injection = len(INJECTION_PATTERNS)
+
+    # #1020: this message used to state "reality is 47+18=65" — a hardcoded
+    # count inside the very test that exists to stop hardcoded counts. It went
+    # stale (the lists are 49+18 today) and nobody saw it, because a passing
+    # assertion never prints its message.
+    assert "69 patrons" not in text, (
+        f"README says 69 patterns; reality is {n_jailbreak}+{n_injection}="
+        f"{n_jailbreak + n_injection}"
+    )
     assert (
         str(n_jailbreak) in text
         or f"{n_jailbreak}+{n_injection}" in text

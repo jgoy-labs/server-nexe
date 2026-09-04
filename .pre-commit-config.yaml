@@ -1,0 +1,50 @@
+# ───────────────────────────────────────────────────────────────────────────
+# Server Nexe — local enforcement of the CI gates (#1010)
+#
+# Until this file existed there was no enforcement before a push at all: no
+# .git/hooks/pre-commit, no config, nothing. ruff and bandit were configured
+# in pyproject.toml and gated in CI, so the first thing that told you a commit
+# was red was a GitHub run several minutes later.
+#
+# THE PINS AND THE COMMANDS BELOW MIRROR `.github/workflows/ci.yml`
+# (job `static-analysis`) DELIBERATELY AND EXACTLY.
+# A pre-commit that runs a different version, or checks a different set of
+# paths, is worse than none: it goes green locally and red on the remote, and
+# then people stop believing it. `tests/test_1010_pre_commit_matches_ci.py`
+# parses BOTH files and fails if they ever drift apart — it does not hardcode
+# the numbers, so a CI bump that forgets this file is caught here.
+#
+# `additional_dependencies` pins the exact PyPI version, so pre-commit builds
+# its own isolated env and the developer needs neither tool on their PATH.
+#
+# Both hooks use `pass_filenames: false` on purpose: they run the CI command
+# verbatim over the CI's paths, instead of the per-file subset pre-commit would
+# hand them. Per-file is faster, but it is precisely how the two ends drift.
+# ruff over the tree takes ~0.06 s and bandit ~2 s on this repo (measured
+# 2026-09-04), which is a fair price for "green here means green there".
+#
+# NOT here on purpose: `ruff format`. This repo does not use it today, and
+# turning it on would reformat the whole tree on the next commit someone makes
+# — an enormous, unasked-for diff. The gate test asserts it stays out, so the
+# decision is recorded rather than merely forgotten.
+#
+# Install it once with:  pre-commit install
+# ───────────────────────────────────────────────────────────────────────────
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff check (same command and version as CI)
+        entry: ruff check .
+        language: python
+        additional_dependencies: ["ruff==0.15.6"]
+        types_or: [python, pyi]
+        pass_filenames: false
+
+      - id: bandit
+        name: bandit (same command and version as CI)
+        entry: bandit -c pyproject.toml -r core memory personality plugins installer scripts -q
+        language: python
+        additional_dependencies: ["bandit==1.9.4"]
+        types: [python]
+        pass_filenames: false

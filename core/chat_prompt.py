@@ -109,6 +109,18 @@ def format_now_natural(_now, _lang: str) -> str:
     )
 
 
+# #1022: the last-resort system prompt, when no configured one can be reached.
+# It lived twice, and the two copies had drifted: /v1 said "an AI assistant"
+# and /ui/chat said "a local AI assistant". The local wording wins — every
+# engine server-nexe can serve (MLX, llama.cpp, Ollama) runs on the machine,
+# so it is the true one of the two, and it is the one that keeps a model from
+# offering to look something up on the web. The two fallbacks are nested
+# rather than parallel: this is what `_get_system_prompt` returns when
+# server.toml configures no prompt, AND what the UI falls back to when
+# `_get_system_prompt` itself cannot be reached at all.
+EMERGENCY_SYSTEM_PROMPT = "You are Nexe, a local AI assistant. Respond clearly and helpfully."
+
+
 def build_system_prompt_with_time(base_system_prompt: str, lang: str, _now=None) -> str:
     """Append the language directive and today's date to a resolved base prompt.
 
@@ -133,6 +145,7 @@ def build_system_prompt_with_time(base_system_prompt: str, lang: str, _now=None)
 
 
 __all__ = [
+    "EMERGENCY_SYSTEM_PROMPT",
     "WEEKDAYS_BY_LANG",
     "MONTHS_BY_LANG",
     "DATE_PHRASE_BY_LANG",

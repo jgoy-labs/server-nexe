@@ -30,12 +30,13 @@ from starlette.requests import Request as StarletteRequest
 
 from plugins.web_ui_module.api.routes_chat import _StreamThinkParser
 from tests.plugins.web_ui_module.test_chat_inner_behavior import (
+    _app_modules,
     _Harness,
     _make_server_state,
 )
 
 
-def _connected_request():
+def _connected_request(server_state=None):
     """A mock Request whose receive channel SUSPENDS (instead of the harness's
     default empty_receive, which raises synchronously). Starlette's
     is_disconnected() wraps the receive in an immediately-cancelled CancelScope, so
@@ -50,6 +51,9 @@ def _connected_request():
     app_mock = MagicMock()
     app_mock.state = State()
     app_mock.state.i18n = None
+    # F-D block 5: same as the harness's own request — the engine loop reads
+    # app.state.modules, so the substitute has to carry it too.
+    app_mock.state.modules = _app_modules(server_state)
 
     async def _receive():
         await asyncio.Event().wait()  # suspend; cancelled by is_disconnected's scope

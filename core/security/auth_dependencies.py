@@ -14,6 +14,7 @@ from typing import Optional
 import logging
 import os
 import ipaddress
+import time
 from datetime import datetime, timezone
 import secrets
 
@@ -38,6 +39,82 @@ def record_auth_failure(*args, **kwargs): pass
 def update_key_expiry_days(*args, **kwargs): pass
 def update_key_status(*args, **kwargs): pass
 def set_grace_period_active(*args, **kwargs): pass
+
+# ── #1005b: how loudly to report a broken audit logger ─────────────────────
+#
+# #1005 gave the three AUTH_SUCCESS sites below a warning each, because losing
+# them silently contradicts SECURITY.md. Warning on EVERY request is the wrong
+# volume: the web UI polls /status WITH authentication every 10 seconds
+# (plugins/web_ui_module/ui/app.js), so an open tab and nothing else is 8 640
+# authenticated requests a day — around 26 000 identical lines across the three
+# sites. A flooded log hides things exactly as well as a silent one, which is
+# what #1005 set out to fix.
+#
+# Warning once per process is not the answer either: a single line at startup
+# rotates away and the log then looks healthy while the trail keeps losing
+# events, one per authentication, for as long as the process lives.
+#
+# So: emit the first, damp the rest, and never damp without the count. Whatever
+# is suppressed is added up and the next warning that gets through says how
+# many — since the previous warning and over the life of the process. A damper
+# that hid the number would be #1005 again wearing a different hat.
+#
+# Per SITE, not global: three different things stop being recorded and each has
+# to be able to say so. Plain module-level ints — this is a single-user local
+# server, not a fleet.
+#
+# The three handlers catch `Exception`, not `ImportError`. #1005 reasoned about
+# the logger being missing and stopped there, but the `try` wraps the log_event()
+# CALL as well as the import: a logger that imports fine and then fails to write
+# — full disk, a locked SQLite file, a bug of its own — raised straight through
+# a SUCCESSFUL authentication and turned a valid key into a 500. The server would
+# stop authenticating because its audit log broke, which is the opposite of what
+# #1005 decided ("a missing plugin never turns a valid key into a 500"). It is
+# the same rule `memory/rag/module.py` already applies to its metric writes: the
+# work is already done, so the bookkeeping cannot be allowed to replace the
+# answer. What is lost is still reported here, never swallowed.
+_AUDIT_WARN_WINDOW_SECONDS = 300.0
+_AUDIT_WARN_EVERY_EVENTS = 500
+
+# site -> (monotonic time of the last emitted warning, suppressed since then,
+#          total lost in this process)
+_audit_warn_state: dict = {}
+
+
+def _reset_audit_warn_state() -> None:
+  """Forget the damper. Tests only — see tests/test_1005b_*."""
+  _audit_warn_state.clear()
+
+
+def _warn_audit_event_lost(site: str, what_was_lost: str, exc: BaseException) -> None:
+  """One unrecorded audit event: warn, or count it towards the next warning.
+
+  Never raises and never decides anything about the request — the caller has
+  already accepted or refused the key by the time this runs.
+  """
+  now = time.monotonic()
+  last, suppressed, total = _audit_warn_state.get(site, (None, 0, 0))
+  total += 1
+
+  within_window = last is not None and (now - last) < _AUDIT_WARN_WINDOW_SECONDS
+  under_budget = (suppressed + 1) < _AUDIT_WARN_EVERY_EVENTS
+  if within_window and under_budget:
+    _audit_warn_state[site] = (last, suppressed + 1, total)
+    return
+
+  _audit_warn_state[site] = (now, 0, total)
+  if suppressed:
+    _log.warning(
+      "IRONCLAD security logger failed (%s: %s) — %s. "
+      "%d more went unrecorded since the last warning; %d in this process so far.",
+      type(exc).__name__, exc, what_was_lost, suppressed, total,
+    )
+  else:
+    _log.warning(
+      "IRONCLAD security logger failed (%s: %s) — %s.",
+      type(exc).__name__, exc, what_was_lost,
+    )
+
 
 def _is_loopback_ip(ip: str) -> bool:
   try:
@@ -89,8 +166,19 @@ def _check_dev_mode(request: Request, dev_mode: bool) -> str:
         message="DEV MODE: API key bypassed",
         details={"warning": "NOT for production!"}
       )
-    except ImportError:
-      pass
+    except Exception as exc:
+      # SECURITY.md states every authentication is recorded. When the IRONCLAD
+      # logger cannot be imported — or imports and then fails to write — the
+      # AUTH_SUCCESS event is simply never written, and an audit trail that
+      # thins out in silence is worse than one that says it is incomplete. The
+      # bypass itself still stands: refusing the request because the logger is
+      # missing, or broken, would take the server down over its own audit log.
+      _warn_audit_event_lost(
+        "dev_mode_bypass",
+        "a DEV MODE key bypass was granted but NOT recorded as an "
+        "AUTH_SUCCESS audit event",
+        exc,
+      )
     return "dev-mode-bypass"
   raise HTTPException(
     status_code=500,
@@ -115,8 +203,16 @@ def _authenticate_primary(x_api_key: str, keys_config, request: Request) -> Opti
             "expires_at": keys_config.primary.expires_at.isoformat() if keys_config.primary.expires_at else None
           }
         )
-      except ImportError:
-        pass
+      except Exception as exc:
+        # Same contract as _check_dev_mode: the key is accepted, but the
+        # AUTH_SUCCESS event SECURITY.md promises never reaches the log —
+        # whether the logger is absent or present and failing to write.
+        _warn_audit_event_lost(
+          "primary_key",
+          "a successful primary API key authentication was NOT recorded as an "
+          "AUTH_SUCCESS audit event",
+          exc,
+        )
       return x_api_key
   return None
 
@@ -139,8 +235,16 @@ def _authenticate_secondary(x_api_key: str, keys_config, request: Request) -> Op
             "expires_at": keys_config.secondary.expires_at.isoformat() if keys_config.secondary.expires_at else None
           }
         )
-      except ImportError:
-        pass
+      except Exception as exc:
+        # The secondary key is the one being rotated out: losing its
+        # AUTH_SUCCESS events also loses the evidence of who is still on it —
+        # and a rotation is exactly when the audit log is worth most.
+        _warn_audit_event_lost(
+          "secondary_key",
+          "a successful secondary (deprecated) API key authentication was NOT "
+          "recorded as an AUTH_SUCCESS audit event",
+          exc,
+        )
       return x_api_key
   return None
 

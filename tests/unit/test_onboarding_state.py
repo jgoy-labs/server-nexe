@@ -122,7 +122,8 @@ def test_apply_to_env_mlx(tmp_data_dir: Path, monkeypatch: pytest.MonkeyPatch) -
     state.apply_to_env()
     assert os.environ["NEXE_MLX_MODEL"].endswith("models/gemma")
     assert os.environ["NEXE_DEFAULT_MODEL"] == "mlx-community/gemma-3-4b-it-4bit"
-    # routes_chat._resolve_engines accepts "mlx" (not "mlx_module")
+    # the shared resolver (core.endpoints.chat_engines.routing) accepts "mlx",
+    # not "mlx_module"
     assert os.environ["NEXE_MODEL_ENGINE"] == "mlx"
 
 

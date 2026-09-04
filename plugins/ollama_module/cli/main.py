@@ -267,7 +267,10 @@ def chat(
 
       full_response = ""
 
-      async def get_response():
+      # B023: `messages` is rebound by the `clear` branch of this same loop, so
+      # a free name here would read whatever the NEXT turn installed. The
+      # default pins the closure to this turn's history.
+      async def get_response(*, messages=messages):
         nonlocal full_response
         async for chunk in ollama.chat(model, messages, stream=True):
           if "message" in chunk:

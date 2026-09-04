@@ -25,21 +25,52 @@ except ImportError:
 class TestAsyncBasics:
   """Basic tests for async/await"""
 
+  TASKS = 10
+  TASK_DELAY = 0.01
+
+  # Ideally gathering N tasks costs 1/N of running them one by one. Asking for
+  # better than half leaves room for a loaded machine while still failing loud
+  # if they stopped overlapping at all. Measured on this tree 2026-09-04:
+  # 0.095-0.108 concurrent-over-sequential, against 1.0 with the gather removed.
+  MAX_OVERLAP_RATIO = 0.5
+
   @pytest.mark.asyncio
   async def test_event_loop_not_blocked(self):
-    """The event loop is not blocked by async operations"""
-    start = time.time()
+    """The event loop is not blocked by async operations.
 
+    #1018: this used to be `elapsed < 0.1` — the sequential total of ten 10 ms
+    sleeps, written as an absolute. On a shared runner the concurrent run can
+    cross 0.1 s with nothing whatsoever wrong, and on a fast one the number
+    passes even if the tasks never overlapped, because the margin was one
+    scheduling hiccup wide.
+
+    The claim was always a RELATION: gathering the tasks must cost a fraction
+    of awaiting them one after another. Both halves are measured here, back to
+    back on the same machine, so anything that slows the machine slows both and
+    the ratio holds.
+    """
     async def quick_task():
-      await asyncio.sleep(0.01)
+      await asyncio.sleep(self.TASK_DELAY)
       return True
 
-    results = await asyncio.gather(*[quick_task() for _ in range(10)])
+    start = time.perf_counter()
+    sequential_results = [await quick_task() for _ in range(self.TASKS)]
+    sequential = time.perf_counter() - start
 
-    elapsed = time.time() - start
+    start = time.perf_counter()
+    concurrent_results = await asyncio.gather(
+      *[quick_task() for _ in range(self.TASKS)]
+    )
+    concurrent = time.perf_counter() - start
 
-    assert all(results)
-    assert elapsed < 0.1, f"Tasks took {elapsed}s, expected < 0.1s"
+    assert all(sequential_results)
+    assert all(concurrent_results)
+    assert concurrent < sequential * self.MAX_OVERLAP_RATIO, (
+      f"{self.TASKS} gathered tasks took {concurrent:.4f}s against "
+      f"{sequential:.4f}s awaited one by one ({concurrent / sequential:.2f}x). "
+      f"Overlapping them should cost about 1/{self.TASKS} of that — the loop "
+      "is running them sequentially, or something in them is blocking it."
+    )
 
   @pytest.mark.asyncio
   async def test_async_sleep_yields_control(self):
@@ -80,9 +111,26 @@ class TestThreadPoolExecutor:
 
     assert result == "done"
 
+  # Two jobs on two workers should cost what one job costs. TestGILRelease
+  # below uses 1.8 for the same shape, but the degradation this one has to
+  # catch sits exactly at 2.0 (a one-worker pool serialising the pair), and
+  # 1.8 leaves almost nothing between pass and fail. Measured on this tree
+  # 2026-09-04: 1.00-1.16 with two workers, 1.82-2.00 with one.
+  MAX_SERIALISATION_RATIO = 1.5
+
   @pytest.mark.asyncio
   async def test_executor_parallel_execution(self, executor):
-    """Executor executes in parallel"""
+    """Executor executes in parallel.
+
+    #1018: this used to be `elapsed < 0.1` — again the sequential total of the
+    two 50 ms jobs, as an absolute. It goes red on a busy runner for reasons
+    that have nothing to do with the pool, and it never compared the pair
+    against anything, so it could only ever say "fast enough today".
+
+    The relation is the one TestGILRelease already states in this file: the two
+    jobs are timed against ONE of the same jobs, measured first through the
+    same executor.
+    """
     results = []
 
     def work(n):
@@ -92,15 +140,24 @@ class TestThreadPoolExecutor:
 
     loop = asyncio.get_running_loop()
 
-    start = time.time()
+    start = time.perf_counter()
+    await loop.run_in_executor(executor, work, 0)
+    single = time.perf_counter() - start
+
+    start = time.perf_counter()
     await asyncio.gather(
       loop.run_in_executor(executor, work, 1),
       loop.run_in_executor(executor, work, 2),
     )
-    elapsed = time.time() - start
+    parallel = time.perf_counter() - start
 
-    assert elapsed < 0.1, f"Parallel execution took {elapsed}s"
-    assert len(results) == 2
+    ratio = parallel / single
+    assert ratio < self.MAX_SERIALISATION_RATIO, (
+      f"two jobs on the pool took {ratio:.2f}x one job ({parallel:.4f}s vs "
+      f"{single:.4f}s) — at 2.0x they ran one after the other, so the pool has "
+      "fewer usable workers than the test believes"
+    )
+    assert len(results) == 3
 
   @pytest.mark.asyncio
   async def test_executor_handles_exceptions(self, executor):

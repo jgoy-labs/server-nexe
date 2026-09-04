@@ -136,12 +136,15 @@ class TestThePromptNeverExceedsTheEngineWindow:
                 marks=pytest.mark.xfail(
                     strict=False,
                     reason=(
-                        "known pre-existing squeeze, filed as a finding: at 2048 the "
-                        "system prompt (~1175 tok) plus a history at the 45% threshold "
-                        "(921 tok) already exceed the window by ~100 tok with no document "
-                        "at all. No budget arithmetic fixes this — the real fix is "
-                        "enforcing prompt-fits-window at assembly time. On main it was "
-                        "far worse: the flat session cap allowed 3000 tok of history."
+                        "at 2048 the ARITHMETIC still overshoots by ~100 tok: the system "
+                        "prompt (~1175 tok) plus a history at the 45% threshold (921 tok) "
+                        "exceed the window with no document at all. That is now a "
+                        "degradation and not a crash — #976 enforces prompt-fits-window "
+                        "at assembly time, so the prompt that actually reaches the engine "
+                        "is trimmed to the window. What this file measures is the plan, "
+                        "not the assembled prompt; the assembled prompt is pinned by "
+                        "tests/core/test_f976_prompt_fits_window.py. On main it was far "
+                        "worse: the flat session cap allowed 3000 tok of history."
                     ),
                 ),
             ),

@@ -71,6 +71,22 @@ def client(app):
     return TestClient(app, raise_server_exceptions=False)
 
 
+# F-D block 5: the chat asks the core which engines are live and the core reads
+# app.state.modules, where the plugin loader registers every instance. These
+# tests describe their engine through a module-manager mock instead, so the
+# builder below also puts it here.
+_LIVE_MODULES: dict = {}
+_ENGINE_KEYS = ("ollama_module", "mlx_module", "llama_cpp_module")
+
+
+@pytest.fixture(autouse=True)
+def _live_modules(app):
+    _LIVE_MODULES.clear()
+    app.state.modules = _LIVE_MODULES
+    yield
+    _LIVE_MODULES.clear()
+
+
 @pytest.fixture
 def auth():
     return {"X-Api-Key": "test-manifest-key"}
@@ -358,6 +374,7 @@ class TestChatEndpoint:
 
         manifest_mod = MagicMock()
         manifest_mod.get_module_instance = MagicMock(return_value=engine)
+        _LIVE_MODULES.update(dict.fromkeys(_ENGINE_KEYS, engine))
 
         reg = MagicMock()
         reg.instance = manifest_mod

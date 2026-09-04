@@ -35,7 +35,14 @@ CI = REPO / ".github" / "workflows" / "ci.yml"
 
 # Gates that must survive an earlier red step in the same job.
 LATER_GATES = {
-    "static-analysis": ["bandit (gate)", "vulture (gate)"],
+    "static-analysis": [
+        "bandit (gate)",
+        "vulture (gate)",
+        # #1007: the complexity freeze needs nothing the pinned install above
+        # provides (it is stdlib-only), so hiding it behind a red ruff — or
+        # behind a failed `pip install` — would be the #914 shape all over again.
+        "complexity freeze (gate)",
+    ],
     "security-audit": [
         "Run OSV CVE gate for bundled deps (B070)",
         "Run gitleaks (secret scan)",

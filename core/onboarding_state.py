@@ -60,10 +60,12 @@ _KEYCHAIN_SERVICE = "nexe-hf-token"
 _KEYCHAIN_USER = "default"
 _HF_TOKEN_ENV_VAR = "HF_TOKEN"  # nosec B105 — env var name, not a password literal
 
-# Mapping from the wizard's engine identifier to the key accepted by
-# `_resolve_engines` in plugins/web_ui_module/api/routes_chat.py.
-# Discovered empirically — the routes_chat resolver uses "mlx" / "ollama" /
-# "llamacpp" / "auto", not module suffixes like "mlx_module".
+# Mapping from the wizard's engine identifier to the key the engine resolver
+# accepts. Since F-D block 5 that resolver is
+# core.endpoints.chat_engines.routing (both doors use it, the web UI no longer
+# has its own): it takes "mlx" / "ollama" / "auto" and normalises every spelling
+# of llama.cpp — "llamacpp" here still resolves — never module suffixes like
+# "mlx_module".
 _ENGINE_TO_RESOLVER_KEY: dict[str, str] = {
     "mlx": "mlx",
     "ollama": "ollama",

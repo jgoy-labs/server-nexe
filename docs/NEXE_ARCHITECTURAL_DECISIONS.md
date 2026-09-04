@@ -116,9 +116,25 @@ engine's window.** llama.cpp does not truncate an oversized prompt — it raises
 a small engine's budget (`MIN_BUDGET_WINDOW_TOKENS` was tried and reverted: at
 n_ctx=2048 it turned degradation into a crash). Degrading always beats dying.
 
-Open edges are tracked as findings, not here: per-engine enforcement at assembly
-(#976), the degenerate truncation branch when the budget reaches ≤0 (#979), and
-the wrapper around retrieved context — nonce'd delimiters plus an assistant ack
-turn — which the budget does not count, so the assembled prompt runs slightly
-past it (#999). `NEXE_HISTORY_CONTEXT_RATIO` (#977) is closed: it is validated
-like its siblings now, and it applies to `/ui/chat` only.
+**Where the invariant is enforced (#976, closed):** the budget decides what a turn
+may KEEP; `fit_prompt_to_window` (`core/context_budget.py`) checks what was actually
+ASSEMBLED, at both doors, and drops whole turns from the oldest end until it fits.
+The two are not the same measurement — the budget knows nothing about the history
+the caller prepends afterwards, the on-demand clock line, or the untrusted-context
+wrapper. A newest turn that overflows on its own is trimmed rather than dropped (an
+empty prompt is not a degradation), keeping its head and its tail for a user turn
+and its end for an assistant one, which is the continue path resuming where the
+generation stopped.
+
+Its limit, stated rather than implied: the check counts CHARS at
+`CHARS_PER_TOKEN_ESTIMATE`, because the core may not reach a plugin's tokenizer
+(the layering gate keeps core → plugins at zero). The estimate undercounts Catalan
+and Spanish, so the margin is the greater of 256 tokens and 5% of the window. That
+converts "over the window by any amount" into "within the estimate's error of it";
+it is not a proof.
+
+Open edges are tracked as findings, not here: the degenerate truncation branch when
+the budget reaches ≤0 (#979) and the wrapper around retrieved context — nonce'd
+delimiters plus an assistant ack turn — which the budget does not count, so the
+assembled prompt runs slightly past it (#999). `NEXE_HISTORY_CONTEXT_RATIO` (#977)
+is closed: it is validated like its siblings now, and it applies to `/ui/chat` only.

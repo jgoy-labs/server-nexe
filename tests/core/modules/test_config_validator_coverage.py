@@ -73,8 +73,13 @@ level = "INFO"
         result = v.validate(config)
         assert any("temperature" in e.lower() or "range" in e.lower() or "value_out_of_range" in e for e in result.errors)
 
-    def test_validate_plugins_max_tokens_invalid(self, tmp_path, validator):
-        """Lines 237-239: invalid max_tokens."""
+    def test_validate_plugins_max_tokens_is_a_warning_not_an_error(self, tmp_path, validator):
+        """#1002: an inherited `max_tokens` must not stop a config from loading.
+
+        It shipped in the default server.toml until #1002, so it is on disk in
+        every installation made before it — and it is read by nothing. The file
+        stays valid; the user is told the key is ignored.
+        """
         config = tmp_path / "server.toml"
         config.write_text("""
 [meta]
@@ -100,7 +105,9 @@ max_tokens = -1
 level = "INFO"
 """)
         result = validator.validate(config)
-        assert any("max_tokens" in e for e in result.errors)
+        assert result.valid, f"an inherited key must not invalidate the file: {result.errors}"
+        assert not any("max_tokens" in e for e in result.errors)
+        assert any("max_tokens" in w for w in result.warnings)
 
     def test_validate_storage_retention_invalid(self, tmp_path, validator):
         """Lines 259-262: invalid retention_days."""

@@ -199,8 +199,11 @@ primary = ""               # Configurat dinàmicament via .env (NEXE_DEFAULT_MOD
 secondary = ""             # Configurat per l'instal·lador segons l'engine
 embedding = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"  # Model d'embeddings local (fastembed/ONNX)
 temperature = 0.7
-max_tokens = 8192
-context_window = 32768
+# #1002: `max_tokens` and `context_window` used to be here and were read by
+# NOTHING. The context window is asked of the live engine
+# (`get_context_window()`, #965) and the answer ceiling comes from the engine's
+# own configuration, so keys here would be misleading — the same reason
+# [security.encryption] carries the note below.
 
 [security.encryption]
 # MC-092: encryption is toggled by the NEXE_ENCRYPTION_ENABLED env var, not here.
