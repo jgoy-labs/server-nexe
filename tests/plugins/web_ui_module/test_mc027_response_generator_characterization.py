@@ -25,6 +25,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+
+from core.memory_facts.intent_texts import text as _intent_text
 from starlette.datastructures import State
 from starlette.requests import Request as StarletteRequest
 
@@ -67,7 +69,12 @@ def _connected_request(server_state=None):
         "headers": [],
         "client": ("127.0.0.1", 12345),
         "app": app_mock,
-        "state": State(),
+        # C4.1 (#1044): the trace `require_ui_auth` leaves behind — the principal
+        # it authenticated. The door copies it onto the turn and `authorize`
+        # refuses a turn without one, so a harness that stubs the auth
+        # dependency has to leave the same trace. A plain dict is what
+        # Starlette's `request.state` wraps.
+        "state": {"principal": "harness-key"},
     }
     return StarletteRequest(scope, receive=_receive)
 
@@ -472,8 +479,11 @@ class TestMemoryIntentStreamPath:
         Mutation: dropping/altering the 2333 add_message, or double-streaming,
         breaks the single-persist or the body==text assertion -> RED.
         """
-        h = _Harness(intent="save", mem_content="Em dic Joan")
-        result = await h.call({"message": "Recorda que em dic Joan", "stream": True})
+        # C3.1/D6: `save` no longer answers the turn (it saves and continues to
+        # the model), so the short-circuit path this test characterises is now
+        # reached by a command — `list` — which still answers by itself.
+        h = _Harness(intent="list")
+        result = await h.call({"message": "Que recordes de mi?", "stream": True})
         assert isinstance(result, StreamingResponse)
         body = await _join_stream(result)
 
@@ -481,7 +491,7 @@ class TestMemoryIntentStreamPath:
         assert len(msgs) == 1, "memory-intent stream must persist exactly one assistant turn"
         # the streamed body is the persisted reply, char-by-char
         assert msgs[0]["content"] in body
-        assert "memory" in body.lower() or "memòria" in body.lower()
+        assert _intent_text("list.empty") in body
 
 
 # ═══════════════════════════════════════════════════════════════

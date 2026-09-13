@@ -38,7 +38,7 @@ class _FakeApi:
 class TestClearMemoryWipesBothStores:
     @pytest.mark.asyncio
     async def test_the_service_stores_are_wiped_too(self, monkeypatch):
-        from plugins.web_ui_module.core import memory_helper as mh
+        from core.memory_facts import helper as mh
 
         api = _FakeApi()
         wiped = {}
@@ -70,7 +70,7 @@ class TestClearMemoryWipesBothStores:
         """forget_everything() returns {} when the service is not running.
         That is 'never reached', not 'wiped nothing'. success:True here is
         the original #897 confirmation-vs-delete, now only on this path."""
-        from plugins.web_ui_module.core import memory_helper as mh
+        from core.memory_facts import helper as mh
 
         api = _FakeApi()
 
@@ -97,7 +97,7 @@ class TestClearMemoryWipesBothStores:
     @pytest.mark.asyncio
     async def test_without_confirmation_nothing_is_touched(self, monkeypatch):
         """The 2-turn confirm gate stays in front of a now-bigger deletion."""
-        from plugins.web_ui_module.core import memory_helper as mh
+        from core.memory_facts import helper as mh
 
         called = {}
 

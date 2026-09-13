@@ -147,6 +147,28 @@ def _update_key_metrics(keys_config) -> None:
   set_grace_period_active(keys_config.secondary and keys_config.secondary.is_valid)
 
 
+def _remember_principal(request: Request, principal: str) -> str:
+  """Keep on the request WHO the door authenticated (ADR-007 C4.1, #1044).
+
+  Both dependencies below already computed a principal and then threw it away —
+  `grep -rn 'state.principal'` returned 0 before C4.1 — so the turn's
+  `authorize` step (`core/turn/authorize.py`) had nothing to read and stayed
+  folded into "the route has a Depends". Now the chat doors copy this into
+  `ctx.principal` and the step is real.
+
+  `request.state` is a Starlette Request's own scratch; a hand-built stub in a
+  test harness may not have one, and auth must not turn into a 500 over a
+  bookkeeping line, so a missing `state` is skipped, not raised.
+  """
+  state = getattr(request, "state", None)
+  if state is not None:
+    try:
+      state.principal = principal
+    except Exception as exc:
+      _log.debug("could not record the principal on the request: %s", exc)
+  return principal
+
+
 def _check_dev_mode(request: Request, dev_mode: bool) -> str:
   """Bypass auth in dev mode if the request comes from localhost."""
   if dev_mode:
@@ -309,7 +331,7 @@ async def authenticate_ui_request(
   request: Request,
   x_api_key: Optional[str],
   authorization: Optional[str] = None,
-) -> None:
+) -> str:
   """Product-path auth (D-I / #883). Same keys as the core, UI fail-closed.
 
   No key material configured → 503 (never open).
@@ -327,11 +349,14 @@ async def authenticate_ui_request(
       if i18n is not None
       else "API key not configured (FAIL CLOSED)",
     )
-  _accept_or_reject_presented_key(
+  # C4.1: the principal is kept, not discarded — same as `require_api_key`.
+  # This door was already fail-closed, so `authorize` never fires here; the
+  # symmetry is what makes it ONE step rather than a step and an exception.
+  return _remember_principal(request, _accept_or_reject_presented_key(
     request,
     presented_api_key(x_api_key, authorization),
     keys_config,
-  )
+  ))
 
 
 def _log_failure(request: Request, keys_config) -> None:
@@ -390,14 +415,14 @@ async def require_api_key(
   _update_key_metrics(keys_config)
 
   if not keys_config.has_any_valid_key:
-    return _check_dev_mode(request, dev_mode)
+    return _remember_principal(request, _check_dev_mode(request, dev_mode))
 
   # D-I / #883: same presented-key + 429 window as /ui/chat.
-  return _accept_or_reject_presented_key(
+  return _remember_principal(request, _accept_or_reject_presented_key(
     request,
     presented_api_key(x_api_key, authorization),
     keys_config,
-  )
+  ))
 
 async def optional_api_key(
   x_api_key: Optional[str] = Header(None, description="Optional API Key")

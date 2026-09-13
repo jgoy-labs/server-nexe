@@ -990,51 +990,33 @@ class TestForwardToMLX:
         req.headers.get = _headers_get
         return req
 
-    def test_no_mlx_module_falls_back_to_ollama(self):
-        """Without mlx_module, falls back to Ollama."""
-        import httpx
+    def test_no_mlx_module_raises(self):
+        """#1036 (C2.4): without mlx_module, raises instead of falling back to
+        Ollama on its own — the mlx→llama_cpp→ollama cascade in
+        _dispatch_through_cascade is the only fallback mechanism now."""
         from core.endpoints.chat import _forward_to_mlx
-        from fastapi import HTTPException
-
-        mock_client = AsyncMock()
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
 
         req = self._make_fastapi_request(modules={})
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            with pytest.raises(HTTPException) as exc:
-                asyncio.run(_forward_to_mlx(
-                    [{"role": "user", "content": "Hi"}],
-                    self._make_request(),
-                    req
-                ))
+        with pytest.raises(RuntimeError, match="MLX module not available"):
+            asyncio.run(_forward_to_mlx(
+                [{"role": "user", "content": "Hi"}],
+                self._make_request(),
+                req
+            ))
 
-        assert exc.value.status_code == 503
-
-    def test_mlx_module_without_chat_attr_falls_back(self):
-        """MLX module without 'chat' attr, falls back."""
-        import httpx
+    def test_mlx_module_without_chat_attr_raises(self):
+        """#1036 (C2.4): MLX module without 'chat' attr raises the same way."""
         from core.endpoints.chat import _forward_to_mlx
-        from fastapi import HTTPException
-
-        mock_client = AsyncMock()
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
 
         req = self._make_fastapi_request(modules={"mlx_module": object()})  # no chat attr
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            with pytest.raises(HTTPException) as exc:
-                asyncio.run(_forward_to_mlx(
-                    [{"role": "user", "content": "Hi"}],
-                    self._make_request(),
-                    req
-                ))
-
-        assert exc.value.status_code == 503
+        with pytest.raises(RuntimeError, match="MLX module not available"):
+            asyncio.run(_forward_to_mlx(
+                [{"role": "user", "content": "Hi"}],
+                self._make_request(),
+                req
+            ))
 
     def test_mlx_non_streaming_returns_openai_format(self):
         """MLX non-streaming returns OpenAI-compatible format."""
@@ -1076,31 +1058,59 @@ class TestForwardToMLX:
 
         assert isinstance(result, StreamingResponse)
 
-    def test_mlx_exception_falls_back_to_ollama(self):
-        """Exception during MLX → fallback to Ollama."""
-        import httpx
+    def test_mlx_stream_error_after_first_token_is_partial(self):
+        """#1036/#1040 (C2.4): once a token reached the client the error is a
+        yielded chunk (irretryable — the StreamingResponse already committed),
+        and the partial reply is still persisted to the mirrored /v1 session
+        instead of being dropped on the floor."""
         from core.endpoints.chat import _forward_to_mlx
-        from fastapi import HTTPException
+        import core.endpoints.chat_engines.mlx as mlx_mod
+
+        async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
+            if stream_callback:
+                stream_callback("partial")
+            raise RuntimeError("GPU crashed mid-stream")
+
+        mlx_module = AsyncMock()
+        mlx_module.chat = fake_chat
+
+        req = self._make_fastapi_request(modules={"mlx_module": mlx_module})
+
+        async def _run():
+            with patch.object(mlx_mod, "persist_v1_turn") as mock_persist:
+                result = await _forward_to_mlx(
+                    [{"role": "user", "content": "Hi"}],
+                    self._make_request(stream=True),
+                    req,
+                )
+                assert isinstance(result, StreamingResponse)
+                chunks = [c async for c in result.body_iterator]
+                return chunks, mock_persist
+
+        chunks, mock_persist = asyncio.run(_run())
+        text = "".join(chunks)
+        assert '"error"' in text
+        assert "[DONE]" in text
+        mock_persist.assert_called_once()
+        assert mock_persist.call_args.kwargs.get("partial") is True
+
+    def test_mlx_exception_propagates(self):
+        """#1036 (C2.4): a non-streaming execution error propagates untouched
+        instead of being swallowed into a fallback — _dispatch_through_cascade
+        is what decides whether to try the next engine."""
+        from core.endpoints.chat import _forward_to_mlx
 
         mlx_module = AsyncMock()
         mlx_module.chat = AsyncMock(side_effect=Exception("GPU error"))
 
-        mock_client = AsyncMock()
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
-
         req = self._make_fastapi_request(modules={"mlx_module": mlx_module})
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            with pytest.raises(HTTPException) as exc:
-                asyncio.run(_forward_to_mlx(
-                    [{"role": "user", "content": "Hi"}],
-                    self._make_request(),
-                    req
-                ))
-
-        assert exc.value.status_code == 503
+        with pytest.raises(Exception, match="GPU error"):
+            asyncio.run(_forward_to_mlx(
+                [{"role": "user", "content": "Hi"}],
+                self._make_request(),
+                req
+            ))
 
     def test_mlx_separates_system_and_user_messages(self):
         """Separates system message from user messages for MLX."""
@@ -1144,28 +1154,20 @@ class TestForwardToLlamaCpp:
         req.headers.get = _headers_get
         return req
 
-    def test_no_llama_module_falls_back(self):
-        """Without llama_cpp_module, falls back to Ollama."""
-        import httpx
+    def test_no_llama_module_raises(self):
+        """#1036 (C2.4): without llama_cpp_module, raises instead of falling
+        back to Ollama on its own — _dispatch_through_cascade is the only
+        fallback mechanism now."""
         from core.endpoints.chat import _forward_to_llama_cpp
-        from fastapi import HTTPException
-
-        mock_client = AsyncMock()
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
 
         req = self._make_fastapi_request(modules={})
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            with pytest.raises(HTTPException) as exc:
-                asyncio.run(_forward_to_llama_cpp(
-                    [{"role": "user", "content": "Hi"}],
-                    self._make_request(),
-                    req
-                ))
-
-        assert exc.value.status_code == 503
+        with pytest.raises(RuntimeError, match="Llama.cpp module not available"):
+            asyncio.run(_forward_to_llama_cpp(
+                [{"role": "user", "content": "Hi"}],
+                self._make_request(),
+                req
+            ))
 
     def test_llama_cpp_non_streaming_success(self):
         """Llama.cpp non-streaming returns OpenAI format."""
@@ -1207,31 +1209,23 @@ class TestForwardToLlamaCpp:
 
         assert isinstance(result, StreamingResponse)
 
-    def test_llama_cpp_exception_falls_back(self):
-        """Exception during llama.cpp → fallback to Ollama."""
-        import httpx
+    def test_llama_cpp_exception_propagates(self):
+        """#1036 (C2.4): a non-streaming execution error propagates untouched
+        instead of being swallowed into a fallback — _dispatch_through_cascade
+        is what decides whether to try the next engine."""
         from core.endpoints.chat import _forward_to_llama_cpp
-        from fastapi import HTTPException
 
         llama_module = AsyncMock()
         llama_module.chat = AsyncMock(side_effect=Exception("Model error"))
 
-        mock_client = AsyncMock()
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
-
         req = self._make_fastapi_request(modules={"llama_cpp_module": llama_module})
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
-            with pytest.raises(HTTPException) as exc:
-                asyncio.run(_forward_to_llama_cpp(
-                    [{"role": "user", "content": "Hi"}],
-                    self._make_request(),
-                    req
-                ))
-
-        assert exc.value.status_code == 503
+        with pytest.raises(Exception, match="Model error"):
+            asyncio.run(_forward_to_llama_cpp(
+                [{"role": "user", "content": "Hi"}],
+                self._make_request(),
+                req
+            ))
 
     def test_llama_cpp_separates_system_messages(self):
         """Separates system message from user messages for llama.cpp."""
@@ -1305,7 +1299,7 @@ class TestMLXStreamGenerator:
         """The generator always ends with [DONE]."""
         from core.endpoints.chat import _mlx_stream_generator
 
-        async def fake_chat(messages, system, session_id, stream_callback=None):
+        async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
             return {"tokens": 0, "tokens_per_second": 0}
 
         mlx_module = AsyncMock()
@@ -1322,11 +1316,36 @@ class TestMLXStreamGenerator:
 
         assert any("[DONE]" in c for c in chunks)
 
-    def test_exception_in_task_yields_done_anyway(self):
-        """Exception during run_mlx → generator ends with [DONE] anyway."""
+    def test_exception_before_first_token_raises(self):
+        """#1036 (C2.4): an error before any token reached the client raises a
+        real exception instead of ending with [DONE] — this is what lets the
+        forwarder's peek-before-first-byte give the cascade something to
+        retry. (Before C2.4 this silently closed the stream with no token and
+        no visible error — arguably worse than either behaviour.)"""
         from core.endpoints.chat import _mlx_stream_generator
 
-        async def fake_chat(messages, system, session_id, stream_callback=None):
+        async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
+            raise RuntimeError("MLX GPU error")
+
+        mlx_module = AsyncMock()
+        mlx_module.chat = fake_chat
+
+        with pytest.raises(RuntimeError, match="MLX GPU error"):
+            self._collect(_mlx_stream_generator(
+                mlx_module=mlx_module,
+                user_messages=[],
+                system_msg="",
+                model_name="test",
+            ))
+
+    def test_exception_after_first_token_yields_chunk_and_done(self):
+        """#1036/#1040 (C2.4): once a token already reached the client, the
+        wire is committed — the error becomes a yielded chunk (irretryable),
+        exactly as before C2.4, and the stream still ends with [DONE]."""
+        from core.endpoints.chat import _mlx_stream_generator
+
+        async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
+            stream_callback("partial")
             raise RuntimeError("MLX GPU error")
 
         mlx_module = AsyncMock()
@@ -1337,10 +1356,10 @@ class TestMLXStreamGenerator:
             user_messages=[],
             system_msg="",
             model_name="test",
+            app_state=None,
         ))
 
-        # When exception in run_mlx, generation_done is set → loop exits,
-        # final_chunk and [DONE] are still yielded
+        assert any('"error"' in c for c in chunks)
         assert any("[DONE]" in c for c in chunks)
 
 
@@ -1395,7 +1414,7 @@ class TestLlamaCppStreamGenerator:
         """Always ends with [DONE]."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
-        async def fake_chat(messages, system, session_id, stream_callback=None):
+        async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
             return {}
 
         llama_module = AsyncMock()
@@ -1412,11 +1431,34 @@ class TestLlamaCppStreamGenerator:
 
         assert any("[DONE]" in c for c in chunks)
 
-    def test_exception_in_task_yields_done_anyway(self):
-        """Exception during run_llama → generator ends with [DONE] anyway."""
+    def test_exception_before_first_token_raises(self):
+        """#1036 (C2.4): an error before any token reached the client raises a
+        real exception instead of ending with [DONE] — see the MLX generator's
+        equivalent test for the full rationale."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
-        async def fake_chat(messages, system, session_id, stream_callback=None):
+        async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
+            raise RuntimeError("GGUF error")
+
+        llama_module = AsyncMock()
+        llama_module.chat = fake_chat
+
+        with pytest.raises(RuntimeError, match="GGUF error"):
+            self._collect(_llama_cpp_stream_generator(
+                llama_module=llama_module,
+                user_messages=[],
+                system_msg="",
+                model_name="test",
+            ))
+
+    def test_exception_after_first_token_yields_chunk_and_done(self):
+        """#1036/#1040 (C2.4): once a token already reached the client, the
+        error becomes a yielded chunk (irretryable) and the stream still ends
+        with [DONE]."""
+        from core.endpoints.chat import _llama_cpp_stream_generator
+
+        async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
+            stream_callback("partial")
             raise RuntimeError("GGUF error")
 
         llama_module = AsyncMock()
@@ -1427,6 +1469,8 @@ class TestLlamaCppStreamGenerator:
             user_messages=[],
             system_msg="",
             model_name="test",
+            app_state=None,
         ))
 
+        assert any('"error"' in c for c in chunks)
         assert any("[DONE]" in c for c in chunks)

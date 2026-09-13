@@ -5,7 +5,7 @@ Without GPU or Qdrant — covers all in-memory logic.
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from plugins.web_ui_module.core.memory_helper import (
+from core.memory_facts.helper import (
     MemoryHelper,
     SAVE_TRIGGERS,
     RECALL_PATTERNS,

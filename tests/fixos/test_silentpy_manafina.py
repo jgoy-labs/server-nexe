@@ -33,7 +33,7 @@ import pytest
 # ─── MC-015 — delete reports "not found" when the search actually failed ──────
 
 def _helper_with_memory(memory):
-    from plugins.web_ui_module.core.memory_helper import MemoryHelper
+    from core.memory_facts.helper import MemoryHelper
     helper = MemoryHelper()
     helper.get_memory_api = AsyncMock(return_value=memory)
     return helper

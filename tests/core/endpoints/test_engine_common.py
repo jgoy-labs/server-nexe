@@ -9,8 +9,7 @@ www.jgoy.net · https://server-nexe.org
 ------------------------------------
 """
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock
 
 MODULE = "core.endpoints.chat_engines._common"
 
@@ -154,23 +153,3 @@ class TestResolveLoadedModelName:
         # A bare mock (not a real loaded config) must not crash Path(); fall back.
         module = MagicMock()
         assert resolve_loaded_model_name(module, "mlx-local") == "mlx-local"
-
-
-class TestFallbackToOllama:
-
-    @pytest.mark.asyncio
-    async def test_calls_forward_to_ollama(self):
-        from core.endpoints.chat_engines._common import fallback_to_ollama
-
-        mock_forward = AsyncMock(return_value={"ok": True})
-        with patch("core.endpoints.chat_engines._common._forward_to_ollama_lazy", mock_forward):
-            result = await fallback_to_ollama(
-                messages=[{"role": "user", "content": "hi"}],
-                request=MagicMock(),
-                app_state=MagicMock(),
-                user_msg="hi",
-                from_engine="mlx",
-                reason="module_unavailable",
-            )
-        assert result == {"ok": True}
-        mock_forward.assert_called_once()

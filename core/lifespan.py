@@ -86,6 +86,13 @@ from .lifespan_modules import (  # noqa: E402  # after warnings filter
 from .lifespan_crypto import _startup_encryption  # noqa: E402  # after warnings filter
 from .lifespan_qdrant import _startup_qdrant, _shutdown_qdrant  # noqa: E402  # after warnings filter
 from .lifespan_sessions import (  # noqa: E402  # after warnings filter
+    _expose_engine_gate,
+    _expose_memory_helper,
+    _expose_post_commit_queue,
+    _expose_session_manager,
+    _startup_engine_gate,
+    _startup_memory_helper,
+    _startup_post_commit_queue,
     _startup_session_cleanup,
     _startup_session_manager,
 )
@@ -378,6 +385,14 @@ async def _startup_init(app: FastAPI) -> None:
 
     await _startup_encryption(server_state)
     await _startup_session_manager(server_state)
+    # F-C fix (2026-09-06): the /v1 routes read app.state, not server_state.
+    _expose_session_manager(app, server_state)
+    await _startup_engine_gate(server_state)
+    _expose_engine_gate(app, server_state)
+    await _startup_post_commit_queue(server_state)
+    _expose_post_commit_queue(app, server_state)
+    await _startup_memory_helper(server_state)
+    _expose_memory_helper(app, server_state)
     _start_qdrant_or_degrade()
 
 
@@ -397,10 +412,7 @@ async def _startup_services(app: FastAPI) -> None:
         record_refusal(RefusalReason.SERVICES_TIMEOUT, f"{STARTUP_TIMEOUT}s")
         raise RuntimeError(f"Services startup timed out after {STARTUP_TIMEOUT}s")
 
-    from core.config import DEFAULT_HOST, DEFAULT_PORT
-    server_config = server_state.config.get('core', {}).get('server', {})
-    host = server_config.get('host', DEFAULT_HOST)
-    port = server_config.get('port', DEFAULT_PORT)
+    host, port = _bound_address()
     msg = _translate(server_state.i18n, "core.server.binding_server",
         "Server ready at {host}:{port}", host=host, port=port)
     logger.info(msg)
@@ -533,14 +545,30 @@ async def _startup_phases_and_tokens(app: FastAPI) -> None:
     await _startup_session_cleanup(app, server_state)
 
 
+def _bound_address() -> tuple[str, int]:
+    """The host and port the server is ACTUALLY listening on.
+
+    Same resolution as `core/server/runner.py:main` — `NEXE_HOST`/`NEXE_PORT`
+    (injected by Tauri in sidecar mode) win over config.yaml, which wins over
+    the defaults. Read from the config alone, these logs announced the
+    config.yaml port (9119) while uvicorn was bound to `NEXE_PORT` (seen live
+    on 08/09 with the server on 9130), which sends anyone reading the log to a
+    port with nothing behind it.
+    """
+    from core.config import DEFAULT_HOST, DEFAULT_PORT
+    from core.env_utils import parse_port
+
+    srv_cfg = server_state.config.get("core", {}).get("server", {})
+    env_port = parse_port(os.environ.get("NEXE_PORT"), var_name="NEXE_PORT")
+    port = env_port if env_port is not None else srv_cfg.get("port", DEFAULT_PORT)
+    host = os.environ.get("NEXE_HOST") or srv_cfg.get("host", DEFAULT_HOST)
+    return host, port
+
+
 def _startup_final_banner() -> None:
     """Phase 4: final banner with URL, API key and encryption status."""
-    from core.config import DEFAULT_HOST, DEFAULT_PORT
-    _srv_cfg = server_state.config.get("core", {}).get("server", {})
-    _nexe_url = os.environ.get(
-        "NEXE_API_BASE_URL",
-        f"http://{_srv_cfg.get('host', DEFAULT_HOST)}:{_srv_cfg.get('port', DEFAULT_PORT)}",
-    )
+    _host, _port = _bound_address()
+    _nexe_url = os.environ.get("NEXE_API_BASE_URL", f"http://{_host}:{_port}")
     _api_key = os.environ.get("NEXE_PRIMARY_API_KEY", "")
     _crypto_status = "ENABLED" if server_state.crypto_provider else "disabled"
 
@@ -675,7 +703,7 @@ async def _cancel_background_tasks() -> None:
             _dreaming_cycle.stop()
         except Exception:
             logger.debug("DreamingCycle.stop() during pre-shutdown raised", exc_info=True)
-    for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task', '_knowledge_ingest_task', '_dreaming_task'):
+    for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task', '_knowledge_ingest_task', '_dreaming_task', '_post_commit_task'):
         _task = getattr(server_state, _task_attr, None)
         if _task is not None and not _task.done():
             _task.cancel()

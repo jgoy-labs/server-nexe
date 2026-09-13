@@ -14,7 +14,7 @@ www.jgoy.net · https://server-nexe.org
 
 import re as _re
 
-from plugins.web_ui_module.api.routes_chat import (
+from core.memory_facts.extract import (
     _is_valid_mem_save_text,
     _extract_safe_mem_saves,
     _MEMORIA_RE,

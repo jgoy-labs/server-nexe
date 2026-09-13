@@ -99,8 +99,8 @@ class TestRagRecallAcross3Turns:
     @pytest.mark.asyncio
     async def test_recall_returns_saved_fact_after_3_turns(self, memory_api):
         """Turn 1 saves 'Ruf', turn 2 is neutral, turn 3 recalls 'Ruf' via Qdrant."""
-        from plugins.web_ui_module.core.memory_helper import MemoryHelper
-        import plugins.web_ui_module.core.memory_helper as mh
+        from core.memory_facts.helper import MemoryHelper
+        import core.memory_facts.helper as mh
 
         # Reset module-level singleton so this test uses our fixture API
         original_instance = mh._memory_api_instance
@@ -148,8 +148,8 @@ class TestRagRecallAcross3Turns:
     @pytest.mark.asyncio
     async def test_neutral_turn_does_not_return_unrelated_fact(self, memory_api):
         """Turn 2 neutral query must not accidentally return the dog fact."""
-        from plugins.web_ui_module.core.memory_helper import MemoryHelper
-        import plugins.web_ui_module.core.memory_helper as mh
+        from core.memory_facts.helper import MemoryHelper
+        import core.memory_facts.helper as mh
 
         original_instance = mh._memory_api_instance
         mh._memory_api_instance = memory_api
@@ -195,22 +195,22 @@ class TestRecallGracefulDegradation:
     """
 
     def setup_method(self):
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         self._orig = (mh._memory_api_instance, mh._memory_api_init_failed, mh._memory_api_last_failure_ts)
         mh._memory_api_instance = None
         mh._memory_api_init_failed = True
         mh._memory_api_last_failure_ts = __import__("time").monotonic()
 
     def teardown_method(self):
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         mh._memory_api_instance, mh._memory_api_init_failed, mh._memory_api_last_failure_ts = self._orig
 
     def test_recall_returns_dict_not_raises(self):
         """recall_from_memory must return a dict, never raise, when API is unavailable."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
 
         async def _test():
-            return await mh.get_memory_helper().recall_from_memory("any query")
+            return await mh.MemoryHelper().recall_from_memory("any query")
 
         # asyncio.run creates a fresh event loop: get_event_loop() relied on
         # the ambient loop policy, which earlier async tests in the suite
@@ -222,10 +222,10 @@ class TestRecallGracefulDegradation:
 
     def test_recall_message_is_clear(self):
         """The failure message must clearly indicate Memory API is unavailable."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
 
         async def _test():
-            return await mh.get_memory_helper().recall_from_memory("query")
+            return await mh.MemoryHelper().recall_from_memory("query")
 
         # See test_recall_returns_dict_not_raises — fresh loop, no ambient
         # loop dependency.

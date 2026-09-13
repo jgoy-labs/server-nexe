@@ -17,8 +17,8 @@ www.jgoy.net · https://server-nexe.org
 import asyncio
 import pytest
 
-import plugins.web_ui_module.core.memory_helper as mh_module
-from plugins.web_ui_module.core.memory_helper import MemoryHelper
+import core.memory_facts.helper as mh_module
+from core.memory_facts.helper import MemoryHelper
 from memory.memory.api import MemoryAPI
 from memory.memory.constants import DEFAULT_VECTOR_SIZE
 from core.endpoints.chat_sanitization import _filter_rag_injection

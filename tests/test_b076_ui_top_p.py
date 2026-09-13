@@ -7,8 +7,10 @@ capture the exact value at the terminal sampling boundary:
 
   (A) `OllamaChat._build_payload` — the value that lands in
       ``payload["options"]["top_p"]`` (what Ollama's sampler reads).
-  (B) `_parse_ui_top_p` — the UI validator that decides which value (or None)
-      is forwarded into that payload.
+  (B) `core.turn.validate.parse_top_p` — the validator that decides which value
+      (or None) is forwarded into that payload. It was `_parse_ui_top_p` in
+      `routes_chat.py` until C4.1; it is the turn's, not the UI door's, and its
+      bounds are the /v1 schema's (`chat_schemas.py`, `gt=0.0, le=1.0`).
 
 Both assert the EXACT propagated value (0.42, 0.5, 1.0, ...). If production
 regressed to a hardcoded constant (e.g. 0.9) or dropped the parameter, the
@@ -80,11 +82,11 @@ class TestOllamaBuildPayloadTopP:
 
 
 class TestParseUiTopP:
-    """(B) _parse_ui_top_p validates + forwards the UI body's top_p."""
+    """(B) `parse_top_p` validates + forwards the UI body's top_p."""
 
     def _fn(self):
-        from plugins.web_ui_module.api.routes_chat import _parse_ui_top_p
-        return _parse_ui_top_p
+        from core.turn.validate import parse_top_p
+        return parse_top_p
 
     def test_valid_midrange(self):
         # EXACT pass-through: a regression that clamped/replaced the user value

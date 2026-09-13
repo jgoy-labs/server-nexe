@@ -128,7 +128,7 @@ def _upload(client):
 def test_upload_survives_a_broken_memory(client):
     """The upload answers 200 and tells the truth about the indexing."""
     with patch(
-        "plugins.web_ui_module.api.routes_files._get_memory_helper",
+        "core.memory_facts.helper_for",
         return_value=_broken_helper(),
     ):
         r = _upload(client)
@@ -147,7 +147,7 @@ def test_upload_survives_a_broken_memory(client):
 def test_the_document_is_attached_even_with_memory_broken(client, session, calls):
     """The point of the fix: the conversation keeps the document."""
     with patch(
-        "plugins.web_ui_module.api.routes_files._get_memory_helper",
+        "core.memory_facts.helper_for",
         return_value=_broken_helper(),
     ):
         r = _upload(client)
@@ -171,7 +171,7 @@ def test_the_attachment_happens_before_the_indexing(client, calls):
     conversation already has the document.
     """
     with patch(
-        "plugins.web_ui_module.api.routes_files._get_memory_helper",
+        "core.memory_facts.helper_for",
         return_value=_healthy_helper(calls),
     ):
         r = _upload(client)
@@ -189,7 +189,7 @@ def test_a_healthy_memory_still_reports_ingested(client, calls):
     the indexing altogether."""
     helper = _healthy_helper(calls)
     with patch(
-        "plugins.web_ui_module.api.routes_files._get_memory_helper",
+        "core.memory_facts.helper_for",
         return_value=helper,
     ):
         r = _upload(client)

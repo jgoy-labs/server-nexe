@@ -210,17 +210,18 @@ class TestMlxStreamGenerator:
         assert any("[DONE]" in c for c in chunks)
 
     def test_mlx_stream_exception(self):
-        """Lines 710-713: MLX streaming exception yields error chunk."""
+        """#1036 (C2.4): an exception before any token reached the client
+        raises instead of yielding an error chunk — the forwarder's peek can
+        catch it and let the cascade retry the next engine. Either way, the
+        failure is never silent."""
         from core.endpoints.chat import _mlx_stream_generator
 
         mock_mlx = AsyncMock()
         mock_mlx.chat = AsyncMock(side_effect=RuntimeError("MLX crashed"))
 
         gen = _mlx_stream_generator(mock_mlx, [], "system", "model")
-        chunks = asyncio.run(_collect_async_gen(gen))
-        # The error gets caught and yields an error chunk
-        error_chunks = [c for c in chunks if "error" in c.lower() or "MLX" in c]
-        assert len(error_chunks) > 0  # Exception path taken: error chunk must be emitted
+        with pytest.raises(RuntimeError, match="MLX crashed"):
+            asyncio.run(_collect_async_gen(gen))
 
 
 # ─── Test _llama_cpp_stream_generator uncovered branches ───────────────
@@ -258,16 +259,17 @@ class TestLlamaCppStreamGenerator:
         assert any("[DONE]" in c for c in chunks)
 
     def test_llama_cpp_stream_exception(self):
-        """Lines 1014-1017: llama.cpp streaming exception."""
+        """#1036 (C2.4): an exception before any token reached the client
+        raises instead of yielding an error chunk — see the MLX generator's
+        equivalent test for the full rationale."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
         mock_llama = AsyncMock()
         mock_llama.chat = AsyncMock(side_effect=RuntimeError("Llama crashed"))
 
         gen = _llama_cpp_stream_generator(mock_llama, [], "system", "model")
-        chunks = asyncio.run(_collect_async_gen(gen))
-        # Exception path must surface an error chunk to the client (not end silently)
-        assert any("error" in c.lower() for c in chunks)
+        with pytest.raises(RuntimeError, match="Llama crashed"):
+            asyncio.run(_collect_async_gen(gen))
 
 
 # ─── Test chat_completions endpoint uncovered branches ─────────────────
@@ -586,21 +588,28 @@ class TestMC114ExcInfo:
     exc_info=True so the traceback reaches the logs."""
 
     def test_mlx_stream_exception_has_exc_info(self, caplog):
+        """The log this pins is `run_mlx`'s own (mlx.py), unaffected by #1036
+        (C2.4): it fires before the generator decides whether to raise or
+        yield a chunk, so it stays regardless of which one happens here."""
         from core.endpoints.chat import _mlx_stream_generator
         mock_mlx = AsyncMock()
         mock_mlx.chat = AsyncMock(side_effect=RuntimeError("MLX crashed"))
         with caplog.at_level(logging.ERROR):
             gen = _mlx_stream_generator(mock_mlx, [], "system", "model")
-            asyncio.run(_collect_async_gen(gen))
+            with pytest.raises(RuntimeError, match="MLX crashed"):
+                asyncio.run(_collect_async_gen(gen))
         assert _has_exc_info(caplog, "MLX streaming error")
 
     def test_llama_cpp_stream_exception_has_exc_info(self, caplog):
+        """See the MLX generator's equivalent test for why this log survives
+        #1036 (C2.4) unchanged."""
         from core.endpoints.chat import _llama_cpp_stream_generator
         mock_llama = AsyncMock()
         mock_llama.chat = AsyncMock(side_effect=RuntimeError("Llama crashed"))
         with caplog.at_level(logging.ERROR):
             gen = _llama_cpp_stream_generator(mock_llama, [], "system", "model")
-            asyncio.run(_collect_async_gen(gen))
+            with pytest.raises(RuntimeError, match="Llama crashed"):
+                asyncio.run(_collect_async_gen(gen))
         assert _has_exc_info(caplog, "Llama.cpp streaming error")
 
     def test_rag_error_has_exc_info(self, caplog):

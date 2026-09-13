@@ -74,7 +74,7 @@ class TestInfoLogsCarryNoUserContent:
     async def test_mem_save_nonstreaming_log_is_redacted(self, caplog, monkeypatch):
         monkeypatch.delenv("NEXE_LOG_SENSITIVE", raising=False)
         from unittest.mock import AsyncMock, MagicMock
-        from plugins.web_ui_module.api.routes_chat import _save_mem_saves_nonstreaming
+        from core.memory_facts.write import write_facts
 
         session = MagicMock()
         session.id = "s1"
@@ -82,8 +82,8 @@ class TestInfoLogsCarryNoUserContent:
         mh = MagicMock()
         mh.save_to_memory = AsyncMock(return_value={"document_id": "doc-1"})
 
-        with caplog.at_level(logging.INFO, logger="plugins.web_ui_module.api.routes_chat"):
-            await _save_mem_saves_nonstreaming([SECRET], session, mh)
+        with caplog.at_level(logging.INFO, logger="core.memory_facts.write"):
+            await write_facts([SECRET], session, mh)
 
         info_lines = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
         assert any("MEM_SAVE" in line for line in info_lines)
@@ -95,7 +95,7 @@ class TestInfoLogsCarryNoUserContent:
         both the success INFO line and the storage-error WARNING line."""
         monkeypatch.delenv("NEXE_LOG_SENSITIVE", raising=False)
         from unittest.mock import AsyncMock, MagicMock
-        from plugins.web_ui_module.api.routes_chat import _persist_facts
+        from core.memory_facts.write import persist_facts as _persist_facts
 
         mh = MagicMock()
         # 1r fact: desat OK (INFO MEM_SAVE) · 2n fact: error d'emmagatzematge (WARNING)
@@ -103,7 +103,7 @@ class TestInfoLogsCarryNoUserContent:
             {"document_id": "doc-1"},
             {"message": "disk full"},
         ])
-        with caplog.at_level(logging.INFO, logger="plugins.web_ui_module.api.routes_chat"):
+        with caplog.at_level(logging.INFO, logger="core.memory_facts.write"):
             await _persist_facts([SECRET, SECRET], mh, "s1")
 
         emitted = [r.getMessage() for r in caplog.records if r.levelno >= logging.INFO]
@@ -116,7 +116,7 @@ class TestInfoLogsCarryNoUserContent:
         monkeypatch.delenv("NEXE_LOG_SENSITIVE", raising=False)
         import inspect as _inspect
         from unittest.mock import MagicMock
-        from plugins.web_ui_module.api.routes_chat import _atomize_fact_llm
+        from core.memory_facts.write import atomize_fact_llm as _atomize_fact_llm
 
         async def _fake_stream():
             yield {"message": {"content": "fact una\nfact dues"}}
@@ -128,7 +128,7 @@ class TestInfoLogsCarryNoUserContent:
             pass
         sig = _inspect.signature(_no_model)
 
-        with caplog.at_level(logging.INFO, logger="plugins.web_ui_module.api.routes_chat"):
+        with caplog.at_level(logging.INFO, logger="core.memory_facts.write"):
             await _atomize_fact_llm(SECRET, engine, "m", sig, lang="ca")
 
         atom_lines = [r.getMessage() for r in caplog.records if "Atomizer split" in r.getMessage()]
@@ -139,9 +139,9 @@ class TestInfoLogsCarryNoUserContent:
         """MC-110 (extended, found by AI audit): the DEBUG skip logs in
         _filter_facts (streaming path) must also redact the fact."""
         monkeypatch.delenv("NEXE_LOG_SENSITIVE", raising=False)
-        from plugins.web_ui_module.api.routes_chat import _filter_facts
+        from core.memory_facts.write import filter_facts as _filter_facts
 
-        with caplog.at_level(logging.DEBUG, logger="plugins.web_ui_module.api.routes_chat"):
+        with caplog.at_level(logging.DEBUG, logger="core.memory_facts.write"):
             # SECRET matches a deleted fact → "recently deleted" branch (debug)
             _filter_facts([SECRET], [SECRET])
 

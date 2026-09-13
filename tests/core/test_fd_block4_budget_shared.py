@@ -115,11 +115,17 @@ class TestBothDoorsShareTheBudgetArithmetic:
     def _assembled(self, window, history, message, lang="ca"):
         """Drive the real entry point and return (retrieved chars, prompt chars).
 
-        _build_rag_and_system_prompt is where production starts, and it is one
-        call ABOVE _inject_rag_context_into_messages — the difference is the
+        The door's own adapters are where production starts, and they are one
+        step ABOVE _inject_rag_context_into_messages — the difference is the
         security rule, which is exactly what used to be left out of the budget.
         The earlier version of this test stopped at the injector and therefore
         could not see the bug this class exists to pin.
+
+        C4.2: `_build_rag_and_system_prompt` was decomposed into the three
+        steps it folded plus `budget`. Driving the adapter table is the same
+        entry point, one abstraction up — and `_fetch_rag_context` is still the
+        seam the fake retrieval is injected at, because the `recall` step calls
+        it through the module.
         """
         import asyncio
         from unittest.mock import MagicMock, patch
@@ -155,10 +161,23 @@ class TestBothDoorsShareTheBudgetArithmetic:
             return self.MARK * 200_000, [("nexe_documentation", 0.9)]
 
         async def _run():
-            with patch.object(chat_mod, "_fetch_rag_context", _found):
-                return await chat_mod._build_rag_and_system_prompt(body, state, lang, window)
+            from fastapi import BackgroundTasks
 
-        assembled, _ = asyncio.run(_run())
+            from core.turn.adapters_api import api_adapters
+            from core.turn.context import TurnContext
+
+            ctx = TurnContext(
+                turn_id="t", entry="api", body=body, app_state=state,
+                lang=lang, context_window=window,
+            )
+            ctx.message = body.messages[-1].content
+            table = api_adapters(BackgroundTasks())
+            with patch.object(chat_mod, "_fetch_rag_context", _found):
+                for step in ("recall", "clock", "system_prompt", "budget"):
+                    await table[step](ctx)
+            return ctx.prompt
+
+        assembled = asyncio.run(_run())
         return (sum(m["content"].count(self.MARK) for m in assembled),
                 sum(len(m["content"]) for m in assembled))
 

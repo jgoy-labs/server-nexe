@@ -18,7 +18,9 @@ import pytest
 
 from core.chat_prompt import format_now_natural, time_context_line
 from core.utils import compute_system_hash
-from plugins.web_ui_module.api.routes_chat import _build_system_prompt_with_time
+# C4.2: the prompt is assembled in the core — this function moved out of the
+# plugin whole (`core/turn/prompt.py`), inverted import and all.
+from core.turn.prompt import _build_system_prompt_with_time
 
 # A timezone-aware anchor, mid-afternoon so +1h stays inside the same day.
 T0 = datetime(2026, 7, 23, 13, 2, 1, tzinfo=timezone.utc)

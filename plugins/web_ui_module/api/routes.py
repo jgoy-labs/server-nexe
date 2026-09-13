@@ -14,8 +14,6 @@ www.jgoy.net · https://server-nexe.org
 import logging
 from fastapi import APIRouter, Depends
 
-from plugins.web_ui_module.core.memory_helper import get_memory_helper  # noqa: F401 — re-export for test patches
-from plugins.web_ui_module.core.compactor import compact_session  # noqa: F401 — re-export for test patches
 from plugins.web_ui_module.core.rag_handler import generate_rag_metadata  # noqa: F401 — re-export
 
 # RAG header parser via the core porter (plugins/ must not import memory/).

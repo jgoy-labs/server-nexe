@@ -33,6 +33,7 @@ expires: null
 - [Arquitectura del CLI](#arquitectura-del-cli)
 - [Arquitectura de memoria (3 subcapes)](#arquitectura-de-memoria-3-subcapes)
 - [Arquitectura de l'endpoint de xat](#arquitectura-de-lendpoint-de-xat)
+- [Compactacio de context (auto-resum)](#compactacio-de-context-auto-resum)
 - [Arquitectura del modul Web UI](#arquitectura-del-modul-web-ui)
 - [Prompt del sistema](#prompt-del-sistema)
 - [Integracio i18n](#integracio-i18n)
@@ -397,6 +398,21 @@ Els fets que el model marca amb `[MEM_SAVE:]` es persisteixen al camí de la UI 
 - `[MEM:N]` — nombre de fets guardats a memoria
 - `[COMPACT:N]` — indicador de compactacio de context
 - `[DOC_TRUNCATED:XX%]` — avis de document truncat per limit de context (nou 2026-04-02)
+
+## Compactacio de context (auto-resum)
+
+Quan una conversa creix, server-nexe en resumeix automaticament la part mes antiga perque no
+superi la finestra de context del model actiu. El marcador `[COMPACT:N]` (vegeu dalt) n'avisa a
+la UI; `[WILL_COMPACT:1]` avisa amb un torn d'antelacio que el proper es compactara.
+
+**Criteri: per mida real de la conversa, no per nombre de missatges o torns.** El servidor
+pregunta al motor actiu (MLX, llama.cpp o Ollama) quina es la seva finestra de context real —MLX
+la calcula segons la RAM disponible i els pesos del model carregat, llama.cpp i Ollama segons la
+RAM del sistema— i compacta quan l'historial estimat supera el **45%** d'aquesta finestra. Els
+**6 missatges mes recents** es mantenen sempre intactes, sense resumir mai.
+
+**Configuracio:** `NEXE_COMPACT_AT_TOKENS` fixa el llindar en un nombre de tokens concret,
+independent del motor que serveixi la conversa, per a qui prefereixi un comportament predictible.
 
 ## Arquitectura del modul Web UI
 

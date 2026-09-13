@@ -49,6 +49,10 @@ from core.chat_prompt import EMERGENCY_SYSTEM_PROMPT
 ROOT = Path(__file__).resolve().parents[1]
 V1_DOOR = ROOT / "core" / "endpoints" / "chat.py"
 UI_DOOR = ROOT / "plugins" / "web_ui_module" / "api" / "routes_chat.py"
+# C4.2: the UI door's fallback moved into the core with the rest of the prompt
+# assembly (`_build_system_prompt_with_time`), so the scan follows it — a copy
+# reappearing in its new home is the same drift this file exists to catch.
+PROMPT_HOME = ROOT / "core" / "turn" / "prompt.py"
 
 
 def _string_constants(path: Path) -> list[str]:
@@ -74,7 +78,9 @@ class TestOneLiteral:
             "You are Nexe, a local AI assistant. Respond clearly and helpfully."
         )
 
-    @pytest.mark.parametrize("door", [V1_DOOR, UI_DOOR], ids=["v1", "ui"])
+    @pytest.mark.parametrize(
+        "door", [V1_DOOR, UI_DOOR, PROMPT_HOME], ids=["v1", "ui", "prompt"],
+    )
     def test_neither_door_carries_its_own_copy(self, door: Path):
         """A second literal is how the two drifted in the first place."""
         offenders = [s for s in _string_constants(door) if s.startswith("You are Nexe")]
@@ -94,14 +100,14 @@ class TestBothDoorsReturnIt:
     the real fallback on each side."""
 
     def test_the_v1_door_falls_back_to_the_constant(self):
-        from core.endpoints.chat import _get_system_prompt
+        from core.turn.prompt import _get_system_prompt
         state = SimpleNamespace(config={"personality": {"prompt": {}}})
         assert _get_system_prompt(state, "en") is EMERGENCY_SYSTEM_PROMPT
 
     def test_the_v1_door_still_prefers_a_configured_prompt(self):
         """Mutation control: returning the constant unconditionally would pass
         the test above and throw away everyone's server.toml."""
-        from core.endpoints.chat import _get_system_prompt
+        from core.turn.prompt import _get_system_prompt
         state = SimpleNamespace(
             config={"personality": {"prompt": {"en_full": "Ets el Nexe configurat"}}}
         )
@@ -110,11 +116,11 @@ class TestBothDoorsReturnIt:
     def test_the_ui_door_falls_back_to_the_same_constant(self):
         """The UI's fallback is the outer one: it fires when the core's
         resolver cannot be reached at all."""
-        from plugins.web_ui_module.api import routes_chat as rc
+        from core.turn import prompt as prompt_mod
 
         with patch("core.lifespan.get_server_state",
                    side_effect=RuntimeError("no server state")):
-            prompt, lang = rc._build_system_prompt_with_time("hola", lang_hint="en")
+            prompt, lang = prompt_mod._build_system_prompt_with_time("hola", lang_hint="en")
 
         assert EMERGENCY_SYSTEM_PROMPT in prompt, (
             "the UI fell back to something that is not the shared constant"
@@ -124,12 +130,12 @@ class TestBothDoorsReturnIt:
     def test_the_two_doors_agree_on_the_base(self):
         """The finding in one assertion: whatever each door falls back to, it
         is the same text."""
-        from core.endpoints.chat import _get_system_prompt
-        from plugins.web_ui_module.api import routes_chat as rc
+        from core.turn.prompt import _get_system_prompt
+        from core.turn import prompt as prompt_mod
 
         v1_base = _get_system_prompt(SimpleNamespace(config={}), "en")
         with patch("core.lifespan.get_server_state", side_effect=RuntimeError("down")):
-            ui_prompt, _ = rc._build_system_prompt_with_time("hola", lang_hint="en")
+            ui_prompt, _ = prompt_mod._build_system_prompt_with_time("hola", lang_hint="en")
 
         assert v1_base in ui_prompt
         assert v1_base is EMERGENCY_SYSTEM_PROMPT
@@ -137,12 +143,12 @@ class TestBothDoorsReturnIt:
     def test_the_ui_door_uses_the_core_resolver_when_it_can(self):
         """The nesting, pinned: the UI's own literal is the LAST resort, not
         the normal path — it must not shadow a configured prompt."""
-        from plugins.web_ui_module.api import routes_chat as rc
+        from core.turn import prompt as prompt_mod
 
         state = MagicMock()
         state.config = {"personality": {"prompt": {"en_full": "Configurat des del TOML"}}}
         with patch("core.lifespan.get_server_state", return_value=state):
-            prompt, _ = rc._build_system_prompt_with_time("hola", lang_hint="en")
+            prompt, _ = prompt_mod._build_system_prompt_with_time("hola", lang_hint="en")
 
         assert "Configurat des del TOML" in prompt
         assert EMERGENCY_SYSTEM_PROMPT not in prompt

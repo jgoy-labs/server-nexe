@@ -29,6 +29,12 @@ Growing the baseline is a decision, not a side effect (#956): `--update` refuses
 to ADD edges without a stated reason, which is recorded in the baseline file.
 Shrinking it (tightening) needs no reason.
 
+The reason is recorded PER EDGE (`reasons`, 2026-09-06). It used to be a single
+`reason` string for the whole file, so every growth erased the justification of
+the one before it — the F-D block 4 entry was already lost that way. Old shapes
+still load: a bare list (historic) and the single `reason` string, which is kept
+verbatim under `reasons["_legacy"]` the next time the file is written.
+
 Usage:
     python scripts/check_layering.py                      # check against baseline (CI)
     python scripts/check_layering.py --update             # tighten (shrink) the baseline
@@ -202,12 +208,33 @@ def _deferred_edges() -> set[str]:
 
 
 def _load_baseline() -> set[str]:
-    """Accepts both shapes: a bare list (historic) and the object form that
-    carries the `reason` #956 requires for a growing baseline."""
+    """Accepts every shape: a bare list (historic), the single-`reason` object,
+    and the per-edge `reasons` map (2026-09-06)."""
     data = json.loads(BASELINE.read_text(encoding="utf-8"))
     if isinstance(data, dict):
         return set(data.get("edges", []))
     return set(data)
+
+
+def _load_reasons() -> dict:
+    """The justifications already on file, keyed by edge.
+
+    A pre-2026-09-06 file has one `reason` for the whole baseline and no way to
+    tell which edge it belonged to; it is preserved under `_legacy` rather than
+    dropped, because it is the only record of why that growth was accepted."""
+    if not BASELINE.exists():
+        return {}
+    try:
+        data = json.loads(BASELINE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    reasons = dict(data.get("reasons") or {})
+    legacy = data.get("reason")
+    if legacy and "_legacy" not in reasons:
+        reasons["_legacy"] = legacy
+    return reasons
 
 
 def _update_reason() -> str:
@@ -238,9 +265,16 @@ def _write_baseline(current: set[str]) -> int:
               '  python scripts/check_layering.py --update --reason "why this edge is right"\n'
               "(or set NEXE_LAYERING_REASON). Shrinking the baseline needs no reason.")
         return 2
-    payload: dict[str, object] = {"edges": sorted(current)}
+    # Per-edge reasons (2026-09-06): the justification of an earlier growth is
+    # never overwritten by a later one. Edges that leave the baseline take their
+    # reason with them; what is left describes what is actually frozen.
+    reasons = {k: v for k, v in _load_reasons().items() if k in current or k == "_legacy"}
     if reason:
-        payload["reason"] = reason
+        for edge in added:
+            reasons[edge] = reason
+    payload: dict[str, object] = {"edges": sorted(current)}
+    if reasons:
+        payload["reasons"] = dict(sorted(reasons.items()))
     BASELINE.write_text(json.dumps(payload, indent=1) + "\n", encoding="utf-8")
     verb = f"+{len(added)}" if added else f"-{len(prior - current)}" if prior else "new"
     print(f"baseline updated ({verb}): {len(current)} import-time cross-package "

@@ -123,6 +123,9 @@ class TestBaselineGrowthNeedsAReason:
     def test_update_grows_when_a_reason_is_given_and_records_it(
         self, monkeypatch, tmp_path, capsys
     ):
+        """2026-09-06: the justification is recorded PER EDGE (`reasons`), not as
+        one string for the whole file. The assert moved with the format, on
+        purpose — see the sibling test below for what the old shape cost."""
         gate = _gate()
         baseline = tmp_path / "baseline.json"
         real = sorted(gate._edges())
@@ -135,8 +138,63 @@ class TestBaselineGrowthNeedsAReason:
         assert gate.main() == 0
         capsys.readouterr()
         written = json.loads(baseline.read_text())
-        assert written["reason"] == "ADR-005 D-B", "the justification must survive in the file"
         assert set(written["edges"]) == set(real)
+        assert written["reasons"][real[0]] == "ADR-005 D-B", (
+            "the justification must survive in the file, attached to the edge it justifies"
+        )
+
+    def test_a_new_reason_does_not_erase_the_previous_one(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        """The defect this format fixes (2026-09-06).
+
+        With a single `reason` field, every growth overwrote the justification of
+        the one before it: by the time the fifth edge was frozen, nobody could
+        say why the first four were. The F-D block 4 entry was already lost that
+        way. Two growths in a row, two reasons, both still readable.
+        """
+        gate = _gate()
+        baseline = tmp_path / "baseline.json"
+        real = sorted(gate._edges())
+        assert len(real) >= 2, "this test needs at least two real edges"
+        baseline.write_text(json.dumps(real[2:]), encoding="utf-8")
+        monkeypatch.setattr(gate, "BASELINE", baseline)
+        monkeypatch.delenv("NEXE_LAYERING_REASON", raising=False)
+
+        monkeypatch.setattr(gate.sys, "argv", ["x", "--update", "--reason", "first growth"])
+        # Freeze only the first of the two missing edges: patch _edges to hide
+        # the other, so the two growths really happen one after the other.
+        monkeypatch.setattr(gate, "_edges", lambda: set(real[1:]))
+        assert gate.main() == 0
+        capsys.readouterr()
+
+        monkeypatch.setattr(gate, "_edges", lambda: set(real))
+        monkeypatch.setattr(gate.sys, "argv", ["x", "--update", "--reason", "second growth"])
+        assert gate.main() == 0
+        capsys.readouterr()
+
+        reasons = json.loads(baseline.read_text())["reasons"]
+        assert reasons[real[1]] == "first growth", "the earlier justification was erased"
+        assert reasons[real[0]] == "second growth"
+
+    def test_a_legacy_single_reason_is_kept_not_dropped(self, monkeypatch, tmp_path, capsys):
+        """A pre-2026-09-06 file cannot say which edge its `reason` belonged to;
+        it is preserved under `_legacy` instead of being thrown away."""
+        gate = _gate()
+        baseline = tmp_path / "baseline.json"
+        real = sorted(gate._edges())
+        baseline.write_text(
+            json.dumps({"edges": real[1:], "reason": "#1004 metrics registry"}), encoding="utf-8"
+        )
+        monkeypatch.setattr(gate, "BASELINE", baseline)
+        monkeypatch.setattr(gate.sys, "argv", ["x", "--update", "--reason", "new one"])
+        monkeypatch.delenv("NEXE_LAYERING_REASON", raising=False)
+
+        assert gate.main() == 0
+        capsys.readouterr()
+        reasons = json.loads(baseline.read_text())["reasons"]
+        assert reasons["_legacy"] == "#1004 metrics registry"
+        assert reasons[real[0]] == "new one"
 
     def test_shrinking_needs_no_reason(self, monkeypatch, tmp_path):
         """Tightening is the good direction — never make it harder than growing."""
@@ -164,6 +222,7 @@ class TestBaselineFormatCompatibility:
         [
             (["a -> b"], {"a -> b"}),
             ({"edges": ["a -> b"], "reason": "x"}, {"a -> b"}),
+            ({"edges": ["a -> b"], "reasons": {"a -> b": "x"}}, {"a -> b"}),
             ({"edges": []}, set()),
         ],
     )

@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 def _reset_memory_helper_globals():
     import asyncio as _a
-    import plugins.web_ui_module.core.memory_helper as mh
+    import core.memory_facts.helper as mh
     mh._memory_api_instance = None
     mh._memory_api_init_failed = False
     mh._memory_api_last_failure_ts = None
@@ -37,8 +37,8 @@ class TestRecallEmptyCollectionsMC041:
         _reset_memory_helper_globals()
 
     async def _run(self, collections):
-        import plugins.web_ui_module.core.memory_helper as mh
-        helper = mh.get_memory_helper()
+        import core.memory_facts.helper as mh
+        helper = mh.MemoryHelper()
         searched = []
         mem = MagicMock()
         mem.filter_requested = lambda requested: list(requested)

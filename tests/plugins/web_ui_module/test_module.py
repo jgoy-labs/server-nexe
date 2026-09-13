@@ -244,9 +244,24 @@ class TestWebUIModuleEndpoints:
         assert response.status_code == 400
 
     def test_chat_calls_engine(self, client, auth_headers, monkeypatch):
-        """Chat should attempt to call an LLM engine."""
+        """Chat should attempt to call an LLM engine.
+
+        C4.2: this used to pass on a 200 that carried the internal-error text —
+        the turn died in `system_prompt` (a MagicMock server state made the
+        base prompt a MagicMock) and the assertion below could not tell the
+        difference. The turn runs for real now, so the harness has to attach
+        what a real one has: a memory helper, which `helper_for` refuses to
+        conjure. What the test's own name promises is asserted too.
+        """
         r1 = client.post("/ui/session/new", headers=auth_headers)
         sid = r1.json()["session_id"]
+
+        helper = MagicMock()
+        helper.detect_intent = MagicMock(return_value=("chat", None))
+        helper.matches_clear_all_confirm = MagicMock(return_value=False)
+        helper.recall_from_memory = AsyncMock(return_value={"success": True, "results": []})
+        helper.save_to_memory = AsyncMock(return_value={"success": True, "document_id": "d"})
+        client.app.state.memory_helper = helper
 
         # Mock engine that returns a response
         mock_engine = MagicMock()
@@ -274,7 +289,9 @@ class TestWebUIModuleEndpoints:
                 headers=auth_headers,
                 json={"message": "Hello!", "session_id": sid}
             )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.text[:300]
+        assert mock_engine.chat.called, "the turn never reached an engine"
+        assert response.json()["response"] == "Test response"
 
 
 class TestWebUIModuleHelpers:

@@ -33,6 +33,34 @@ MOVING_NAMES = (
     "_assemble_engine_messages",
 )
 
+# C4.2: the same "exactly one definition" guard, for the eleven symbols the
+# prompt assembly moved out of the plugin into `core/turn/{prompt,recall,
+# assemble}.py`. A separate tuple because the two contracts are different:
+# `MOVING_NAMES` above must also RESOLVE from `routes_chat` (production and
+# tests reach for them there), and most of these must not — only the three the
+# FD-S6 `continue` path still calls do.
+#
+# Audit finding (09/09): the reason given for keeping the moved symbols' names
+# was "so `TestOneDefinitionPerName` stays the gate", and that was true of
+# `_assemble_engine_messages` alone — the other ten were outside the scan. No
+# fork exists today (each is defined exactly once, measured), so this is a
+# guard for the NEXT move: C4.3 touches these files again.
+C42_MOVED_NAMES = (
+    "_collections_prompt_overrides",   # core/turn/prompt.py
+    "_resolve_session_lang",           # core/turn/prompt.py
+    "_finalize_system_prompt",         # core/turn/prompt.py
+    "_get_system_prompt",              # core/turn/prompt.py (was core/endpoints/chat.py)
+    "_build_system_prompt_with_time",  # core/turn/prompt.py
+    "_build_turn_system_prompt",       # core/turn/prompt.py
+    "turn_system_prompt",              # core/turn/prompt.py (the shared step)
+    "_build_rag_context",              # core/turn/recall.py
+    "_build_turn_context",             # core/turn/assemble.py
+    "_build_document_context",         # core/turn/assemble.py
+)
+
+#: Every name whose definition must be unique across `core/` and `plugins/`.
+ONE_DEFINITION_ONLY = MOVING_NAMES + C42_MOVED_NAMES
+
 WEB_UI_ROOT = Path(routes_chat.__file__).parent.parent  # plugins/web_ui_module/
 
 # F-D block 4 moved compute_context_budget and _inject_context_into_messages out
@@ -119,7 +147,7 @@ class TestOneDefinitionPerName:
     way a split silently forks behaviour."""
 
     def test_each_moving_name_is_defined_exactly_once_in_the_package(self) -> None:
-        for name in MOVING_NAMES:
+        for name in ONE_DEFINITION_ONLY:
             hits = []
             for root in SCAN_ROOTS:
                 for path in sorted(root.rglob("*.py")):

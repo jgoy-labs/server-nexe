@@ -494,16 +494,19 @@ class TestEmptyContentTurns:
 
     def test_a_request_with_nothing_storable_does_not_damage_a_borrowed_thread(self, session_manager):
         """Nothing storable + a borrowed X-Session-Id must leave that thread
-        exactly as it was: not overwritten (the mirror declines to write an
-        empty history) and not appended to (the guard diverts, so the reply
-        lands elsewhere).
+        exactly as it was.
 
-        "Elsewhere" is not nowhere, and the second half of this test says so
-        out loud: persist_v1_turn has no way of knowing the mirror declined,
-        so the reply still creates a thread — an `_alt` one holding a single
-        assistant turn and no user turn. That is pre-existing behaviour (it
-        reproduces identically on the parent commit), it is filed, and it is
-        asserted here rather than left for a green test to hide.
+        C4.1 changed HOW. Until here the request ran a whole turn: the mirror
+        declined to write an empty history, the collision guard diverted, and
+        the reply still landed in an `_alt` thread holding one assistant turn
+        and no user turn — a ghost thread this test pinned as filed
+        pre-existing behaviour, with "if this is now None the ghost thread is
+        fixed — update this test".
+
+        It is fixed, and this is that update. `/v1` and `/ui/chat` now share
+        one `validate` (`core/turn/validate.py`), and a turn with no message is
+        refused at both doors instead of only at the web one: 400, before a
+        session, an engine or a thread is touched. No turn, no ghost.
         """
         ui_session = session_manager.get_or_create_session("ui-thread")
         for role, content in [
@@ -519,21 +522,16 @@ class TestEmptyContentTurns:
         with patch("httpx.AsyncClient", return_value=_OllamaCapture(reply="ok")):
             resp = _post(client, [{"role": "user", "content": ""}], session_id="ui-thread")
 
-        assert resp.status_code == 200, "the guard must never break the chat response"
+        assert resp.status_code == 400, (
+            "C4.1: a turn with no message is refused at validate, at both doors"
+        )
         after = [m["content"] for m in session_manager.get_session("ui-thread").messages]
         assert after == before, "an unrelated thread was modified by a request with no content"
 
-        # Known and filed: the reply still lands somewhere. Pinned so that a
-        # future fix shows up here as a failing assertion instead of passing
-        # unnoticed.
-        diverted = session_manager.get_session("ui-thread_alt")
-        assert diverted is not None, (
-            "expected the reply to be diverted to _alt (pre-existing: persist_v1_turn "
-            "cannot know the mirror declined). If this is now None the ghost thread is "
-            "fixed — update this test."
-        )
-        assert [m["role"] for m in diverted.messages] == ["assistant"], (
-            "the diverted thread holds an orphan assistant turn and no user turn"
+        # The ghost `_alt` thread this test used to pin: gone, because the turn
+        # no longer runs at all.
+        assert session_manager.get_session("ui-thread_alt") is None, (
+            "a request refused at validate created a thread anyway"
         )
 
     def test_nothing_storable_does_not_wipe_the_api_key_fallback_thread(self, session_manager):
@@ -561,20 +559,21 @@ class TestEmptyContentTurns:
 
         # Same API key, nothing storable at all: must not erase the above.
         with patch("httpx.AsyncClient", return_value=_OllamaCapture(reply="ok2")):
-            _post(client, [{"role": "user", "content": ""}])
+            resp = _post(client, [{"role": "user", "content": ""}])
 
+        # C4.1: refused at `validate` — the shared step both doors run — so the
+        # unvetted fallback thread is not merely un-erased, it is untouched.
+        # This test used to pin the opposite ("the reply is appended … if this
+        # now fails the ghost turn is fixed — update this test"): it is fixed.
+        assert resp.status_code == 400, (
+            "C4.1: a turn with no message is refused at validate, at both doors"
+        )
         contents = [m["content"] for m in session_manager.get_session(fallback_id).messages]
         assert "hola" in contents, (
             f"the fallback thread was wiped by a request with nothing to mirror (got {contents})"
         )
-        # What this test does NOT claim: that the thread is left alone. The
-        # API-key-hash id never reaches the collision guard, so the reply is
-        # appended here — an assistant turn with no user turn before it. The
-        # erasure is fixed; the ghost turn is filed. Asserted so the gap is
-        # visible in the test, not just in a finding.
-        assert contents[-1] == "ok2", (
-            "pre-existing: the reply is appended to the unvetted fallback thread. "
-            "If this now fails the ghost turn is fixed — update this test."
+        assert "ok2" not in contents, (
+            f"a request refused at validate still appended a ghost turn (got {contents})"
         )
 
 

@@ -22,11 +22,7 @@ except ImportError:
         return s
 from core.dependencies import limiter
 from core.log_redact import redact_user_content
-
-def _get_memory_helper():
-    """Lazy resolve via routes module so test patches work."""
-    import plugins.web_ui_module.api.routes as _r
-    return _r.get_memory_helper()
+import core.memory_facts as memory_facts
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +47,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
         if not content:
             raise HTTPException(status_code=400, detail=get_message(get_i18n(request), "webui.memory.content_required"))
 
-        memory_helper = _get_memory_helper()
+        memory_helper = memory_facts.helper_for(request.app.state)
         result = await memory_helper.save_to_memory(
             content=content,
             session_id=session_id,
@@ -74,7 +70,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
             raise HTTPException(status_code=400, detail=get_message(get_i18n(request), "webui.memory.query_required"))
         query = validate_string_input(query, max_length=1000, context="chat")
 
-        memory_helper = _get_memory_helper()
+        memory_helper = memory_facts.helper_for(request.app.state)
         result = await memory_helper.recall_from_memory(
             query=query,
             limit=limit
@@ -92,7 +88,7 @@ def register_memory_routes(router: APIRouter, *, require_ui_auth):
         if not fact:
             raise HTTPException(status_code=400, detail="fact required")
         fact = validate_string_input(fact, max_length=500, context="chat")
-        memory_helper = _get_memory_helper()
+        memory_helper = memory_facts.helper_for(request.app.state)
         result = await memory_helper.delete_from_memory(fact)
         logger.info("MEM_DELETE confirmed by user: %s → deleted=%d", redact_user_content(fact), result.get("deleted", 0))
         return result

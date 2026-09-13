@@ -443,7 +443,7 @@ NexeUI.extend({
                 model: modelSel ? modelSel.value : undefined,
                 ...(pendingImage ? { image_b64: pendingImage.b64, image_type: pendingImage.type } : {})
             };
-            const response = await this.fetchWithCsrf('/ui/chat', {
+            let response = await this.fetchWithCsrf('/ui/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(chatBody),
@@ -453,6 +453,34 @@ NexeUI.extend({
             if (response.status === 401) {
                 this._handleUnauthorized();
                 return;
+            }
+
+            // C2.3 (ADR-007 §9/I9): this session is open elsewhere — never a
+            // silent race between two writers. Ask, and only on "yes" resend
+            // once with force_lease: true (an explicit takeover, never
+            // automatic). A "no" leaves the turn unsent, exactly as if the
+            // user had not pressed send.
+            if (response.status === 409) {
+                let detail = null;
+                try { detail = (await response.json()).detail; } catch (_) { /* non-JSON error body */ }
+                if (detail && detail.code === 'session_leased' && detail.lease) {
+                    const since = new Date(detail.lease.since);
+                    const timeStr = isNaN(since) ? detail.lease.since : since.toLocaleTimeString();
+                    const msg = this.t('session_leased_confirm')
+                        .replace('{where}', detail.lease.where || '?')
+                        .replace('{time}', timeStr);
+                    if (window.confirm(msg)) {
+                        response = await this.fetchWithCsrf('/ui/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ...chatBody, force_lease: true }),
+                            signal: this.abortController.signal
+                        });
+                    } else {
+                        this.setAiState('idle');
+                        return;
+                    }
+                }
             }
 
             if (response.ok) {

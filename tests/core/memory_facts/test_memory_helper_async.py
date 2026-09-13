@@ -19,13 +19,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.memory_access import MemoryView
 
-import plugins.web_ui_module.core.memory_helper as mh_module
-from plugins.web_ui_module.core.memory_helper import (
+import core.memory_facts.helper as mh_module
+from core.memory_facts import attach_memory_helper
+from core.memory_facts.helper import (
     MemoryHelper,
     SIMILARITY_THRESHOLD,
     MAX_MEMORY_ENTRIES,
     PRUNE_BATCH_SIZE,
-    get_memory_helper,
 )
 
 
@@ -88,7 +88,7 @@ class TestGetMemoryApi:
         helper = MemoryHelper()
         view = MemoryView(mem, plugin_id="web_ui_module")
 
-        with patch("plugins.web_ui_module.core.memory_helper.get_memory_view",
+        with patch("core.memory_facts.helper.get_memory_view",
                    AsyncMock(return_value=view)):
             result = asyncio.run(helper.get_memory_api())
 
@@ -101,7 +101,7 @@ class TestGetMemoryApi:
         helper = MemoryHelper()
         view = MemoryView(mem, plugin_id="web_ui_module")
 
-        with patch("plugins.web_ui_module.core.memory_helper.get_memory_view",
+        with patch("core.memory_facts.helper.get_memory_view",
                    AsyncMock(return_value=view)):
             asyncio.run(helper.get_memory_api())
 
@@ -112,7 +112,7 @@ class TestGetMemoryApi:
         mh_module._memory_api_instance = mem
         helper = MemoryHelper()
 
-        with patch("plugins.web_ui_module.core.memory_helper.get_memory_view") as mock_door:
+        with patch("core.memory_facts.helper.get_memory_view") as mock_door:
             result = asyncio.run(helper.get_memory_api())
 
         mock_door.assert_not_called()
@@ -121,7 +121,7 @@ class TestGetMemoryApi:
     def test_returns_none_on_exception(self):
         helper = MemoryHelper()
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(side_effect=Exception("door closed")),
         ):
             result = asyncio.run(helper.get_memory_api())
@@ -133,7 +133,7 @@ class TestGetMemoryApi:
         mem = make_memory_mock()
         helper = MemoryHelper()
         view = MemoryView(mem, plugin_id="web_ui_module")
-        with patch("plugins.web_ui_module.core.memory_helper.get_memory_view",
+        with patch("core.memory_facts.helper.get_memory_view",
                    AsyncMock(return_value=view)):
             asyncio.run(helper.get_memory_api())
 
@@ -826,7 +826,7 @@ class TestClearMemory:
 
         with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
             with patch(
-                "plugins.web_ui_module.core.memory_helper.get_memory_view",
+                "core.memory_facts.helper.get_memory_view",
                 AsyncMock(return_value=view),
             ):
                 result = asyncio.run(helper.clear_memory(confirm=True))
@@ -844,7 +844,7 @@ class TestClearMemory:
 
         with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
             with patch(
-                "plugins.web_ui_module.core.memory_helper.get_memory_view",
+                "core.memory_facts.helper.get_memory_view",
                 AsyncMock(return_value=view),
             ):
                 result = asyncio.run(helper.clear_memory(confirm=True))
@@ -871,15 +871,17 @@ class TestClearMemory:
         assert result["success"] is False
 
 
-# ─── Tests get_memory_helper ──────────────────────────────────────────────────
+# ─── Tests attach_memory_helper ───────────────────────────────────────────────
 
-class TestGetMemoryHelper:
+class TestAttachMemoryHelper:
+    """C3.0: the module singleton is gone; server_state holds the one helper."""
 
-    def test_returns_singleton(self):
-        h1 = get_memory_helper()
-        h2 = get_memory_helper()
-        assert h1 is h2
+    class _State:
+        pass
+
+    def test_one_helper_per_state(self):
+        state = self._State()
+        assert attach_memory_helper(state) is attach_memory_helper(state)
 
     def test_returns_memory_helper_instance(self):
-        h = get_memory_helper()
-        assert isinstance(h, MemoryHelper)
+        assert isinstance(attach_memory_helper(self._State()), MemoryHelper)

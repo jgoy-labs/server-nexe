@@ -329,7 +329,7 @@ class TestUploadEndpoint:
         content = b"Hello, this is a test document with enough content for processing."
         mock_save_result = {"success": True, "chunks_saved": 1, "document_id": "test.txt", "message": "ok"}
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
+        with patch("core.memory_facts.helper_for") as mock_mh:
             mh = MagicMock()
             mh.save_document_chunks = AsyncMock(return_value=mock_save_result)
             mock_mh.return_value = mh
@@ -341,7 +341,7 @@ class TestUploadEndpoint:
         assert r.status_code in (200, 400, 422)
 
     def test_upload_invalid_extension(self, client, auth):
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper"):
+        with patch("core.memory_facts.helper_for"):
             r = client.post(
                 "/ui/upload",
                 headers=auth,
@@ -398,7 +398,7 @@ class TestChatEndpoint:
         sid = r1.json()["session_id"]
 
         mock_save = {"success": True, "document_id": "doc-1", "message": "✓"}
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
+        with patch("core.memory_facts.helper_for") as mock_mh:
             mh = MagicMock()
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("save", "El meu nom és Jordi"))
@@ -410,9 +410,10 @@ class TestChatEndpoint:
                 "/ui/chat", headers=auth,
                 json={"message": "El meu nom és Jordi, guarda-ho", "session_id": sid}
             )
-        assert r.status_code == 200
-        data = r.json()
-        assert "response" in data
+        # D6 (C3.1): a save continues to the model, which this app does not
+        # mount — the point under test is that the fact was saved.
+        assert r.status_code in (200, 503)
+        hh.save_to_memory.assert_awaited_once()
 
     def test_save_intent_empty_content(self, client, auth):
         """When extracted_content is empty, uses the original message."""
@@ -420,7 +421,7 @@ class TestChatEndpoint:
         sid = r1.json()["session_id"]
 
         mock_save = {"success": True, "document_id": None, "message": "⏭️ Similar already exists"}
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
+        with patch("core.memory_facts.helper_for") as mock_mh:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("save", ""))
             hh.save_to_memory = AsyncMock(return_value=mock_save)
@@ -430,14 +431,19 @@ class TestChatEndpoint:
                 "/ui/chat", headers=auth,
                 json={"message": "guarda-ho", "session_id": sid}
             )
-        assert r.status_code == 200
+        # D6 (C3.1): a save intent continues to the model instead of
+        # answering by itself; no engine is mounted here. What this test is
+        # about is the fallback to the original message, so assert THAT.
+        assert r.status_code in (200, 503)
+        hh.save_to_memory.assert_awaited_once()
+        assert hh.save_to_memory.await_args.kwargs["content"] == "guarda-ho"
 
     def test_recall_intent_treated_as_chat(self, client, auth):
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
         mm = self._make_mock_module_manager()
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("recall", "Recordes el meu nom?"))
@@ -463,7 +469,7 @@ class TestChatEndpoint:
         mm = MagicMock()
         mm.registry = registry
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -489,7 +495,7 @@ class TestChatEndpoint:
         engine.chat = MagicMock(return_value="Direct string response")
         mm = self._make_mock_module_manager(engine=engine)
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -513,7 +519,7 @@ class TestChatEndpoint:
         engine.chat = MagicMock(side_effect=Exception("Engine crashed"))
         mm = self._make_mock_module_manager(engine=engine)
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -545,7 +551,7 @@ class TestChatEndpoint:
 
         engine.chat = MagicMock(side_effect=capture_chat)
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state, \
              patch(
                  "core.endpoints.chat_rag.build_rag_context",
@@ -582,7 +588,7 @@ class TestChatEndpoint:
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -602,7 +608,7 @@ class TestChatEndpoint:
 
     def test_chat_without_session_creates_one(self, client, auth):
         """Chat without session_id creates a session automatically."""
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("save", "some content here"))
@@ -627,7 +633,7 @@ class TestMemoryEndpoints:
 
     def test_save_with_content(self, client, auth):
         mock_result = {"success": True, "document_id": "doc-1", "message": "✓"}
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
+        with patch("core.memory_facts.helper_for") as mock_mh:
             hh = MagicMock()
             hh.save_to_memory = AsyncMock(return_value=mock_result)
             mock_mh.return_value = hh
@@ -644,7 +650,7 @@ class TestMemoryEndpoints:
 
     def test_recall_with_query(self, client, auth):
         mock_result = {"success": True, "results": [], "total": 0, "message": ""}
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
+        with patch("core.memory_facts.helper_for") as mock_mh:
             hh = MagicMock()
             hh.recall_from_memory = AsyncMock(return_value=mock_result)
             mock_mh.return_value = hh

@@ -7,8 +7,8 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import plugins.web_ui_module.core.memory_helper as mh_module
-from plugins.web_ui_module.core.memory_helper import (
+import core.memory_facts.helper as mh_module
+from core.memory_facts.helper import (
     MemoryHelper,
     DELETE_THRESHOLD,
 )

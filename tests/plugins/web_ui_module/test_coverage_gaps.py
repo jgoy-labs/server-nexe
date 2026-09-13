@@ -289,7 +289,7 @@ class TestMemoryHelperGaps:
 
     def test_calculate_retention_score_naive_saved_at(self):
         """Lines 213, 217-218: naive datetime in saved_at causes exception."""
-        from plugins.web_ui_module.core.memory_helper import MemoryHelper
+        from core.memory_facts.helper import MemoryHelper
 
         class FakeEntry:
             def __init__(self, meta):
@@ -303,7 +303,7 @@ class TestMemoryHelperGaps:
 
     def test_calculate_retention_score_exception_returns_default(self):
         """Lines 224-226: exception during calculation returns 0.5."""
-        from plugins.web_ui_module.core.memory_helper import MemoryHelper
+        from core.memory_facts.helper import MemoryHelper
 
         class BadEntry:
             @property

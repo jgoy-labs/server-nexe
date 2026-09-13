@@ -113,7 +113,7 @@ def test_chat_endpoint_module_manager_none_returns_503():
     with (
         patch("core.lifespan.get_server_state", return_value=mock_state),
         patch(
-            "plugins.web_ui_module.api.routes_chat._get_memory_helper",
+            "core.memory_facts.helper_for",
             return_value=mock_memory_helper,
         ),
         patch.object(_nexe_limiter, "_check_request_limit"),  # bypass @limiter.limit("20/min") cross-test accumulation

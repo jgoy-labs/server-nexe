@@ -182,14 +182,14 @@ class TestNormalizeEngine:
 
 class TestGetSystemPrompt:
     def test_no_config(self):
-        from core.endpoints.chat import _get_system_prompt
+        from core.turn.prompt import _get_system_prompt
         app_state = MagicMock()
         app_state.config = {}
         result = _get_system_prompt(app_state)
         assert "Nexe" in result
 
     def test_with_lang_and_tier(self):
-        from core.endpoints.chat import _get_system_prompt
+        from core.turn.prompt import _get_system_prompt
         app_state = MagicMock()
         app_state.config = {
             "personality": {"prompt": {"ca_full": "Ets Nexe en català"}}
@@ -199,7 +199,7 @@ class TestGetSystemPrompt:
         assert result == "Ets Nexe en català"
 
     def test_fallback_to_en_full(self):
-        from core.endpoints.chat import _get_system_prompt
+        from core.turn.prompt import _get_system_prompt
         app_state = MagicMock()
         app_state.config = {
             "personality": {"prompt": {"en_full": "You are Nexe in English"}}
@@ -208,14 +208,14 @@ class TestGetSystemPrompt:
         assert result == "You are Nexe in English"
 
     def test_fallback_to_hardcoded_when_no_prompts(self):
-        from core.endpoints.chat import _get_system_prompt
+        from core.turn.prompt import _get_system_prompt
         app_state = MagicMock()
         app_state.config = {"personality": {"prompt": {}}}
         result = _get_system_prompt(app_state, lang="ja")
         assert "Nexe" in result
 
     def test_lang_from_env_when_none(self):
-        from core.endpoints.chat import _get_system_prompt
+        from core.turn.prompt import _get_system_prompt
         app_state = MagicMock()
         app_state.config = {
             "personality": {"prompt": {"en_full": "English prompt"}}
@@ -225,7 +225,7 @@ class TestGetSystemPrompt:
         assert result == "English prompt"
 
     def test_lang_with_region_stripped(self):
-        from core.endpoints.chat import _get_system_prompt
+        from core.turn.prompt import _get_system_prompt
         app_state = MagicMock()
         app_state.config = {
             "personality": {"prompt": {"ca_full": "Prompt català"}}

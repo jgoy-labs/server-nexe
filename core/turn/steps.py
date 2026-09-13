@@ -1,0 +1,311 @@
+"""The turn pipeline as a map, not an engine (ADR-007, C0).
+
+TURN_STEPS is the frozen, ordered description of every step a chat turn goes
+through. It does not execute anything: each Step just names what a step is
+called, what road it belongs to, whether it is mandatory and substitutable,
+what it reads and writes on a TurnContext, and where its behaviour lives
+TODAY across the two doors (`/ui/chat` and `/v1/chat/completions`).
+
+Building `run_turn()` on top of this (C1 of the pipeline plan, ADR-007) is
+deliberately NOT part of this module. Until then, every door keeps its own
+procedural orchestration; this table is the target shape they converge to,
+and the single place that can now say, in code, "here is the whole turn".
+
+Every `today` pointer below is a file:line citation verified against the
+codebase on 2026-09-05, by two read-only audits of the turn as it stood then:
+one mapped the sequence, the other the organs. `doors_today` is coarse on
+purpose (per-door presence of an EQUIVALENT step, not a re-encoding of every
+fine-grained divergence): the exhaustive 33-row divergence table lives in
+those audits, not here.
+
+See ADR-007 §4 for the source table this module implements, and its §2 for
+why StepKind is a two-value label (COMPUTE | LLM) rather than two pipelines.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import FrozenSet, Mapping
+
+
+class StepKind(Enum):
+    """The road a step travels on. A label on the step, not a second pipeline
+    (ADR-007 §7): the scheduler (C7) may run steps of different kinds
+    concurrently, but there is one ordered sequence, not two."""
+
+    COMPUTE = "compute"
+    LLM = "llm"
+
+
+@dataclass(frozen=True)
+class Step:
+    """One named, ordered step of the turn. Descriptive metadata only — no
+    callable, no conducta (that is C1's `run_turn`). `reads`/`writes` name
+    keys on a `core.turn.context.TurnContext`."""
+
+    id: str
+    kind: StepKind
+    must_have: bool
+    replaceable: bool
+    idempotent: bool
+    reads: FrozenSet[str] = field(default_factory=frozenset)
+    writes: FrozenSet[str] = field(default_factory=frozenset)
+    doors_today: FrozenSet[str] = field(default_factory=frozenset)
+    today: Mapping[str, str] = field(default_factory=dict)
+    note: str = ""
+
+
+# Fields already on the TurnContext before step 1 runs: the door fills
+# identity + payload (ADR-007 §3) and nothing else. Kept here, not imported
+# from context.py, so this module stays free of any import beyond stdlib —
+# it is data, and the layering gate has nothing to say about it.
+GIVEN_BY_DOOR: FrozenSet[str] = frozenset({
+    "turn_id", "session_id", "entry", "principal", "pipeline_version",
+    "message", "attachments", "cancel_token", "deadline", "trace_id",
+    # transitional plumbing the C1 adapters need (see context.py docstring)
+    "body", "request", "app_state", "streaming",
+})
+
+
+TURN_STEPS: tuple[Step, ...] = (
+    Step(
+        id="validate", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=True,
+        reads=frozenset({"message", "attachments"}),
+        # C4.1: `validate` decodes the turn's image attachment, so it writes
+        # back into `attachments` the door handed it.
+        writes=frozenset({"attachments"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "core/turn/validate.py (validate_turn) — was routes_chat.py:595 (_validate_chat_input)",
+            "api": "core/turn/validate.py (validate_turn), after core/endpoints/chat.py:177 (_validate_chat_request: routing params + non-user content)",
+        },
+        note="C4.1: one validate for both doors. The message-required 400 the "
+             "UI has always answered now answers at /v1 too.",
+    ),
+    Step(
+        id="authorize", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=True,
+        reads=frozenset({"principal"}), writes=frozenset(),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "core/turn/authorize.py (authorize_turn), on the principal require_ui_auth recorded",
+            "api": "core/turn/authorize.py (authorize_turn), on the principal require_api_key recorded",
+        },
+        note="C4.1 / #1044: the two doors answered the same misconfiguration in "
+             "opposite ways. The fail-closed one won (31/08 decision), and the "
+             "chat door now refuses the `dev-mode-bypass` label at both entries. "
+             "`_check_dev_mode` is untouched: the administration endpoints that "
+             "hang off it are a separate decision.",
+    ),
+    Step(
+        id="sanitize", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=True,
+        reads=frozenset({"message"}), writes=frozenset({"message"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "core/turn/validate.py (sanitize_user_text) + jailbreak_speed_bump",
+            "api": "core/turn/validate.py (sanitize_user_text), written back into body.messages",
+        },
+        note="C4.1 / #1043: one chain, allow_html=True at both doors (31/08 "
+             "decision applied), check_xss untouched. The jailbreak speed-bump "
+             "stays /ui/chat-only: #1021 measured that asymmetry and SECURITY.md "
+             "documents it — converging it is its own decision.",
+    ),
+    Step(
+        id="session", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=False,
+        reads=frozenset({"session_id", "entry", "message"}),
+        writes=frozenset({"session_id", "session", "history", "lang"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (get_or_create_session, id from body) + core/turn/prompt.py (_resolve_session_lang)",
+            "api": "core/endpoints/chat_engines/_common.py:196 (derive_session_id: X-Session-Id or hash of first message) + core/endpoints/chat.py (_resolve_request_lang)",
+        },
+        note="C4.2: `lang` is written HERE at both doors, which is what this "
+             "table always said. The UI door used to resolve it three steps "
+             "later, inside `system_prompt`, so `recall` labelled its sections "
+             "with NEXE_LANG instead of the conversation's language.",
+    ),
+    Step(
+        id="persist_user_turn", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=False,
+        reads=frozenset({"session_id", "message"}), writes=frozenset(),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/routes_chat.py:2981-2986 (add_message + _save_session_to_disk)",
+            "api": "core/endpoints/chat.py:652 (mirror_v1_conversation, rewrites the mirror + save_session)",
+        },
+        note="The guarantee (I3 of ADR-007): nothing below this step may write "
+             "memory before this one has written disk. No test asserts it yet "
+             "on the chat path (both doors) — see the plan's C1 gate.",
+    ),
+    Step(
+        id="intent", kind=StepKind.COMPUTE, must_have=False, replaceable=True,
+        idempotent=True,
+        reads=frozenset({"message"}), writes=frozenset({"intent"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (intent -> core.memory_facts.intents)",
+            "api": "core/turn/adapters_api.py (intent -> core.memory_facts.intents)",
+        },
+        note="C3.1: both doors run the same resolver (core/memory_facts/intents.py). "
+             "D6 — a 'save' intent persists the fact and lets the turn continue; only "
+             "commands (forget/list/clear all/confirmations) short-circuit. A save here "
+             "owns the turn's fact and says so in `usage.saved_by_intent`, which "
+             "`memory.write` reads.",
+    ),
+    Step(
+        id="recall", kind=StepKind.COMPUTE, must_have=False, replaceable=True,
+        idempotent=True,
+        reads=frozenset({"message", "intent", "lang"}), writes=frozenset({"recall", "recall_text"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "core/turn/recall.py (_build_rag_context), skipped when the session has an attached document",
+            "api": "core/turn/recall.py (_build_rag_context), through core/endpoints/chat.py (_fetch_rag_context: the use_rag field)",
+        },
+        note="C4.2: one recall for both doors. The text comes back RAW — "
+             "sizing it to the serving engine's window is `budget`'s, which is "
+             "the first step that knows the window. Cost is embedding + vector "
+             "search, not generation — COMPUTE per ADR-007 §2 ('EMBED is "
+             "COMPUTE with cost=\"embed\"').",
+    ),
+    Step(
+        id="clock", kind=StepKind.COMPUTE, must_have=False, replaceable=True,
+        idempotent=True,
+        reads=frozenset(), writes=frozenset({"clock_line"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (clock -> core.chat_prompt.time_context_line)",
+            "api": "core/turn/adapters_api.py (clock -> the same time_context_line)",
+        },
+        note="C4.2: resolved once per turn and written down, at both doors — "
+             "it used to be computed inside `_assemble_engine_messages` (ui) "
+             "and `_build_rag_and_system_prompt` (api), which `budget` called. "
+             "`budget` prefixes it to this turn's user message, never to the "
+             "system prompt: that would poison the prefix cache for the whole "
+             "conversation.",
+    ),
+    Step(
+        id="system_prompt", kind=StepKind.COMPUTE, must_have=True, replaceable=True,
+        idempotent=True,
+        reads=frozenset({"clock_line", "intent", "lang"}), writes=frozenset({"system_prompt"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "core/turn/prompt.py (turn_system_prompt), from plugins/web_ui_module/api/turn_adapters.py",
+            "api": "core/turn/prompt.py (turn_system_prompt), through core/endpoints/chat.py (_system_prompt_for_turn: a client-supplied system message is the base)",
+        },
+        note="C4.2: one prompt for both doors, and the inverted import is gone "
+             "— `_get_system_prompt` lives in core/turn/prompt.py now, so the "
+             "plugin no longer reaches into the API's route module for it. "
+             "Visible consequence: the collection-toggle notes (#851) reach "
+             "/v1 for the first time. The sticky reply language is still "
+             "stored per door (session object vs LRU, #850/#854) — the policy "
+             "is one function, the store is not.",
+    ),
+    Step(
+        id="engine", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=False,
+        reads=frozenset({"body", "app_state"}),
+        writes=frozenset({"engine", "gpu_slot", "context_window", "engine_fallback_from", "engine_fallback_reason"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/routes_chat.py:2646-2661 (resolve_engine_cascade, iter_live_engines, switch_engine_model)",
+            "api": "core/endpoints/chat_engines/routing.py + core/endpoints/chat.py:583-618 (resolve_engine_cascade, _dispatch_through_cascade)",
+        },
+        note="Contract today is duck typing (hasattr(module,'chat')): no Protocol "
+             "in core/. Two competing fallback mechanisms at A (finding #1036, "
+             "reassessed 20260905) must become one here.",
+    ),
+    Step(
+        id="budget", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=True,
+        reads=frozenset({"system_prompt", "recall", "recall_text", "history", "message", "lang", "engine", "context_window"}),
+        writes=frozenset({"prompt", "recall_text"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/routes_chat.py:2444-2451 (compute_context_budget, history_ratio=0.30)",
+            "api": "core/endpoints/chat.py:322-323 (_trim_rag_context, history_ratio=0.0)",
+        },
+        note="Same shared function (core/context_budget.py), different parameters "
+             "by design (ADR-006) — not a bug, kept as one 'budget' step here. "
+             "Runs AFTER `engine` (reordered 2026-09-06, C1.2): the budget is sized "
+             "to the serving engine's window, at both doors.",
+    ),
+    Step(
+        id="generate", kind=StepKind.LLM, must_have=True, replaceable=True,
+        idempotent=False,
+        reads=frozenset({"prompt", "engine", "cancel_token", "deadline", "context_window"}),
+        writes=frozenset({"response", "wire", "engine", "engine_fallback_from", "engine_fallback_reason"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/routes_chat.py:2723-2861 (engine.chat, StreamingResponse)",
+            "api": "core/endpoints/chat_engines/{mlx,llama_cpp,ollama}.py (module.chat / HTTP)",
+        },
+        note="No deadline for MLX/llama.cpp at either door today (finding #1041): "
+             "'deadline' is read here but nothing enforces it yet.",
+    ),
+    Step(
+        id="postprocess", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=True,
+        reads=frozenset({"response"}), writes=frozenset({"response", "facts"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/routes_chat.py (_clean_full_response: think-tag filtering, then core.memory_facts.extract)",
+            "api": "core/turn/adapters_api.py (postprocess -> core.memory_facts.extract, JSON shape)",
+        },
+        note="C3.2: both doors read the model's memory tags through "
+             "core/memory_facts/extract.py. At /v1 this is the JSON shape only — in "
+             "streaming the text has already been forwarded to the client; the "
+             "sentinel FSM that strips them live is unified in C4. The model-format "
+             "cleanup (<think>, harmony tags) stays the UI's until C4.",
+    ),
+    Step(
+        id="persist_assistant_turn", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=False,
+        reads=frozenset({"session_id", "response"}), writes=frozenset(),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/routes_chat.py:2253,2257 (_persist_assistant_turn + _save_session_to_disk)",
+            "api": "core/endpoints/chat_engines/_common.py:284 (persist_v1_turn)",
+        },
+        note="This is the commit point (ADR-007 §8): everything after it is "
+             "post-commit. Today an error mid-stream at the UI is committed as "
+             "complete (finding #1040) — there is no outcome flag yet.",
+    ),
+    Step(
+        id="emit", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=False,
+        reads=frozenset({"response", "entry", "wire", "engine", "recall_text", "engine_fallback_from", "engine_fallback_reason"}),
+        writes=frozenset({"wire"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/routes_chat.py (NUL sentinels \\x00[TAG]\\x00, two shapes: streaming and JSON)",
+            "api": "core/endpoints/chat_engines/_streaming.py:170 (format_sse_chunk, OpenAI SSE)",
+        },
+        note="The only door-specific step by design (ADR-007 §1). UI streaming "
+             "has no byte cap / token sanitizer here today (finding #1039).",
+    ),
+    Step(
+        id="memory.write", kind=StepKind.LLM, must_have=False, replaceable=True,
+        idempotent=False,
+        reads=frozenset({"facts", "session_id"}), writes=frozenset(),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (memory_write -> core.memory_facts.write.write_facts)",
+            "api": "core/turn/adapters_api.py (memory_write -> core.memory_facts.write.write_facts, no atomiser)",
+        },
+        note="C3.3: both doors write through core/memory_facts/write.py — one junk filter (the union of the two that used to disagree), one first-turn rule, and a coroutine instead of two generators, because on the post-commit queue nobody is listening to a wire. What was saved is told on the NEXT turn. C3 review (08/09): a turn whose `intent` step already saved (`usage.saved_by_intent`) writes nothing here — what the model marks about that fact is its own paraphrase of it.",
+    ),
+    Step(
+        id="compact", kind=StepKind.LLM, must_have=False, replaceable=True,
+        idempotent=False,
+        reads=frozenset({"session_id"}), writes=frozenset(),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "core/sessions/compactor.py (compact_session), queued by turn_adapters",
+            "api": "core/sessions/compactor.py (compact_session), queued by adapters_api",
+        },
+        note="C3.4: the compactor lives with the sessions it summarises, and both doors queue it post-commit. A long thread used to be compacted at one door and not at the other.",
+    ),
+)

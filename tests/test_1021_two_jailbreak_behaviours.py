@@ -28,9 +28,13 @@ Description: A jailbreak gets two different answers depending on the door, and
              * the 400 is exercised end to end through TestClient on both real
                routes — it happens during input validation, before any engine is
                needed, so it is reachable without a model;
-             * the prefix is exercised by calling the real production validators
-               (`_validate_chat_input` for /ui/chat, `_validate_chat_request` for
-               /v1) with real strings. Reaching the prefix over HTTP means
+             * the prefix is exercised by running the real production steps
+               with real strings. Since C4.1 there is ONE chain
+               (`core.turn.validate.sanitize_user_text`) and the prefix is the
+               step after it (`jailbreak_speed_bump`), which only the /ui/chat
+               table calls — so the asymmetry is now visible as two adapter
+               tables rather than two validator functions, and this file drives
+               those two adapters. Reaching the prefix over HTTP would mean
                getting a full answer out of /ui/chat, which needs a live engine
                and a booted SessionManager — that is what the `integration`+`gpu`
                suite is for.
@@ -182,26 +186,38 @@ def test_neither_door_rejects_what_only_the_speed_bump_sees(message) -> None:
 
 # ── The prefix: the real validators, real strings, no patched detector ────────
 
-class _Request:
-    """The little of a Request that `_validate_chat_input` reads (i18n on the
-    empty-message branch only, which none of these inputs takes)."""
-
-    headers: dict = {}
-
-
 def _ui_validate(message: str) -> str:
-    from plugins.web_ui_module.api.routes_chat import _validate_chat_input
+    """The /ui/chat door's `sanitize` step, run for real (C4.1).
 
-    _image, validated = _validate_chat_input({"message": message}, _Request())
-    return validated
+    Not `sanitize_user_text` directly: what this file is about is which door
+    adds the prefix, and that decision lives in the door's adapter table —
+    calling the shared chain would prove nothing about it.
+    """
+    import asyncio
+    from unittest.mock import MagicMock
+
+    from core.turn.context import TurnContext
+    from plugins.web_ui_module.api.turn_adapters import ui_adapters
+
+    ctx = TurnContext(turn_id="t", entry="ui", message=message)
+    asyncio.run(ui_adapters(MagicMock(), streaming=False)["sanitize"](ctx))
+    return ctx.message
 
 
 def _v1_validate(message: str) -> str:
-    from core.endpoints.chat import _validate_chat_request
+    """The /v1 door's `sanitize` step, run for real (C4.1). Same shape, other
+    table: this one rewrites `body.messages` because that is where /v1 carries
+    the turn."""
+    import asyncio
+
     from core.endpoints.chat_schemas import ChatCompletionRequest
+    from core.turn.adapters_api import api_adapters
+    from core.turn.context import TurnContext
+    from fastapi import BackgroundTasks
 
     body = ChatCompletionRequest(messages=[{"role": "user", "content": message}])
-    _validate_chat_request(body)
+    ctx = TurnContext(turn_id="t", entry="api", body=body)
+    asyncio.run(api_adapters(BackgroundTasks())["sanitize"](ctx))
     return body.messages[0].content
 
 
@@ -209,9 +225,8 @@ def test_ui_chat_prefixes_a_message_the_speed_bump_recognises() -> None:
     """A real string, not a patched detector: this one matches
     `_JAILBREAK_PATTERNS` and none of the sanitizer's 49."""
     assert _ui_validate(FLAGGED_BY_UI_ONLY).startswith(PREFIX), (
-        f"/ui/chat did not prefix {FLAGGED_BY_UI_ONLY!r}. Either the speed-bump "
-        "stopped running on this route, or routes_chat fell back to its "
-        "degraded-mode `detect_jailbreak_attempt` stub."
+        f"/ui/chat did not prefix {FLAGGED_BY_UI_ONLY!r}: the speed-bump "
+        "stopped running on this door's table."
     )
 
 
@@ -219,7 +234,9 @@ def test_v1_does_not_prefix_the_message_the_ui_flags() -> None:
     """The asymmetry, on the same input: the API gets no warning at all."""
     assert _v1_validate(FLAGGED_BY_UI_ONLY) == FLAGGED_BY_UI_ONLY, (
         "/v1 rewrote the message. It has no speed-bump today; if one was added, "
-        "SECURITY.md must stop saying the prefix is /ui/chat only."
+        "SECURITY.md must stop saying the prefix is /ui/chat only. C4.1 gave "
+        "the two doors one sanitizer chain and deliberately left this out of "
+        "it (see core/turn/validate.py)."
     )
 
 
@@ -233,8 +250,6 @@ def test_a_benign_message_is_untouched_on_both_doors() -> None:
 def test_the_rejection_really_comes_from_the_shared_sanitizer_gate() -> None:
     """Both validators raise the same 400 with the same body — that is what
     makes it one gate rather than two lookalikes."""
-    from core.endpoints.chat import _validate_chat_request  # noqa: F401 - import check
-
     details = []
     for validate in (_ui_validate, _v1_validate):
         with pytest.raises(HTTPException) as raised:

@@ -23,7 +23,7 @@ import pytest
 def _reset_memory_helper_globals():
     """Reset module-level singletons between tests."""
     import asyncio as _a
-    import plugins.web_ui_module.core.memory_helper as mh
+    import core.memory_facts.helper as mh
     mh._memory_api_instance = None
     mh._memory_api_init_failed = False
     mh._memory_api_last_failure_ts = None
@@ -56,18 +56,18 @@ class TestF1WarningVisibility:
         """When get_memory_view raises, the helper returns None and never builds MemoryAPI."""
         import logging
         import inspect
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
 
         src = inspect.getsource(mh.MemoryHelper._create_memory_api)
         assert "MemoryAPI(" not in src
         assert "from memory" not in src
 
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(side_effect=RuntimeError("no memory")),
         ):
-            with caplog.at_level(logging.ERROR, logger="plugins.web_ui_module.core.memory_helper"):
-                result = await mh.get_memory_helper().get_memory_api()
+            with caplog.at_level(logging.ERROR, logger="core.memory_facts.helper"):
+                result = await mh.MemoryHelper().get_memory_api()
 
         assert result is None
         assert mh._memory_api_init_failed is True
@@ -182,13 +182,13 @@ class TestF3RetryBackoff:
     @pytest.mark.asyncio
     async def test_init_failed_flag_set_on_failure(self):
         """After a failed init, _memory_api_init_failed must be True."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
 
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(side_effect=RuntimeError("embed model missing")),
         ):
-            result = await mh.get_memory_helper().get_memory_api()
+            result = await mh.MemoryHelper().get_memory_api()
 
         assert result is None
         assert mh._memory_api_init_failed is True
@@ -196,17 +196,17 @@ class TestF3RetryBackoff:
     @pytest.mark.asyncio
     async def test_init_failed_with_no_retry_returns_none_immediately(self):
         """With _memory_api_init_failed=True and recent failure, returns None without retry."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         mh._memory_api_init_failed = True
         mh._memory_api_last_failure_ts = time.monotonic()  # recent failure
 
-        result = await mh.get_memory_helper().get_memory_api()
+        result = await mh.MemoryHelper().get_memory_api()
         assert result is None
 
     @pytest.mark.asyncio
     async def test_retry_after_60s_elapsed(self):
         """After 60s since last failure, _memory_api_init_failed is reset inside the lock."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         mh._memory_api_init_failed = True
         mh._memory_api_last_failure_ts = time.monotonic() - 61.0  # 61s ago — should retry
 
@@ -216,10 +216,10 @@ class TestF3RetryBackoff:
         view = MemoryView(mock_api, plugin_id="web_ui_module")
 
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(return_value=view),
         ):
-            result = await mh.get_memory_helper().get_memory_api()
+            result = await mh.MemoryHelper().get_memory_api()
 
         assert result is view, "After 60s, retry must succeed if init works"
         assert mh._memory_api_init_failed is False, "Flag must be reset after successful retry"
@@ -228,16 +228,16 @@ class TestF3RetryBackoff:
     @pytest.mark.asyncio
     async def test_retry_failure_resets_timestamp(self):
         """If retry also fails, _memory_api_last_failure_ts is updated and flag stays True."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         old_ts = time.monotonic() - 70.0
         mh._memory_api_init_failed = True
         mh._memory_api_last_failure_ts = old_ts
 
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(side_effect=RuntimeError("still failing")),
         ):
-            result = await mh.get_memory_helper().get_memory_api()
+            result = await mh.MemoryHelper().get_memory_api()
 
         assert result is None
         assert mh._memory_api_init_failed is True
@@ -246,14 +246,14 @@ class TestF3RetryBackoff:
     @pytest.mark.asyncio
     async def test_last_failure_ts_set_on_first_failure(self):
         """On first failure (no previous ts), _memory_api_last_failure_ts is set."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         assert mh._memory_api_last_failure_ts is None
 
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(side_effect=RuntimeError("init failure")),
         ):
-            await mh.get_memory_helper().get_memory_api()
+            await mh.MemoryHelper().get_memory_api()
 
         assert mh._memory_api_last_failure_ts is not None, "Failure timestamp must be set after first failure"
 
@@ -279,11 +279,11 @@ class TestRecallFromMemoryWhenAPIUnavailable:
     @pytest.mark.asyncio
     async def test_recall_returns_success_false_when_api_none(self):
         """get_memory_api() = None → recall returns {"success": False, "results": []}."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         mh._memory_api_init_failed = True
         mh._memory_api_last_failure_ts = time.monotonic()  # recent, no retry
 
-        result = await mh.get_memory_helper().recall_from_memory("test query")
+        result = await mh.MemoryHelper().recall_from_memory("test query")
         assert result["success"] is False
         assert result["results"] == []
         assert "Memory API not available" in result.get("message", "")
@@ -291,11 +291,11 @@ class TestRecallFromMemoryWhenAPIUnavailable:
     @pytest.mark.asyncio
     async def test_recall_does_not_raise_when_api_unavailable(self):
         """recall_from_memory must never propagate MemoryAPI exceptions to callers."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         mh._memory_api_init_failed = True
         mh._memory_api_last_failure_ts = time.monotonic()
 
-        result = await mh.get_memory_helper().recall_from_memory("query")
+        result = await mh.MemoryHelper().recall_from_memory("query")
         assert isinstance(result, dict), "recall must return dict even when API unavailable"
 
 
@@ -317,17 +317,17 @@ class TestGetMemoryAPIHappyPaths:
     @pytest.mark.asyncio
     async def test_already_cached_returns_instance_without_reinit(self):
         """If _memory_api_instance is set, get_memory_api returns it immediately."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         mock_api = MagicMock()
         mh._memory_api_instance = mock_api
 
-        result = await mh.get_memory_helper().get_memory_api()
+        result = await mh.MemoryHelper().get_memory_api()
         assert result is mock_api, "Must return the cached instance without re-init"
 
     @pytest.mark.asyncio
     async def test_v1_reuse_success_sets_instance(self):
         """When the porter returns a view, the instance is cached."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         from core.memory_access import MemoryView
 
         mock_api = MagicMock()
@@ -335,10 +335,10 @@ class TestGetMemoryAPIHappyPaths:
         view = MemoryView(mock_api, plugin_id="web_ui_module")
 
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(return_value=view),
         ):
-            result = await mh.get_memory_helper().get_memory_api()
+            result = await mh.MemoryHelper().get_memory_api()
 
         assert result is view
         assert mh._memory_api_instance is view
@@ -346,7 +346,7 @@ class TestGetMemoryAPIHappyPaths:
     @pytest.mark.asyncio
     async def test_v1_reuse_creates_collections_if_missing(self):
         """If the API exists but collections are missing, they are created through the view."""
-        import plugins.web_ui_module.core.memory_helper as mh
+        import core.memory_facts.helper as mh
         from core.memory_access import MemoryView
 
         mock_api = MagicMock()
@@ -355,10 +355,10 @@ class TestGetMemoryAPIHappyPaths:
         view = MemoryView(mock_api, plugin_id="web_ui_module")
 
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(return_value=view),
         ):
-            result = await mh.get_memory_helper().get_memory_api()
+            result = await mh.MemoryHelper().get_memory_api()
 
         assert result is view
         assert mock_api.create_collection.call_count == 2, (

@@ -144,6 +144,24 @@ CATALOG: tuple[KeyDecl, ...] = (
        description="Equal readings needed before a new state is believed (anti-flap)"),
     _k("state_watcher_sensor_timeout", "NEXE_STATE_WATCHER_SENSOR_TIMEOUT", "env", 5.0,
        description="Seconds one sensor may take before the round stops waiting for it (#944)"),
+    _k("engine_gate_slots", "NEXE_ENGINE_SLOTS", "env", 1,
+       description="Concurrent generation slots across ALL engines and doors (ADR-007 §7, C2.1) — "
+                    "raised past 1 only with a measured reason: two LLM calls in parallel on this "
+                    "machine's GPU already crashed Metal once"),
+    _k("engine_gate_wait_s", "NEXE_ENGINE_GATE_WAIT_S", "env", 5.0,
+       description="Seconds a user turn waits for an engine slot before the door answers 429 "
+                    "(C2.1; replaces the old per-router Semaphore(2) timeout)"),
+    _k("engine_deadline_s", "NEXE_ENGINE_DEADLINE_S", "env", 90.0,
+       description="Seconds a turn's generate step may run before it is cut short (#1041, C2.5); "
+                    "0 disables it. Measured 2026-09-06 on a 128 GB machine (two local MLX models, "
+                    "dev-tools/reports/): generate took 14.3s/23.1s/24.1s — min(300, ceil(3×24.1)) "
+                    "rounded up to 30s. A LOWER bound; re-measured at the 8 GB DMG live-test stage",
+       toml_path=("core", "server", "engine_deadline_s")),
+    _k("reprompt_if_only_memsave", "NEXE_REPROMPT_IF_ONLY_MEMSAVE", "env", True,
+       description="D3 (ADR-007 §6, C2.5): a turn that cleaned down to ONLY [MEM_SAVE: ...] gets a "
+                    "second LLM call trying for a real reply before falling back to a canned "
+                    "confirmation. OFF skips that extra call at the cost of the plainer UX",
+       toml_path=("personality", "orchestrator", "reprompt_if_only_memsave")),
 )
 
 

@@ -2,12 +2,11 @@
  "core/cli/cli.py::install_model": 15,
  "core/endpoints/installer_gguf.py::_stream_gguf": 19,
  "core/lifespan.py::_startup_init": 15,
+ "core/memory_facts/write.py::atomize_fact_llm": 17,
  "installer/installer_ollama_install.py::_install_ollama_windows": 15,
  "memory/memory/engines/persistence_sqlite.py::SqliteStorageMixin._migrate_to_encrypted": 19,
  "plugins/mlx_module/core/config.py::model_kv_bytes_per_token": 16,
  "plugins/mlx_module/core/model_loader.py::load_model_into": 21,
- "plugins/web_ui_module/api/routes_chat.py::_atomize_fact_llm": 17,
  "plugins/web_ui_module/api/routes_chat.py::_generate_streaming_response": 20,
- "plugins/web_ui_module/api/routes_chat.py::register_chat_routes._chat_inner": 28,
- "plugins/web_ui_module/api/routes_chat.py::register_chat_routes._handle_chat_engine": 29
+ "plugins/web_ui_module/api/routes_chat.py::register_chat_routes._handle_chat_engine": 22
 }

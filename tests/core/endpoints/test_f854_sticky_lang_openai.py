@@ -25,7 +25,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import core.endpoints.chat as ce
-import plugins.web_ui_module.api.routes_chat as rc
+# C4.2: the web UI door's half of the policy lives in `core/turn/prompt.py`
+# now — one function, still two stores (this door's LRU, the session object
+# there), which is what the parity class below measures.
+import core.turn.prompt as rc
 
 API_KEY = "test-f854-key"
 

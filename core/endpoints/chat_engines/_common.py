@@ -261,6 +261,10 @@ def mirror_v1_conversation(app_state: Any, session_id: str, messages) -> None:
     try:
         session_mgr = getattr(app_state, "session_manager", None)
         if session_mgr is None:
+            # Not a normal state: the lifespan exposes the manager on app.state
+            # (`_expose_session_manager`). Say so — this exact silence hid, from
+            # 31/08 to 06/09/2026, that no /v1 thread was reaching disk.
+            logger.warning("F-C: no session_manager on app state — /v1 thread %s not mirrored", session_id)
             return
         turns = _stripped_turns(messages)
         if not turns:
@@ -282,22 +286,28 @@ def mirror_v1_conversation(app_state: Any, session_id: str, messages) -> None:
         logger.error("F-C: failed to mirror /v1 conversation into session %s: %s", session_id, e)
 
 
-def persist_v1_turn(app_state: Any, session_id: str, response_text: str) -> None:
+def persist_v1_turn(app_state: Any, session_id: str, response_text: str, *, partial: bool = False) -> None:
     """Append the assistant's reply to the mirrored session and save it (F-C).
 
     Called once the full reply text is known — after the non-streaming
     response returns, or at the end of a streaming generator. Best-effort:
     same policy as :func:`mirror_v1_conversation`, and as the pre-F-A
     background memory save this replaces functionally.
+
+    `partial` (#1040, C2.4): the stream errored mid-generation and this is
+    whatever reached the client before that — the caller (the MLX/llama.cpp
+    stream generators) still calls this instead of dropping the text, so an
+    interrupted /v1 reply is not silently lost from the mirrored session.
     """
     if not app_state or not session_id or not response_text or not response_text.strip():
         return
     try:
         session_mgr = getattr(app_state, "session_manager", None)
         if session_mgr is None:
+            logger.warning("F-C: no session_manager on app state — /v1 assistant turn for %s not persisted", session_id)
             return
         session = session_mgr.get_or_create_session(session_id)
-        session.add_message("assistant", response_text)
+        session.add_message("assistant", response_text, partial=partial)
         session_mgr.save_session(session_id)
     except Exception as e:
         logger.error("F-C: failed to persist /v1 assistant turn to session %s: %s", session_id, e)
@@ -322,6 +332,50 @@ def resolve_loaded_model_name(module, fallback: str) -> str:
     if isinstance(model_path, str) and model_path:
         return Path(model_path).name
     return fallback
+
+
+#: Where a forwarder writes the model it is serving a STREAM with. An internal
+#: attribute on the response object, deliberately not a header: the name
+#: already travels inside every SSE chunk, and a second public spelling of it
+#: would be a promise this door then has to keep.
+_SERVED_MODEL_ATTR = "nexe_served_model"
+
+
+def mark_served_model(response, model_name: str):
+    """Record which model is answering, and hand the response straight back.
+
+    Every forwarder resolves this name synchronously, before it builds the
+    `StreamingResponse` — and then dropped it, so the turn's LLM counter wrote
+    `model=null` for every streamed /v1 call while the UI door logged the real
+    name (#1054). The JSON shape needs nothing: `build_openai_response` already
+    writes `"model"`.
+    """
+    setattr(response, _SERVED_MODEL_ATTR, model_name)
+    return response
+
+
+def served_model_of(response) -> Optional[str]:
+    """The model that answered: the `"model"` field of a JSON response, the
+    attribute above for a stream, and `None` for a test double that carries
+    neither — an unknown name is logged as unknown, never guessed."""
+    if isinstance(response, dict):
+        return response.get("model") or None
+    return getattr(response, _SERVED_MODEL_ATTR, None)
+
+
+def extract_engine_text(result) -> str:
+    """Extract text content from a non-streaming engine result (dict or str)."""
+    if isinstance(result, dict):
+        if "message" in result and "content" in result["message"]:
+            return result["message"]["content"]
+        if "content" in result:
+            return result["content"]
+        if "response" in result:
+            return result["response"]
+        return ""
+    if isinstance(result, str):
+        return result
+    return ""
 
 
 def build_openai_response(result: dict, model_name: str, engine_prefix: str) -> dict:
@@ -366,30 +420,3 @@ def build_openai_response(result: dict, model_name: str, engine_prefix: str) -> 
     }
 
 
-async def _forward_to_ollama_lazy(
-    messages, request, *, app_state, user_msg, fallback_from, fallback_reason, session_id=None
-):
-    """Lazy-import wrapper to avoid circular imports with ollama.py."""
-    from .ollama import _forward_to_ollama
-    return await _forward_to_ollama(
-        messages, request,
-        app_state=app_state,
-        user_msg=user_msg,
-        fallback_from=fallback_from,
-        fallback_reason=fallback_reason,
-        session_id=session_id,
-    )
-
-
-async def fallback_to_ollama(
-    messages, request, app_state, user_msg, from_engine: str, reason: str, session_id=None
-):
-    """Forward to Ollama as a fallback. Uses lazy import to avoid circular deps."""
-    return await _forward_to_ollama_lazy(
-        messages, request,
-        app_state=app_state,
-        user_msg=user_msg,
-        fallback_from=from_engine,
-        fallback_reason=reason,
-        session_id=session_id,
-    )

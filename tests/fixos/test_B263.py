@@ -21,6 +21,7 @@ import re
 import pytest
 
 import core.endpoints.chat as openai_chat
+import core.turn.prompt as prompt_mod
 import plugins.web_ui_module.api.routes_chat as rc
 from core.endpoints.chat_sanitization import (
     _RAG_SECURITY_RULE,
@@ -47,22 +48,25 @@ class TestSharedHelper:
 
 class TestWebUiUnconditional:
     def test_finalize_always_arms_the_rule(self):
-        out = rc._finalize_system_prompt("BASE", "ca")
+        # C4.2: `_finalize_system_prompt` moved into `core/turn/prompt.py` with
+        # the rest of the prompt assembly, and BOTH doors run it now.
+        out = prompt_mod._finalize_system_prompt("BASE", "ca")
         assert _RAG_SECURITY_RULE["ca"] in out
 
     def test_finalize_with_collections_keeps_rule_last(self):
-        out = rc._finalize_system_prompt("BASE", "ca", rag_collections=None)
+        out = prompt_mod._finalize_system_prompt("BASE", "ca", rag_collections=None)
         assert out.endswith(_RAG_SECURITY_RULE["ca"])
 
     def test_tripwire_no_conditional_rule_in_handler(self):
         """Contra HEAD: el handler feia `if _ctx_injected: system_prompt +=
         rag_security_rule(...)`. Cap resta d'aquest patró pot sobreviure."""
-        src = inspect.getsource(rc)
-        assert not re.search(
-            r"if _ctx_injected:\s*\n\s*system_prompt", src
-        ), "la regla RAG torna a ser condicional (#851 reobert)"
-        # I la regla s'arma via el helper compartit (paritat entre rutes).
-        assert "append_rag_security_rule" in src
+        for module in (rc, prompt_mod):
+            assert not re.search(
+                r"if _ctx_injected:\s*\n\s*system_prompt", inspect.getsource(module)
+            ), "la regla RAG torna a ser condicional (#851 reobert)"
+        # I la regla s'arma via el helper compartit (paritat entre rutes) —
+        # C4.2: al nucli, que és des d'on l'apliquen les dues portes.
+        assert "append_rag_security_rule" in inspect.getsource(prompt_mod)
 
 
 def _capturing_engine():
@@ -116,11 +120,14 @@ class TestWebUiHandlerEndToEnd:
         from unittest.mock import patch as _patch
         from tests.plugins.web_ui_module.test_chat_inner_behavior import _drain
 
-        async def _fake_rag(memory_helper, message, body_arg, attached_doc,
-                            context_window=None):
+        # C4.2: retrieval is the turn's `recall` step; the UI door's adapter
+        # imports it by name, so this is where the door reaches it.
+        async def _fake_rag(message, **_kwargs):
             return rag_context, (1 if rag_context else 0), []
 
-        with _patch.object(rc, "_build_rag_context", _fake_rag):
+        import plugins.web_ui_module.api.turn_adapters as ui_adapters_mod
+
+        with _patch.object(ui_adapters_mod, "_build_rag_context", _fake_rag):
             result = await harness.call(body, server_state=state)
             await _drain(result)
 
@@ -232,43 +239,58 @@ class TestWebUiHandlerEndToEnd:
 class TestOpenAiRouteParity:
     def test_injection_no_longer_arms_the_rule_itself(self):
         """La regla surt de _inject_rag_context_into_messages (que només corre
-        amb context) i puja a _build_rag_and_system_prompt (sempre)."""
+        amb context) i puja al pas `system_prompt`, que corre sempre."""
         src = inspect.getsource(openai_chat._inject_rag_context_into_messages)
         assert "rag_security_rule" not in src
 
     def test_build_arms_rule_unconditionally(self):
-        src = inspect.getsource(openai_chat._build_rag_and_system_prompt)
-        assert "append_rag_security_rule" in src
+        """C4.2: la regla ve del pas compartit que corren LES DUES portes, no
+        d'una còpia per ruta. Sense context, sense col·leccions, sense res: hi és."""
+        out = prompt_mod.turn_system_prompt(lang="ca", base="BASE")
+        assert out.endswith(_RAG_SECURITY_RULE["ca"])
+
+    @staticmethod
+    async def _v1_messages(monkeypatch, rag_text):
+        """Els missatges que /v1 lliura al model, pels seus adapters reals.
+
+        C4.2: `_build_rag_and_system_prompt` s'ha descompost en els tres passos
+        que plegava més `budget`. El seient on s'injecta el retrieval fals
+        segueix sent `_fetch_rag_context` — el pas `recall` el crida pel mòdul.
+        """
+        from fastapi import BackgroundTasks
+
+        from core.endpoints.chat_schemas import ChatCompletionRequest, Message
+        from core.turn.adapters_api import api_adapters
+        from core.turn.context import TurnContext
+
+        async def _ctx(body, app_state, server_lang):
+            return rag_text, ([("personal_memory", 0.9)] if rag_text else [])
+
+        monkeypatch.setattr(openai_chat, "_fetch_rag_context", _ctx)
+        body = ChatCompletionRequest(
+            messages=[
+                Message(role="system", content="You are Nexe."),
+                Message(role="user", content="hola"),
+            ],
+            use_rag=True,
+        )
+        ctx = TurnContext(
+            turn_id="t", entry="api", body=body, app_state=None, lang="ca",
+        )
+        ctx.message = "hola"
+        table = api_adapters(BackgroundTasks())
+        for step in ("recall", "clock", "system_prompt", "budget"):
+            await table[step](ctx)
+        return ctx.prompt, ctx.recall_text
 
     @pytest.mark.asyncio
     async def test_build_produces_armed_system_WITH_context(self, monkeypatch):
         """Review B030: la direcció crítica de seguretat — torn AMB context
         untrusted → system armat — ha de seguir assertada enlloc."""
-
-        async def _ctx(body, app_state, server_lang):
-            return "fets recuperats del document", []
-
-        monkeypatch.setattr(openai_chat, "_fetch_rag_context", _ctx)
-        monkeypatch.setattr(
-            openai_chat,
-            "_ensure_system_message",
-            lambda messages, app_state, server_lang: messages.insert(
-                0, {"role": "system", "content": "You are Nexe."}
-            ),
+        messages, ctx_text = await self._v1_messages(
+            monkeypatch, "fets recuperats del document",
         )
-        body = type(
-            "B",
-            (),
-            {
-                "messages": [
-                    type("M", (), {"model_dump": lambda self: {"role": "user", "content": "hola"}})()
-                ]
-            },
-        )()
-        messages, ctx = await openai_chat._build_rag_and_system_prompt(
-            body, app_state=None, server_lang="ca"
-        )
-        assert ctx
+        assert ctx_text
         assert _RAG_SECURITY_RULE["ca"] in messages[0]["content"]
         assert any(
             "fets recuperats" in m.get("content", "") for m in messages[1:]
@@ -278,30 +300,7 @@ class TestOpenAiRouteParity:
     async def test_build_produces_armed_system_without_context(self, monkeypatch):
         """Behavioral: sense cap context RAG, el system de la ruta OpenAI DUU la
         regla igualment (contra HEAD: només amb context → RED)."""
-
-        async def _no_ctx(body, app_state, server_lang):
-            return "", []
-
-        monkeypatch.setattr(openai_chat, "_fetch_rag_context", _no_ctx)
-        monkeypatch.setattr(
-            openai_chat,
-            "_ensure_system_message",
-            lambda messages, app_state, server_lang: messages.insert(
-                0, {"role": "system", "content": "You are Nexe."}
-            ),
-        )
-        body = type(
-            "B",
-            (),
-            {
-                "messages": [
-                    type("M", (), {"model_dump": lambda self: {"role": "user", "content": "hola"}})()
-                ]
-            },
-        )()
-        messages, ctx = await openai_chat._build_rag_and_system_prompt(
-            body, app_state=None, server_lang="ca"
-        )
-        assert ctx == ""
+        messages, ctx_text = await self._v1_messages(monkeypatch, "")
+        assert ctx_text == ""
         assert messages[0]["role"] == "system"
         assert _RAG_SECURITY_RULE["ca"] in messages[0]["content"]

@@ -113,3 +113,47 @@ class TestStartupFinalBanner:
         with caplog.at_level(logging.INFO, logger="core.lifespan"):
             _startup_final_banner()
         assert any("disabled" in r.message for r in caplog.records)
+
+    def test_it_announces_the_port_the_server_actually_binds(self, monkeypatch, caplog):
+        """`NEXE_PORT` (Tauri's injection in sidecar mode) is what uvicorn binds
+        — `core/server/runner.py:main` reads it before config.yaml. The banner
+        read the config alone and sent readers to a dead port: seen live on
+        08/09 announcing 9119 with the server on 9130.
+
+        Mutation guard: make `_bound_address` read `server_state.config` only
+        and this goes RED — the banner says 9119 again.
+        """
+        import logging
+        monkeypatch.setattr(
+            server_state, "config",
+            {"core": {"server": {"host": "127.0.0.1", "port": 9119}}}, raising=False,
+        )
+        monkeypatch.setattr(server_state, "crypto_provider", None, raising=False)
+        monkeypatch.delenv("NEXE_API_BASE_URL", raising=False)
+        monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
+        monkeypatch.setenv("NEXE_PORT", "9130")
+
+        with caplog.at_level(logging.INFO, logger="core.lifespan"):
+            _startup_final_banner()
+
+        listening = next(m for m in (r.getMessage() for r in caplog.records) if "Listening on" in m)
+        assert "9130" in listening, listening
+        assert "9119" not in listening, listening
+
+    def test_the_config_port_still_wins_when_nothing_is_injected(self, monkeypatch, caplog):
+        """The control: without `NEXE_PORT` the config value is the bound one."""
+        import logging
+        monkeypatch.setattr(
+            server_state, "config",
+            {"core": {"server": {"host": "127.0.0.1", "port": 9119}}}, raising=False,
+        )
+        monkeypatch.setattr(server_state, "crypto_provider", None, raising=False)
+        monkeypatch.delenv("NEXE_API_BASE_URL", raising=False)
+        monkeypatch.delenv("NEXE_PRIMARY_API_KEY", raising=False)
+        monkeypatch.delenv("NEXE_PORT", raising=False)
+
+        with caplog.at_level(logging.INFO, logger="core.lifespan"):
+            _startup_final_banner()
+
+        listening = next(m for m in (r.getMessage() for r in caplog.records) if "Listening on" in m)
+        assert "9119" in listening, listening

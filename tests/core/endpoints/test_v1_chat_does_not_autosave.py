@@ -75,10 +75,13 @@ class TestV1ChatCompletionsDoesNotWriteMemory:
     def test_non_streaming_path_does_not_remember_or_store(self):
         from core.endpoints.chat import chat_completions, ChatCompletionRequest, Message
 
+        from core.turn.gate import EngineGate
+
         remember, store, svc, api = _spies()
         req = MagicMock()
         req.app.state.config = {}
         req.app.state.modules = {}
+        req.app.state.engine_gate = EngineGate(slots=100)
         req.headers = {"x-api-key": "test-key"}
         bg = BackgroundTasks()
         body = ChatCompletionRequest(

@@ -8,7 +8,7 @@ F1 finding: memory_action remained null because the non-streaming path did not s
 when it detected and saved MEM_SAVE inline (unlike the explicit intent path
 save/delete/list/recall which did set it).
 """
-from plugins.web_ui_module.api.routes_chat import _extract_safe_mem_saves
+from core.memory_facts.extract import _extract_safe_mem_saves
 
 
 class TestExtractSafeMemSaves:

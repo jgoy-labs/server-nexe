@@ -22,8 +22,12 @@ Description: #856, la meitat que faltava — PARITAT COMPLETA del torn que nomé
              els dos camins han de dir la confirmació.
 
              Mutació que l'ha de matar: treure la crida a
-             `_reprompt_nonstreaming` de `_handle_nonstreaming_response` →
+             `_reprompt_nonstreaming` de `_postprocess_nonstreaming` →
              el no-stream torna a la confirmació i la paritat es trenca.
+             (C1.4, 06/09/2026: `_handle_nonstreaming_response`, la funció
+             citada aquí originalment, s'ha retirat — sense cridador de
+             producció des que `turn_adapters.py` crida `postprocess` i
+             `memory.write` per separat.)
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -135,3 +139,55 @@ class TestG10NonStreamReprompts:
             server_state=_make_server_state(engine=_MemSaveThenAnswerEngine()),
         )
         assert "[MEM_SAVE:" not in result["response"]
+
+
+@pytest.mark.asyncio
+class TestG10ReprompFlagD3:
+    """D3 (ADR-007 §6, C2.5): NEXE_REPROMPT_IF_ONLY_MEMSAVE. ON (default) is
+    exactly the parity gate above (`calls == 2`); OFF skips the extra LLM
+    call and goes straight to the confirmation (`calls == 1`) — on BOTH wire
+    shapes, without breaking parity between them.
+
+    Mutation (exercised by hand before merging, see the diari): removing the
+    `_reprompt_enabled()` guard from `_postprocess_nonstreaming` turns
+    `test_flag_off_skips_the_reprompt_call[false-False]` red (calls stays 2).
+    """
+
+    @pytest.mark.parametrize("flag_value,expect_reprompt_call", [
+        ("true", True),
+        ("false", False),
+    ])
+    async def test_flag_off_skips_the_reprompt_call(self, monkeypatch, flag_value, expect_reprompt_call):
+        monkeypatch.setenv("NEXE_REPROMPT_IF_ONLY_MEMSAVE", flag_value)
+        engine = _MemSaveThenAnswerEngine()
+        h = _Harness(intent="chat")
+        result = await h.call(
+            {"message": "recorda que em dic Aran", "stream": False},
+            server_state=_make_server_state(engine=engine),
+        )
+        assert engine.calls == (2 if expect_reprompt_call else 1)
+        if expect_reprompt_call:
+            assert result["response"] == _SECOND_TURN
+        else:
+            assert "Memòria desada" in result["response"]
+            assert "l'usuari es diu Aran" in result["response"]
+
+    async def test_flag_off_keeps_stream_and_nonstream_in_parity(self, monkeypatch):
+        monkeypatch.setenv("NEXE_REPROMPT_IF_ONLY_MEMSAVE", "false")
+        h_ns = _Harness(intent="chat")
+        result = await h_ns.call(
+            {"message": "recorda que em dic Aran", "stream": False},
+            server_state=_make_server_state(engine=_MemSaveThenAnswerEngine()),
+        )
+
+        h_st = _Harness(intent="chat")
+        streamed = await h_st.call(
+            {"message": "recorda que em dic Aran", "stream": True},
+            server_state=_make_server_state(engine=_MemSaveThenAnswerEngine()),
+        )
+        body = ""
+        async for chunk in streamed.body_iterator:
+            body += chunk if isinstance(chunk, str) else chunk.decode()
+
+        assert _visible_stream_text(body) == result["response"].strip()
+        assert "Memòria desada" in result["response"]

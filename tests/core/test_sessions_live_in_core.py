@@ -12,10 +12,11 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from types import SimpleNamespace
+import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from starlette.datastructures import State
 from starlette.requests import Request as StarletteRequest
 
@@ -148,8 +149,11 @@ def test_startup_session_cleanup_uses_server_state(monkeypatch):
 async def test_user_turn_is_saved_before_memory_runs():
     """Losing memory must not lose the conversation (plan 22/08).
 
-    Spies: _save_session_to_disk is called before detect_intent. Changing a
-    comment must stay green; swapping the two calls must go red.
+    Spies: _save_session_to_disk is called before detect_intent AND before the
+    write that D6 (C3.1) added — a "remember that ..." now persists the fact in
+    the intent step itself, which is a memory write I3 covers and this test did
+    not watch until C3. Changing a comment must stay green; swapping the calls
+    must go red.
     """
     from plugins.web_ui_module.api.routes_chat import register_chat_routes
 
@@ -166,9 +170,11 @@ async def test_user_turn_is_saved_before_memory_runs():
         return ("save", "un fet")
 
     mh.detect_intent.side_effect = _detect
-    mh.save_to_memory = AsyncMock(
-        return_value={"success": True, "document_id": "doc-1"}
-    )
+    async def _save_to_memory(**_kwargs):
+        order.append("memory_write")
+        return {"success": True, "document_id": "doc-1"}
+
+    mh.save_to_memory = AsyncMock(side_effect=_save_to_memory)
     mh.matches_clear_all_confirm = MagicMock(return_value=False)
 
     router = APIRouter()
@@ -193,7 +199,12 @@ async def test_user_turn_is_saved_before_memory_runs():
             "headers": [],
             "client": ("127.0.0.1", 12345),
             "app": app_mock,
-            "state": State(),
+            # C4.1 (#1044): the trace `require_ui_auth` leaves behind — the principal
+            # it authenticated. The door copies it onto the turn and `authorize`
+            # refuses a turn without one, so a harness that stubs the auth
+            # dependency has to leave the same trace. A plain dict is what
+            # Starlette's `request.state` wraps.
+            "state": {"principal": "harness-key"},
         }
     )
 
@@ -203,10 +214,14 @@ async def test_user_turn_is_saved_before_memory_runs():
     limiter.enabled = False
     try:
         with patch(
-            "plugins.web_ui_module.api.routes_chat._get_memory_helper",
+            "core.memory_facts.helper_for",
             return_value=mh,
         ):
-            await endpoint(req, {"message": "Recorda que em dic Joan"}, None)
+            # D6 (C3.1): a save no longer answers the turn — it continues to
+            # the model, which this harness does not mount (503). The order
+            # under test is already recorded by then.
+            with contextlib.suppress(HTTPException):
+                await endpoint(req, {"message": "Recorda que em dic Joan"}, None)
     finally:
         limiter.enabled = previous
 
@@ -214,5 +229,12 @@ async def test_user_turn_is_saved_before_memory_runs():
     assert "detect_intent" in order, f"intent was never detected; calls={order}"
     assert order.index("save") < order.index("detect_intent"), (
         "the user-turn save must run before detect_intent; "
+        f"got {order}"
+    )
+    # I3 for D6's own write: the fact this turn stores deterministically must
+    # not reach memory before the user's turn reached disk.
+    assert "memory_write" in order, f"D6 never wrote the fact; got {order}"
+    assert order.index("save") < order.index("memory_write"), (
+        "the user-turn save must run before the intent step writes to memory; "
         f"got {order}"
     )

@@ -123,15 +123,15 @@ async def test_mc017_rag_search_error_logs_warning(caplog):
 async def test_mc016_persist_facts_storage_error_logs_warning(caplog):
     """A storage error (success=False, no duplicate flag) must log at WARNING,
     not be silently logged as a dedup skip at debug."""
-    from plugins.web_ui_module.api import routes_chat
+    import core.memory_facts.write as write_mod
 
     helper = MagicMock()
     helper.save_to_memory = AsyncMock(
         return_value={"success": False, "document_id": None, "message": "backend down"}
     )
 
-    with caplog.at_level(logging.WARNING, logger=routes_chat.logger.name):
-        saved = await routes_chat._persist_facts(["fact one"], helper, "sess-1")
+    with caplog.at_level(logging.WARNING, logger="core.memory_facts.write"):
+        saved = await write_mod.persist_facts(["fact one"], helper, "sess-1")
 
     assert saved == 0
     assert any(
@@ -143,15 +143,15 @@ async def test_mc016_persist_facts_storage_error_logs_warning(caplog):
 async def test_mc016_persist_facts_dedup_stays_quiet(caplog):
     """A genuine dedup (duplicate=True) must NOT be logged as an error/warning —
     it's a legitimate no-op, kept at debug."""
-    from plugins.web_ui_module.api import routes_chat
+    import core.memory_facts.write as write_mod
 
     helper = MagicMock()
     helper.save_to_memory = AsyncMock(
         return_value={"success": False, "document_id": None, "duplicate": True}
     )
 
-    with caplog.at_level(logging.WARNING, logger=routes_chat.logger.name):
-        saved = await routes_chat._persist_facts(["fact two"], helper, "sess-2")
+    with caplog.at_level(logging.WARNING, logger="core.memory_facts.write"):
+        saved = await write_mod.persist_facts(["fact two"], helper, "sess-2")
 
     assert saved == 0
     assert not any(

@@ -159,6 +159,21 @@ class TokenBridge:
                     raise StopAsyncIteration
 
 
+async def _prepend_chunk(first: str, agen):
+    """Re-emit ``first`` (already pulled off ``agen`` by the caller), then drain it.
+
+    #1036 (C2.4): the forwarders must "peek" the generator's first chunk
+    before wrapping it in a ``StreamingResponse``, so an error that happens
+    before any token reaches the client raises out of that peek as a real
+    exception the cascade can retry — instead of only surfacing once
+    ``StreamingResponse`` starts draining the generator, by which point the
+    cascade's own ``try`` has long since returned.
+    """
+    yield first
+    async for chunk in agen:
+        yield chunk
+
+
 def format_sse_chunk(token: str, model_name: str, engine_prefix: str) -> str:
     """Format a single token as an OpenAI-compatible SSE chunk."""
     now = int(time.time())

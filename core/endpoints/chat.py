@@ -11,20 +11,19 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import os
 import time
 from collections import OrderedDict
+from uuid import uuid4
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from core.security.auth_dependencies import require_api_key
-from core.security.input_sanitizers import validate_string_input, strip_memory_tags
+from core.security.input_sanitizers import validate_string_input
 
 from .chat_schemas import Message, ChatCompletionRequest
 from core.log_redact import redact_user_content
 from .chat_sanitization import (
-    append_rag_security_rule,
     _sanitize_rag_context,
     _sanitize_sse_token,
     untrusted_context_turns,
@@ -60,9 +59,14 @@ from .chat_engines.ollama import (
 )
 from .chat_engines.mlx import _forward_to_mlx, _mlx_stream_generator
 from .chat_engines.llama_cpp import _forward_to_llama_cpp, _llama_cpp_stream_generator
-from .chat_engines._common import derive_session_id, mirror_v1_conversation, persist_v1_turn
-from core.chat_prompt import EMERGENCY_SYSTEM_PROMPT, build_system_prompt_with_time, time_context_line
+from .chat_engines._common import persist_v1_turn, served_model_of
 from core.dependencies import limiter
+from core.turn.adapters_api import api_adapters
+from core.turn.recall import _build_rag_context as recall_for_turn
+from core.turn.prompt import turn_system_prompt
+from core.turn.context import TurnContext
+from core.turn.post_commit import queue_for
+from core.turn.run import run_turn
 from core.lang_detect import (
     detect_user_lang_or_none as _detect_lang_or_none,
     fallback_lang as _fallback_lang,
@@ -139,56 +143,42 @@ def _resolve_request_lang(session_key: str, user_text: str) -> str:
 
 
 # --- System Prompt ---
-
-def _get_system_prompt(app_state: Any, lang: Optional[str] = None) -> str:
-    """
-    Select the system prompt by language and model tier.
-
-    Priority:
-    1. server.toml [personality.prompt].<lang>_<tier>
-    2. server.toml [personality.prompt].<lang>_full  (tier fallback)
-    3. server.toml [personality.prompt].en_full       (neutral fallback)
-    4. Hardcoded minimum prompt
-    """
-    if lang is None:
-        lang = os.getenv("NEXE_LANG", "en")
-
-    config = getattr(app_state, "config", {}) or {}
-    prompts = config.get("personality", {}).get("prompt", {})
-
-    tier = os.getenv("NEXE_PROMPT_TIER", "full")
-    lang_short = lang.split("-")[0].lower()  # "ca-ES" → "ca"
-
-    # Look up specific prompt → fallback to full → fallback to en → minimum
-    for key in [f"{lang_short}_{tier}", f"{lang_short}_full", "en_full"]:
-        prompt = prompts.get(key, "")
-        if prompt:
-            return prompt
-
-    return EMERGENCY_SYSTEM_PROMPT
+# C4.2: `_get_system_prompt` lives in `core/turn/prompt.py` now, with the rest
+# of the turn's prompt assembly. It moved because the OTHER door had to import
+# it from here — a plugin reaching into this route module (`routes_chat.py`'s
+# `from core.endpoints.chat import _get_system_prompt`), which is exactly the
+# inverted dependency C4 exists to remove. This module reaches it the same way
+# everyone else does now: through `turn_system_prompt`.
 
 
 # --- Helper Functions ---
 
 def _validate_chat_request(body: ChatCompletionRequest) -> None:
-    """Sanitize and validate all user-supplied fields in the chat request.
+    """Validate the request's own fields: the routing params, and the content
+    of the messages this door did NOT receive from the user.
 
-    user-role messages go through `apply_user_text_sanitizer`, which
-    detects jailbreaks / prompt injections. High/critical → HTTP 400.
-    The module does not rewrite the text (it is a detector; D-B / D-G).
+    C4.1: the USER's text is no longer sanitized here. It goes through
+    `core.turn.validate.sanitize_user_text` in the turn's `sanitize` step
+    (`core/turn/adapters_api.py`), which is the same chain `/ui/chat` runs —
+    that is what unfolds `sanitize` at this door. Two consequences, both
+    intended:
+
+    * `apply_user_text_sanitizer` still gates every user message, one step
+      later in the same turn, before anything is persisted or sent to a model;
+    * user content is validated with `allow_html=True` (the 31/08 decision,
+      quoted in `core/turn/validate.py`), while a system/assistant message the
+      CLIENT supplies keeps the escaping default it has always had — that
+      decision was about the user's message reaching the model, and about
+      nothing else.
     """
     if body.model is not None:
         body.model = validate_string_input(body.model, max_length=200, context="param")
     if body.engine is not None:
         body.engine = validate_string_input(body.engine, max_length=50, context="param")
-    from plugins.security.sanitizer import apply_user_text_sanitizer
     for _msg in body.messages:
         if _msg.role is not None:
             _msg.role = validate_string_input(_msg.role, max_length=50, context="param")
-        if _msg.content is not None:
-            if _msg.role == "user":
-                _msg.content = strip_memory_tags(_msg.content)
-                _msg.content = apply_user_text_sanitizer(_msg.content)
+        if _msg.content is not None and _msg.role != "user":
             _msg.content = validate_string_input(_msg.content, max_length=MAX_CHAT_INPUT_LENGTH, context="chat")
 
 
@@ -207,25 +197,47 @@ async def _fetch_rag_context(
         return "", []
     # MC-109/111: the user's message must not land in plain in the log file.
     logger.info("RAG Search for: %s", redact_user_content(last_user_msg))
-    return await build_rag_context(
-        last_user_msg, app_state, server_lang,
+    # C4.2: the retrieval itself is the turn's `recall` step, shared with
+    # /ui/chat (`core/turn/recall.py`). What stays this door's is the question
+    # of WHETHER to recall — `use_rag` is a field of this schema alone.
+    text, _count, items = await recall_for_turn(
+        last_user_msg, app_state=app_state, lang=server_lang,
         collections=body.rag_collections, threshold_override=body.rag_threshold,
     )
+    return text, items
 
 
-def _ensure_system_message(messages: list, app_state: Any, server_lang: str) -> None:
-    """Prepend a system message to messages list if none is present (in-place).
+def _ensure_system_message(messages: list, system_prompt: str) -> None:
+    """Put the turn's system prompt at the head of the messages list (in-place).
 
-    F-D block 2: the system prompt now carries the same natural-language
-    date phrase the UI route has always had (``build_system_prompt_with_time``,
-    ``core/chat_prompt.py``) — /v1 previously had none, so an API
-    conversation never knew today's date.
+    C4.2: the prompt itself is built by the turn's `system_prompt` step
+    (`core/turn/prompt.py::turn_system_prompt`), which is where the date phrase,
+    the collection-toggle notes and the unconditional RAG rule are added — the
+    same function `/ui/chat` runs. This only places it: a client that sent its
+    own system message keeps it (finalised), and one that sent none gets the
+    server's.
     """
-    if not (messages and messages[0]['role'] == 'system'):
-        nexe_prompt = build_system_prompt_with_time(
-            _get_system_prompt(app_state, server_lang), server_lang
-        )
-        messages.insert(0, {"role": "system", "content": nexe_prompt})
+    if messages and messages[0]['role'] == 'system':
+        messages[0]['content'] = system_prompt
+    else:
+        messages.insert(0, {"role": "system", "content": system_prompt})
+
+
+def _system_prompt_for_turn(body: ChatCompletionRequest, app_state: Any, server_lang: str) -> str:
+    """This door's `system_prompt` step: what the turn's system message says.
+
+    A client-supplied system message is the base when there is one — this door
+    has always used it as-is, so it does NOT get the date phrase; without one
+    the prompt comes from server.toml exactly as the web UI builds it. Both go
+    through the same finalisation (collection notes + RAG security rule).
+    """
+    client_system = None
+    if body.messages and body.messages[0].role == 'system':
+        client_system = body.messages[0].content
+    return turn_system_prompt(
+        lang=server_lang, rag_collections=body.rag_collections,
+        base=client_system, app_state=app_state,
+    )
 
 
 def get_effective_context_window(engine: str, app_state: Any = None) -> int:
@@ -388,50 +400,46 @@ def _inject_rag_context_into_messages(messages: list, context_text: str, server_
     return True
 
 
-async def _build_rag_and_system_prompt(
-    body: ChatCompletionRequest, app_state: Any, server_lang: str, effective_ctx_window: int = None
+def _assemble_v1_messages(
+    body: ChatCompletionRequest, system_prompt: str, context_text: str,
+    clock_line: str, server_lang: str, effective_ctx_window: int = None,
 ) -> tuple[list[dict], str]:
-    """Build the final messages list with system prompt and injected RAG context.
+    """The `budget` step at this door: the messages list the engine is given.
 
-    ``effective_ctx_window`` (MC-090) is the serving engine's real context window,
-    used to size the RAG token budget; None falls back to DEFAULT_CONTEXT_WINDOW.
+    C4.2: this is what is LEFT of `_build_rag_and_system_prompt` once the three
+    steps it used to fold ran for themselves. Retrieval arrives as
+    ``context_text`` (the `recall` step), the system message arrives built
+    (`system_prompt`), and the clock line arrives resolved (`clock`) — this
+    places them, fits the retrieved block to what the turn's budget leaves, and
+    reports what actually reached the model.
 
-    Returns:
-        Tuple of (messages, injected_context_text). The second value is the
-        retrieved text ONLY when it actually reached the prompt: since F-D
-        block 4 the turn's budget can drop it, and this returns "" then. It
-        drives X-Nexe-RAG-Status, so it has to mean "the model was given
-        this", not "retrieval found this".
+    ``effective_ctx_window`` (MC-090) is the serving engine's real context
+    window, used to size the RAG token budget; None falls back to
+    DEFAULT_CONTEXT_WINDOW.
+
+    Returns (messages, injected_context_text). The second value is the
+    retrieved text ONLY when it actually reached the prompt: since F-D block 4
+    the turn's budget can drop it, and this returns "" then. It drives
+    X-Nexe-RAG-Status, so it has to mean "the model was given this", not
+    "retrieval found this".
     """
-    context_text, _rag_items = await _fetch_rag_context(body, app_state, server_lang)
-
     messages = [m.model_dump() for m in body.messages]
 
-    _ensure_system_message(messages, app_state, server_lang)
-
-    # #851: static data-not-instructions rule, UNCONDITIONAL (parity with the
-    # web UI route via the shared helper) — a conditional suffix split the
-    # prefix-cache namespace between RAG and non-RAG turns.
-    #
-    # Armed BEFORE the injection, which is the order /ui/chat has always used
-    # (_finalize_system_prompt runs, and only then is system_chars measured).
-    # Arming it afterwards left the rule — 457 to 514 chars depending on the
-    # language — outside the system_chars the turn budget is computed from, so
-    # /v1 planned a prompt ~490 chars smaller than the one it then sent. At a
-    # 2048 window that was most of the overrun. Unlike the wrapper overhead
-    # (#999), this half was ours alone: the UI never had it.
-    if messages and messages[0]['role'] == 'system':
-        messages[0]['content'] = append_rag_security_rule(messages[0]['content'], server_lang)
+    # #851: the static data-not-instructions rule is armed by
+    # `turn_system_prompt`, UNCONDITIONALLY and BEFORE the injection — which is
+    # the order /ui/chat has always used, and the reason the rule is counted in
+    # the system_chars the turn's budget is computed from. Arming it afterwards
+    # left 457-514 chars (language-dependent) outside that budget, so /v1
+    # planned a prompt ~490 chars smaller than the one it then sent.
+    _ensure_system_message(messages, system_prompt)
 
     _injected = _inject_rag_context_into_messages(messages, context_text, server_lang, effective_ctx_window)
 
     # F-D block 1: clock on demand — parity with the UI route. Never the
     # system prompt (would poison the prefix cache for the whole
     # conversation); only this turn's user message diverges in the cache.
-    if messages and messages[-1]['role'] == 'user':
-        _time_line = time_context_line(messages[-1]['content'], server_lang)
-        if _time_line:
-            messages[-1]['content'] = f"{_time_line}\n\n{messages[-1]['content']}"
+    if clock_line and messages and messages[-1]['role'] == 'user':
+        messages[-1]['content'] = f"{clock_line}\n\n{messages[-1]['content']}"
 
     # The second value drives X-Nexe-RAG-Status: report what the model was
     # actually given, not what retrieval found.
@@ -440,20 +448,26 @@ async def _build_rag_and_system_prompt(
 
 async def _dispatch_to_engine(
     engine: str, messages: list[dict], body: ChatCompletionRequest,
-    request: Request, app_state: Any, last_user_msg: Optional[str], session_id: Optional[str] = None
+    request: Request, app_state: Any, last_user_msg: Optional[str], session_id: Optional[str] = None,
+    cancel_event: Any = None,
 ) -> Any:
     """Route the chat request to the resolved backend engine (Ollama, MLX, or llama.cpp).
 
     ``session_id`` (F-C) is only threaded to Ollama here: MLX and llama.cpp
     derive it themselves from the RAW client request (they need it either
     way), so passing it again would just be a second, redundant derivation.
+
+    ``cancel_event`` (#1041, C2.5): only MLX/llama.cpp take it — they are the
+    in-process engines whose token loop can check it. Ollama keeps its own
+    ``httpx`` timeout (a deadline shorter than that timeout still wins,
+    since either one ending the call is enough).
     """
     if engine.lower() == "ollama":
         return await _forward_to_ollama(messages, body, app_state, last_user_msg, session_id=session_id)
     elif engine.lower() == "mlx":
-        return await _forward_to_mlx(messages, body, request)
+        return await _forward_to_mlx(messages, body, request, cancel_event=cancel_event)
     elif engine.lower() in ["llama_cpp", "llama.cpp", "llamacpp"]:
-        return await _forward_to_llama_cpp(messages, body, request)
+        return await _forward_to_llama_cpp(messages, body, request, cancel_event=cancel_event)
     else:
         return await _forward_to_ollama(messages, body, app_state, last_user_msg, session_id=session_id)
 
@@ -560,10 +574,18 @@ def _fit_v1_messages_to_window(
 async def _dispatch_through_cascade(
     body: ChatCompletionRequest, request: Request, messages: list[dict],
     last_user_msg: Optional[str], session_id: str, engine: str,
-    preferred_fallback: Optional[str],
+    preferred_fallback: Optional[str], *, cancel_event: Any = None,
 ) -> tuple:
     """Try the resolved engine, then the rest of the cascade. Returns
-    ``(response, engine_that_answered, fallback_from, fallback_reason)``.
+    ``(response, engine_that_answered, fallback_from, fallback_reason,
+    model_that_answered)``.
+
+    The last element is #1054: the engine's NAME is not the model's, and the
+    turn's LLM counter had no way to reach the second one — every streamed /v1
+    call was logged with ``model=null`` while the UI door logged the real name.
+    Read off the response the forwarder just built (`served_model_of`), so no
+    forwarder signature changes and a patched double that returns a bare dict
+    keeps working.
 
     F-D block 5. This door used to dispatch exactly once: whatever the single
     engine raised became the client's error, while /ui/chat quietly walked down
@@ -575,10 +597,11 @@ async def _dispatch_through_cascade(
     An HTTPException is never retried — that is how the forwarders report a
     backend that is down, and it is the answer, not a crash. What IS retried is
     an engine failing at this moment: a corrupt model, an out-of-memory, a
-    driver. Note the MLX and llama.cpp forwarders still catch their own
-    execution errors first and fall back straight to Ollama (a one-step
-    mechanism that predates this block and skips llama.cpp); this cascade is
-    what catches everything they do not.
+    driver. This is now the ONLY fallback mechanism (#1036, C2.4): the MLX and
+    llama.cpp forwarders used to catch their own execution errors and jump
+    straight to Ollama, a second mechanism that pre-empted this cascade and
+    skipped llama.cpp entirely — removed, so every failure (including one
+    raised before a streaming response's first byte) lands here.
     """
     cascade = resolve_engine_cascade(body.engine, request.app.state) or [engine]
     last_exc: Optional[BaseException] = None
@@ -597,7 +620,8 @@ async def _dispatch_through_cascade(
                 messages, get_effective_context_window(candidate, request.app.state), body
             )
             response = await _dispatch_to_engine(
-                candidate, attempt_messages, body, request, request.app.state, last_user_msg, session_id
+                candidate, attempt_messages, body, request, request.app.state, last_user_msg, session_id,
+                cancel_event=cancel_event,
             )
         except Exception as exc:
             _record_engine_metrics(candidate, "error", start_time)
@@ -611,7 +635,7 @@ async def _dispatch_through_cascade(
         _record_engine_metrics(candidate, "success", start_time)
         if candidate != engine and not preferred_fallback:
             preferred_fallback = engine
-        return response, candidate, preferred_fallback, reason
+        return response, candidate, preferred_fallback, reason, served_model_of(response)
 
     # Every live engine failed with something retryable.
     raise last_exc if last_exc is not None else RuntimeError("no engine available")
@@ -627,47 +651,31 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
     Supports:
     - RAG (Retrieval Augmented Generation)
     - Auto-routing to engines (Ollama, MLX, Llama.cpp)
+
+    ADR-007 (C1.2): this door no longer decides the order of the turn. It
+    builds a `TurnContext` and lets `run_turn` walk `TURN_STEPS`; every step
+    is an adapter in `core/turn/adapters_api.py` wrapping the same functions
+    this body used to call in the same order. `ctx.wire` is what the client
+    gets — a dict, or the `StreamingResponse` the engine forwarder built.
+    Exceptions propagate untouched (a 400 from validation stays a 400).
     """
-    _validate_chat_request(body)
-
-    engine, preferred_fallback = _resolve_engine(body.engine, request.app.state)
-
-    last_user_msg = next((m.content for m in reversed(body.messages) if m.role == "user"), None)
-
-    # F-C: one thread id per conversation, derived from the client's raw
-    # request (X-Session-Id when sent, else the first user message). Shared
-    # by the sticky-language cache below (unchanged use) and the new session
-    # mirror, so both agree on which conversation this is.
-    session_id = derive_session_id(request, body.messages)
-
-    # Reply language follows the user's message (not just the install language),
-    # sticky per session so a short ack cannot rewrite the system prompt from
-    # token 0 halfway through a conversation (#854).
-    _server_lang = _resolve_request_lang(session_id, last_user_msg or "")
-
-    # F-C: mirror what the client sent as a session — /v1 conversations become
-    # a thread visible from the UI/Tauri/mobile, same as a chat started there.
-    # The client is the source of truth; this rewrites the mirror, it never
-    # reads it back to decide what to send the engine.
-    mirror_v1_conversation(request.app.state, session_id, body.messages)
-
-    # MC-090: size the RAG budget to the engine's real context window (Ollama).
-    _effective_ctx = get_effective_context_window(engine, request.app.state)
-    messages, context_text = await _build_rag_and_system_prompt(body, request.app.state, _server_lang, _effective_ctx)
-
-    # #976: last check before the engine sees it — what the budget planned and
-    # what got assembled are not the same thing.
-    messages = _fit_v1_messages_to_window(messages, _effective_ctx, body)
-
-    response, engine, preferred_fallback, fallback_reason = await _dispatch_through_cascade(
-        body, request, messages, last_user_msg, session_id, engine, preferred_fallback
+    ctx = TurnContext(
+        turn_id=uuid4().hex,
+        entry="api",
+        # C4.1 (#1044): WHO the route dependency authenticated. `require_api_key`
+        # records it on the request (`auth_dependencies._remember_principal`);
+        # the turn's `authorize` step refuses a missing one, and refuses the
+        # `dev-mode-bypass` label too. Nothing wrote this field before C4.1.
+        principal=getattr(getattr(request, "state", None), "principal", None),
+        streaming=bool(body.stream),
+        body=body,
+        request=request,
+        app_state=request.app.state,
     )
-
-    _persist_v1_turn_from_response(response, background_tasks, request.app.state, session_id)
-
-    return _inject_response_headers(
-        response, engine, context_text, preferred_fallback, fallback_reason
-    )
+    # C3.3: /v1 gets the post-commit queue too — memory.write leaves the
+    # critical path here as well, instead of running inline or not at all.
+    await run_turn(ctx, api_adapters(background_tasks), post_commit=queue_for(request.app.state))
+    return ctx.wire
 
 
 # Re-exports for backwards compatibility (used by tests and other modules

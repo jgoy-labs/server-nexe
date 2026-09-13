@@ -23,7 +23,7 @@ from fastapi.responses import StreamingResponse
 from core.ollama_utils import resolve_ollama_url
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
-from ._common import persist_v1_turn
+from ._common import mark_served_model, persist_v1_turn
 from .ollama_helpers import auto_num_ctx
 from ._streaming import MAX_STREAM_BYTES, format_sse_done
 
@@ -188,11 +188,12 @@ def _ollama_streaming_response(
     if fallback_from:
         headers["X-Nexe-Fallback-From"] = fallback_from
         headers["X-Nexe-Fallback-Reason"] = fallback_reason or "fallback"
-    return StreamingResponse(
+    # #1054: the name is already in the payload this stream was built from.
+    return mark_served_model(StreamingResponse(
         _ollama_stream_generator(url, payload, app_state, user_msg, session_id=session_id),
         media_type="text/event-stream",
         headers=headers,
-    )
+    ), payload.get("model") or "")
 
 
 async def _ollama_blocking_response(

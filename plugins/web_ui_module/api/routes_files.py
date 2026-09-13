@@ -24,11 +24,7 @@ except ImportError:
         return s
 from core.dependencies import limiter
 from core.endpoints.chat_sanitization import _filter_rag_injection
-
-def _get_memory_helper():
-    """Lazy resolve via routes module so test patches work."""
-    import plugins.web_ui_module.api.routes as _r
-    return _r.get_memory_helper()
+import core.memory_facts as memory_facts
 
 def _generate_rag_metadata(body_content, filename):
     """Lazy resolve via routes module so test patches work."""
@@ -146,7 +142,7 @@ def _apply_rag_header_metadata(doc_metadata: dict, rag_header, body_content: str
         logger.info(f"No RAG header — metadata simple per '{filename}'")
 
 
-async def _index_document_chunks(*, chunks, filename, session_id, metadata) -> dict:
+async def _index_document_chunks(*, chunks, filename, session_id, metadata, app_state) -> dict:
     """Index the chunks for RAG, reporting failure instead of raising it (#893).
 
     save_document_chunks() walks into collection_exists()/create_collection()
@@ -155,7 +151,7 @@ async def _index_document_chunks(*, chunks, filename, session_id, metadata) -> d
     this runs; what is at stake is only whether it will be searchable.
     """
     try:
-        return await _get_memory_helper().save_document_chunks(
+        return await memory_facts.helper_for(app_state).save_document_chunks(
             chunks=chunks,
             filename=filename,
             session_id=session_id,
@@ -290,6 +286,7 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         # isolation. Degradable: what a broken memory/ costs is the search
         # index, and the answer says so via `ingested`.
         ingestion_result = await _index_document_chunks(
+            app_state=request.app.state,
             chunks=chunks,
             filename=file.filename,
             session_id=session_id or "web_ui_upload",

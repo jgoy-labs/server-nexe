@@ -172,6 +172,7 @@ def _assembled_ui(window: int, history_chars: int, system_chars: int = 4700):
     stays green if the call is there and wrong, and goes red if someone renames
     a variable. This calls the assembler and measures what it returns.
     """
+    from core.turn.assemble import PromptParts
     from plugins.web_ui_module.api import routes_chat
 
     engine = MagicMock()
@@ -180,7 +181,9 @@ def _assembled_ui(window: int, history_chars: int, system_chars: int = 4700):
     session.messages = []
 
     system_prompt = "S" * system_chars
-    turn = routes_chat.TurnContext(
+    # C4.2: the prompt's parts are `PromptParts` now — this used to be a second
+    # `TurnContext` inside routes_chat, shadowing the turn's real envelope.
+    turn = PromptParts(
         context_messages=[{"role": "user", "content": "H" * history_chars}] if history_chars else [],
         document_context="",
         rag_context="",

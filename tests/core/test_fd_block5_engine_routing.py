@@ -35,6 +35,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
 
 from core.endpoints.chat_engines.routing import (
     engine_error_to_http,
@@ -184,7 +185,7 @@ class TestTheCascadeIsTheSameAtBothDoors:
             return {"choices": [{"message": {"content": "ok"}}]}
 
         state = _state(llama_cpp=_Engine(), ollama=_Engine())
-        _resp, answered, fallback_from, reason = self._v1_dispatch(state, "mlx", _dispatch)
+        _resp, answered, fallback_from, reason, _model = self._v1_dispatch(state, "mlx", _dispatch)
         assert answered == "llama_cpp"
         assert fallback_from == "mlx"
         assert reason == "preferred_unavailable"
@@ -217,26 +218,69 @@ class TestTheCascadeIsTheSameAtBothDoors:
         assert llama.calls == 1, "the cascade skipped llama.cpp and went to ollama"
 
     def test_v1_retries_the_next_engine_when_one_crashes(self):
-        """The behaviour this door did not have: whatever the single resolved
-        engine raised used to become the client's error."""
-        tried = []
+        """#1036 (C2.4): drives the REAL `_forward_to_mlx` (no patch of
+        `_dispatch_to_engine`, unlike before C2.4) with a fake MLX module that
+        crashes in `chat()`. This used to be masked by two independent
+        mechanisms: mocking `_dispatch_to_engine` skipped the forwarders
+        entirely, AND the real forwarders had their own fallback-to-Ollama
+        that jumped straight past llama.cpp. Both are gone: the cascade in
+        `_dispatch_through_cascade` is now the only thing deciding what runs
+        next, and it must land on llama.cpp (not skip to ollama)."""
+        mlx = _Engine(raises=RuntimeError("model went bad"))
+        llama = _Engine(reply="from llama")
+        state = _state(mlx=mlx, llama_cpp=llama, ollama=_Engine(reply="from ollama"))
+        state.session_manager = None  # no mirror bookkeeping needed for this test
 
-        async def _dispatch(engine, *a, **kw):
-            tried.append(engine)
-            if engine == "mlx":
-                raise RuntimeError("model went bad")
-            return {"choices": [{"message": {"content": "ok"}}]}
+        import core.endpoints.chat as chat_mod
+        from core.endpoints.chat_schemas import ChatCompletionRequest, Message
 
-        state = _state(mlx=_Engine(), llama_cpp=_Engine(), ollama=_Engine())
-        response, answered, fallback_from, reason = self._v1_dispatch(state, "mlx", _dispatch)
-        assert tried == ["mlx", "llama_cpp"]
+        body = ChatCompletionRequest(messages=[Message(role="user", content="hola")], engine="mlx")
+        request = MagicMock()
+        request.app.state = state
+        request.headers.get = lambda key, default=None: default if default is not None else ""
+
+        response, answered, fallback_from, reason, _model = asyncio.run(
+            chat_mod._dispatch_through_cascade(body, request, [], "hola", "sid", "mlx", None)
+        )
+        assert mlx.calls == 1
+        assert llama.calls == 1, "the cascade skipped llama.cpp and went straight to ollama"
         assert answered == "llama_cpp"
         assert fallback_from == "mlx", "the headers must name the engine that did not answer"
         assert reason == "execution_failed", (
             "the client is told WHY it got another engine, and this one was live "
             "and broke — reporting 'preferred_unavailable' describes a different event"
         )
-        assert response["choices"][0]["message"]["content"] == "ok"
+        assert response["choices"][0]["message"]["content"] == "from llama"
+
+    def test_v1_stream_error_before_first_byte_falls_to_next_engine(self):
+        """#1036 (C2.4): the SAME cascade behaviour, but streaming — the
+        forwarder must peek the generator's first chunk before returning a
+        StreamingResponse, so an engine that dies before any token reaches
+        the client is still retried, not just its non-streaming twin above.
+        `_Engine.raises` never calls `stream_callback`, matching a crash
+        before generation starts."""
+        mlx = _Engine(raises=RuntimeError("model went bad"))
+        llama = _Engine(reply="from llama")
+        state = _state(mlx=mlx, llama_cpp=llama, ollama=_Engine(reply="from ollama"))
+        state.session_manager = None
+
+        import core.endpoints.chat as chat_mod
+        from core.endpoints.chat_schemas import ChatCompletionRequest, Message
+
+        body = ChatCompletionRequest(messages=[Message(role="user", content="hola")], engine="mlx", stream=True)
+        request = MagicMock()
+        request.app.state = state
+        request.headers.get = lambda key, default=None: default if default is not None else ""
+
+        response, answered, fallback_from, reason, _model = asyncio.run(
+            chat_mod._dispatch_through_cascade(body, request, [], "hola", "sid", "mlx", None)
+        )
+        assert mlx.calls == 1
+        assert llama.calls == 1, "the cascade skipped llama.cpp and went straight to ollama"
+        assert answered == "llama_cpp"
+        assert fallback_from == "mlx"
+        assert reason == "execution_failed"
+        assert isinstance(response, StreamingResponse)
 
     def test_the_prompt_is_refitted_for_the_engine_that_answers(self):
         """The fit guard (#976) sized the prompt for the engine that was
@@ -485,3 +529,63 @@ async def test_the_ui_answers_with_the_engine_that_worked():
         {"message": "hola", "backend": "mlx"}, server_state=state,
     )
     assert "llama" in str(result), f"answered with the wrong engine: {result}"
+
+
+class TestTheCascadeNamesTheModelThatAnswered:
+    """#1054: `served_by` names the ENGINE ("mlx", "ollama"); what it loaded is
+    a different string entirely, and /v1's LLM counter had no way to reach it —
+    every call was billed with `model=null` while the UI door billed the real
+    name. The cascade reports it as the fifth element, read off the response the
+    forwarder has already built, so no forwarder signature changes.
+
+    Mutation guard: return `None` instead of `served_model_of(response)` in
+    `_dispatch_through_cascade` and the first two go red.
+    """
+
+    def _cascade_over(self, response):
+        """Run the real cascade with a forwarder that answers `response`."""
+        import core.endpoints.chat as chat_mod
+        from core.endpoints.chat_schemas import ChatCompletionRequest, Message
+
+        async def _dispatch(*_args, **_kwargs):
+            return response
+
+        body = ChatCompletionRequest(messages=[Message(role="user", content="hola")], engine="mlx")
+        request = MagicMock()
+        request.app.state = _state(mlx=_Engine())
+        with patch.object(chat_mod, "_dispatch_to_engine", _dispatch):
+            return asyncio.run(chat_mod._dispatch_through_cascade(
+                body, request, [], "hola", "sid", "mlx", None,
+            ))
+
+    def test_a_json_reply_is_asked_for_the_model_it_already_carries(self):
+        from core.endpoints.chat_engines._common import build_openai_response
+
+        reply = build_openai_response({"response": "hola"}, "gemma-4-e4b-it-4bit", "mlx")
+        _resp, answered, _fb, _reason, model = self._cascade_over(reply)
+
+        assert answered == "mlx", "the engine that answered"
+        assert model == "gemma-4-e4b-it-4bit", "and the model it loaded — not the same string"
+
+    def test_a_stream_carries_the_name_its_forwarder_resolved(self):
+        """The half that was actually broken: a `StreamingResponse` exposes the
+        model nowhere, so the forwarder marks it (`mark_served_model`) with the
+        name it resolved synchronously before building the response."""
+        from core.endpoints.chat_engines._common import mark_served_model
+
+        async def _body():
+            yield b"data: {}\n\n"
+
+        stream = mark_served_model(StreamingResponse(_body()), "Qwen3.5-27B-4bit")
+        _resp, _answered, _fb, _reason, model = self._cascade_over(stream)
+
+        assert model == "Qwen3.5-27B-4bit"
+
+    def test_a_response_that_names_no_model_is_reported_unknown_not_guessed(self):
+        """A test double (or an engine that never said) leaves this empty. The
+        counter then logs an unknown model as unknown — the one thing it must
+        not do is put the ENGINE's name there and call it a model."""
+        _resp, answered, _fb, _reason, model = self._cascade_over({"choices": []})
+
+        assert answered == "mlx"
+        assert model is None

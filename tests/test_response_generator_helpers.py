@@ -1,13 +1,15 @@
 """Tests for the helper functions extracted from the response_generator closure."""
 import pytest
 import asyncio
+# C3.3: the junk filter, the name guard and the fact filter live in the core
+# now — and the junk one is the union of what the two doors used to disagree on.
+from core.memory_facts.write import JUNK_RE as _JUNK_PATTERNS_RE
+from core.memory_facts.write import NAME_CLAIM_RE as _NAME_CLAIM_RE
+from core.memory_facts.write import filter_facts as _filter_facts
 from plugins.web_ui_module.api.routes_chat import (
     _parse_chunk,
     _normalize_content,
-    _JUNK_PATTERNS_RE,
-    _NAME_CLAIM_RE,
     _CTX_HEADERS_RE,
-    _filter_facts,
     _process_content_think_tags,
     _build_mem_stats,
     _yield_response_headers,
@@ -209,22 +211,22 @@ class TestCollectionsPromptOverrides:
     prometre-la (el RAG ja callava, però el model improvisava des del prompt)."""
 
     def test_none_means_all_on_no_override(self):
-        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        from core.turn.prompt import _collections_prompt_overrides
         assert _collections_prompt_overrides("ca", None) == ""
 
     def test_all_enabled_no_override(self):
-        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        from core.turn.prompt import _collections_prompt_overrides
         all_on = ["personal_memory", "user_knowledge", "nexe_documentation"]
         assert _collections_prompt_overrides("es", all_on) == ""
 
     def test_docs_off_ca(self):
-        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        from core.turn.prompt import _collections_prompt_overrides
         out = _collections_prompt_overrides("ca", ["personal_memory", "user_knowledge"])
         assert "DESACTIVAT la base de coneixement" in out
         assert "memòria personal" not in out  # només la col·lecció apagada
 
     def test_memory_off_en(self):
-        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        from core.turn.prompt import _collections_prompt_overrides
         out = _collections_prompt_overrides("en", ["user_knowledge", "nexe_documentation"])
         assert "DISABLED personal memory" in out
         # La nota parla de "memory tag" GENÈRIC — mai el tag literal (el model
@@ -233,12 +235,12 @@ class TestCollectionsPromptOverrides:
         assert "[MEM_" not in out
 
     def test_unknown_lang_falls_back_to_en(self):
-        from plugins.web_ui_module.api.routes_chat import _collections_prompt_overrides
+        from core.turn.prompt import _collections_prompt_overrides
         out = _collections_prompt_overrides("de", [])
         assert "CRITICAL NOTE" in out
 
     def test_memory_saves_gate(self):
-        from plugins.web_ui_module.api.routes_chat import _memory_saves_enabled
+        from core.memory_facts.write import memory_saves_enabled as _memory_saves_enabled
         assert _memory_saves_enabled(None) is True
         assert _memory_saves_enabled(["personal_memory"]) is True
         assert _memory_saves_enabled(["user_knowledge"]) is False
@@ -248,7 +250,7 @@ class TestCollectionsPromptOverrides:
         # Vist en viu (04/07): anomenar "[MEM_SAVE:]" a una nota fa que el
         # model petit imiti/inventi tags ([MEM_OBLIT:]). Les notes no poden
         # contenir cap tag literal.
-        from plugins.web_ui_module.api.routes_chat import _COLLECTIONS_OFF_NOTES
+        from core.turn.prompt import _COLLECTIONS_OFF_NOTES
         for coll in _COLLECTIONS_OFF_NOTES.values():
             for text in coll.values():
                 assert "[MEM_" not in text and "[MEMORIA" not in text
@@ -258,7 +260,7 @@ class TestStripUnknownMemTags:
     """El 4b es va inventar [MEM_OBLIT: …] i va sortir CRU a la UI (04/07)."""
 
     def test_invented_tag_stripped(self):
-        from plugins.web_ui_module.api.routes_chat import _strip_unknown_mem_tags
+        from core.memory_facts.extract import _strip_unknown_mem_tags
         out = _strip_unknown_mem_tags(
             "[MEM_OBLIT: L'usuari ha activat la memòria personal]\nPerfecte, entenc."
         )
@@ -266,12 +268,12 @@ class TestStripUnknownMemTags:
         assert out == "Perfecte, entenc."
 
     def test_other_variants_stripped(self):
-        from plugins.web_ui_module.api.routes_chat import _strip_unknown_mem_tags
+        from core.memory_facts.extract import _strip_unknown_mem_tags
         assert _strip_unknown_mem_tags("[MEMORIA_GUARDA: x y z] hola") == "hola"
         assert _strip_unknown_mem_tags("[MEM_REMEMBER: fact] ok") == "ok"
 
     def test_normal_text_untouched(self):
-        from plugins.web_ui_module.api.routes_chat import _strip_unknown_mem_tags
+        from core.memory_facts.extract import _strip_unknown_mem_tags
         text = "Resposta normal amb [claudàtors] i [CONTEXT] i res de memòria."
         assert _strip_unknown_mem_tags(text) == text
 

@@ -186,7 +186,11 @@ class TestChatFinalCoverage:
             assert isinstance(result, StreamingResponse)
 
     def test_llama_cpp_stream_exception_line_1014_1017(self):
-        """Lines 1014-1017: llama.cpp streaming general exception."""
+        """#1036 (C2.4): the engine task fails before any token reached the
+        client, so the generator now RAISES instead of surfacing an error SSE
+        chunk — a real exception is what lets the forwarder's peek give the
+        cascade something to retry. A silent swallow is still the regression
+        this guards against; it just looks like a raise now, not a chunk."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
         mock_llama = AsyncMock()
@@ -195,27 +199,20 @@ class TestChatFinalCoverage:
         gen = _llama_cpp_stream_generator(
             mock_llama, [], "system", "model"
         )
-        chunks = asyncio.run(_async_gen_collect(gen))
-        # The engine task fails, so the generator MUST surface an error SSE
-        # chunk to the client and then close the stream with [DONE]
-        # (llama_cpp.py:117-119). A silent swallow is the regression we guard.
-        assert any("error" in c for c in chunks)
-        assert any("[DONE]" in c for c in chunks)
+        with pytest.raises(RuntimeError, match="llama crash"):
+            asyncio.run(_async_gen_collect(gen))
 
     def test_mlx_stream_exception_line_710_713(self):
-        """Lines 710-713: MLX streaming general exception."""
+        """#1036 (C2.4): see the llama.cpp generator's equivalent test for the
+        full rationale — a pre-first-token failure now raises, not yields."""
         from core.endpoints.chat import _mlx_stream_generator
 
         mock_mlx = AsyncMock()
         mock_mlx.chat = AsyncMock(side_effect=RuntimeError("mlx crash"))
 
         gen = _mlx_stream_generator(mock_mlx, [], "sys", "model")
-        chunks = asyncio.run(_async_gen_collect(gen))
-        # The engine task fails, so the generator MUST surface an error SSE
-        # chunk to the client and then close the stream with [DONE]
-        # (mlx.py:76-78). A silent swallow is the regression we guard.
-        assert any("error" in c for c in chunks)
-        assert any("[DONE]" in c for c in chunks)
+        with pytest.raises(RuntimeError, match="mlx crash"):
+            asyncio.run(_async_gen_collect(gen))
 
     def test_llama_cpp_stream_token_enqueue_fail_line_948_949(self):
         """Lines 948-949: token enqueue failure in llama.cpp stream."""

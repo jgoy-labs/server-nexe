@@ -1,5 +1,5 @@
 """
-Tests for plugins/web_ui_module/core/memory_helper.py — Fix bug #19a.
+Tests for core/memory_facts/helper.py — Fix bug #19a.
 
 Objective: guarantee that the MemoryAPI singleton init NEVER calls
 delete_collection() on `personal_memory` or `user_knowledge`,
@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from plugins.web_ui_module.core import memory_helper
+from core.memory_facts import helper as memory_helper
 
 
 class TestNoSilentWipeInSingletonInit:
@@ -75,7 +75,7 @@ class TestExistingCollectionsArePreserved:
         from core.memory_access import MemoryView
         view = MemoryView(mock_api, plugin_id="web_ui_module")
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(return_value=view),
         ):
             helper = memory_helper.MemoryHelper()
@@ -100,7 +100,7 @@ class TestExistingCollectionsArePreserved:
         from core.memory_access import MemoryView
         view = MemoryView(mock_api, plugin_id="web_ui_module")
         with patch(
-            "plugins.web_ui_module.core.memory_helper.get_memory_view",
+            "core.memory_facts.helper.get_memory_view",
             AsyncMock(return_value=view),
         ):
             helper = memory_helper.MemoryHelper()

@@ -528,7 +528,7 @@ class TestRAGChatMLX:
             # Fixed stale import: memory_helper moved under core/
             # (plugins.web_ui_module.memory_helper no longer exists and made
             # this fixture ERROR at setup before the skip guards could run).
-            import plugins.web_ui_module.core.memory_helper as mh
+            import core.memory_facts.helper as mh
             mem = MemoryAPI()
             await mem.initialize()
             # Start from a clean personal_memory collection in the isolated

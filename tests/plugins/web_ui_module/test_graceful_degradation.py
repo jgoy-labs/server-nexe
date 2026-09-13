@@ -102,15 +102,19 @@ def test_require_ui_auth_returns_503_when_security_absent():
     )
 
 
-@pytest.mark.parametrize(
-    "module_path",
-    [
-        "plugins.web_ui_module.api.routes_chat",
-        "plugins.web_ui_module.api.routes_files",
-        "plugins.web_ui_module.api.routes_memory",
-        "plugins.web_ui_module.api.routes_sessions",
-    ],
-)
+#: C4.1: `routes_chat` left this list. It no longer imports anything from
+#: `core.security.input_sanitizers` — the three sanitizers went to
+#: `core/turn/validate.py` with `_validate_chat_input`, so there is nothing in
+#: that module left to wrap. Its importability under a missing security plugin
+#: is still asserted, by the test below.
+_MODULES_IMPORTING_SANITIZERS = [
+    "plugins.web_ui_module.api.routes_files",
+    "plugins.web_ui_module.api.routes_memory",
+    "plugins.web_ui_module.api.routes_sessions",
+]
+
+
+@pytest.mark.parametrize("module_path", _MODULES_IMPORTING_SANITIZERS)
 def test_dependent_routes_wrap_security_imports(module_path):
     """Every routes_*.py that imports from core.security.input_sanitizers
     must wrap it in try/except so the module is importable when security is
@@ -223,6 +227,13 @@ def test_dependent_routes_importable_with_security_absent(security_absent, modul
     """Every protected-route module imports cleanly without plugins.security.
     Without this, importing routes.py would cascade-fail the whole web UI."""
     mod = importlib.import_module(module_path)
+    if module_path not in _MODULES_IMPORTING_SANITIZERS:
+        # C4.1: `routes_chat` has no sanitizer stub any more (see the note on
+        # `_MODULES_IMPORTING_SANITIZERS`). Importing it at all IS the contract
+        # here, and it is the half that would cascade-fail the web UI —
+        # `core.turn.validate`, which it now imports, must therefore keep its
+        # own `plugins.security.sanitizer` import function-local.
+        return
     # The stub must be callable and return its input verbatim (passthrough).
     assert callable(mod.validate_string_input)
     assert mod.validate_string_input("hello") == "hello"

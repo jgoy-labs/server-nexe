@@ -18,7 +18,10 @@ from types import SimpleNamespace
 
 import pytest
 
-import plugins.web_ui_module.api.routes_chat as rc
+# C4.2: the sticky-language policy and the system-prompt assembly moved out of
+# the plugin into `core/turn/prompt.py`, whole. `rc` keeps its name here so the
+# assertions below stay a move, not a rewrite.
+import core.turn.prompt as rc
 from core.utils import compute_system_hash
 from core.sessions import ChatSession
 

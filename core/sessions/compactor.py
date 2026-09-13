@@ -2,9 +2,10 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy
-Location: plugins/web_ui_module/core/compactor.py
+Location: core/sessions/compactor.py
 Description: Context compacting for long sessions.
-             Extracted from manifest.py during normalization.
+             Lives with the sessions it summarises (ADR-007 C3.4): both
+             doors compact, so this cannot be the UI plugin's.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -78,7 +79,7 @@ async def _call_engine(engine, messages, system_msg):
     return _extract_mlx_content(summary_result)
 
 
-async def compact_session(session, engine, session_manager):
+async def compact_session(session, engine, session_manager, *, cancel_event=None):
     """
     Compacts a session with too many messages using an LLM summary.
 
@@ -86,6 +87,13 @@ async def compact_session(session, engine, session_manager):
         session: ChatSession instance
         engine: LLM engine with chat() method
         session_manager: SessionManager for save_to_disk
+        cancel_event: (C2.2) set by the engine gate when a user turn has to
+            wait for this background job's slot. Checked ONLY after the LLM
+            call returns — the summary was already paid for, but a preempted
+            compaction is never APPLIED: `apply_compaction` would otherwise
+            race a user turn that appended new messages while this call was
+            in flight, resumming a slice of the conversation that no longer
+            matches `get_messages_to_compact()`'s current view.
     """
     # #965: ask the engine that is about to serve the turn how much it can hold,
     # so the same history compacts on a 4096-token model and does not on a 32768.
@@ -117,8 +125,15 @@ async def compact_session(session, engine, session_manager):
             _SYSTEM_MSG,
         )
 
+        if cancel_event is not None and cancel_event.is_set():
+            logger.info("Session %s: compaction preempted by a user turn, not applied", session.id[:8])
+            return
+
         if summary:
-            session.apply_compaction(summary)
+            # The slice actually summarised, not "the last COMPACT_KEEP" at
+            # apply time — a user turn queued between the LLM call above and
+            # this line must not lose its own message (C2.2).
+            session.apply_compaction(summary, compacted_count=len(to_compact))
             session_manager._save_session_to_disk(session)
             logger.info("Session %s: compaction done (%d chars summary)", session.id[:8], len(summary))
         else:

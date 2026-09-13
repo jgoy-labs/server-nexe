@@ -196,12 +196,17 @@ async def test_no_engine_raises_503_not_200(monkeypatch):
     req = StarletteRequest({
         "type": "http", "method": "POST", "path": "/ui/chat",
         "query_string": b"", "headers": [], "client": ("127.0.0.1", 12345),
-        "app": app_mock, "state": State(),
+        # C4.1 (#1044): the trace `require_ui_auth` leaves behind — the principal
+        # it authenticated. The door copies it onto the turn and `authorize`
+        # refuses a turn without one, so a harness that stubs the auth
+        # dependency has to leave the same trace. A plain dict is what
+        # Starlette's `request.state` wraps.
+        "app": app_mock, "state": {"principal": "harness-key"},
     })
 
     patches = [
-        patch("plugins.web_ui_module.api.routes_chat._get_memory_helper", return_value=mh),
-        patch("plugins.web_ui_module.api.routes_chat._compact_session", new=AsyncMock()),
+        patch("core.memory_facts.helper_for", return_value=mh),
+        patch("plugins.web_ui_module.api.turn_adapters.compact_session", new=AsyncMock()),
         patch("core.lifespan.get_server_state", return_value=state),
     ]
     for p in patches:

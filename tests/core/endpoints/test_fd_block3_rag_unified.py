@@ -301,34 +301,44 @@ class TestLabelledSections:
 
 
 class TestUiRouteDelegatesToCore:
-    """F-D block 3: the UI's _build_rag_context is now a thin wrapper — no
-    second threshold/dedup/limit implementation left in routes_chat.py."""
+    """F-D block 3: no second threshold/dedup/limit implementation left in the
+    plugin. C4.2: retrieval is the turn's `recall` step (`core/turn/recall.py`)
+    and the UI door reaches it through its adapter, so these drive the adapter
+    — what the door does — instead of a function that has moved twice."""
+
+    @staticmethod
+    async def _recall(body: dict, *, attached_doc=None):
+        """Run the UI door's real `recall` step and return its context."""
+        from unittest.mock import MagicMock as _MM
+
+        from core.turn.context import TurnContext
+        from plugins.web_ui_module.api.turn_adapters import ui_adapters
+
+        session = _MM()
+        session.has_attached_document.return_value = attached_doc is not None
+        ctx = TurnContext(
+            turn_id="t", entry="ui", message=body.get("message", "hola"),
+            lang="en", body=body, app_state=None, session=session,
+        )
+        await ui_adapters(_MM(), streaming=False)["recall"](ctx)
+        return ctx.recall_text, ctx.usage.get("ui", {}).get("rag_count", 0), ctx.recall
 
     @pytest.mark.asyncio
     async def test_attached_doc_short_circuits_before_calling_core(self):
-        from plugins.web_ui_module.api.routes_chat import _build_rag_context
-
         with patch("core.endpoints.chat_rag.build_rag_context", new=AsyncMock()) as mock_core:
-            rag_context, rag_count, rag_items = await _build_rag_context(
-                memory_helper=MagicMock(), message="hola", body={}, attached_doc={"filename": "x"},
-            )
+            out = await self._recall({"message": "hola"}, attached_doc={"filename": "x"})
 
-        assert (rag_context, rag_count, rag_items) == ("", 0, [])
+        assert out == ("", 0, [])
         mock_core.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_delegates_to_core_with_the_toggle(self):
-        from plugins.web_ui_module.api.routes_chat import _build_rag_context
-
         with patch(
             "core.endpoints.chat_rag.build_rag_context",
             new=AsyncMock(return_value=("[Font: x]\ntext", [("nexe_documentation", 0.9)])),
-        ) as mock_core, patch("core.lifespan.get_server_state", return_value=MagicMock()):
-            rag_context, rag_count, rag_items = await _build_rag_context(
-                memory_helper=MagicMock(),
-                message="hola",
-                body={"rag_collections": ["nexe_documentation"]},
-                attached_doc=None,
+        ) as mock_core:
+            rag_context, rag_count, rag_items = await self._recall(
+                {"message": "hola", "rag_collections": ["nexe_documentation"]}
             )
 
         mock_core.assert_called_once()
@@ -344,20 +354,13 @@ class TestUiRouteDelegatesToCore:
     async def test_rag_threshold_reaches_the_shared_core_function(self):
         """C1 regression: the UI's rag_threshold slider must actually reach
         build_rag_context as threshold_override, not be silently dropped —
-        _build_rag_context read body["rag_threshold"] into a local variable
-        and never passed it on."""
-        from plugins.web_ui_module.api.routes_chat import _build_rag_context
-
+        the old `_build_rag_context` read body["rag_threshold"] into a local
+        variable and never passed it on."""
         with patch(
             "core.endpoints.chat_rag.build_rag_context",
             new=AsyncMock(return_value=("[Font: x]\ntext", [("nexe_documentation", 0.9)])),
-        ) as mock_core, patch("core.lifespan.get_server_state", return_value=MagicMock()):
-            await _build_rag_context(
-                memory_helper=MagicMock(),
-                message="hola",
-                body={"rag_threshold": 0.9},
-                attached_doc=None,
-            )
+        ) as mock_core:
+            await self._recall({"message": "hola", "rag_threshold": 0.9})
 
         _args, kwargs = mock_core.call_args
         assert kwargs.get("threshold_override") == 0.9, (
@@ -369,26 +372,19 @@ class TestUiRouteDelegatesToCore:
     async def test_no_rag_threshold_passes_none_override(self):
         """No rag_threshold in the body must keep the 3 tuned per-collection
         thresholds (None override), not accidentally pass 0 or ''."""
-        from plugins.web_ui_module.api.routes_chat import _build_rag_context
-
         with patch(
             "core.endpoints.chat_rag.build_rag_context",
             new=AsyncMock(return_value=("", [])),
-        ) as mock_core, patch("core.lifespan.get_server_state", return_value=MagicMock()):
-            await _build_rag_context(
-                memory_helper=MagicMock(), message="hola", body={}, attached_doc=None,
-            )
+        ) as mock_core:
+            await self._recall({"message": "hola"})
 
         _args, kwargs = mock_core.call_args
         assert kwargs.get("threshold_override") is None
 
     @pytest.mark.asyncio
     async def test_core_failure_degrades_to_no_context_not_a_crash(self):
-        from plugins.web_ui_module.api.routes_chat import _build_rag_context
+        with patch("core.endpoints.chat_rag.build_rag_context",
+                   new=AsyncMock(side_effect=RuntimeError("down"))):
+            out = await self._recall({"message": "hola"})
 
-        with patch("core.endpoints.chat_rag.build_rag_context", new=AsyncMock(side_effect=RuntimeError("down"))):
-            rag_context, rag_count, rag_items = await _build_rag_context(
-                memory_helper=MagicMock(), message="hola", body={}, attached_doc=None,
-            )
-
-        assert (rag_context, rag_count, rag_items) == ("", 0, [])
+        assert out == ("", 0, [])

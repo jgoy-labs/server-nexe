@@ -292,7 +292,7 @@ class TestChatEngineBranches:
 
         mm = self._make_mock_mm(has_get_module=False)
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -312,7 +312,7 @@ class TestChatEngineBranches:
 
         mm = self._make_mock_mm(has_chat=False)
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -340,7 +340,7 @@ class TestChatEngineBranches:
         mm = self._make_mock_mm()
         self._distinct_engines()
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -366,7 +366,7 @@ class TestChatEngineBranches:
         mm = self._make_mock_mm()
         self._distinct_engines()
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -421,7 +421,7 @@ class TestChatStreamEngineIntegration:
         engine.chat = mock_chat
         mm = self._make_mock_mm(engine)
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -446,7 +446,7 @@ class TestChatStreamEngineIntegration:
         engine.chat = MagicMock(return_value={"content": "Direct content response"})
         mm = self._make_mock_mm(engine)
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -506,7 +506,7 @@ class TestChatSaveFailure:
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
+        with patch("core.memory_facts.helper_for") as mock_mh:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("save", "some content"))
             hh.save_to_memory = AsyncMock(return_value={"success": False, "message": "Storage full"})
@@ -516,14 +516,17 @@ class TestChatSaveFailure:
                 "/ui/chat", headers=auth,
                 json={"message": "guarda something", "session_id": sid}
             )
-        assert r.status_code == 200
+        # D6: the turn goes on to the model even when the save failed — and the
+        # save was still attempted, which is what this test exists to check.
+        assert r.status_code in (200, 503)
+        hh.save_to_memory.assert_awaited_once()
 
     def test_save_intent_empty_extracted(self, client, auth):
         """Lines 433-434: empty extracted content asks what to save."""
         r1 = client.post("/ui/session/new", headers=auth)
         sid = r1.json()["session_id"]
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh:
+        with patch("core.memory_facts.helper_for") as mock_mh:
             hh = MagicMock()
             # extracted_content is empty whitespace only
             hh.detect_intent = MagicMock(return_value=("save", "   "))
@@ -533,7 +536,11 @@ class TestChatSaveFailure:
                 "/ui/chat", headers=auth,
                 json={"message": "guarda", "session_id": sid}
             )
-        assert r.status_code == 200
+        # D6 (C3.1): a save intent continues to the model instead of
+        # answering by itself; no engine is mounted here. Whitespace-only
+        # extracted content must persist nothing at all.
+        assert r.status_code in (200, 503)
+        assert not hh.save_to_memory.called
 
 
 class TestChatAutoSaveRAG:
@@ -562,7 +569,7 @@ class TestChatAutoSaveRAG:
         mm = MagicMock()
         mm.registry = registry
 
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -603,7 +610,7 @@ class TestChatRecallIntent:
         engine = MagicMock()
         engine.chat = MagicMock(return_value={"response": "recalled"})
         mm = self._make_mm(engine)
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("recall", None))
@@ -631,7 +638,7 @@ class TestChatNoEngineAvailable:
         registry.list_modules = MagicMock(return_value=[])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -663,7 +670,7 @@ class TestChatEngineNoChat:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -696,7 +703,7 @@ class TestChatRagContext:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state, \
              patch(
                  "core.endpoints.chat_rag.build_rag_context",
@@ -736,7 +743,7 @@ class TestChatRagContext:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state, \
              patch(
                  "core.endpoints.chat_rag.build_rag_context",
@@ -782,7 +789,7 @@ class TestChatNonStreamingAsyncGen:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -820,7 +827,7 @@ class TestChatCoroutineResult:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -854,7 +861,7 @@ class TestChatAutoSaveWithDocId:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))
@@ -888,7 +895,7 @@ class TestChatEngineException:
         registry.list_modules = MagicMock(return_value=[MagicMock(name="ollama_module")])
         mm = MagicMock()
         mm.registry = registry
-        with patch("plugins.web_ui_module.api.routes.get_memory_helper") as mock_mh, \
+        with patch("core.memory_facts.helper_for") as mock_mh, \
              patch("core.lifespan.get_server_state") as mock_state:
             hh = MagicMock()
             hh.detect_intent = MagicMock(return_value=("chat", None))

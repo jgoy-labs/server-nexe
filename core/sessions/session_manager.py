@@ -16,6 +16,7 @@ import json
 import asyncio
 import logging
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -23,6 +24,22 @@ from typing import Any, Dict, List, Optional
 from core.chat_history import merge_consecutive_same_role
 
 logger = logging.getLogger(__name__)
+
+#: C2.3 (ADR-007 §9): how long a granted lease is valid without a renewal —
+#: until C2.5 measures a real per-engine deadline, at which point this
+#: should become a function of it (2x, per the pla). A user turn releases its
+#: lease at `emit` well before this could matter; the TTL exists for the
+#: pathological case (a crashed worker, a process killed mid-turn) so a
+#: session is never locked out forever.
+DEFAULT_LEASE_TTL_S = 600.0
+
+@dataclass
+class LeaseResult:
+    """Outcome of `SessionManager.acquire_lease`. `lease` is set whether
+    granted (the lease just written) or refused (the one blocking it)."""
+
+    granted: bool
+    lease: Optional[Dict[str, str]]
 
 
 class ChatSession:
@@ -64,9 +81,15 @@ class ChatSession:
         self.lang_pending: Optional[str] = None  # #850 hysteresis: candidate awaiting 2nd confirmation (transient)
         self.rag_collections: Optional[list] = None  # #851: last turn's toggles — continue has no body copy
         self._recently_deleted_facts: list = []  # Transient, not persisted to disk
+        # C2.3 (ADR-007 §9, I9): the session's one live writer, if any —
+        # {"holder", "turn_id", "where", "since", "expires"}. In-memory only,
+        # NEVER read back by from_dict (see there): a lease that outlived the
+        # process that granted it would be a lock nobody can ever release.
+        self.lease: Optional[Dict[str, str]] = None
 
     def add_message(self, role: str, content: str, stats: dict = None,  # type: ignore[assignment]  # no_implicit_optional
-                    image_b64: str = None, image_type: str = None):  # type: ignore[assignment]  # no_implicit_optional
+                    image_b64: str = None, image_type: str = None,  # type: ignore[assignment]  # no_implicit_optional
+                    partial: bool = False):
         """Add message to the history.
 
         `image_b64` (bug #19c): if the user attaches an image to the message,
@@ -79,6 +102,11 @@ class ChatSession:
         in the frontend when the session is reloaded. Without it, Safari
         and some browsers cannot infer the format from the b64 and the
         image is not rendered.
+
+        `partial` (#1040, C2.4): the reply broke mid-generation — the text
+        saved is whatever reached the client before the error, not the
+        model's complete answer. Saved ONLY if true, same backward-compat
+        rule as `stats`/`image_b64`.
         """
         msg: Dict[str, Any] = {
             "role": role,
@@ -91,6 +119,8 @@ class ChatSession:
             msg["image_b64"] = image_b64
             if image_type:
                 msg["image_type"] = image_type
+        if partial:
+            msg["partial"] = True
         self.messages.append(msg)
         self.last_activity = datetime.now(timezone.utc)
 
@@ -217,9 +247,23 @@ class ChatSession:
             return []
         return self.messages[:-self.COMPACT_KEEP]
 
-    def apply_compaction(self, summary: str):
-        """Apply compacting: save summary and remove old messages"""
-        keep = self.messages[-self.COMPACT_KEEP:]
+    def apply_compaction(self, summary: str, compacted_count: Optional[int] = None):
+        """Apply compacting: save summary and remove old messages.
+
+        `compacted_count` (C2.2): the exact number of leading messages the
+        summary actually covers, from the caller's `get_messages_to_compact()`
+        snapshot BEFORE its (possibly slow) LLM call. Compaction now runs in
+        the background, off the critical path — a user turn can append a new
+        message while the summarisation is in flight, and `self.messages` at
+        apply time is no longer the same list that was measured. Keeping
+        everything from `compacted_count` onward (instead of always "the last
+        COMPACT_KEEP") is what keeps that new message from being silently
+        dropped. `None` keeps the old behaviour (inline, synchronous callers,
+        if any remain)."""
+        if compacted_count is not None:
+            keep = self.messages[compacted_count:]
+        else:
+            keep = self.messages[-self.COMPACT_KEEP:]
         # Ensure keep starts with user (summary prepend adds user+assistant, so
         # if keep[0] is assistant we'd get two consecutive assistant → VLM error)
         while keep and keep[0].get("role") != "user":
@@ -280,11 +324,20 @@ class ChatSession:
         if self.context_summary:
             d["context_summary"] = self.context_summary
             d["compaction_count"] = self.compaction_count
+        if self.lease is not None:
+            d["lease"] = self.lease
         return d
 
     @classmethod
     def from_dict(cls, data: dict) -> 'ChatSession':
-        """Create a session from a dict."""
+        """Create a session from a dict.
+
+        Deliberately does NOT read back `lease` even if a stray one made it
+        to disk (this dict is also what `_save_session_to_disk` writes): a
+        lease means "a writer is live right now, in THIS process" — one that
+        outlived the process that granted it would be a lock nobody still
+        running can ever release. Every session loads with `lease=None`.
+        """
         session = cls(session_id=data.get("id"))  # type: ignore[arg-type]  # Any|None; session_id=None → UUID autogenerat (L34)
         _ca = data.get("created_at")
         session.created_at = datetime.fromisoformat(_ca) if _ca else datetime.now(timezone.utc)
@@ -599,6 +652,75 @@ class SessionManager:
             # create_session re-enters the lock (RLock) without problems
             return self.create_session(session_id)
 
+    def acquire_lease(
+        self, session_id: str, *, holder: str, turn_id: str, where: str,
+        ttl_s: float = DEFAULT_LEASE_TTL_S, force: bool = False,
+    ) -> LeaseResult:
+        """One live writer per session (ADR-007 §9, I9, C2.3) — for USER
+        holders only ("ui"/"api"). Atomic under the same RLock every other
+        check-then-act on `_sessions` uses (#992).
+
+        A background job (compact/memory.write) never calls this: it is
+        already serialised against user turns by the `EngineGate` (C2.1/
+        C2.2), and the caller checks `PostCommitQueue.running(session_id)`
+        directly to decide whether to preempt one. This lease exists to stop
+        TWO PEOPLE writing the same session at once, not to track background
+        work — asymmetric rules for a holder that never competes for it
+        would be complexity this minimal version does not need.
+
+        - No session, or no current lease, or the current one expired, or
+          it's a renewal (same `turn_id`): granted outright.
+        - A live lease from a DIFFERENT turn: refused, with a copy of the
+          lease that is blocking it (the caller needs `where`/`since` to
+          tell the person) — UNLESS `force=True` (the explicit takeover a
+          door asks for on the user's behalf after showing them the lease
+          above: never automatic, never a side effect of a plain retry).
+        """
+        with self._sessions_lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                # An id nobody has created yet — nothing to contend for; the
+                # door that resolves/creates the session runs this check
+                # right after, under the same lock (re-entrant).
+                return LeaseResult(granted=True, lease=None)
+            now = datetime.now(timezone.utc)
+            current = session.lease
+            if current is not None and not force:
+                expires = datetime.fromisoformat(current["expires"])
+                if expires > now and current["turn_id"] != turn_id:
+                    return LeaseResult(granted=False, lease=dict(current))
+            lease = {
+                "holder": holder, "turn_id": turn_id, "where": where,
+                "since": now.isoformat(),
+                "expires": (now + timedelta(seconds=ttl_s)).isoformat(),
+            }
+            session.lease = lease
+            return LeaseResult(granted=True, lease=dict(lease))
+
+    def release_lease(self, session_id: str, turn_id: str) -> None:
+        """Release the lease — only if `turn_id` is the one that holds it
+        (a stale caller releasing after being preempted must not clear the
+        NEW holder's lease). Silently a no-op otherwise: every release site
+        (emit, the cancel path, a finished background job) calls this
+        unconditionally, including when nothing was ever granted."""
+        with self._sessions_lock:
+            session = self._sessions.get(session_id)
+            if session is None or session.lease is None:
+                return
+            if session.lease.get("turn_id") == turn_id:
+                session.lease = None
+
+    def renew_lease(self, session_id: str, turn_id: str, ttl_s: float = DEFAULT_LEASE_TTL_S) -> bool:
+        """Push a live lease's expiry out — for a turn (or background job)
+        that is taking longer than the default TTL. Returns whether `turn_id`
+        actually held it; renewing a lease you do not hold is a no-op."""
+        with self._sessions_lock:
+            session = self._sessions.get(session_id)
+            if session is None or session.lease is None or session.lease.get("turn_id") != turn_id:
+                return False
+            session.lease["expires"] = (datetime.now(timezone.utc) + timedelta(seconds=ttl_s)).isoformat()
+            return True
+
     def delete_session(self, session_id: str) -> bool:
         """Delete a session. (Bug 16: protected by RLock)
 
@@ -635,7 +757,11 @@ class SessionManager:
                 "last_activity": s.last_activity.isoformat(),
                 "message_count": len(s.messages),
                 "context_files": s.context_files,
-                "first_message": s.custom_name or (first_user[:60] if first_user else None)
+                "first_message": s.custom_name or (first_user[:60] if first_user else None),
+                # C2.3: so a session list can show "open elsewhere" without a
+                # second round-trip per session.
+                "lease_holder": s.lease.get("holder") if s.lease else None,
+                "lease_where": s.lease.get("where") if s.lease else None,
             })
         return sessions
 

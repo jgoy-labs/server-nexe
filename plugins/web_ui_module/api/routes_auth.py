@@ -408,11 +408,11 @@ def _mark_active_backend(backends: list, current_backend: str) -> str:
     return current_backend
 
 
-async def _fetch_rag_collections() -> list:
+async def _fetch_rag_collections(app_state) -> list:
     """Return list of RAG collection dicts {name, count}. Returns [] on error."""
     try:
-        from plugins.web_ui_module.core.memory_helper import get_memory_helper
-        mem = await get_memory_helper().get_memory_api()
+        import core.memory_facts as memory_facts
+        mem = await memory_facts.helper_for(app_state).get_memory_api()
         if not mem:
             return []
         names = await mem.visible_names()
@@ -468,14 +468,14 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     # -- GET /info --
 
     @router.get("/info", operation_id="webui_info")
-    async def get_ui_info(_auth=Depends(require_ui_auth)):
+    async def get_ui_info(request: Request, _auth=Depends(require_ui_auth)):
         """Active model and backend info"""
         model_name = get_with_env_fallback("NEXE_DEFAULT_MODEL", "")
         configured_backend = get_with_env_fallback("NEXE_MODEL_ENGINE", "auto")
         backend, version = _resolve_backend_version(configured_backend)
         model_name = _resolve_model_name(model_name, backend, configured_backend)
         lang = get_server_lang()
-        rag_collections = await _fetch_rag_collections()
+        rag_collections = await _fetch_rag_collections(request.app.state)
         return {
             "model": model_name,
             "backend": backend,

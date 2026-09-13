@@ -77,7 +77,7 @@ class IngestConfig:
 
     Defaults preserve the historical hardcoded behaviour exactly:
     - store_batch_size=50 matched BATCH_SIZE=50 at ingest_knowledge.py:281
-      and plugins/web_ui_module/core/memory_helper.py:724.
+      and save_document_chunks() in core/memory_facts/helper.py.
     - embed_batch_size=None means we do NOT pass batch_size kwarg to
       fastembed.TextEmbedding.embed(...), so FastEmbed keeps its own
       internal default (preserving prior behaviour).
