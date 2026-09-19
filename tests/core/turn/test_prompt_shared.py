@@ -187,10 +187,98 @@ async def test_recall_is_identical_for_both_doors(turn_lab) -> None:
     assert list(ui_ctx.recall) == list(api_ctx.recall) == FOUND_ITEMS
 
 
-async def test_the_ui_door_does_not_recall_over_an_attached_document(turn_lab) -> None:
+async def test_both_doors_narrow_the_same_way_for_an_attached_document(turn_lab) -> None:
+    """C4.3: the attached-document rule is the TURN's, not one door's.
+
+    It used to hang off `ctx.session.has_attached_document()` inside the web
+    door's adapter, so `/v1` did not obey it — a turn on a session with a
+    document open searched the documents collection again at one door and not
+    at the other. That is precisely what I1 says cannot happen: the door is a
+    label on the step, not a switch inside it. Both doors now ask
+    `collections_for_turn` with the document the `session` step wrote.
+
+    This one is a CLIENT-VISIBLE change at `/v1`, which is why it is asserted
+    and not assumed.
+    """
+    from core.endpoints.chat_schemas import ChatCompletionRequest, Message
+    from core.memory_access import DOCS_COLLECTION, KNOWLEDGE_COLLECTION, MEMORY_COLLECTION
+    from core.turn.adapters_api import api_adapters
+    from plugins.web_ui_module.api.turn_adapters import ui_adapters
+
+    document = {"filename": "informe.pdf", "content": "hola", "chunks": ["hola"]}
+    message = "què diu el document?"
+    asked: dict[str, list] = {}
+
+    async def _capture(*args, **kwargs):
+        asked[args[0] if args else "?"] = kwargs.get("collections")
+        return FOUND_TEXT, list(FOUND_ITEMS)
+
+    session = turn_lab.session_manager.get_or_create_session("recall-both")
+    session.attached_document = document
+    ui_ctx = TurnContext(
+        turn_id="t", entry="ui", message=message, lang="ca",
+        body={"message": message}, app_state=turn_lab.app_state, session=session,
+    )
+    api_ctx = TurnContext(
+        turn_id="t", entry="api", message=message, lang="ca",
+        body=ChatCompletionRequest(
+            messages=[Message(role="user", content=message)], use_rag=True,
+        ),
+        app_state=turn_lab.app_state,
+    )
+    # What the `session` step writes at both doors, stood in for here.
+    ui_ctx.attachments["document"] = document
+    api_ctx.attachments["document"] = document
+
+    with patch("core.endpoints.chat_rag.build_rag_context", new=_capture):
+        await ui_adapters(turn_lab.session_manager, streaming=False)["recall"](ui_ctx)
+        await api_adapters(BackgroundTasks())["recall"](api_ctx)
+
+    got = asked[message]
+    assert KNOWLEDGE_COLLECTION not in got, f"the document's own collection was searched: {got}"
+    assert MEMORY_COLLECTION in got and DOCS_COLLECTION in got, got
+
+
+async def test_the_api_door_without_a_document_is_left_alone(turn_lab) -> None:
+    """The narrowing only fires when there IS a document: an ordinary `/v1`
+    turn keeps passing the client's toggle through untouched (`None` = search
+    everything discovered), which is what it did before C4.3."""
+    from core.endpoints.chat_schemas import ChatCompletionRequest, Message
+    from core.turn.adapters_api import api_adapters
+
+    seen = {}
+
+    async def _capture(*args, **kwargs):
+        seen.update(kwargs)
+        return FOUND_TEXT, list(FOUND_ITEMS)
+
+    api_ctx = TurnContext(
+        turn_id="t", entry="api", message="hola", lang="ca",
+        body=ChatCompletionRequest(
+            messages=[Message(role="user", content="hola")], use_rag=True,
+        ),
+        app_state=turn_lab.app_state,
+    )
+    with patch("core.endpoints.chat_rag.build_rag_context", new=_capture):
+        await api_adapters(BackgroundTasks())["recall"](api_ctx)
+
+    assert seen.get("collections") is None, (
+        f"a turn with no document had its collections narrowed: {seen.get('collections')}"
+    )
+
+
+async def test_the_ui_door_drops_only_the_documents_collection(turn_lab) -> None:
     """The one thing that door still decides for itself, asserted so the
-    convergence above cannot quietly delete it: a session with an attached
-    document already has its context, and RAG has never run on those turns."""
+    convergence above cannot quietly delete it — but narrowed to what it was
+    always meant to be.
+
+    A session with an attached document already has ITS OWN knowledge for the
+    turn, so the uploaded-documents collection is not searched. Until #1064
+    this skipped the step whole, and one retrieval covers three collections:
+    personal memory was going silent too, on every turn a document was open.
+    The door now drops one collection instead of all of them.
+    """
+    from core.memory_access import DOCS_COLLECTION, KNOWLEDGE_COLLECTION, MEMORY_COLLECTION
     from plugins.web_ui_module.api.turn_adapters import ui_adapters
 
     session = turn_lab.session_manager.get_or_create_session("recall-doc")
@@ -200,6 +288,60 @@ async def test_the_ui_door_does_not_recall_over_an_attached_document(turn_lab) -
         body={"message": "què diu el document?"}, app_state=turn_lab.app_state,
         session=session,
     )
-    with patch("core.endpoints.chat_rag.build_rag_context", new=_found):
+    # C4.3: the document reaches `recall` through the context, written by the
+    # `session` step — exercising one step alone means standing in for it.
+    ctx.attachments["document"] = session.attached_document
+    seen = {}
+
+    async def _capture(*args, **kwargs):
+        seen.update(kwargs)
+        return FOUND_TEXT, list(FOUND_ITEMS)
+
+    with patch("core.endpoints.chat_rag.build_rag_context", new=_capture):
         await ui_adapters(turn_lab.session_manager, streaming=False)["recall"](ctx)
-    assert ctx.recall_text == "" and list(ctx.recall) == []
+
+    asked = seen.get("collections")
+    assert asked is not None, "the step was skipped whole again (#1064)"
+    assert KNOWLEDGE_COLLECTION not in asked, (
+        f"the attached document's own collection was searched anyway: {asked}"
+    )
+    assert MEMORY_COLLECTION in asked, (
+        "personal memory went silent because a document was attached (#1064) — "
+        f"asked for {asked}"
+    )
+    assert DOCS_COLLECTION in asked, asked
+
+
+async def test_an_empty_toggle_stays_empty_with_a_document_attached(turn_lab) -> None:
+    """A client that switched every source OFF must keep searching nothing.
+
+    `build_rag_context` treats `[]` as "the user disabled every source" and
+    `None` as "no toggle, search everything" — turning the first into the
+    second would answer from personal memory against an explicit opt-out.
+    Dropping a collection from an already-empty list must stay empty.
+    """
+    from plugins.web_ui_module.api.turn_adapters import ui_adapters
+
+    session = turn_lab.session_manager.get_or_create_session("recall-doc-empty")
+    session.attached_document = {"filename": "x.txt", "content": "hola", "chunks": ["hola"]}
+    ctx = TurnContext(
+        turn_id="t", entry="ui", message="què diu?", lang="ca",
+        body={"message": "què diu?", "rag_collections": []},
+        app_state=turn_lab.app_state, session=session,
+    )
+    # C4.3: `recall` reads the document from the context, where the `session`
+    # step puts it (`steps.py`: session writes `attachments`, recall reads it).
+    # Exercising one step alone means standing in for the one before it.
+    ctx.attachments["document"] = session.attached_document
+    seen = {}
+
+    async def _capture(*args, **kwargs):
+        seen.update(kwargs)
+        return FOUND_TEXT, list(FOUND_ITEMS)
+
+    with patch("core.endpoints.chat_rag.build_rag_context", new=_capture):
+        await ui_adapters(turn_lab.session_manager, streaming=False)["recall"](ctx)
+
+    assert seen.get("collections") == [], (
+        f"an explicit empty toggle was widened: {seen.get('collections')}"
+    )

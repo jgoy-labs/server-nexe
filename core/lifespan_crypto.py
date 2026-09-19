@@ -22,8 +22,12 @@ def _resolve_storage_root(server_state):
 
     In sidecar mode the storage tree (memory/, vectors/, etc.) lives under
     SidecarConfig.data_dir — typically ~/.nexe/data — not inside the Tauri
-    bundle's project_root/storage which is read-only and would mask user
-    data. Standalone mode keeps the legacy project_root/storage layout.
+    bundle's project_root/storage, which every update extracts fresh
+    (`sidecar_extract.rs`, `set_overwrite(true)`) and which would mask user
+    data. This used to say that tree was "read-only"; it is not — the
+    packaged Python lands under ~/Library/Application Support/… and the app
+    writes databases there. The reason is surviving updates, not permissions
+    (#1065). Standalone mode keeps the legacy project_root/storage layout.
 
     Returns None if neither resolution succeeds (callers must handle).
     """

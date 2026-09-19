@@ -263,7 +263,11 @@ class TestOpenAiRouteParity:
         from core.turn.adapters_api import api_adapters
         from core.turn.context import TurnContext
 
-        async def _ctx(body, app_state, server_lang):
+        # `**_kw` on purpose: this stands in for `_fetch_rag_context`, and a
+        # double that pins the exact signature breaks the day the real one
+        # grows a keyword-only argument with a default (C4.3: `has_document`)
+        # — a false red about the double, not about the behaviour under test.
+        async def _ctx(body, app_state, server_lang, **_kw):
             return rag_text, ([("personal_memory", 0.9)] if rag_text else [])
 
         monkeypatch.setattr(openai_chat, "_fetch_rag_context", _ctx)

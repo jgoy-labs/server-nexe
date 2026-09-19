@@ -163,7 +163,12 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         # persist_user_turn's own get_or_create_session finds the same object.
         session_mgr = getattr(ctx.app_state, "session_manager", None)
         if session_mgr is not None:
-            session_mgr.get_or_create_session(ctx.session_id)
+            # C4.3 (D4): the object was already being asked for and thrown
+            # away. Keeping it is what lets an attachment be the SESSION's and
+            # not the web door's — `TURN_STEPS` has always said this step
+            # writes `session`, and until now only one door did.
+            ctx.session = session_mgr.get_or_create_session(ctx.session_id)
+            ctx.attachments["document"] = ctx.session.get_attached_document()
             result = session_mgr.acquire_lease(
                 ctx.session_id, holder=ctx.entry, turn_id=ctx.turn_id, where="API",
                 force=bool(getattr(ctx.body, "force_lease", False)),
@@ -200,7 +205,8 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         which is the first step that knows what the window is.
         """
         ctx.recall_text, ctx.recall = await _chat()._fetch_rag_context(
-            ctx.body, ctx.app_state, ctx.lang
+            ctx.body, ctx.app_state, ctx.lang,
+            has_document=ctx.attachments.get("document") is not None,
         )
 
     async def clock(ctx: TurnContext) -> None:
@@ -232,8 +238,40 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
 
     async def budget(ctx: TurnContext) -> None:
         chat = _chat()
+        # #1078: `session` already read the attached document into
+        # `ctx.attachments` and `recall` already narrowed the collections for
+        # it (C4.3-a) — but nobody at this door ever turned the document into
+        # text and put it in front of the model. `_build_document_context` is
+        # the one place that does that; the UI door's `budget` has called it
+        # (via `_build_turn_context`) since C4.3. `context_text` folds it in
+        # ahead of whatever `recall` found — narrowing only ever removes
+        # `user_knowledge`, so `ctx.recall_text` can still carry
+        # nexe_documentation/personal_memory results alongside a document.
+        # NOT the same block the UI builds, and the difference is deliberate
+        # until someone decides otherwise (audited 19/09, left open):
+        #   * the UI appends `_doc_framing` to the user's message ("answer
+        #     based on the ATTACHED DOCUMENT…", `core/context_budget.py:234`).
+        #     Doing that here would EDIT the client's own `messages` array,
+        #     which an OpenAI-compatible API has no business doing.
+        #   * the document travels this door's RAG path, so it arrives under
+        #     "Use this retrieved information to answer if relevant"
+        #     (`_RAG_CONTEXT_LABELS[…]["intro"]`), and under this door's RAG
+        #     budget: `_trim_rag_context` is called with `document_chars=0` and
+        #     `history_ratio=0.0`, so a long client-supplied history can drop
+        #     the document entirely (measured: gone at ~30k chars of history,
+        #     with only a WARNING in the log).
+        # Converging the two means deciding whose shape is right, which is C4.4
+        # work, not a fix to smuggle into an adjustment pass.
+        context_text = ctx.recall_text
+        attached_doc = ctx.attachments.get("document")
+        if attached_doc:
+            from core.turn.assemble import _build_document_context
+            document_context, _shown, _total = _build_document_context(
+                attached_doc, context_window=ctx.context_window, lang=ctx.lang,
+            )
+            context_text = document_context + context_text
         ctx.prompt, ctx.recall_text = chat._assemble_v1_messages(
-            ctx.body, ctx.system_prompt, ctx.recall_text, ctx.clock_line,
+            ctx.body, ctx.system_prompt, context_text, ctx.clock_line,
             ctx.lang, ctx.context_window,
         )
         # #976: what the budget planned and what got assembled are not the same

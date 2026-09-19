@@ -6,7 +6,7 @@ import pytest
 import time
 from pathlib import Path
 
-from plugins.web_ui_module.core.file_handler import (
+from core.files.handler import (
     FileHandler,
     SUPPORTED_EXTENSIONS,
     MAX_FILE_SIZE,

@@ -73,10 +73,18 @@ logger = logging.getLogger(__name__)
 _CTX_HEADERS_RE = _re.compile(
     # (?:FI\s+)?CONTEXT(?:\s+hex)? covers [CONTEXT], [FI CONTEXT] and the
     # nonce'd B030 variants ([CONTEXT a1b2c3d4], [FI CONTEXT a1b2c3d4]).
+    # #1063: DOCUMENT ADJUNTAT only had its Catalan spelling here, unlike every
+    # other label above — added ATTACHED DOCUMENT / DOCUMENTO ADJUNTO now that
+    # the header itself can be emitted in any of the three. Pre-existing and
+    # separate from that fix: `core/turn/assemble.py`'s header line has never
+    # carried brackets ("DOCUMENT ADJUNTAT (file):", not "[DOCUMENT ADJUNTAT]"),
+    # so this branch does not strip it in ANY language — only a model that
+    # echoes the bracketed shape back verbatim is caught. Not closed here.
     r'\[(?:(?:FI\s+)?CONTEXT(?:\s+[0-9a-f]{6,16})?|MEMORIA DE L\'USUARI|MEMORIA DEL USUARIO|'
     r'USER MEMORY|DOCUMENTACI[ÓO] DEL SISTEMA|SYSTEM DOCUMENTATION|'
     r'DOCUMENTACI[ÓO] T[EÈ]CNICA|TECHNICAL DOCUMENTATION|'
-    r'DOCUMENT ADJUNTAT|FI DOCUMENT)\]',
+    r'DOCUMENT ADJUNTAT|ATTACHED DOCUMENT|DOCUMENTO ADJUNTO|'
+    r'FI DOCUMENT|END DOCUMENT|FIN DOCUMENTO)\]',
     _re.IGNORECASE
 )
 

@@ -568,6 +568,10 @@ def _make_request(modules=None, config=None):
     req.app.state.config = config or {}
     req.app.state.modules = modules or {}
     req.headers = {"x-api-key": "test-key"}
+    # #1078: `session` reads this into ctx.attachments["document"]. An
+    # unconfigured MagicMock answers truthy, which `budget` now treats as a
+    # real attached document — these tests are not about attachments.
+    req.app.state.session_manager.get_or_create_session.return_value.get_attached_document.return_value = None
     return req
 
 

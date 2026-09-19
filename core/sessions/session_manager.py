@@ -166,8 +166,15 @@ class ChatSession:
             "is_last": current + 1 >= len(chunks)
         }
 
-    def get_and_clear_attached_document(self) -> Optional[Dict[str, str]]:
-        """Get the attached document (persists in the session for follow-up questions)."""
+    def get_attached_document(self) -> Optional[Dict[str, str]]:
+        """The document attached to this session, or None.
+
+        C4.3: this used to be called `get_and_clear_attached_document` and it
+        never cleared anything — the document persists for the whole session on
+        purpose (see `attach_document`), so that follow-up questions can reach
+        it. The name cost one analysis before it was renamed; `clear_context_files`
+        is, and always was, the one that clears.
+        """
         return self.attached_document
 
     def has_attached_document(self) -> bool:

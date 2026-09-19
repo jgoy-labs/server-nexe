@@ -87,10 +87,12 @@ from .lifespan_crypto import _startup_encryption  # noqa: E402  # after warnings
 from .lifespan_qdrant import _startup_qdrant, _shutdown_qdrant  # noqa: E402  # after warnings filter
 from .lifespan_sessions import (  # noqa: E402  # after warnings filter
     _expose_engine_gate,
+    _expose_file_handler,
     _expose_memory_helper,
     _expose_post_commit_queue,
     _expose_session_manager,
     _startup_engine_gate,
+    _startup_file_handler,
     _startup_memory_helper,
     _startup_post_commit_queue,
     _startup_session_cleanup,
@@ -387,6 +389,8 @@ async def _startup_init(app: FastAPI) -> None:
     await _startup_session_manager(server_state)
     # F-C fix (2026-09-06): the /v1 routes read app.state, not server_state.
     _expose_session_manager(app, server_state)
+    await _startup_file_handler(server_state)
+    _expose_file_handler(app, server_state)
     await _startup_engine_gate(server_state)
     _expose_engine_gate(app, server_state)
     await _startup_post_commit_queue(server_state)

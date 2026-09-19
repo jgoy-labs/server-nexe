@@ -50,6 +50,29 @@ class Step:
     idempotent: bool
     reads: FrozenSet[str] = field(default_factory=frozenset)
     writes: FrozenSet[str] = field(default_factory=frozenset)
+    #: The subset of `writes` this step assigns on EVERY turn where it runs to
+    #: completion — its signature of having done the work. The engine checks it
+    #: after each step and records a step that wrote none of it as folded
+    #: (`core/turn/run.py::_finish_ok`), which is what makes `FOLDED_BASELINE`
+    #: a measurement rather than a decoration.
+    #:
+    #: Measured, not reasoned (19/09): the engine logged the fields every step
+    #: really wrote across the turns driven through REAL adapter tables
+    #: (`turn_lab`, `test_i1_one_sequence`, `test_api_turn_order`,
+    #: `test_turn_adapters_ui`), and this is the intersection per step. It is
+    #: deliberately NOT the intersection over the whole suite: a test that
+    #: stubs a step with an empty double makes it write nothing, which is
+    #: indistinguishable here from the step being folded — so the whole-suite
+    #: figure collapses to empty and says nothing about production.
+    #:
+    #: Empty means "not observable this way", and for seven steps it is:
+    #: `authorize`, `persist_user_turn`, `persist_assistant_turn`,
+    #: `memory.write` and `compact` write no context field at all by design;
+    #: `validate` writes `attachments` only when a turn carries an image; and
+    #: `emit` leaves `ctx.wire` None on the streaming path, where the answer IS
+    #: the chunk sequence. Those seven need a behavioural test to catch a fold,
+    #: and today only some of them have one.
+    writes_always: FrozenSet[str] = field(default_factory=frozenset)
     doors_today: FrozenSet[str] = field(default_factory=frozenset)
     today: Mapping[str, str] = field(default_factory=dict)
     note: str = ""
@@ -102,6 +125,7 @@ TURN_STEPS: tuple[Step, ...] = (
         id="sanitize", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=True,
         reads=frozenset({"message"}), writes=frozenset({"message"}),
+        writes_always=frozenset({"message"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "core/turn/validate.py (sanitize_user_text) + jailbreak_speed_bump",
@@ -116,7 +140,15 @@ TURN_STEPS: tuple[Step, ...] = (
         id="session", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=False,
         reads=frozenset({"session_id", "entry", "message"}),
-        writes=frozenset({"session_id", "session", "history", "lang"}),
+        # `history` was listed here and NO door has ever written it in this
+        # step — measured 19/09 with the engine recording real writes: the
+        # only production assignment to `ctx.history` in the whole codebase is
+        # `turn_adapters.py:400`, inside `budget`, at the UI door. It moved to
+        # the step that does it; `test_turn_steps.py` only ever checked this
+        # table for internal consistency, so a field claimed by the wrong step
+        # cost nothing and stayed for four sub-phases.
+        writes=frozenset({"session_id", "session", "lang", "attachments"}),
+        writes_always=frozenset({"lang", "session", "session_id"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/turn_adapters.py (get_or_create_session, id from body) + core/turn/prompt.py (_resolve_session_lang)",
@@ -144,6 +176,7 @@ TURN_STEPS: tuple[Step, ...] = (
         id="intent", kind=StepKind.COMPUTE, must_have=False, replaceable=True,
         idempotent=True,
         reads=frozenset({"message"}), writes=frozenset({"intent"}),
+        writes_always=frozenset({"intent"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/turn_adapters.py (intent -> core.memory_facts.intents)",
@@ -158,22 +191,30 @@ TURN_STEPS: tuple[Step, ...] = (
     Step(
         id="recall", kind=StepKind.COMPUTE, must_have=False, replaceable=True,
         idempotent=True,
-        reads=frozenset({"message", "intent", "lang"}), writes=frozenset({"recall", "recall_text"}),
+        reads=frozenset({"message", "intent", "lang", "attachments"}),
+        writes=frozenset({"recall", "recall_text"}),
+        writes_always=frozenset({"recall", "recall_text"}),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "core/turn/recall.py (_build_rag_context), skipped when the session has an attached document",
-            "api": "core/turn/recall.py (_build_rag_context), through core/endpoints/chat.py (_fetch_rag_context: the use_rag field)",
+            "ui": "core/turn/recall.py (_build_rag_context), collections chosen by core/turn/recall.py (collections_for_turn)",
+            "api": "core/turn/recall.py (_build_rag_context), through core/endpoints/chat.py (_fetch_rag_context: the use_rag field), same collections_for_turn",
         },
         note="C4.2: one recall for both doors. The text comes back RAW — "
              "sizing it to the serving engine's window is `budget`'s, which is "
              "the first step that knows the window. Cost is embedding + vector "
              "search, not generation — COMPUTE per ADR-007 §2 ('EMBED is "
-             "COMPUTE with cost=\"embed\"').",
+             "COMPUTE with cost=\"embed\"'). "
+             "C4.3: `attachments` is READ here, and that is why it is declared: "
+             "an attached document replaces its OWN collection for the turn and "
+             "only that one (#1064), and the decision moved out of the web door "
+             "into `collections_for_turn` so both doors answer the same. The "
+             "step contract is what guarantees `session` wrote it first.",
     ),
     Step(
         id="clock", kind=StepKind.COMPUTE, must_have=False, replaceable=True,
         idempotent=True,
         reads=frozenset(), writes=frozenset({"clock_line"}),
+        writes_always=frozenset({"clock_line"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/turn_adapters.py (clock -> core.chat_prompt.time_context_line)",
@@ -190,6 +231,7 @@ TURN_STEPS: tuple[Step, ...] = (
         id="system_prompt", kind=StepKind.COMPUTE, must_have=True, replaceable=True,
         idempotent=True,
         reads=frozenset({"clock_line", "intent", "lang"}), writes=frozenset({"system_prompt"}),
+        writes_always=frozenset({"system_prompt"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "core/turn/prompt.py (turn_system_prompt), from plugins/web_ui_module/api/turn_adapters.py",
@@ -208,6 +250,7 @@ TURN_STEPS: tuple[Step, ...] = (
         idempotent=False,
         reads=frozenset({"body", "app_state"}),
         writes=frozenset({"engine", "gpu_slot", "context_window", "engine_fallback_from", "engine_fallback_reason"}),
+        writes_always=frozenset({"context_window", "engine"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/routes_chat.py:2646-2661 (resolve_engine_cascade, iter_live_engines, switch_engine_model)",
@@ -220,8 +263,22 @@ TURN_STEPS: tuple[Step, ...] = (
     Step(
         id="budget", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=True,
-        reads=frozenset({"system_prompt", "recall", "recall_text", "history", "message", "lang", "engine", "context_window"}),
-        writes=frozenset({"prompt", "recall_text"}),
+        # `history` was in `reads` too, and no step has ever put it there for
+        # this one to read: `budget` BUILDS it (`turn_adapters.py:400`) out of
+        # the session. The pair `session writes history` + `budget reads
+        # history` described a handover that never happened, and the gate that
+        # checks reads are satisfied could not see it while both halves of the
+        # fiction were present. Removing only the write half is what turned
+        # that gate red — which is the gate doing its job.
+        reads=frozenset({"system_prompt", "recall", "recall_text", "message", "lang", "engine", "context_window"}),
+        # `history`: the UI door assembles the turn's context messages here and
+        # keeps them on the context (`turn_adapters.py:400`). It is NOT in
+        # `writes_always` because the API door does not write it at all — its
+        # history comes from the client's own `messages` array, so there is
+        # nothing to carry. That asymmetry is now visible in the map instead of
+        # being attributed to a step that never touched the field.
+        writes=frozenset({"prompt", "recall_text", "history"}),
+        writes_always=frozenset({"prompt", "recall_text"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/routes_chat.py:2444-2451 (compute_context_budget, history_ratio=0.30)",
@@ -237,6 +294,7 @@ TURN_STEPS: tuple[Step, ...] = (
         idempotent=False,
         reads=frozenset({"prompt", "engine", "cancel_token", "deadline", "context_window"}),
         writes=frozenset({"response", "wire", "engine", "engine_fallback_from", "engine_fallback_reason"}),
+        writes_always=frozenset({"engine", "response"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/routes_chat.py:2723-2861 (engine.chat, StreamingResponse)",
@@ -249,6 +307,7 @@ TURN_STEPS: tuple[Step, ...] = (
         id="postprocess", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=True,
         reads=frozenset({"response"}), writes=frozenset({"response", "facts"}),
+        writes_always=frozenset({"facts", "response"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/routes_chat.py (_clean_full_response: think-tag filtering, then core.memory_facts.extract)",

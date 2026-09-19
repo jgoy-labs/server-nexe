@@ -89,7 +89,7 @@ class TestChatSession:
     def test_attach_document(self):
         s = ChatSession()
         s.attach_document("doc.txt", "Full content", chunks=["c1", "c2"])
-        doc = s.get_and_clear_attached_document()
+        doc = s.get_attached_document()
         assert doc is not None
         assert doc["filename"] == "doc.txt"
 
@@ -97,9 +97,9 @@ class TestChatSession:
         """Document persists for follow-up questions (no longer clears)."""
         s = ChatSession()
         s.attach_document("f.txt", "content")
-        doc1 = s.get_and_clear_attached_document()
+        doc1 = s.get_attached_document()
         assert doc1 is not None
-        doc2 = s.get_and_clear_attached_document()
+        doc2 = s.get_attached_document()
         assert doc2 is not None
         assert doc1["filename"] == doc2["filename"]
 

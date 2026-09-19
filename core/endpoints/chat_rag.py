@@ -13,7 +13,6 @@ import asyncio
 import functools
 import hashlib
 import logging
-import os
 import unicodedata
 from typing import Any, Optional
 
@@ -23,19 +22,20 @@ from core.memory_access import (
     MEMORY_COLLECTION,
     SYSTEM_COLLECTIONS,
 )
+from core.rag.source import RAGQuery
+# ADR-008: a collection's tuned parameters live with the source that applies
+# them (`core/rag/collections.py`), not here. The three thresholds are
+# nonetheless re-exported from this module because they are a public surface:
+# `core/endpoints/chat.py` imports them from here and lists them in its
+# `__all__`, and the knowledge base documents the env vars behind them.
+from core.rag.collections import (  # noqa: F401  (re-export, see above)
+    RAG_DOCS_THRESHOLD,
+    RAG_KNOWLEDGE_THRESHOLD,
+    RAG_MEMORY_THRESHOLD,
+    source_for,
+)
 
 logger = logging.getLogger(__name__)
-
-# Cosine similarity thresholds (0-1, higher = more restrictive)
-# Configurable via env vars
-RAG_DOCS_THRESHOLD = float(os.environ.get('NEXE_RAG_DOCS_THRESHOLD', '0.4'))
-RAG_KNOWLEDGE_THRESHOLD = float(os.environ.get('NEXE_RAG_KNOWLEDGE_THRESHOLD', '0.35'))
-RAG_MEMORY_THRESHOLD = float(os.environ.get('NEXE_RAG_MEMORY_THRESHOLD', '0.3'))
-
-# Default search params for a collection outside the 3 system ones (#896):
-# a plugin's own collection has no tuned threshold, so it gets the middle
-# ground (knowledge-grade recall) instead of being skipped entirely.
-_UNKNOWN_COLLECTION_PARAMS = (RAG_KNOWLEDGE_THRESHOLD, 3, None)
 
 
 @functools.lru_cache(maxsize=1)
@@ -52,33 +52,6 @@ def system_rag_limit() -> int:
         return 3 if ram_gb < 12 else 5
     except Exception:
         return 5
-
-
-def _rag_params_for(
-    name: str, server_lang: str, threshold_override: Optional[float] = None
-) -> tuple[float, int, dict | None]:
-    """(threshold, top_k, filter_metadata) for one collection, by name.
-
-    ``threshold_override`` (F-D block 3, ported from the UI's per-turn
-    ``rag_threshold`` — a slider in app.js persisted to localStorage, also a
-    CLI flag): applies the SAME threshold to every collection, same as the
-    single flat threshold the UI's old implementation had — only the tuned
-    per-collection top_k/filter stay untouched. ``None`` (the default) keeps
-    the 3 tuned thresholds.
-    """
-    if name == DOCS_COLLECTION:
-        return (threshold_override if threshold_override is not None else RAG_DOCS_THRESHOLD, 3, None)
-    if name == KNOWLEDGE_COLLECTION:
-        return (
-            threshold_override if threshold_override is not None else RAG_KNOWLEDGE_THRESHOLD,
-            3, {"lang": server_lang},
-        )
-    if name == MEMORY_COLLECTION:
-        return (threshold_override if threshold_override is not None else RAG_MEMORY_THRESHOLD, 2, None)
-    return (
-        threshold_override if threshold_override is not None else _UNKNOWN_COLLECTION_PARAMS[0],
-        _UNKNOWN_COLLECTION_PARAMS[1], _UNKNOWN_COLLECTION_PARAMS[2],
-    )
 
 
 # MC-001's docs→knowledge→memory order (not SYSTEM_COLLECTIONS's docs→memory→
@@ -191,9 +164,10 @@ async def build_rag_context(
             # search nothing — not fall through to "no restriction" (privacy
             # regression: personal_memory would answer despite the toggle).
             names = list(collections) if collections is not None else await _discover_collection_names(memory)
-            search_plan = [
-                (name, *_rag_params_for(name, server_lang, threshold_override)) for name in names
-            ]
+            # ADR-008: one source per collection. Each one carries its own
+            # threshold, top_k, language filter and existence guard; what is
+            # left here is everything that spans them.
+            sources = [source_for(name) for name in names]
 
             # MC-001: embed the (already NFKC-normalized) query ONCE and reuse it
             # for every collection instead of recomputing the identical embedding
@@ -204,12 +178,20 @@ async def build_rag_context(
             except Exception as emb_err:
                 logger.debug("RAG: query embedding precompute unavailable: %s", emb_err)
 
+            # One question, asked of every source: prepared once so no source
+            # can normalize, re-embed or re-read the override differently.
+            query = RAGQuery(
+                text=last_user_msg,
+                lang=server_lang,
+                embedding=query_embedding,
+                threshold_override=threshold_override,
+            )
+
             # MC-001: run the per-collection searches concurrently (was serial).
             # gather preserves argument order, so all_results keeps the original
             # docs→knowledge→memory ordering that dedup/context rely on.
             per_collection = await asyncio.gather(*(
-                _search_collection(memory, name, last_user_msg, threshold, top_k, filter_md, query_embedding)
-                for name, threshold, top_k, filter_md in search_plan
+                source.search(memory, query) for source in sources
             ))
             all_results: list = []
             for results in per_collection:
@@ -245,35 +227,6 @@ async def build_rag_context(
 
 
 # ─── Private helpers ─────────────────────────────────────────────────────────
-
-
-async def _search_collection(
-    memory: Any,
-    name: str,
-    query: str,
-    threshold: float,
-    top_k: int,
-    filter_metadata: dict | None = None,
-    query_embedding: "list[float] | None" = None,
-) -> list:
-    """Search a single MemoryAPI collection, returning [] on error or no results."""
-    try:
-        if await memory.collection_exists(name):
-            kwargs: dict = dict(query=query, collection=name, top_k=top_k, threshold=threshold)
-            if filter_metadata:
-                kwargs["filter_metadata"] = filter_metadata
-            if query_embedding is not None:
-                kwargs["query_embedding"] = query_embedding
-            results = await memory.search(**kwargs)
-            if results:
-                logger.info("RAG: Found %d docs from %s", len(results), name)
-                return results
-    except Exception as e:
-        # MC-017: a failing search is NOT the same as the legitimate 0-results
-        # case — log at warning so a broken RAG (Qdrant down) is visible in
-        # production instead of looking like an empty knowledge base.
-        logger.warning("RAG %s search failed: %s", name, e)
-    return []
 
 
 def _deduplicate_results(results: list) -> list:

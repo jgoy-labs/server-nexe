@@ -265,7 +265,21 @@ class TestTheApiDoor:
         monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-f976-key")
         monkeypatch.setenv("NEXE_ADMIN_API_KEY", "test-f976-key")
 
-        async def _no_rag(body, app_state, server_lang):
+        # `**_kw` and `_reached`, both for the same reason (#1076/#1077). This
+        # double stands in for `_fetch_rag_context`; pinning its exact
+        # signature means the day the real one grows a keyword-only argument
+        # with a default — which changes no real caller — the call raises
+        # TypeError before entering here. And because `recall` is
+        # `must_have=False`, ADR-007's policy does the right thing with that:
+        # the step is recorded degraded and the turn goes on, answering 200
+        # with no context. Correct for a broken Qdrant, and indistinguishable
+        # from a broken double — so this gate would go on measuring the window
+        # of a turn whose retrieval never ran. Measured live on 19/09: with the
+        # signature pinned, `_reached` stayed empty and this test still passed.
+        _reached = []
+
+        async def _no_rag(body, app_state, server_lang, **_kw):
+            _reached.append(True)
             return "", []
 
         monkeypatch.setattr("core.endpoints.chat._fetch_rag_context", _no_rag)
@@ -285,6 +299,11 @@ class TestTheApiDoor:
             )
 
         assert resp.status_code == 200
+        assert _reached, (
+            "the retrieval double was never entered — the step raised and the "
+            "turn degraded past it, so this gate measured a turn without the "
+            "recall it thinks it stubbed (#1077)"
+        )
         sent = type(recorder).sent
         assert sent, "the engine was never called — this gate would pass on nothing"
         prompt_chars = sum(len(m.get("content") or "") for m in sent)

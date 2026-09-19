@@ -9,10 +9,15 @@ adapters call it as the step it is.
 
 **What each door still decides for itself**, because it is the door's own
 field and not the turn's behaviour: `/v1` asks only when `use_rag` is set,
-`/ui/chat` skips retrieval when the session has an attached document (the
-document is the context that turn already has). Everything below that — which
-collections, which threshold, the log line, and the fact that a retrieval
-failure is a turn without context and never a failed turn — is the same.
+and `/ui/chat` narrows WHICH collections it asks for when the session has an
+attached document — it drops the uploaded-documents one, because the document
+IS that turn's knowledge, and keeps the rest. Until #1064 this paragraph said
+it skipped retrieval altogether, and the adapter did exactly that: one
+retrieval covers three collections, so personal memory went silent too on
+every turn with a document open. The narrowing lives in
+`plugins/web_ui_module/api/turn_adapters.py` (`recall`). Everything below that
+— which threshold, the log line, and the fact that a retrieval failure is a
+turn without context and never a failed turn — is the same.
 
 **What moved, deliberately, to `budget`.** The UI door used to sanitize the
 retrieved text here (`_sanitize_rag_context`) with the serving engine's
@@ -32,7 +37,44 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+from core.memory_access import KNOWLEDGE_COLLECTION, SYSTEM_COLLECTIONS
+
 logger = logging.getLogger(__name__)
+
+
+def collections_for_turn(
+    toggled: Optional[list], *, has_document: bool,
+) -> Optional[list]:
+    """Which sources this turn asks, given the client's toggle and whether the
+    session has a document attached. **The same answer at both doors** (C4.3).
+
+    A session with an attached document already has ITS OWN knowledge for the
+    turn, so searching the uploaded-documents collection again adds nothing —
+    but only that one is dropped. Until #1064 the web door skipped retrieval
+    whole, which also silenced personal memory on every turn with a document
+    open; the rule was right and its width was not.
+
+    This lived at the web door, and it could not stay there. The moment `/v1`
+    accepts an attachment, a rule that hangs off one door's session means the
+    two doors answer the same turn differently, and the I1 contract — one
+    sequence, the door is a label and not a switch — stops being true. So the
+    decision is the turn's, not the door's.
+
+    `None` means "no toggle from the client": the baseline is the known system
+    collections. An explicit list is honoured as given, INCLUDING an empty one
+    — `[]` is "the user switched every source off", and turning it into a full
+    list here would answer from personal memory against an opt-out, the
+    privacy regression `chat_rag` warns about in its own comment.
+
+    Collections a plugin registers at runtime stay out of these turns, exactly
+    as they were when the step was skipped whole: narrowing to an explicit
+    list is what makes dropping one possible, and widening past that is a
+    separate question.
+    """
+    if not has_document:
+        return toggled
+    base = list(SYSTEM_COLLECTIONS) if toggled is None else list(toggled)
+    return [c for c in base if c != KNOWLEDGE_COLLECTION]
 
 
 async def _build_rag_context(

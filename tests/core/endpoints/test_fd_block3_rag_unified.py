@@ -320,16 +320,39 @@ class TestUiRouteDelegatesToCore:
             turn_id="t", entry="ui", message=body.get("message", "hola"),
             lang="en", body=body, app_state=None, session=session,
         )
+        # C4.3: `recall` takes the document from the context, where the
+        # `session` step writes it (declared in `steps.py`: session writes
+        # `attachments`, recall reads them). Driving one step by hand means
+        # standing in for the step before it.
+        if attached_doc is not None:
+            ctx.attachments["document"] = attached_doc
         await ui_adapters(_MM(), streaming=False)["recall"](ctx)
         return ctx.recall_text, ctx.usage.get("ui", {}).get("rag_count", 0), ctx.recall
 
     @pytest.mark.asyncio
-    async def test_attached_doc_short_circuits_before_calling_core(self):
-        with patch("core.endpoints.chat_rag.build_rag_context", new=AsyncMock()) as mock_core:
-            out = await self._recall({"message": "hola"}, attached_doc={"filename": "x"})
+    async def test_attached_doc_narrows_the_collections_instead_of_skipping(self):
+        """#1064: it used to short-circuit, and that took personal memory with it.
 
-        assert out == ("", 0, [])
-        mock_core.assert_not_called()
+        One retrieval covers three collections, so skipping the step because a
+        document is attached also silenced every fact the user had asked the
+        assistant to remember. The document's own collection is still not
+        searched — the document IS that context for the turn — but the other
+        two are.
+        """
+        from core.memory_access import (
+            DOCS_COLLECTION, KNOWLEDGE_COLLECTION, MEMORY_COLLECTION,
+        )
+
+        with patch(
+            "core.endpoints.chat_rag.build_rag_context",
+            new=AsyncMock(return_value=("text", [])),
+        ) as mock_core:
+            await self._recall({"message": "hola"}, attached_doc={"filename": "x"})
+
+        mock_core.assert_called_once()
+        asked = mock_core.call_args.kwargs["collections"]
+        assert KNOWLEDGE_COLLECTION not in asked, asked
+        assert MEMORY_COLLECTION in asked and DOCS_COLLECTION in asked, asked
 
     @pytest.mark.asyncio
     async def test_delegates_to_core_with_the_toggle(self):

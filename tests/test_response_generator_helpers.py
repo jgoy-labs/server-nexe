@@ -338,6 +338,20 @@ class TestCtxHeadersRe:
     def test_matches_fi_document(self):
         assert _CTX_HEADERS_RE.search("[FI DOCUMENT]")
 
+    def test_matches_attached_document(self):
+        """#1063: the header can now be emitted in English too."""
+        assert _CTX_HEADERS_RE.search("[ATTACHED DOCUMENT]")
+
+    def test_matches_documento_adjunto(self):
+        """#1063: and in Spanish."""
+        assert _CTX_HEADERS_RE.search("[DOCUMENTO ADJUNTO]")
+
+    def test_matches_end_document(self):
+        assert _CTX_HEADERS_RE.search("[END DOCUMENT]")
+
+    def test_matches_fin_documento(self):
+        assert _CTX_HEADERS_RE.search("[FIN DOCUMENTO]")
+
     def test_no_match_normal_brackets(self):
         assert not _CTX_HEADERS_RE.search("[alguna cosa normal]")
 

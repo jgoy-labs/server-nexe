@@ -161,6 +161,13 @@ NOT_COMPARABLE = {
     "cancel_token", "gpu_slot",
     # Shared mutable state of the process, not of the turn.
     "app_state",
+    # C4.3-c: the engine's per-step write record. Reset at the start of every
+    # step (`ctx.begin_step()`), so at the end of a turn it holds whatever the
+    # LAST step wrote and nothing else — an artefact of the measurement, not
+    # turn state. What the record is FOR is compared, and strictly:
+    # `usage_folded` below is derived from it, and `FOLDED_BASELINE` pins it
+    # to zero at both doors.
+    "_written",
     # `usage` holds 14 buckets and most of them carry at least one clock
     # reading (a duration in ms, a `time.time()` stamp) that is never equal
     # twice — so the dict as a WHOLE is excluded here, and `_turn_state`

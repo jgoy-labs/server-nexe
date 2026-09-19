@@ -55,8 +55,9 @@ class TestG15NoSilentRagDegradation:
         memory = MagicMock()
         memory.embed_query = AsyncMock(return_value=[0.0])
         # `collection_exists` ha de ser awaitable de debò: si es deixa MagicMock,
-        # `_search_collection` peta i emet el seu propi WARNING (MC-017), que no
-        # és el que aquest control mira — i el test passaria per la raó dolenta.
+        # `CollectionSource.search` (ADR-008, abans `_search_collection`) peta i
+        # emet el seu propi WARNING (MC-017), que no és el que aquest control
+        # mira — i el test passaria per la raó dolenta.
         memory.collection_exists = AsyncMock(return_value=True)
         memory.search = AsyncMock(return_value=[])
 

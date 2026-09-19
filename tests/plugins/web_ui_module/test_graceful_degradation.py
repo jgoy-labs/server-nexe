@@ -107,14 +107,30 @@ def test_require_ui_auth_returns_503_when_security_absent():
 #: `core/turn/validate.py` with `_validate_chat_input`, so there is nothing in
 #: that module left to wrap. Its importability under a missing security plugin
 #: is still asserted, by the test below.
+#:
+#: C4.3: `routes_files` left it for the same reason — `validate_string_input`
+#: went to `core/files/attach.py` with the body of POST /upload. Which moves
+#: the obligation, it does not lift it: `core/files/attach.py` is now the module
+#: that must keep the wrap, exactly as `core/turn/validate.py` must.
 _MODULES_IMPORTING_SANITIZERS = [
-    "plugins.web_ui_module.api.routes_files",
     "plugins.web_ui_module.api.routes_memory",
     "plugins.web_ui_module.api.routes_sessions",
 ]
 
 
-@pytest.mark.parametrize("module_path", _MODULES_IMPORTING_SANITIZERS)
+#: The core modules that inherited a MODULE-LEVEL sanitizer import from a
+#: routes_*.py. They carry the same obligation and nothing else asserted it
+#: after the move. `core.turn.validate` is deliberately NOT here: C4.1 gave it
+#: the other guarantee — the sanitizer import is function-local, so there is no
+#: module-level import to wrap and asserting the shape would be a false gate.
+_CORE_MODULES_IMPORTING_SANITIZERS = [
+    "core.files.attach",
+]
+
+
+@pytest.mark.parametrize(
+    "module_path", _MODULES_IMPORTING_SANITIZERS + _CORE_MODULES_IMPORTING_SANITIZERS,
+)
 def test_dependent_routes_wrap_security_imports(module_path):
     """Every routes_*.py that imports from core.security.input_sanitizers
     must wrap it in try/except so the module is importable when security is

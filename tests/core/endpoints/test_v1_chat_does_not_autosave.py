@@ -83,6 +83,9 @@ class TestV1ChatCompletionsDoesNotWriteMemory:
         req.app.state.modules = {}
         req.app.state.engine_gate = EngineGate(slots=100)
         req.headers = {"x-api-key": "test-key"}
+        # #1078: an unconfigured MagicMock answers get_attached_document()
+        # truthy, which `budget` now treats as a real attached document.
+        req.app.state.session_manager.get_or_create_session.return_value.get_attached_document.return_value = None
         bg = BackgroundTasks()
         body = ChatCompletionRequest(
             messages=[Message(role="user", content="hola")],

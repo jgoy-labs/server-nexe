@@ -1,4 +1,4 @@
-"""Tests for plugins/web_ui_module/core/file_handler.py — coverage gaps."""
+"""Tests for core/files/handler.py — coverage gaps."""
 import pytest
 from pathlib import Path
 
@@ -6,7 +6,7 @@ from pathlib import Path
 class TestFileHandler:
     @pytest.fixture
     def handler(self, tmp_path):
-        from plugins.web_ui_module.core.file_handler import FileHandler
+        from core.files.handler import FileHandler
         return FileHandler(upload_dir=tmp_path)
 
     def test_init(self, handler):

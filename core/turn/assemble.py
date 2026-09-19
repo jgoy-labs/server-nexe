@@ -31,34 +31,113 @@ from core.sessions.compactor import compact_session
 logger = logging.getLogger(__name__)
 
 
-def _build_document_context(attached_doc: dict, context_window=None) -> tuple[str, int, int]:
+#: #1063: the header used to be Catalan no matter what. The sentence that
+#: CITES it — `context_budget._doc_framing` — already answers in the turn's
+#: language; with `NEXE_LANG=en` (the default) a model reading "Answer based
+#: on the ATTACHED DOCUMENT" would find a block titled "DOCUMENT ADJUNTAT"
+#: right after it. `core/endpoints/chat_rag.py` treats that correspondence as
+#: a deliberate invariant ("labels per language — must match system prompt
+#: references"); this was the one label that broke it.
+#:
+#: Same shape as `_doc_framing` (`core/context_budget.py`) and
+#: `_COLLECTIONS_OFF_NOTES` (`core/turn/prompt.py`): a module dict keyed by
+#: the two-letter code, resolved by the caller's `lang`, `en` as the fallback
+#: — never read from `NEXE_LANG` here, unlike its neighbour, because this one
+#: has `ctx.lang` in scope at its only production call site (`budget` in
+#: `turn_adapters.py`) and the turn's reply language is what the surrounding
+#: prompt is already written in.
+_DOC_HEADER = {
+    "ca": "DOCUMENT ADJUNTAT ({filename}):",
+    "es": "DOCUMENTO ADJUNTO ({filename}):",
+    "en": "ATTACHED DOCUMENT ({filename}):",
+}
+_DOC_PARTIAL_NOTE = {
+    "ca": (
+        "[Mostrant les primeres ~{shown_pages} pagines de ~{total_pages} "
+        "({shown}/{total} parts, {pct}% del document). "
+        "La resta del document esta indexada — l'usuari pot fer preguntes "
+        "sobre qualsevol part i el sistema les recuperara.]\n\n"
+    ),
+    "es": (
+        "[Mostrando las primeras ~{shown_pages} paginas de ~{total_pages} "
+        "({shown}/{total} partes, {pct}% del documento). "
+        "El resto del documento esta indexado — el usuario puede hacer preguntas "
+        "sobre cualquier parte y el sistema las recuperara.]\n\n"
+    ),
+    "en": (
+        "[Showing the first ~{shown_pages} pages of ~{total_pages} "
+        "({shown}/{total} parts, {pct}% of the document). "
+        "The rest of the document is indexed — the user can ask about "
+        "any part and the system will retrieve it.]\n\n"
+    ),
+}
+_DOC_COMPLETE_NOTE = {
+    "ca": "[Document complet: ~{total_pages} pagines]\n\n",
+    "es": "[Documento completo: ~{total_pages} paginas]\n\n",
+    "en": "[Complete document: ~{total_pages} pages]\n\n",
+}
+
+
+def _doc_lang_key(lang) -> str:
+    """Two-letter code restricted to ca/es/en, `en` as the fallback.
+
+    Same normalisation `core/turn/prompt.py::_collections_prompt_overrides`
+    already applies — this does not invent a second convention.
+    """
+    _lk = (lang or "en")[:2]
+    return _lk if _lk in _DOC_HEADER else "en"
+
+
+def _build_document_context(
+    attached_doc: dict, context_window=None, lang=None,
+) -> tuple[str, int, int]:
     """Build document_context string from an attached_doc dict.
+
+    `lang` (#1063) is the turn's reply language — the caller's `ctx.lang` —
+    so the header agrees with `_doc_framing`, the sentence in the same
+    prompt that cites it by name. `None` (a caller with no turn language in
+    scope) falls back to `en`, never to `NEXE_LANG`: this is turn content,
+    not the server's voice.
 
     Returns (document_context, shown, total_chunks).
     """
     from core.endpoints.chat_sanitization import _sanitize_rag_context
 
+    _lk = _doc_lang_key(lang)
+    # Every other field here is read with `.get` and a default; `filename` was
+    # the one read by subscript, so a session holding a document without it
+    # raised KeyError from inside `budget`. At the UI that surfaced as the
+    # door's internal-error wrapper; at `/v1`, where C4.3-b's `budget` has no
+    # wrapper of its own, it became an uncaught 500 on a turn that had
+    # answered fine the day before. A document is session state that may have
+    # been written by an older build, so the shape is not guaranteed: an
+    # unusable one costs the turn its document, never the turn itself.
+    if not attached_doc.get('filename'):
+        logger.warning(
+            "Attached document has no filename (%s) — answering without it",
+            sorted(attached_doc) or "empty dict",
+        )
+        return "", 0, 0
     chunks = attached_doc.get('chunks', [attached_doc.get('content', '')])
     total_chunks = attached_doc.get('total_chunks', len(chunks))
     total_chars = attached_doc.get('total_chars', 0)
     shown = len(chunks)
     doc_content = "\n\n---\n\n".join(chunks)
+    header = _DOC_HEADER[_lk].format(filename=attached_doc['filename'])
     if total_chunks == 1:
-        document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n\n{doc_content}\n"
+        document_context = f"\n\n{header}\n\n{doc_content}\n"
     else:
         est_pages_total = round(total_chars / 3000)
         est_pages_shown = round(len(doc_content) / 3000)
         pct = round(shown * 100 / total_chunks)
-        document_context = f"\n\nDOCUMENT ADJUNTAT ({attached_doc['filename']}):\n"
+        document_context = f"\n\n{header}\n"
         if shown < total_chunks:
-            document_context += (
-                f"[Mostrant les primeres ~{est_pages_shown} pagines de ~{est_pages_total} "
-                f"({shown}/{total_chunks} parts, {pct}% del document). "
-                f"La resta del document esta indexada — l'usuari pot fer preguntes "
-                f"sobre qualsevol part i el sistema les recuperara.]\n\n"
+            document_context += _DOC_PARTIAL_NOTE[_lk].format(
+                shown_pages=est_pages_shown, total_pages=est_pages_total,
+                shown=shown, total=total_chunks, pct=pct,
             )
         else:
-            document_context += f"[Document complet: ~{est_pages_total} pagines]\n\n"
+            document_context += _DOC_COMPLETE_NOTE[_lk].format(total_pages=est_pages_total)
         document_context += f"{doc_content}\n"
     document_context = _sanitize_rag_context(document_context, context_window)
     logger.info(
@@ -93,6 +172,7 @@ class PromptParts:
 async def _build_turn_context(
     body: dict, session, session_mgr, engine, message: str, _continue: bool,
     *, compact: bool = True, recall: tuple = ("", 0, ()),
+    attachments: dict | None = None, lang: str | None = None,
 ) -> PromptParts:
     """Compaction + conversation history + attached document + RAG.
 
@@ -111,6 +191,16 @@ async def _build_turn_context(
     POST_COMMIT) instead, so it must not ALSO run here inline. The `continue`
     path (which never reaches the column, §5 of the C1 plan) keeps the
     default and compacts exactly as it always did.
+
+    `lang` (#1063) is the turn's reply language, forwarded to
+    `_build_document_context` so its header agrees with `_doc_framing`
+    (`core/context_budget.py`), the sentence in the same prompt that names it.
+    The `continue` path never reaches this: `_continue=True` forces
+    `attached_doc = None` two lines below, so passing nothing here (the
+    default) is correct, not an oversight. The API door (`/v1`) does not call
+    this function at all yet — D4 (C4.3) is what would make it — so today's
+    only production caller is the `budget` adapter, which already has
+    `ctx.lang` in scope.
     """
     # --- Context Compacting ---
     # If the session has too many messages, compact with LLM summary.
@@ -141,7 +231,12 @@ async def _build_turn_context(
         document_context = ""
         rag_context, rag_count, _rag_items = "", 0, []
     else:
-        attached_doc = session.get_and_clear_attached_document()
+        # C4.3: the `session` step read it into `ctx.attachments`; this no
+        # longer reaches into the session for it. The disk write stays exactly
+        # where it was — the read it sat next to never mutated anything, so
+        # what it persists is whatever the steps before it did, and moving it
+        # is a separate question from moving the read.
+        attached_doc = (attachments or {}).get("document")
         session_mgr._save_session_to_disk(session)
 
         # #972: the sanitizer sizes against the window the serving engine
@@ -153,7 +248,7 @@ async def _build_turn_context(
         document_context = ""
         if attached_doc:
             document_context, _shown, _total_chunks = _build_document_context(
-                attached_doc, context_window=_window,
+                attached_doc, context_window=_window, lang=lang,
             )
 
         # 3. The memory context (RAG) the `recall` step retrieved, sized to the

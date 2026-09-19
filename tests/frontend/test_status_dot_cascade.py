@@ -34,6 +34,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -92,27 +93,69 @@ document.getElementById('out').textContent =
 _LINE = re.compile(r"NEXEDOT\|(\w+)\|(\w+)\|([^\n<]*)")
 
 
+def _read(path) -> str:
+    """The dump so far. Chrome is still writing, so a partial read is normal."""
+    try:
+        return path.read_text(errors="replace")
+    except OSError:
+        return ""
+
+
+
 @pytest.fixture(scope="module")
 def rendered(tmp_path_factory):
     """Computed styles from a real browser: {(id, prop): value}."""
-    page = tmp_path_factory.mktemp("cascade") / "status_dot.html"
+    tmp = tmp_path_factory.mktemp("cascade")
+    page = tmp / "status_dot.html"
     page.write_text(_PAGE.format(css=_CSS))
+    # `--headless=new`, not `--headless`: Chrome removed the old headless mode,
+    # and from 132 the bare flag does not error — it HANGS, forever. On Chrome
+    # 153 (this machine, 19/09) `--headless --dump-dom` on a one-div page never
+    # returns; `--headless=new` returns the DOM in under a second. The 120s
+    # timeout below then fires and the fixture skips with "browser could not
+    # render on this machine", which reads like a runner without a browser and
+    # is why this went unnoticed: the render gate — layer 1, the only one that
+    # can see a cascade — had been silently skipping every local run, leaving
+    # just the static gate it was built to back up.
+    #
+    # `--user-data-dir`: a test has no business opening the developer's real
+    # Chrome profile, and a throwaway one under the test's own tmp dir also
+    # keeps two parallel suites (two worktrees, the BUS) off each other's lock.
+    dom_path = tmp / "dumped.html"
+    cmd = [
+        _BROWSER, "--headless=new", "--disable-gpu", "--no-sandbox",
+        f"--user-data-dir={tmp / 'chrome-profile'}",
+        "--virtual-time-budget=3000", "--dump-dom", f"file://{page}",
+    ]
+    # Chrome 153 writes the DOM and then does not exit. `subprocess.run(...,
+    # capture_output=True)` therefore waits for a process that never returns,
+    # hits its timeout and hands back NOTHING — the dump is complete inside a
+    # pipe nobody drained. Writing to a file and reading it as soon as the four
+    # markers are there sidesteps both halves of that: the wait ends when the
+    # DATA is ready, not when Chrome decides to leave, and what Chrome already
+    # wrote is on disk either way.
     try:
-        result = subprocess.run(
-            [
-                _BROWSER, "--headless", "--disable-gpu", "--no-sandbox",
-                "--virtual-time-budget=3000", "--dump-dom", f"file://{page}",
-            ],
-            capture_output=True, text=True, timeout=120,
-        )
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        pytest.skip(f"browser could not render on this machine: {exc!r}")
+        with open(dom_path, "w") as fh:
+            proc = subprocess.Popen(cmd, stdout=fh, stderr=subprocess.DEVNULL)
+            try:
+                for _ in range(600):  # 60s, polled every 100ms
+                    if proc.poll() is not None:
+                        break
+                    if len(_LINE.findall(_read(dom_path))) >= 4:
+                        break
+                    time.sleep(0.1)
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+                proc.wait(timeout=10)
+    except OSError as exc:
+        pytest.skip(f"browser could not be launched on this machine: {exc!r}")
 
-    styles = {(m[0], m[1]): m[2].strip() for m in _LINE.findall(result.stdout)}
+    styles = {(m[0], m[1]): m[2].strip() for m in _LINE.findall(_read(dom_path))}
     assert styles, (
         "the browser returned no computed styles — the harness is broken, not "
         "the CSS. Fix the harness; do not delete the check.\n"
-        f"--- stdout ---\n{result.stdout[:1500]}\n--- stderr ---\n{result.stderr[:800]}"
+        f"--- dumped DOM ({dom_path}) ---\n{_read(dom_path)[:1500]}"
     )
     return styles
 

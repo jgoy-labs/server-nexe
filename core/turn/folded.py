@@ -34,6 +34,26 @@ that manufactures a "this step did not really run" record has no reason to
 exist in a pipeline where every step does. Re-folding a step means writing it
 again, deliberately, which is the point.
 
+**And that is exactly what left this number guarding nothing (C4.3-c).** With
+the helpers went the only writers of `ctx.usage["folded"]`, so from C4.2 until
+19/09 the bucket was filled by no production line at all —
+`core/turn/trace.py:56` read it, nothing wrote it — and `== 0` was true by
+construction. An audit measured the cost: folding the UI's `recall` back into
+a bare `return`, the precise regression this gate is named for, left
+`test_folded_never_grows` GREEN. A thermometer is not a fever just because it
+reads zero; this one was unplugged.
+
+The engine fills the bucket itself now. Each step declares in
+`steps.py::Step.writes_always` the context fields it assigns on EVERY turn it
+completes — measured across real turns, not asserted — and `run.py::_finish_ok`
+records a step that wrote none of them as folded. **Ten of the seventeen steps
+are watched this way.** The other seven (`validate`, `authorize`,
+`persist_user_turn`, `persist_assistant_turn`, `emit`, `memory.write`,
+`compact`) leave no mark on the context on every turn, so a fold in them is
+invisible here and needs a behavioural test; `steps.py` says why for each, and
+`tests/core/turn/test_folded_is_measured.py` pins the count so that narrowing
+the watch is a visible act rather than a silent one.
+
 `DESIGN_DEGRADATIONS` is the other half of the same budget: the two limits C3
 declared in writing and left for C4 to close.
 
@@ -56,7 +76,10 @@ the layering gate has nothing to say about it.
 from __future__ import annotations
 
 #: Folded steps per door. Zero since C4.2, and the I1 contract test compares
-#: with `==`: a sub-fase may not fold a step again.
+#: with `==`: a sub-fase may not fold a step again. Since C4.3-c the engine
+#: fills the bucket this counts (`run.py::_finish_ok` against
+#: `Step.writes_always`), so the comparison measures the pipeline instead of an
+#: empty dict — see this module's docstring for the two months it did not.
 FOLDED_BASELINE: dict[str, int] = {"api": 0, "ui": 0}
 
 #: The step ids whose degradation is a DESIGN limit C3 declared and C4 closes,

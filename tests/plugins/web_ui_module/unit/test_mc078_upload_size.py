@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
-import plugins.web_ui_module.core.file_handler as fh
+import core.files.handler as fh
 from plugins.web_ui_module.api.routes_files import register_file_routes
 from core.dependencies import limiter as core_limiter
 

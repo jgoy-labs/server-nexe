@@ -112,9 +112,7 @@
   "plugins/web_ui_module/api/routes_chat.py -> core.turn.run",
   "plugins/web_ui_module/api/routes_chat.py -> core.turn.validate",
   "plugins/web_ui_module/api/routes_files.py -> core.dependencies",
-  "plugins/web_ui_module/api/routes_files.py -> core.endpoints.chat_sanitization",
-  "plugins/web_ui_module/api/routes_files.py -> core.memory_facts",
-  "plugins/web_ui_module/api/routes_files.py -> core.security.input_sanitizers",
+  "plugins/web_ui_module/api/routes_files.py -> core.files",
   "plugins/web_ui_module/api/routes_memory.py -> core.dependencies",
   "plugins/web_ui_module/api/routes_memory.py -> core.log_redact",
   "plugins/web_ui_module/api/routes_memory.py -> core.memory_facts",
@@ -138,6 +136,7 @@
   "plugins/web_ui_module/manifest.py -> core.modules.manifest_base",
   "plugins/web_ui_module/messages.py -> core.dependencies",
   "plugins/web_ui_module/module.py -> core.modules.protocol",
+  "plugins/web_ui_module/module.py -> core.paths.helpers",
   "plugins/web_ui_module/module.py -> core.sessions"
  ],
  "reasons": {
@@ -153,7 +152,7 @@
   "plugins/web_ui_module/api/routes_chat.py -> core.turn.prompt": "C4.2: the prompt is assembled in the core \u2014 routes_chat/turn_adapters now import core.turn.{assemble,prompt,recall} instead of holding the code themselves (plugins -> core, the allowed direction)",
   "plugins/web_ui_module/api/routes_chat.py -> core.turn.run": "ADR-007 C1.3: the web UI door consumes the turn engine (core/turn: run_turn, stream_turn, TurnContext). plugins -> core is the sane direction (56 such edges were already frozen); the alternative \u2014 deferring the import \u2014 would hide the coupling from this gate without removing it, which is what the gate's own message warns about.",
   "plugins/web_ui_module/api/routes_chat.py -> core.turn.validate": "C4.1 (ADR-007): the web UI door imports the turn's shared validate/authorize from core \u2014 plugins -> core is the sanctioned direction, and it is what unfolds the sanitize and authorize steps at that door (core -> plugins stays 0).",
-  "plugins/web_ui_module/api/routes_files.py -> core.memory_facts": "ADR-007 C3.0: MemoryHelper moved to core/memory_facts/, so the UI door resolves it through the core module (memory_facts.helper_for) instead of a plugin-level singleton. plugins -> core is the allowed direction; the two memory_helper.py -> core.* edges it replaces are gone.",
+  "plugins/web_ui_module/api/routes_files.py -> core.files": "C4.3: the upload body is core/files/, so the web door imports it instead of owning it (plugins -> core, the allowed direction; core -> plugins stays 0)",
   "plugins/web_ui_module/api/routes_memory.py -> core.memory_facts": "ADR-007 C3.0: MemoryHelper moved to core/memory_facts/, so the UI door resolves it through the core module (memory_facts.helper_for) instead of a plugin-level singleton. plugins -> core is the allowed direction; the two memory_helper.py -> core.* edges it replaces are gone.",
   "plugins/web_ui_module/api/turn_adapters.py -> core.memory_facts": "ADR-007 C3.0: MemoryHelper moved to core/memory_facts/, so the UI door resolves it through the core module (memory_facts.helper_for) instead of a plugin-level singleton. plugins -> core is the allowed direction; the two memory_helper.py -> core.* edges it replaces are gone.",
   "plugins/web_ui_module/api/turn_adapters.py -> core.memory_facts.write": "ADR-007 C3.3: memory.write moved to core/memory_facts/write.py, so both doors write a turn's facts with the same filter and the same first-turn rule; routes_chat also reads an engine result through core.endpoints.chat_engines._common (extract_engine_text), which moved out of the plugin because the core's atomiser needs it too. plugins -> core is the allowed direction.",
@@ -167,6 +166,7 @@
   "plugins/web_ui_module/api/turn_adapters.py -> core.turn.prompt": "C4.2: the prompt is assembled in the core \u2014 routes_chat/turn_adapters now import core.turn.{assemble,prompt,recall} instead of holding the code themselves (plugins -> core, the allowed direction)",
   "plugins/web_ui_module/api/turn_adapters.py -> core.turn.recall": "C4.2: the prompt is assembled in the core \u2014 routes_chat/turn_adapters now import core.turn.{assemble,prompt,recall} instead of holding the code themselves (plugins -> core, the allowed direction)",
   "plugins/web_ui_module/api/turn_adapters.py -> core.turn.run": "ADR-007 C1.3: the web UI door consumes the turn engine (core/turn: run_turn, stream_turn, TurnContext). plugins -> core is the sane direction (56 such edges were already frozen); the alternative \u2014 deferring the import \u2014 would hide the coupling from this gate without removing it, which is what the gate's own message warns about.",
-  "plugins/web_ui_module/api/turn_adapters.py -> core.turn.validate": "C4.1 (ADR-007): the web UI door imports the turn's shared validate/authorize from core \u2014 plugins -> core is the sanctioned direction, and it is what unfolds the sanitize and authorize steps at that door (core -> plugins stays 0)."
+  "plugins/web_ui_module/api/turn_adapters.py -> core.turn.validate": "C4.1 (ADR-007): the web UI door imports the turn's shared validate/authorize from core \u2014 plugins -> core is the sanctioned direction, and it is what unfolds the sanitize and authorize steps at that door (core -> plugins stays 0).",
+  "plugins/web_ui_module/module.py -> core.paths.helpers": "P2/#1065: uploads move out of the plugin's own code tree to the data tree, and get_data_dir is the helper every other consumer of that tree already goes through (it also chmods 0700). plugins->core is the sanctioned direction"
  }
 }

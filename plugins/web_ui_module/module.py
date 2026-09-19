@@ -20,7 +20,7 @@ from fastapi import APIRouter
 from core.modules.protocol import ModuleMetadata, HealthResult, HealthStatus
 
 from core.sessions import SessionManager
-from .core.file_handler import FileHandler
+from core.paths.helpers import get_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +53,35 @@ class WebUIModule:
         # Paths — available immediately for create_router
         self._plugin_dir = Path(__file__).parent
         self.ui_dir = self._plugin_dir / "ui"
-        self.upload_dir = self.ui_dir / "uploads"
-        self.file_handler = FileHandler(self.upload_dir)
+        #: What a user uploads is user data, so it lives with the rest of the
+        #: user's data and not inside the plugin's own code tree, where it used
+        #: to sit (`ui/uploads`). The packaged app extracts that tree fresh on
+        #: every version, and uploads survived it only by an accident of how
+        #: `tar` unpacks — nothing guaranteed it. `storage/data/uploads` is the
+        #: tree `_resolve_storage_root` already points at `NEXE_DATA_DIR` in
+        #: sidecar mode, which exists precisely to be segregated from updates.
+        #: Closes the debt `core/files/attach.py` declares about where a second
+        #: door's uploads should land. `get_data_dir` is the helper every other
+        #: consumer of the data tree already goes through, and it chmods 0700:
+        #: uploaded documents are private, and until now they inherited umask.
+        self.upload_dir = get_data_dir("uploads")
+        #: LEGACY_UPLOAD_DIR is not written any more; it is kept so the
+        #: unauthenticated static route can keep refusing it. See the WS5-01
+        #: guard in `api/routes_static.py`: a document left behind by an
+        #: install from before the move is still a document.
+        self.legacy_upload_dir = self.ui_dir / "uploads"
+        # C4.3-b: the process-wide FileHandler, not a plugin-private one — same
+        # instance /v1/attachments reads off app.state.file_handler. Built here
+        # (not deferred to initialize(), unlike session_manager) because it has
+        # no crypto/encryption ordering dependency: attach_file_handler() is
+        # idempotent, so whichever door (core lifespan or this constructor)
+        # runs first creates it and the other just reuses it. create_router()
+        # reads module_instance.file_handler eagerly (no late-binding proxy,
+        # unlike session_manager — see api/routes.py), so it must already be
+        # set here, before initialize() ever runs.
+        from core.files import attach_file_handler
+        from core.server_state import get_server_state
+        self.file_handler = attach_file_handler(get_server_state())
         from core.config import get_server_url
         self.api_base_url = os.getenv("NEXE_API_BASE_URL", get_server_url())
 
@@ -102,9 +129,11 @@ class WebUIModule:
                 # Resolve API base URL
                 self.api_base_url = self._resolve_api_base_url(context)
 
-                # Ensure directories exist
+                # Ensure directories exist. The upload root is created by
+                # get_data_dir() (with 0700) when it is resolved; the legacy
+                # one is NOT created — it is only remembered so the static
+                # route can keep refusing whatever an older install left there.
                 self.ui_dir.mkdir(parents=True, exist_ok=True)
-                self.upload_dir.mkdir(parents=True, exist_ok=True)
 
                 # Initialize router
                 self._init_router()

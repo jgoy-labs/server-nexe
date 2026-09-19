@@ -16,9 +16,9 @@ import pytest
 
 from core.endpoints.chat_rag import (
     _discover_collection_names,
-    _rag_params_for,
     build_rag_context,
 )
+from core.rag.collections import source_for
 from core.memory_access import DOCS_COLLECTION, KNOWLEDGE_COLLECTION, MEMORY_COLLECTION
 
 
@@ -93,16 +93,25 @@ class TestDiscoverCollectionNames:
         assert names == [DOCS_COLLECTION, KNOWLEDGE_COLLECTION, MEMORY_COLLECTION]
 
 
-class TestRagParamsFor:
+class TestTunedParamsPerSource:
+    """ADR-008 (E1a): the tuned parameters moved from `_rag_params_for` into
+    the source that applies them. Same values, same pairing, asserted where
+    they live now — `source_for` is what maps a collection name to them."""
+
     def test_known_collections_keep_their_tuned_params(self):
         from core.endpoints.chat_rag import RAG_DOCS_THRESHOLD, RAG_KNOWLEDGE_THRESHOLD, RAG_MEMORY_THRESHOLD
-        assert _rag_params_for(DOCS_COLLECTION, "ca") == (RAG_DOCS_THRESHOLD, 3, None)
-        assert _rag_params_for(KNOWLEDGE_COLLECTION, "ca") == (RAG_KNOWLEDGE_THRESHOLD, 3, {"lang": "ca"})
-        assert _rag_params_for(MEMORY_COLLECTION, "ca") == (RAG_MEMORY_THRESHOLD, 2, None)
+        docs = source_for(DOCS_COLLECTION)
+        assert (docs.threshold, docs.top_k, docs.filter_by_lang) == (RAG_DOCS_THRESHOLD, 3, False)
+        knowledge = source_for(KNOWLEDGE_COLLECTION)
+        assert (knowledge.threshold, knowledge.top_k, knowledge.filter_by_lang) == (RAG_KNOWLEDGE_THRESHOLD, 3, True)
+        memory = source_for(MEMORY_COLLECTION)
+        assert (memory.threshold, memory.top_k, memory.filter_by_lang) == (RAG_MEMORY_THRESHOLD, 2, False)
 
     def test_unknown_collection_gets_generic_defaults(self):
         from core.endpoints.chat_rag import RAG_KNOWLEDGE_THRESHOLD
-        assert _rag_params_for("agenda_notes", "ca") == (RAG_KNOWLEDGE_THRESHOLD, 3, None)
+        unknown = source_for("agenda_notes")
+        assert unknown.name() == "agenda_notes"
+        assert (unknown.threshold, unknown.top_k, unknown.filter_by_lang) == (RAG_KNOWLEDGE_THRESHOLD, 3, False)
 
 
 class TestBuildRagContextSearchesDiscoveredCollections:

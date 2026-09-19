@@ -102,6 +102,23 @@ def _expose_memory_helper(app, server_state) -> None:
     app.state.memory_helper = helper
 
 
+async def _startup_file_handler(server_state) -> None:
+    """Create the process-wide FileHandler (C4.3-b) — the web UI module used to
+    build its own; now the core owns it, so /v1 can attach documents too."""
+    from core.files import attach_file_handler
+    attach_file_handler(server_state)
+
+
+def _expose_file_handler(app, server_state) -> None:
+    """Mirror the handler onto `app.state`, same reason as `_expose_memory_helper`
+    above: `/v1/attachments` reads `request.app.state.file_handler`."""
+    handler = getattr(server_state, "file_handler", None)
+    if handler is None:
+        logger.warning("FileHandler not attached on server_state — /v1/attachments will be unavailable")
+        return
+    app.state.file_handler = handler
+
+
 async def _startup_session_cleanup(app, server_state) -> None:
     """Start the session cleanup background task (N-5 / N04)."""
     try:

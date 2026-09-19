@@ -4,15 +4,15 @@ Tests the extracted helper `_detect_sensitive_upload()` directly —
 same strategy as P0-2.c (_check_llama_cpp_available) because slowapi's
 @limiter.limit rejects MagicMock on the full endpoint.
 """
-import pytest
-
-try:
-  from plugins.web_ui_module.api.routes_files import (
-    _detect_sensitive_upload,
-    _SENSITIVE_UPLOAD_SCAN_LIMIT,
-  )
-except ImportError:
-  pytest.skip("_detect_sensitive_upload helper not available", allow_module_level=True)
+# C4.3: the helper moved to core/files/attach.py with the body of POST /upload.
+# The import is deliberately HARD. It used to be wrapped in a try/except that
+# skipped the module, and when the move happened that guard turned a 19-test
+# loss into a single SKIPPED line — green suite, denylist unguarded. An import
+# that breaks must break loudly.
+from core.files.attach import (
+  _detect_sensitive_upload,
+  _SENSITIVE_UPLOAD_SCAN_LIMIT,
+)
 
 
 # ─── Positive: should be rejected ──────────────────────────────────────────

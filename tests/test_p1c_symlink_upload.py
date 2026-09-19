@@ -17,12 +17,11 @@ import os
 import tempfile
 from pathlib import Path
 
-import pytest
-
-try:
-    from plugins.web_ui_module.api.routes_files import _is_symlink_outside_uploads
-except ImportError:
-    pytest.skip("_is_symlink_outside_uploads helper not available", allow_module_level=True)
+# C4.3: the helper moved to core/files/attach.py with the body of POST /upload.
+# The import is deliberately HARD — see the note in test_upload_denylist.py:
+# the try/except that used to sit here turns a move into a silent skip, and a
+# silently skipped security test is worse than no test at all.
+from core.files.attach import _is_symlink_outside_uploads
 
 
 class TestIsSymlinkOutsideUploads:

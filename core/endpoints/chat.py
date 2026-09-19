@@ -183,12 +183,18 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
 
 
 async def _fetch_rag_context(
-    body: ChatCompletionRequest, app_state: Any, server_lang: str
+    body: ChatCompletionRequest, app_state: Any, server_lang: str,
+    *, has_document: bool = False,
 ) -> tuple[str, list[tuple[str, float]]]:
     """Retrieve RAG context text for the last user message, if RAG is enabled.
 
     Returns (context_text, rag_items) — rag_items is [(collection, score), ...]
     for the results actually used; empty when RAG is off or found nothing.
+
+    `has_document` (C4.3) is whether this turn's session carries an attached
+    document. It reaches the same `collections_for_turn` the web door uses, so
+    the rule that a document replaces its own collection — and ONLY its own —
+    is the turn's and not one door's.
     """
     if not body.use_rag:
         return "", []
@@ -200,9 +206,11 @@ async def _fetch_rag_context(
     # C4.2: the retrieval itself is the turn's `recall` step, shared with
     # /ui/chat (`core/turn/recall.py`). What stays this door's is the question
     # of WHETHER to recall — `use_rag` is a field of this schema alone.
+    from core.turn.recall import collections_for_turn
     text, _count, items = await recall_for_turn(
         last_user_msg, app_state=app_state, lang=server_lang,
-        collections=body.rag_collections, threshold_override=body.rag_threshold,
+        collections=collections_for_turn(body.rag_collections, has_document=has_document),
+        threshold_override=body.rag_threshold,
     )
     return text, items
 

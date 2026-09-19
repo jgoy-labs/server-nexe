@@ -63,8 +63,20 @@ def register_static_routes(router: APIRouter, *, module_ref):
         # must NOT serve anything under the uploads dir — otherwise a document could be
         # exfiltrated by name over an opt-in remote binding (Tailscale/LAN) without the
         # key. 404 (not 403) so we don't confirm whether a given upload exists.
-        _upload_dir = getattr(module_ref, "upload_dir", module_ref.ui_dir / "uploads").resolve()
-        if file_path == _upload_dir or file_path.is_relative_to(_upload_dir):
+        # Both roots, deliberately. Uploads moved out of ui_dir to the data
+        # tree, so the configured one is normally OUTSIDE what this route can
+        # reach and the check never fires for it — but an install from before
+        # the move still has documents sitting in ui_dir/uploads, and those are
+        # exactly what this guard exists for. Dropping the legacy path when the
+        # directory moved is the regression that
+        # tests/plugins/web_ui_module/test_uploads_stay_out_of_the_product.py
+        # records from the first attempt: the guard followed the new root and
+        # the old files started being served with a 200.
+        _upload_dirs = {
+            getattr(module_ref, "upload_dir", module_ref.ui_dir / "uploads").resolve(),
+            getattr(module_ref, "legacy_upload_dir", module_ref.ui_dir / "uploads").resolve(),
+        }
+        if any(file_path == d or file_path.is_relative_to(d) for d in _upload_dirs):
             raise HTTPException(status_code=404, detail=get_message(i18n, "webui.static.file_not_found"))
         if not file_path.exists():
             raise HTTPException(status_code=404, detail=get_message(i18n, "webui.static.file_not_found"))

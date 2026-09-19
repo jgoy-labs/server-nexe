@@ -81,7 +81,7 @@ Server Nexe empezó como un experimento de learning-by-doing: *"¿Qué haría fa
 
 **Todo este proyecto — código, tests, auditorías, documentación — ha sido construido por una persona orquestando diferentes modelos de IA**, tanto locales (MLX, Ollama) como en la nube (Claude, GPT, Gemini, DeepSeek, Qwen, Grok...), como colaboradores. El humano decide qué construir, diseña la arquitectura, revisa línea a línea y ejecuta tests. Las IAs escriben, auditan y hacen stress-test bajo dirección humana.
 
-Lo que empezó como un prototipo se ha convertido en un producto genuinamente útil: 8711 tests, auditorías de seguridad, encriptación at-rest, un instalador macOS con detección de hardware, y un sistema de plugins. No está acabado — hay una hoja de ruta llena de ideas — pero ya hace lo que se proponía: **ejecutar un servidor de IA en tu máquina, con memoria que persiste, y cero datos saliendo de tu dispositivo.**
+Lo que empezó como un prototipo se ha convertido en un producto genuinamente útil: 9058 tests, auditorías de seguridad, encriptación at-rest, un instalador macOS con detección de hardware, y un sistema de plugins. No está acabado — hay una hoja de ruta llena de ideas — pero ya hace lo que se proponía: **ejecutar un servidor de IA en tu máquina, con memoria que persiste, y cero datos saliendo de tu dispositivo.**
 
 No intenta competir con ChatGPT ni Claude. Pero sí puede ser complementario para tareas menos pesadas. Es una herramienta open-source para gente que quiere ser propietaria de su infraestructura de IA. Construido por una persona en Barcelona, con IA como copiloto, música, y tozudez.
 
@@ -161,7 +161,7 @@ Sube .txt, .md o .pdf y se indexan automáticamente para RAG. Cada documento sol
 <td width="50%">
 
 ### Construido para Crecer
-8711 tests (~89% cobertura), auditoría de seguridad, i18n en 3 idiomas, API completa. Lo que empezó como un experimento se construye con prácticas de producción.
+9058 tests (~89% cobertura), auditoría de seguridad, i18n en 3 idiomas, API completa. Lo que empezó como un experimento se construye con prácticas de producción.
 
 </td>
 </tr>
@@ -362,7 +362,7 @@ La RAM y el disco son iguales en todas las plataformas (dependen del modelo que 
 
 ## Testing
 
-8711 tests recogidos, ~89% cobertura de código. Esta es la suite que el CI ejecuta en cada push a `main` o `pre-production` y en cada pull request a `main`: todo excepto los marcadores `integration`, `e2e`, `slow`, `gpu` y `test_live`. Los de integración del `web_ui_module` tienen un job propio.
+9058 tests recogidos, ~89% cobertura de código. Esta es la suite que el CI ejecuta en cada push a `main` o `pre-production` y en cada pull request a `main`: todo excepto los marcadores `integration`, `e2e`, `slow`, `gpu` y `test_live`. Los de integración del `web_ui_module` tienen un job propio.
 
 ```bash
 # Tests unitarios

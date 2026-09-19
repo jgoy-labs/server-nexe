@@ -25,12 +25,12 @@ class TestUploadSecurity:
 
     WS6-01/02: the /rag upload surface (and its ALLOWED_UPLOAD_EXTENSIONS)
     was retired; the live validation is FileHandler.validate_file
-    (plugins/web_ui_module/core/file_handler.py), which these tests now
+    (core/files/handler.py), which these tests now
     exercise directly instead of asserting membership in a constant set.
     """
 
     def _handler(self, tmp_path):
-        from plugins.web_ui_module.core.file_handler import FileHandler
+        from core.files.handler import FileHandler
         return FileHandler(upload_dir=tmp_path)
 
     def test_path_traversal_rejected(self, tmp_path):

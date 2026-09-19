@@ -142,18 +142,35 @@ def _should_queue(ctx: TurnContext, step: Step) -> bool:
     return not (step.id == "memory.write" and ctx.partial)
 
 
-def _finish_ok(ctx: TurnContext, step: Step, started: float) -> None:
+def _finish_ok(
+    ctx: TurnContext, step: Step, started: float, *, check_writes: bool = False,
+) -> None:
     """Record a step that raised nothing. Usually "ok" — but a streaming
     `generate` step converts a mid-stream engine error into wire text instead
     of raising (the wire is already committed, so there is nothing left to
     catch), and signals it out-of-band via `ctx.error` instead (#1040, C2.4).
     A step that leaves that signal for ITSELF is recorded degraded, exactly
-    like a step whose adapter raised."""
+    like a step whose adapter raised.
+
+    A step that returns without writing ANY of the fields `steps.py` says it
+    writes is recorded as FOLDED (C4.3-c). Not "all of them": `writes` is the
+    set a step MAY write, and several fields are conditional by design
+    (`engine_fallback_from` only when a fallback happened). Writing none of
+    them is the signature of a step folded back into a no-op, which is exactly
+    what `FOLDED_BASELINE` claims cannot happen any more and, until now,
+    nothing measured.
+    """
     if ctx.error is not None and ctx.error.get("step") == step.id:
         _record(ctx, step, "degraded", started)
         ctx.degradations.append({"step": step.id, "error": ctx.error.get("message", "")})
-    else:
-        _record(ctx, step, "ok", started)
+        return
+    if check_writes and step.writes_always:
+        missing = step.writes_always - ctx.written_fields
+        if missing:
+            ctx.usage.setdefault("folded", {})[step.id] = (
+                f"did not write: {','.join(sorted(missing))}"
+            )
+    _record(ctx, step, "ok", started)
 
 
 def _mark_skipped(ctx: TurnContext, steps: Iterable[Step]) -> None:
@@ -225,6 +242,7 @@ async def _run_awaitable(ctx: TurnContext, step: Step, adapter: Adapter) -> Opti
     """Run one coroutine adapter under the failure policy. Returns the short-
     circuit if the step raised one; re-raises a must_have failure untouched."""
     started = time.perf_counter()
+    ctx.begin_step()
     try:
         await adapter(ctx)  # type: ignore[misc]
     except TurnShortCircuit as sc:
@@ -241,7 +259,7 @@ async def _run_awaitable(ctx: TurnContext, step: Step, adapter: Adapter) -> Opti
         _record(ctx, step, "degraded", started, error=exc)
         ctx.degradations.append({"step": step.id, "error": f"{type(exc).__name__}: {exc}"})
         return None
-    _finish_ok(ctx, step, started)
+    _finish_ok(ctx, step, started, check_writes=True)
     return None
 
 
@@ -256,6 +274,7 @@ async def _drive_generator(ctx: TurnContext, step: Step, adapter: StreamingStepA
     recorded — the client would be gone and the trace would say "skipped".
     """
     started = time.perf_counter()
+    ctx.begin_step()
     agen = adapter(ctx)
     try:
         async for chunk in agen:
@@ -277,7 +296,7 @@ async def _drive_generator(ctx: TurnContext, step: Step, adapter: StreamingStepA
         ctx.degradations.append({"step": step.id, "error": f"{type(exc).__name__}: {exc}"})
         return
     else:
-        _finish_ok(ctx, step, started)
+        _finish_ok(ctx, step, started, check_writes=True)
     finally:
         await agen.aclose()
 

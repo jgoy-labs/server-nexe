@@ -115,6 +115,22 @@ class TestWebUIModuleInit:
     def test_get_router_prefix(self, module):
         assert module.get_router_prefix() == "/ui"
 
+    def test_file_handler_is_the_process_wide_one(self, module):
+        """C4.3-b: the plugin must consume attach_file_handler's instance,
+        not build a private one — the point of moving it to the core lifespan
+        was a single FileHandler both /ui/upload and /v1/attachments read.
+        Without this, a WebUIModule() that quietly went back to constructing
+        its own `FileHandler(self.upload_dir)` would pass every other test in
+        this file and every integration test: FileHandler is stateless
+        (nothing but a path), so two instances pointed at the same directory
+        behave identically on disk — divergence here would be silent, unlike
+        the SessionManager bug this pattern was copied from, where a second
+        instance really did lose the crypto_provider."""
+        from core.files import attach_file_handler
+        from core.server_state import get_server_state
+
+        assert module.file_handler is attach_file_handler(get_server_state())
+
 
 class TestResolveApiBaseUrl:
     """Tests for _resolve_api_base_url."""

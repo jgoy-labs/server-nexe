@@ -101,14 +101,20 @@ async def test_mc021_ingest_init_failure_logs_error(tmp_path, monkeypatch, caplo
 async def test_mc017_rag_search_error_logs_warning(caplog):
     """A failing Qdrant search must log at WARNING (distinct from the legitimate
     0-results case), so 'RAG looks empty' is distinguishable from 'RAG broken'."""
-    from core.endpoints.chat_rag import _search_collection
+    # ADR-008 (E1a): searching one collection is a source's job now, so the
+    # warning is emitted by `core.rag.collections` instead of `chat_rag`. The
+    # invariant is the one MC-017 bought: a search that RAISES is audible at
+    # WARNING, and stays distinguishable from a search that legitimately
+    # found nothing.
+    from core.rag.collections import DOCS_SOURCE
+    from core.rag.source import RAGQuery
 
     memory = MagicMock()
     memory.collection_exists = AsyncMock(return_value=True)
     memory.search = AsyncMock(side_effect=RuntimeError("Qdrant connection failed"))
 
-    with caplog.at_level(logging.WARNING, logger="core.endpoints.chat_rag"):
-        result = await _search_collection(memory, "nexe_documentation", "q", 0.5, 5)
+    with caplog.at_level(logging.WARNING, logger="core.rag.collections"):
+        result = await DOCS_SOURCE.search(memory, RAGQuery(text="q"))
 
     assert result == []  # control flow unchanged (graceful degradation kept)
     assert any(

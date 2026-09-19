@@ -17,7 +17,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from core.sessions import ChatSession, SessionManager
-from plugins.web_ui_module.core.file_handler import FileHandler
+from core.files.handler import FileHandler
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -75,7 +75,7 @@ class TestChatSessionGaps:
         assert s.has_attached_document() is False
         s.attach_document("f.txt", "content")
         assert s.has_attached_document() is True
-        s.get_and_clear_attached_document()
+        s.get_attached_document()
         # Document persists for follow-up questions (no longer clears)
         assert s.has_attached_document() is True
 
@@ -146,7 +146,7 @@ class TestFileHandlerGaps:
         pdf_path = tmp_path / "test.pdf"
         pdf_path.write_bytes(b"%PDF-1.4 fake pdf")
 
-        with patch("plugins.web_ui_module.core.file_handler.FileHandler.extract_text") as mock_extract:
+        with patch("core.files.handler.FileHandler.extract_text") as mock_extract:
             mock_extract.return_value = "Page 1 content\nPage 2 content"
             result = fh.extract_text(pdf_path)
             assert "Page 1 content" in result

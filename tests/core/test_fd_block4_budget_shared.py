@@ -157,7 +157,10 @@ class TestBothDoorsShareTheBudgetArithmetic:
         state = MagicMock()
         state.config = {"personality": {"prompt": {f"{lang}_full": "S" * 4700}}}
 
-        async def _found(_body, _state, _lang):
+        # `**_kw`: stands in for `_fetch_rag_context`; see the note in
+        # tests/fixos/test_B263.py — a double must not pin a signature it
+        # does not own.
+        async def _found(_body, _state, _lang, **_kw):
             return self.MARK * 200_000, [("nexe_documentation", 0.9)]
 
         async def _run():
@@ -321,7 +324,7 @@ class TestTheRagStatusTellsTheTruth:
         monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-fc-key")
         monkeypatch.setenv("NEXE_ADMIN_API_KEY", "test-fc-key")
 
-        async def _found_plenty(body, app_state, server_lang):
+        async def _found_plenty(body, app_state, server_lang, **_kw):
             return "R" * 5000, [("nexe_documentation", 0.9)]
 
         monkeypatch.setattr("core.endpoints.chat._fetch_rag_context", _found_plenty)
@@ -353,7 +356,7 @@ class TestTheRagStatusTellsTheTruth:
         monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-fc-key")
         monkeypatch.setenv("NEXE_ADMIN_API_KEY", "test-fc-key")
 
-        async def _found_plenty(body, app_state, server_lang):
+        async def _found_plenty(body, app_state, server_lang, **_kw):
             return "R" * 5000, [("nexe_documentation", 0.9)]
 
         monkeypatch.setattr("core.endpoints.chat._fetch_rag_context", _found_plenty)
@@ -382,7 +385,7 @@ class TestTheRagStatusTellsTheTruth:
         monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-fc-key")
         monkeypatch.setenv("NEXE_ADMIN_API_KEY", "test-fc-key")
 
-        async def _found_a_little(body, app_state, server_lang):
+        async def _found_a_little(body, app_state, server_lang, **_kw):
             return "un fet recuperat", [("nexe_documentation", 0.9)]
 
         monkeypatch.setattr("core.endpoints.chat._fetch_rag_context", _found_a_little)

@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from plugins.web_ui_module.core.file_handler import FileHandler
+from core.files.handler import FileHandler
 
 
 GLUED = (

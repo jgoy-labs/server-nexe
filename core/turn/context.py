@@ -79,3 +79,48 @@ class TurnContext:
     # (facts extracted from a broken reply are not trustworthy).
     partial: bool = False
     error: Optional[dict] = None
+
+    # --- What this turn has actually written, field by field (C4.3-c) ---
+    # `TURN_STEPS` declares what each step writes. Until now nothing checked
+    # it: `FOLDED_BASELINE` counted a bucket (`usage["folded"]`) that no
+    # production line ever wrote to, so a step could be folded back into a
+    # no-op and the contract test stayed green. The engine now compares the
+    # fields a step REALLY wrote against the ones it declares, and for that it
+    # needs writes recorded as they happen — not values sampled before and
+    # after, which cannot tell "wrote the empty string" from "wrote nothing"
+    # (`clock_line` is `""` on most turns, and that IS the step doing its job).
+    #
+    # Populated by `__post_init__`, so the door's own constructor arguments are
+    # NOT counted: those are given, not written by a step.
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_written", set())
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        object.__setattr__(self, name, value)
+        written = self.__dict__.get("_written")
+        if written is not None and not name.startswith("_"):
+            written.add(name)
+
+    def begin_step(self) -> None:
+        """Start recording afresh for the step about to run.
+
+        The record is per step, not cumulative: `sanitize` rewriting `message`
+        after `validate` already wrote it has to count as a write, and a
+        running total cannot see that — the field is already in the set.
+        """
+        written = self.__dict__.get("_written")
+        if written is None:
+            object.__setattr__(self, "_written", set())
+        else:
+            written.clear()
+
+    @property
+    def written_fields(self) -> frozenset:
+        """The context fields assigned since the last `begin_step()`.
+
+        A step that mutates a field in place (`ctx.usage[...] = x`) does not
+        appear here — only rebinding does. That is why `steps.py` declares a
+        field in `writes` only when the step assigns it.
+        """
+        return frozenset(self.__dict__.get("_written", ()))

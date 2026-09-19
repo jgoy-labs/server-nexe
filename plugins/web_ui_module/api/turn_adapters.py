@@ -52,7 +52,7 @@ from core.memory_facts.write import write_facts
 from core.sessions.compactor import compact_session
 from core.turn.post_commit import queue_for
 from core.turn.prompt import _resolve_session_lang, turn_system_prompt
-from core.turn.recall import _build_rag_context
+from core.turn.recall import _build_rag_context, collections_for_turn
 from core.turn.run import Adapters, TurnShortCircuit
 from core.turn.validate import (
     jailbreak_speed_bump,
@@ -228,6 +228,11 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         # the conversation's language, and said so in a comment. The other
         # door has resolved it in this step since C1.2.
         ctx.lang = _resolve_session_lang(ctx.session, ctx.message)
+        # C4.3 (D4): the document attached to this session is turn state, read
+        # once here like everything else the session gives. It used to be read
+        # deep inside `budget` (`_build_turn_context`), which is why only this
+        # door could ever see it.
+        ctx.attachments["document"] = ctx.session.get_attached_document()
         # C2.3 (ADR-007 §9/I9): one live writer per session — refused with the
         # current lease unless the client explicitly asks to take over (the
         # 409 dialog on the frontend). A background job for this session is a
@@ -291,17 +296,23 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         """C4.2: retrieval is a step of the turn, not a line inside
         `_build_turn_context`.
 
-        What stays this door's is the question of WHETHER to recall: a session
-        with an attached document already has its context, and RAG has never
-        run on those turns. The retrieval under it is `core/turn/recall.py`,
-        shared with /v1. The text comes back RAW — `budget` sizes it to the
-        engine's window, which is the first step that knows what it is.
+        The retrieval under it is `core/turn/recall.py`, shared with /v1. The
+        text comes back RAW — `budget` sizes it to the engine's window, which
+        is the first step that knows what it is.
+
+        WHICH sources a turn asks is no longer this door's call either (C4.3):
+        `collections_for_turn` decides it in the core, from the document the
+        `session` step already wrote to `ctx.attachments`. It used to hang off
+        `ctx.session.has_attached_document()` right here, and a rule that
+        hangs off one door's session is a rule the other door cannot obey —
+        which is exactly what would break the day `/v1` accepts an attachment.
         """
-        if ctx.session is not None and ctx.session.has_attached_document():
-            return
         ctx.recall_text, _count, ctx.recall = await _build_rag_context(
             ctx.message, app_state=ctx.app_state, lang=ctx.lang,
-            collections=ctx.body.get("rag_collections"),
+            collections=collections_for_turn(
+                ctx.body.get("rag_collections"),
+                has_document=ctx.attachments.get("document") is not None,
+            ),
             threshold_override=ctx.body.get("rag_threshold"),
         )
         _ui(ctx)["rag_count"] = _count
@@ -375,6 +386,12 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             turn = await rc._build_turn_context(
                 ctx.body, ctx.session, session_mgr, ctx.engine, ctx.message, False,
                 compact=False,
+                # C4.3: the attached document arrives as turn state (the
+                # `session` step read it), not fetched from the session here.
+                attachments=ctx.attachments,
+                # #1063: the document header agrees with the turn's reply
+                # language, not always Catalan.
+                lang=ctx.lang,
                 # C4.2: what the `recall` step retrieved. `_build_turn_context`
                 # used to do the retrieval itself — that is what made `recall`
                 # folded at this door — and now only sizes it to the window.

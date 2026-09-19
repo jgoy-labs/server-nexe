@@ -2,14 +2,15 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy
-Location: plugins/web_ui_module/file_handler.py
-Description: Uploaded file handling (upload) for the web UI
+Location: core/files/handler.py
+Description: Uploaded file handling (upload), shared by every door
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Tuple
 
@@ -85,9 +86,37 @@ class FileHandler:
 
         return True, ""
 
+    def _dir_for_today(self) -> Path:
+        """The dated folder this upload belongs in: `<root>/<year>/<yyyymmdd>/`.
+
+        Two levels, not three: a year folder so the root does not grow without
+        bound, and one folder per DAY named with the whole date, so a folder
+        name means something on its own when you are looking at it without its
+        parent. The same shape the project's own journal uses.
+        """
+        today = datetime.now()
+        day_dir = self.upload_dir / today.strftime("%Y") / today.strftime("%Y%m%d")
+        day_dir.mkdir(parents=True, exist_ok=True)
+        return day_dir
+
+    def _iter_files(self):
+        """Every uploaded file under the root, dated folders included.
+
+        `iterdir` only saw the flat layout; uploads have lived in
+        `<year>/<date>/` since they moved to the storage tree. Walking instead
+        of listing keeps the listing and the cleanup honest for both, which
+        matters because an install that predates the move still has files
+        sitting directly in the root.
+        """
+        if not self.upload_dir.is_dir():
+            return
+        for file_path in self.upload_dir.rglob("*"):
+            if file_path.is_file():
+                yield file_path
+
     async def save_file(self, filename: str, content: bytes) -> Path:
         """
-        Save file to the temporary directory
+        Save file to the dated upload folder
 
         Args:
             filename: File name
@@ -98,14 +127,15 @@ class FileHandler:
         """
         # Sanitize filename
         safe_filename = Path(filename).name
-        file_path = self.upload_dir / safe_filename
+        target_dir = self._dir_for_today()
+        file_path = target_dir / safe_filename
 
         # Avoid overwrite by adding counter
         counter = 1
         while file_path.exists():
             stem = Path(safe_filename).stem
             ext = Path(safe_filename).suffix
-            file_path = self.upload_dir / f"{stem}_{counter}{ext}"
+            file_path = target_dir / f"{stem}_{counter}{ext}"
             counter += 1
 
         # Write file
@@ -280,23 +310,46 @@ class FileHandler:
         max_age_seconds = max_age_hours * 3600
 
         try:
-            for file_path in self.upload_dir.iterdir():
-                if file_path.is_file():
-                    file_age = current_time - file_path.stat().st_mtime
-                    if file_age > max_age_seconds:
-                        try:
-                            file_path.unlink()
-                            deleted_count += 1
-                            logger.info(f"Cleaned up old file: {file_path.name}")
-                        except Exception as e:
-                            logger.error(f"Error deleting {file_path}: {e}")
+            for file_path in self._iter_files():
+                file_age = current_time - file_path.stat().st_mtime
+                if file_age > max_age_seconds:
+                    try:
+                        file_path.unlink()
+                        deleted_count += 1
+                        logger.info(f"Cleaned up old file: {file_path.name}")
+                    except Exception as e:
+                        logger.error(f"Error deleting {file_path}: {e}")
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
 
         if deleted_count > 0:
             logger.info(f"Cleanup completed: {deleted_count} files deleted")
+            self._prune_empty_dated_dirs()
 
         return deleted_count
+
+    def _prune_empty_dated_dirs(self) -> None:
+        """Remove the dated folders the cleanup just emptied (#1065).
+
+        Without this the tree keeps one empty directory per day for ever — a
+        folder a year later has 365 empty children and the layout stops being
+        the tidy thing it was introduced to be. Deepest first, so a year folder
+        goes once its last day does. Never the root, and never a folder that
+        still holds anything.
+        """
+        try:
+            dirs = sorted(
+                (p for p in self.upload_dir.rglob("*") if p.is_dir()),
+                key=lambda p: len(p.parts), reverse=True,
+            )
+            for d in dirs:
+                try:
+                    if not any(d.iterdir()):
+                        d.rmdir()
+                except OSError as e:  # raced, or not empty after all — leave it
+                    logger.debug("Could not prune %s: %s", d, e)
+        except Exception as e:
+            logger.debug("Pruning empty upload folders failed: %s", e)
 
     def get_uploaded_files(self) -> list:
         """
@@ -307,14 +360,22 @@ class FileHandler:
         """
         files = []
         try:
-            for file_path in self.upload_dir.iterdir():
-                if file_path.is_file() and file_path.suffix.lower() in SUPPORTED_EXTENSIONS:
+            for file_path in self._iter_files():
+                if file_path.suffix.lower() in SUPPORTED_EXTENSIONS:
                     stat = file_path.stat()
                     files.append({
                         "filename": file_path.name,
                         "size": stat.st_size,
                         "modified": stat.st_mtime,
-                        # NB: no absolute "path" — it would leak the OS username/FS layout.
+                        # Which dated folder it is in (#1065). The flat layout used
+                        # to make `filename` unique by itself — `save_file` adds a
+                        # `_1` suffix on a clash — but that uniqueness is per FOLDER,
+                        # and folders are per day now. Two uploads of `informe.pdf`
+                        # on different days are two different files with one name,
+                        # and without this a caller cannot tell the rows apart.
+                        # A relative folder name, never the absolute path: that
+                        # would leak the OS username and the filesystem layout.
+                        "day": file_path.parent.name if file_path.parent != self.upload_dir else "",
                     })
             # Sort by modified time descending (newest first)
             files.sort(key=lambda x: x["modified"], reverse=True)  # type: ignore[arg-type, return-value]  # lambda x["modified"]: float — dict[str,object] però "modified" sempre float

@@ -40,17 +40,25 @@ def test_chat_rag_imports_unicodedata():
 
 
 def test_chat_rag_normalizes_before_first_search():
-    """NFKC normalize on last_user_msg must precede the first memory.search call."""
+    """NFKC normalize on last_user_msg must precede handing the query to any source.
+
+    ADR-008 (E1a): the `await memory.search(...)` call moved out of this
+    module and into the source that owns the collection, so the guard follows
+    it. What it protects is unchanged — the query is normalized ONCE, by the
+    orchestrator, before any source can see it, so a fullwidth query still
+    matches NFKC-indexed documents (R1).
+    """
     import core.endpoints.chat_rag as rag_module
+    import core.rag.collections as sources_module
     src = inspect.getsource(rag_module)
     lines = src.splitlines()
 
     norm_idx = None
-    first_search_idx = None
+    handoff_idx = None
     for i, line in enumerate(lines):
         stripped = line.strip()
         # Skip comments — the docstring/comment may legitimately mention
-        # memory.search() in prose without being an actual call.
+        # the call in prose without being an actual call.
         if stripped.startswith("#"):
             continue
         if (
@@ -58,19 +66,32 @@ def test_chat_rag_normalizes_before_first_search():
             and 'unicodedata.normalize("NFKC", last_user_msg)' in line
         ):
             norm_idx = i
-        if first_search_idx is None and "await memory.search(" in line:
-            first_search_idx = i
+        if handoff_idx is None and "RAGQuery(" in line:
+            handoff_idx = i
 
     assert norm_idx is not None, (
         "chat_rag.py is missing unicodedata.normalize('NFKC', last_user_msg). "
         "Without it, fullwidth queries miss NFKC-indexed documents (R1)."
     )
-    assert first_search_idx is not None, (
-        "await memory.search(...) call not found in chat_rag.py — fixture out of sync."
+    assert handoff_idx is not None, (
+        "the RAGQuery handed to the sources was not found in chat_rag.py — "
+        "fixture out of sync."
     )
-    assert norm_idx < first_search_idx, (
-        f"NFKC normalize at line {norm_idx + 1} must precede first memory.search "
-        f"at line {first_search_idx + 1}."
+    assert norm_idx < handoff_idx, (
+        f"NFKC normalize at line {norm_idx + 1} must precede the RAGQuery the "
+        f"sources receive, at line {handoff_idx + 1}."
+    )
+
+    # And the source must search with the text it was GIVEN: a source that
+    # re-derived the query from somewhere else would search un-normalized.
+    sources_src = inspect.getsource(sources_module)
+    assert "await memory.search(" in sources_src, (
+        "await memory.search(...) not found in core/rag/collections.py — "
+        "fixture out of sync."
+    )
+    assert "query=query.text" in sources_src, (
+        "the source must search with the orchestrator's already-normalized "
+        "query.text, never a text of its own (R1)."
     )
 
 

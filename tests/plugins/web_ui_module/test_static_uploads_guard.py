@@ -30,7 +30,14 @@ def _upload_dir() -> Path:
 
 
 def test_uploaded_file_not_served_by_unauth_static(client):
-    """A real file under ui_dir/uploads must not leak via unauthenticated /static/."""
+    """A real file under ui_dir/uploads must not leak via unauthenticated /static/.
+
+    #1065: uploads are written to the data tree now, so this path is no longer
+    where they land — which is exactly why it still has to be refused. An
+    install from before the move left documents here, and the first attempt at
+    moving the directory pointed the guard at the new root only, so these
+    started coming back with a 200. The guard covers both roots.
+    """
     ud = _upload_dir()
     ud.mkdir(parents=True, exist_ok=True)
     probe = ud / "ws5-01-secret-probe.txt"
@@ -64,3 +71,27 @@ def test_normal_static_asset_still_served(client):
     r = client.get("/ui/static/nexe-render.js")
     assert r.status_code == 200
     assert "escapeAttr" in r.text
+
+
+def test_the_guard_covers_the_legacy_root_even_though_uploads_moved(client):
+    """#1065, stated as a property rather than as a path.
+
+    The module now carries two: `upload_dir` (the data tree, where uploads are
+    written) and `legacy_upload_dir` (`ui_dir/uploads`, where an older install
+    left them). The static route can only reach things under `ui_dir`, so the
+    one that needs guarding HERE is the legacy one — and it is precisely the
+    one a refactor is likely to drop, because nothing writes to it any more.
+
+    Mutation: remove `legacy_upload_dir` from the set in `routes_static.py` and
+    this goes red, together with the probe test above.
+    """
+    import plugins.web_ui_module.module as m
+
+    mod = m.WebUIModule()
+    assert mod.legacy_upload_dir == mod.ui_dir / "uploads"
+    assert mod.upload_dir != mod.legacy_upload_dir, (
+        "uploads are supposed to live outside the plugin tree now (#1065)"
+    )
+    # And the route refuses it whether or not anything is there.
+    r = client.get("/ui/static/uploads/whatever-the-old-install-left.txt")
+    assert r.status_code == 404
