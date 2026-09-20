@@ -157,8 +157,18 @@ async def _validate_ollama_model(host: str, model_name: str) -> tuple[str, list]
     return model_name, chat_models
 
 
-def _build_ollama_payload(request, messages: List[Dict], model_name: str) -> dict:
-    """Builds the payload for the Ollama API."""
+def _build_ollama_payload(
+    request, messages: List[Dict], model_name: str, images: Optional[List[str]] = None,
+) -> dict:
+    """Builds the payload for the Ollama API.
+
+    `images` (#1081): Ollama's `/api/chat` wants them INSIDE the last
+    user message, not as a top-level payload key (that shape is
+    `/api/generate`'s). Duplicated from
+    `plugins/ollama_module/core/chat.py::OllamaChat._build_payload` rather
+    than imported: this is `core/`, that is a plugin, and `core -> plugins`
+    is the one direction the layering gate forbids.
+    """
     options = {
         "temperature": request.temperature,
         "num_predict": request.max_tokens or int(os.getenv("NEXE_DEFAULT_MAX_TOKENS", "4096")),
@@ -169,13 +179,29 @@ def _build_ollama_payload(request, messages: List[Dict], model_name: str) -> dic
     # `is not None` (never truthiness); schema enforces gt=0.0 so 0.0 never reaches here.
     if request.top_p is not None:
         options["top_p"] = request.top_p
-    return {
+    payload = {
         "model": model_name,
         "messages": messages,
         "stream": request.stream,
         "think": os.getenv("NEXE_OLLAMA_THINK", "false").lower() == "true",  # NEVER default true — 400 on non-thinking models
         "options": options
     }
+    if images:
+        for i in range(len(payload["messages"]) - 1, -1, -1):
+            if payload["messages"][i].get("role") == "user":
+                payload["messages"][i] = dict(payload["messages"][i])
+                payload["messages"][i]["images"] = images
+                break
+        else:
+            # No user turn to attach them to: the images would leave this
+            # function without ever reaching Ollama. The llama.cpp module
+            # warns in the same situation; this copy used to be the silent
+            # one of the three.
+            logger.warning(
+                "Ollama payload: %d image(s) dropped — no user message to attach them to",
+                len(images),
+            )
+    return payload
 
 
 def _ollama_streaming_response(
@@ -254,6 +280,7 @@ async def _forward_to_ollama(
     fallback_from: Optional[str] = None,
     fallback_reason: Optional[str] = None,
     session_id: Optional[str] = None,
+    images: Optional[List[str]] = None,
 ):
     """Forward request to local Ollama instance."""
     # MC-089: honour the full cascade (SidecarConfig → NEXE_OLLAMA_HOST →
@@ -262,7 +289,7 @@ async def _forward_to_ollama(
     url = f"{_ollama_host}/api/chat"
     model_name = _resolve_ollama_model(request, app_state)
     model_name, _ = await _validate_ollama_model(_ollama_host, model_name)  # raises status_code=404 if not found, 503 if unavailable
-    payload = _build_ollama_payload(request, messages, model_name)
+    payload = _build_ollama_payload(request, messages, model_name, images=images)
     if request.stream:
         return _ollama_streaming_response(
             url, payload, app_state, user_msg, fallback_from, fallback_reason, session_id=session_id

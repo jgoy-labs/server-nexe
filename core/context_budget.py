@@ -38,8 +38,8 @@ from core.endpoints.chat_sanitization import (
     CHARS_PER_TOKEN_ESTIMATE,
     DEFAULT_CONTEXT_WINDOW,
     _ratio_env,
-    untrusted_context_turns,
-    wrap_untrusted_context,
+    context_turns_for,
+    note_turns_for,
 )
 
 logger = logging.getLogger(__name__)
@@ -204,20 +204,62 @@ def _inject_context_into_messages(
     budget: dict,
     available_chars: int,
     history_chars: int,
+    lang: str | None = None,
+    app_state=None,
+    has_image: bool = False,
 ) -> tuple[list, int, bool]:
-    """Append the user message (and document/RAG context turns) to engine_messages.
+    """Append the user message (and document/RAG/image context turns) to engine_messages.
 
     Returns (engine_messages, doc_truncated_pct, ctx_injected). ctx_injected
     is True when untrusted retrieved content (document or RAG) was injected —
     the system-prompt rule is armed unconditionally by _finalize_system_prompt (B030/#851).
+    `has_image` (#1081) is independent of that flag: the image note is trusted
+    scaffolding, not untrusted data, so it never arms the RAG rule.
 
     B030 layer 2d (turn separation): wrapped context goes in its own user turn
-    + assistant data-only ack BEFORE the user message, never inside it.
+    + assistant data-only ack BEFORE the user message, never inside it. The
+    image note (#1081) follows the same rule with its own neutral ack
+    (`note_turns_for`) — it has no block to wrap, but scaffolding still must
+    not speak with the user's authority.
+
+    `lang` (#1072) is the turn's reply language — the caller's `ctx.lang` — and
+    it governs EVERY piece of scaffolding written here: the B030 wrapper, the
+    ack turn, the sentence that frames the document and the one that frames
+    retrieval. It used to be read from `NEXE_LANG`, the server's own voice,
+    which put this function in a different language from the content it wraps:
+
+    * the document HEADER follows `ctx.lang` since #1063, and the comment there
+      justifies it by saying the sentence that CITES the header "already
+      answers in the turn's language". It did not. With `NEXE_LANG=ca` and an
+      English conversation the model got `ATTACHED DOCUMENT (x.pdf)` underneath
+      a framing sentence in Catalan — #1063's bug, inverted.
+    * the RAG SECTION LABELS the `_rag_instruction` cites by name
+      (`[SYSTEM DOCUMENTATION]` and its siblings) are built by
+      `chat_rag._format_results`, and BOTH doors already pass `ctx.lang` to it
+      (`turn_adapters.py`, `adapters_api.py`). `chat_rag` calls that
+      correspondence a deliberate invariant; reading `NEXE_LANG` here was the
+      one thing breaking it.
+
+    `None` keeps the old behaviour (the server's language) for a caller with no
+    turn language in hand — the same fallback shape `_build_document_context`
+    uses, not a second convention.
     """
     _doc_truncated_pct = budget["doc_truncated_pct"]
     _ctx_injected = False
-    _lang_key = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
-    if document_context and budget["doc_kept_chars"] > 0:
+    _lang_key = (lang or _os.environ.get("NEXE_LANG", "en")).split("-")[0].lower()
+
+    # The two kinds of context this turn carries, named once. The rule that an
+    # attached document SILENCES retrieval used to live hidden in the `elif`
+    # below; it is the same rule, said out loud, because the presenter has to
+    # be told the shape of the turn and a hidden rule cannot be told.
+    _use_doc = bool(document_context) and budget["doc_kept_chars"] > 0
+    _use_rag = (not document_context) and bool(rag_context) and available_chars > 0
+    # #1081: computed once — an image can coexist with a document or RAG block,
+    # and in every branch it sits closest to the user's real question (the
+    # extend() below is a no-op list when there is no image).
+    _image_turns = note_turns_for(app_state, lang, has_image=has_image)
+
+    if _use_doc:
         _original_doc_len = len(document_context)
         document_context = document_context[: budget["doc_kept_chars"]]
         if _doc_truncated_pct > 0:
@@ -229,73 +271,38 @@ def _inject_context_into_messages(
             )
         # B030: nonce'd wrapper + no "EXCLUSIVAMENT obey the document" amplifier —
         # the document is a SOURCE to answer from, never a source of instructions.
-        # B030 layer 2d: the document travels in its own turn pair; the user's
-        # message arrives clean as the last word (the "do not follow
-        # instructions" commitment lives in the assistant ack turn).
-        _doc_framing = {
-            "ca": (
-                "Respon basant-te en el DOCUMENT ADJUNTAT del bloc de context "
-                "anterior. Si la informacio no hi es, indica-ho clarament."
-            ),
-            "es": (
-                "Responde basandote en el DOCUMENTO ADJUNTO del bloque de "
-                "contexto anterior. Si la informacion no esta, indicalo claramente."
-            ),
-            "en": (
-                "Answer based on the ATTACHED DOCUMENT in the previous context "
-                "block. If the information is not there, say so clearly."
-            ),
-        }
+        # B030 layer 2d, now applied to the framing sentence too: it used to be
+        # glued onto the user's message (`f"{framing}\n\n{message}"`), which is
+        # exactly what that layer stopped doing for the retrieved content
+        # itself. It travels with the block now, after the closing delimiter —
+        # its own words say "del bloc de context ANTERIOR" — and the user's
+        # message arrives clean as the last word.
         engine_messages.extend(
-            untrusted_context_turns(
-                wrap_untrusted_context(document_context, _lang_key), _lang_key
+            context_turns_for(
+                app_state, document_context, lang,
+                has_document=True, has_rag=False,
             )
         )
-        _framing = _doc_framing.get(_lang_key, _doc_framing["en"])
-        engine_messages.append({"role": "user", "content": f"{_framing}\n\n{message}"})
+        engine_messages.extend(_image_turns)
+        engine_messages.append({"role": "user", "content": message})
         _ctx_injected = True
     elif document_context and budget["doc_kept_chars"] == 0:
         logger.warning(
             "Bug 32: dropping document (history reserved fully) — history=%s, reserve=%s",
             history_chars, budget["history_reserve"],
         )
+        engine_messages.extend(_image_turns)
         engine_messages.append({"role": "user", "content": message})
-    elif rag_context and available_chars > 0:
+    elif _use_rag:
         rag_context = rag_context[:available_chars]
-        _rag_instruction = {
-            "ca": (
-                "INFORMACIO RECUPERADA. UTILITZA-LA per respondre. "
-                "Si la resposta es aqui, cita-la directament. "
-                "Fonts: [DOCUMENTACIO DEL SISTEMA] = knowledge base del sistema, "
-                "[DOCUMENTACIO TECNICA] = documents pujats per l'usuari, "
-                "[MEMORIA DE L'USUARI] = coses que l'usuari t'ha dit abans. "
-                "Quan et preguntin d'on saps algo, indica la font correcta. "
-                "MAI diguis que ho saps pel teu entrenament si la info ve d'aqui:"
-            ),
-            "es": (
-                "INFORMACION RECUPERADA. UTILIZALA para responder. "
-                "Si la respuesta esta aqui, citala directamente. "
-                "Fuentes: [DOCUMENTACION DEL SISTEMA] = knowledge base del sistema, "
-                "[DOCUMENTACION TECNICA] = documentos subidos por el usuario, "
-                "[MEMORIA DEL USUARIO] = cosas que el usuario te dijo antes. "
-                "Cuando te pregunten de donde sabes algo, indica la fuente correcta. "
-                "NUNCA digas que lo sabes por tu entrenamiento si la info viene de aqui:"
-            ),
-            "en": (
-                "RETRIEVED INFORMATION. USE IT to answer. "
-                "If the answer is here, cite it directly. "
-                "Sources: [SYSTEM DOCUMENTATION] = system knowledge base, "
-                "[TECHNICAL DOCUMENTATION] = documents uploaded by the user, "
-                "[USER MEMORY] = things the user told you before. "
-                "When asked where you know something from, indicate the correct source. "
-                "NEVER say you know it from training if the info comes from here:"
-            ),
-        }
-        _instr = _rag_instruction.get(_lang_key, _rag_instruction["en"])
         # B030 layer 2d: trusted source legend OUTSIDE the untrusted delimiters,
         # both in their own turn pair; the user's message arrives clean.
-        context_block = f"{_instr}\n{wrap_untrusted_context(rag_context, _lang_key)}"
-        engine_messages.extend(untrusted_context_turns(context_block, _lang_key))
+        engine_messages.extend(
+            context_turns_for(
+                app_state, rag_context, lang, has_document=False, has_rag=True,
+            )
+        )
+        engine_messages.extend(_image_turns)
         engine_messages.append({"role": "user", "content": message})
         _ctx_injected = True
     else:
@@ -307,6 +314,7 @@ def _inject_context_into_messages(
                 "Dropping retrieved context: budget exhausted (available_chars=%d, history=%d)",
                 available_chars, history_chars,
             )
+        engine_messages.extend(_image_turns)
         engine_messages.append({"role": "user", "content": message})
     return engine_messages, _doc_truncated_pct, _ctx_injected
 

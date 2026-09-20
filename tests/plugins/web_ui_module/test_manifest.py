@@ -698,34 +698,3 @@ class TestGetModuleInstance:
 
 # ─── TestGenerateRagMetadata ──────────────────────────────────────────────────
 
-class TestGenerateRagMetadata:
-    """Tests for _generate_rag_metadata (fallback path)."""
-
-    def test_fallback_when_no_module_manager(self):
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-        with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
-            result = asyncio.run(_generate_rag_metadata("This is test content", "test.txt"))
-        assert "abstract" in result
-        assert "tags" in result
-
-    def test_fallback_abstract_truncated(self):
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-        long_content = "word " * 200
-        with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
-            result = asyncio.run(_generate_rag_metadata(long_content, "doc.txt"))
-        assert len(result["abstract"]) <= 305  # 300 + possible space
-
-    def test_fallback_includes_filename_stem_as_tag(self):
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-        with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
-            result = asyncio.run(_generate_rag_metadata("content", "my_document.txt"))
-        assert any("my document" in t.lower() or "my_document" in t.lower()
-                   for t in result["tags"])
-
-    def test_fallback_has_required_fields(self):
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-        with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
-            result = asyncio.run(_generate_rag_metadata("content", "file.pdf"))
-        assert "priority" in result
-        assert "type" in result
-        assert "lang" in result

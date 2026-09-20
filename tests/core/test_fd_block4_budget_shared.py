@@ -133,10 +133,16 @@ class TestBothDoorsShareTheBudgetArithmetic:
         import core.endpoints.chat as chat_mod
         from core.endpoints.chat_schemas import ChatCompletionRequest, Message
         from core.endpoints.chat_sanitization import _UNTRUSTED_INTRO, rag_security_rule
-        from core.endpoints.chat_rag import _RAG_CONTEXT_LABELS
+        from core.context_presentation import ContextShape, DefaultContextPresenter
 
+        # The legend moved behind the presentation port (ADR-008's other half);
+        # `_RAG_CONTEXT_LABELS["intro"]` was this door's own one-liner and is
+        # gone. Same guarantee, asked of the text that actually ships.
+        _legend = DefaultContextPresenter().frame(
+            ContextShape(lang, has_document=True, has_rag=True)
+        )
         for text in (_UNTRUSTED_INTRO[lang], rag_security_rule(lang),
-                     _RAG_CONTEXT_LABELS[lang]["intro"]):
+                     _legend.legend, _legend.closing):
             assert self.MARK not in text, "the marker leaked into the assembler's own prose"
 
         # Split into turns of at most MAX_CHAT_INPUT_LENGTH: a single 20000-char

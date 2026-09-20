@@ -37,6 +37,7 @@ async def _mlx_stream_generator(
     temperature: Optional[float] = None,
     top_p: Optional[float] = None,
     cancel_event=None,
+    images: Optional[List[str]] = None,
 ):
     """SSE generator for MLX streaming.
 
@@ -62,6 +63,7 @@ async def _mlx_stream_generator(
                 temperature=temperature,
                 top_p=top_p,
                 cancel_event=cancel_event,
+                images=images,
             )
             bridge.set_done(result=result)
         except Exception as e:
@@ -138,6 +140,7 @@ async def _mlx_stream_generator(
 
 async def _forward_to_mlx(
     messages: List[Dict], request: ChatCompletionRequest, req: Request, *, cancel_event=None,
+    images: Optional[List[str]] = None,
 ):
     """Forward to MLX module (Apple Silicon optimized).
 
@@ -150,6 +153,11 @@ async def _forward_to_mlx(
     `cancel_event` (#1041, C2.5): threaded through from ``_dispatch_to_engine``
     — see ``_mlx_stream_generator``'s docstring for why /v1 needed this door
     at all.
+
+    `images` (#1081): a single base64 string in a list, the same shape
+    `_start_engine_call` has always passed at the UI door — MLX decides
+    whether the loaded model reads it (`_detect_vlm_capability`), never this
+    forwarder.
     """
     last_user_msg = extract_last_user_msg(messages)
     # F-C: derived from the RAW client request (request.messages), not the
@@ -180,7 +188,7 @@ async def _forward_to_mlx(
             app_state=req.app.state, user_msg=last_user_msg,
             session_id=session_id, max_tokens=request.max_tokens,
             temperature=request.temperature, top_p=request.top_p,
-            cancel_event=cancel_event,
+            cancel_event=cancel_event, images=images,
         )
         # Peek the first chunk BEFORE committing to a StreamingResponse: an
         # error before any token reaches the client raises here as a real
@@ -196,6 +204,6 @@ async def _forward_to_mlx(
     result = await mlx_module.chat(
         messages=user_messages, system=system_msg, session_id=session_id,
         max_tokens=request.max_tokens, temperature=request.temperature,
-        top_p=request.top_p, cancel_event=cancel_event,
+        top_p=request.top_p, cancel_event=cancel_event, images=images,
     )
     return build_openai_response(result, model_name, "mlx")

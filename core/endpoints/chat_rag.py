@@ -85,19 +85,16 @@ _RAG_CONTEXT_LABELS = {
         "docs": "DOCUMENTACIO DEL SISTEMA",
         "knowledge": "DOCUMENTACIO TECNICA",
         "memory": "MEMORIA DE L'USUARI",
-        "intro": "Usa aquesta informació recuperada per respondre si és rellevant:",
     },
     "es": {
         "docs": "DOCUMENTACION DEL SISTEMA",
         "knowledge": "DOCUMENTACION TECNICA",
         "memory": "MEMORIA DEL USUARIO",
-        "intro": "Usa esta información recuperada para responder si es relevante:",
     },
     "en": {
         "docs": "SYSTEM DOCUMENTATION",
         "knowledge": "TECHNICAL DOCUMENTATION",
         "memory": "USER MEMORY",
-        "intro": "Use this retrieved information to answer if relevant:",
     },
 }
 
@@ -249,7 +246,8 @@ def _format_results(results: list, server_lang: str = "en") -> str:
     [DOCUMENTACIO DEL SISTEMA]/[MEMORIA DE L'USUARI]/etc. — those section
     markers must actually be in the context, or the model can deny having
     information it does have. `_RAG_CONTEXT_LABELS` already carries these
-    labels (used elsewhere only for its "intro" key); this is the other use.
+    labels; the framing prose that CITES them lives behind the presentation
+    port now (`core/context_presentation/`), shared by both doors.
     `[Font: source]` stays per-item inside each section for traceability.
     """
     labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])

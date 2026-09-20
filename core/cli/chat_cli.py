@@ -158,13 +158,14 @@ async def _stream_with_spinner(gen: AsyncGenerator) -> AsyncGenerator:
 @click.option('--verbose', '-v', is_flag=True, help='Show RAG detail per source')
 @click.option('--rag-threshold', type=float, default=None, help='RAG score threshold (0.20-0.70)')
 @click.option('--collections', '-c', default=None, help='Comma-separated collections: memory,knowledge,docs (default: all)')
+@click.option('--attach', '-a', type=click.Path(), default=None, help='Attach a file to the session before the first message (same upload /upload does interactively)')
 def chat(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool,
-         rag_threshold: Optional[float], collections: Optional[str]):
+         rag_threshold: Optional[float], collections: Optional[str], attach: Optional[str]):
     """
     Start an interactive chat with Nexe.
     Auto-detects the configured engine if none is specified.
     """
-    asyncio.run(_chat_async(engine, system, no_rag, model, verbose, rag_threshold, collections))
+    asyncio.run(_chat_async(engine, system, no_rag, model, verbose, rag_threshold, collections, attach))
 
 def detect_model() -> str:
     """Detect which model is currently configured."""
@@ -214,27 +215,35 @@ def _parse_collections(collections_str: Optional[str]) -> Optional[list[str]]:
     return [_COLL_ALIASES.get(c.strip(), c.strip()) for c in collections_str.split(',')]
 
 
+async def _upload_attachment(file_path: str, client: Any, session_id: str) -> bool:
+    """Upload one file to the session, echoing the same messages `/upload`
+    has always shown. Shared by `/upload` (interactive) and `--attach`
+    (#1081, at startup) — the flag is repointed at `upload_file`, not a
+    second upload path."""
+    if not os.path.isfile(file_path):
+        click.echo(click.style(f"❌ File not found: {file_path}", fg="red"))
+        return False
+    filename = Path(file_path).name
+    click.echo(click.style(f"📎 Uploading {filename}...", fg="yellow"))
+    try:
+        upload_result = await client.upload_file(file_path, session_id)
+    except Exception as e:
+        click.echo(click.style(f"❌ Error: {e}", fg="red"))
+        return False
+    if not upload_result:
+        click.echo(click.style("❌ Error uploading file. Check that the format is compatible.", fg="red"))
+        return False
+    chunks = upload_result.get("chunks", "?")
+    click.echo(click.style(f"✅ {filename} indexed ({chunks} chunks).", fg="green"))
+    return True
+
+
 async def _cmd_upload(cmd_arg: str, client: Any, session_id: str, stream_kwargs: dict) -> None:
     path_parts = re.split(r'(?<!\\) ', cmd_arg.strip(), maxsplit=1)
     raw_path = path_parts[0].replace("\\ ", " ")
     follow_up = path_parts[1].strip() if len(path_parts) > 1 else ""
     file_path = os.path.expanduser(raw_path)
-    if not os.path.isfile(file_path):
-        click.echo(click.style(f"❌ File not found: {file_path}", fg="red"))
-        return
-    filename = Path(file_path).name
-    click.echo(click.style(f"📎 Uploading {filename}...", fg="yellow"))
-    upload_ok = False
-    try:
-        upload_result = await client.upload_file(file_path, session_id)
-        if not upload_result:
-            click.echo(click.style("❌ Error uploading file. Check that the format is compatible.", fg="red"))
-        else:
-            chunks = upload_result.get("chunks", "?")
-            click.echo(click.style(f"✅ {filename} indexed ({chunks} chunks).", fg="green"))
-            upload_ok = True
-    except Exception as e:
-        click.echo(click.style(f"❌ Error: {e}", fg="red"))
+    upload_ok = await _upload_attachment(file_path, client, session_id)
     if upload_ok and follow_up:
         first = True
         async for chunk in _stream_with_spinner(client.chat_ui_stream(message=follow_up, session_id=session_id, **stream_kwargs)):
@@ -437,7 +446,8 @@ async def _chat_handle_input(user_input: str, client, session_id: str, stream_kw
 
 
 async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool = False,
-                      rag_threshold: Optional[float] = None, collections: Optional[str] = None):
+                      rag_threshold: Optional[float] = None, collections: Optional[str] = None,
+                      attach: Optional[str] = None):
     from .utils.api_client import NexeAPIClient
 
     engine, model = await _resolve_chat_engine_and_model(engine, model)
@@ -462,6 +472,13 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
         return
 
     _stream_kwargs = _chat_build_stream_kwargs(collections, rag_threshold)
+
+    if attach and not await _upload_attachment(os.path.expanduser(attach), client, session_id):
+        # The user asked for this file explicitly. Dropping into the chat
+        # anyway puts the ❌ three lines above a "🚀 Nexe Chat / Memory: ✅
+        # Active" banner and lets them talk to a document that was never
+        # indexed — continuing without it would be deciding for them.
+        raise SystemExit(1)
 
     click.echo(f"\n  {click.style('🚀 Nexe Chat', fg='cyan', bold=True)}")
     click.echo(f"  {click.style('Engine:', fg='yellow')} {engine}  |  {click.style('Model:', fg='yellow')} {model}  |  {click.style('Memory:', fg='yellow')} ✅ Active")

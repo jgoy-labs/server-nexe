@@ -361,6 +361,119 @@ _UNTRUSTED_ACK = {
 }
 
 
+#: Acknowledgement for a `note` (#1081): trusted server prose with no data to
+#: guard against, so it does not claim to treat anything "as data" the way
+#: `_UNTRUSTED_ACK` does — it only keeps the turn's role alternation valid
+#: (user-note, assistant-ack, real user question) the same shape B030 layer 2d
+#: already uses for the untrusted case.
+_NOTE_ACK = {
+    "ca": "Entesos, tinc en compte la imatge adjunta.",
+    "es": "Entendido, tengo en cuenta la imagen adjunta.",
+    "en": "Understood, I'll take the attached image into account.",
+}
+
+
+def _escape_delimiters(text: str) -> str:
+    """Neutralise our own markers inside text that is about to sit next to them.
+
+    Same three prefix replacements `_sanitize_rag_context` applies to retrieved
+    content, for the same reason and with the same shape. It is applied to the
+    FRAMING prose too because that prose stopped being a literal of this module
+    the day it moved behind a port (ADR-008's presentation half): the wording
+    can now come from a presenter this module does not control, and a legend
+    containing "[CONTEXT " would forge the pair that makes the nonce
+    meaningful (RT-01, `test_forged_pair_inside_document_cannot_close_the_block`).
+    """
+    text = text.replace('[/CONTEXT', '[/CONTEXT_ESCAPED')
+    text = text.replace('[FI CONTEXT', '[FI CONTEXT_ESCAPED')
+    return text.replace('[CONTEXT', '[CONTEXT_ESCAPED')
+
+
+def framed_context_turns(
+    body: str, lang: str, *, legend: str = "", closing: str = "",
+) -> list[dict]:
+    """The (user-context, assistant-ack) pair with the server's prose around it.
+
+    One shape for both doors:
+
+        legend · [CONTEXT n] notice + body [FI CONTEXT n] · closing   → + ack
+
+    The prose goes OUTSIDE the delimiters and INSIDE the same user turn, which
+    is what `untrusted_context_turns` already contemplated ("plus any trusted
+    source-legend text the caller keeps outside the delimiters") and what the
+    web door already did for its legend. `/v1` used to wrap its legend INSIDE,
+    telling the model the server's own instructions were untrusted data.
+
+    `body` must already have been through `_sanitize_rag_context`; the prose is
+    escaped here, because it no longer necessarily comes from this repo.
+    """
+    parts = []
+    if legend:
+        parts.append(_escape_delimiters(legend))
+    parts.append(wrap_untrusted_context(body, lang))
+    if closing:
+        parts.append(_escape_delimiters(closing))
+    return untrusted_context_turns("\n".join(parts), lang)
+
+
+def context_turns_for(
+    app_state, body: str, lang: str, *, has_document: bool, has_rag: bool,
+) -> list[dict]:
+    """The context turns for one turn: ONE decision, not one per door.
+
+    This is the whole sequence — ask the presenter what this shape of turn
+    says, then place it around the delimited block — so the two doors do not
+    each carry their own copy of it. They were identical before this; identical
+    is something somebody has to keep watching, and the last three findings in
+    this area (#1063, #1072, #1079) were all a copy drifting from its twin.
+
+    What the doors still do differently is the only thing that genuinely
+    differs: the web door BUILDS its message list and appends these turns to
+    it, while `/v1` INSERTS them into an array the client sent. Placing the
+    result is theirs; deciding what it says is not.
+
+    `lang` is normalised the same way on both sides: two-letter code, the
+    server's language when the turn has none (#1072).
+    """
+    from core.context_presentation import ContextShape, frame_for
+
+    framing = frame_for(
+        app_state,
+        ContextShape(lang=lang, has_document=has_document, has_rag=has_rag),
+    )
+    lang_key = (lang or os.environ.get("NEXE_LANG", "en")).split("-")[0].lower()
+    return framed_context_turns(
+        body, lang_key, legend=framing.legend, closing=framing.closing,
+    )
+
+
+def note_turns_for(app_state, lang: str, *, has_image: bool) -> list[dict]:
+    """The freestanding scaffolding turn for this turn's shape (#1081), if any.
+
+    Unlike `context_turns_for`, there is no `body` to wrap: `has_image` names
+    a piece of trusted server prose with no delimited block, so it travels in
+    its own (user-note, assistant-ack) pair — same B030 layer 2d reason as the
+    untrusted case (the user's real message must not carry it), different ack
+    (nothing here claims to be "data").
+
+    Returns `[]` when there is nothing to say, so callers can `extend()`
+    unconditionally.
+    """
+    if not has_image:
+        return []
+    from core.context_presentation import ContextShape, frame_for
+
+    framing = frame_for(app_state, ContextShape(lang=lang, has_image=True))
+    if not framing.note:
+        return []
+    lang_key = (lang or os.environ.get("NEXE_LANG", "en")).split("-")[0].lower()
+    ack = _NOTE_ACK.get(lang_key, _NOTE_ACK["en"])
+    return [
+        {"role": "user", "content": _escape_delimiters(framing.note)},
+        {"role": "assistant", "content": ack},
+    ]
+
+
 def untrusted_context_turns(wrapped_block: str, lang: str) -> list[dict]:
     """Return the (user-context, assistant-ack) turn pair for retrieved content.
 

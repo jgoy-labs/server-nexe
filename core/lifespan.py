@@ -86,11 +86,13 @@ from .lifespan_modules import (  # noqa: E402  # after warnings filter
 from .lifespan_crypto import _startup_encryption  # noqa: E402  # after warnings filter
 from .lifespan_qdrant import _startup_qdrant, _shutdown_qdrant  # noqa: E402  # after warnings filter
 from .lifespan_sessions import (  # noqa: E402  # after warnings filter
+    _expose_context_presenter,
     _expose_engine_gate,
     _expose_file_handler,
     _expose_memory_helper,
     _expose_post_commit_queue,
     _expose_session_manager,
+    _startup_context_presenter,
     _startup_engine_gate,
     _startup_file_handler,
     _startup_memory_helper,
@@ -397,6 +399,8 @@ async def _startup_init(app: FastAPI) -> None:
     _expose_post_commit_queue(app, server_state)
     await _startup_memory_helper(server_state)
     _expose_memory_helper(app, server_state)
+    await _startup_context_presenter(server_state)
+    _expose_context_presenter(app, server_state)
     _start_qdrant_or_degrade()
 
 

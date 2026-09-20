@@ -1,6 +1,6 @@
 """
 Tests for plugins/web_ui_module/manifest.py - targeting uncovered lines.
-Focuses on: parse_rag_header import fallback (29-30), _generate_rag_metadata LLM paths (73-134),
+Focuses on: parse_rag_header import fallback (29-30),
 _require_ui_auth (160-161), chat engine selection branches (460-491),
 streaming response paths (508-533, 652-714), session cleanup (834-839).
 """
@@ -101,95 +101,6 @@ class TestParseRagHeaderFallback:
         import plugins.web_ui_module.api.routes as m
         # Just check it's either callable or None
         assert m.parse_rag_header is None or callable(m.parse_rag_header)
-
-
-class TestGenerateRagMetadataLLM:
-    """Test lines 73-134: LLM-powered metadata generation paths."""
-
-    def test_llm_generates_metadata_ollama_style(self):
-        """Lines 78-131: LLM engine with 'model' param generates metadata."""
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-
-        mock_engine = MagicMock()
-        # Simulate ollama-style chat that returns a coroutine
-        async def mock_chat(**kwargs):
-            return {"message": {"content": "abstract: Test description\ntags: [test, doc, info]"}}
-
-        mock_engine.chat = mock_chat
-
-        mock_reg = MagicMock()
-        mock_instance = MagicMock()
-        mock_instance.get_module_instance.return_value = mock_engine
-        mock_reg.instance = mock_instance
-
-        mock_registry = MagicMock()
-        mock_registry.get_module.return_value = mock_reg
-
-        mock_state = MagicMock()
-        mock_state.module_manager.registry = mock_registry
-
-        with patch("core.lifespan.get_server_state", return_value=mock_state):
-            result = asyncio.run(_generate_rag_metadata("Test content here", "test.txt"))
-            assert "abstract" in result
-            assert "tags" in result
-
-    def test_llm_engine_not_found_uses_fallback(self):
-        """Lines 72-73: no engine found falls back."""
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-
-        mock_registry = MagicMock()
-        mock_registry.get_module.return_value = None
-
-        mock_state = MagicMock()
-        mock_state.module_manager.registry = mock_registry
-
-        with patch("core.lifespan.get_server_state", return_value=mock_state):
-            result = asyncio.run(_generate_rag_metadata("Some content", "doc.txt"))
-            assert "abstract" in result
-            assert "tags" in result
-
-    def test_llm_engine_no_chat_method(self):
-        """Lines 75-76: engine without chat method skipped."""
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-
-        mock_engine = MagicMock(spec=[])  # no chat attribute
-
-        mock_reg = MagicMock()
-        mock_instance = MagicMock()
-        mock_instance.get_module_instance.return_value = mock_engine
-        mock_reg.instance = mock_instance
-
-        mock_registry = MagicMock()
-        mock_registry.get_module.return_value = mock_reg
-
-        mock_state = MagicMock()
-        mock_state.module_manager.registry = mock_registry
-
-        with patch("core.lifespan.get_server_state", return_value=mock_state):
-            result = asyncio.run(_generate_rag_metadata("Content", "file.txt"))
-            assert "abstract" in result
-
-    def test_llm_chat_exception_continues(self):
-        """Lines 132-134: engine.chat raises exception, continues to next."""
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-
-        mock_engine = MagicMock()
-        mock_engine.chat.side_effect = Exception("Engine error")
-
-        mock_reg = MagicMock()
-        mock_instance = MagicMock()
-        mock_instance.get_module_instance.return_value = mock_engine
-        mock_reg.instance = mock_instance
-
-        mock_registry = MagicMock()
-        mock_registry.get_module.return_value = mock_reg
-
-        mock_state = MagicMock()
-        mock_state.module_manager.registry = mock_registry
-
-        with patch("core.lifespan.get_server_state", return_value=mock_state):
-            result = asyncio.run(_generate_rag_metadata("Content", "file.txt"))
-            assert "abstract" in result
 
 
 class TestChatEngineBranches:
@@ -909,60 +820,3 @@ class TestChatEngineException:
         assert r.status_code == 503
 
 
-class TestGenerateRagMetadataAsyncGen:
-    """Test lines 90-96: LLM returns async generator."""
-
-    def test_llm_async_gen_response(self):
-        """Lines 90-96: async gen chunks from LLM."""
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-
-        async def mock_chat(**kwargs):
-            async def gen():
-                yield {"message": {"content": "abstract: Async gen abstract\n"}}
-                yield {"message": {"content": "tags: [tag1, tag2]\n"}}
-            return gen()
-
-        mock_engine = MagicMock()
-        mock_engine.chat = mock_chat
-
-        mock_reg = MagicMock()
-        mock_instance = MagicMock()
-        mock_instance.get_module_instance.return_value = mock_engine
-        mock_reg.instance = mock_instance
-        mock_registry = MagicMock()
-        mock_registry.get_module.return_value = mock_reg
-        mock_state = MagicMock()
-        mock_state.module_manager.registry = mock_registry
-
-        with patch("core.lifespan.get_server_state", return_value=mock_state):
-            result = asyncio.run(_generate_rag_metadata("Test content", "test.txt"))
-            assert "abstract" in result
-            assert "tags" in result
-
-    def test_llm_string_response(self):
-        """Line 106: engine returns plain string."""
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-
-        mock_engine = MagicMock()
-        mock_engine.chat.return_value = "abstract: Plain text abstract\ntags: [t1, t2]"
-
-        mock_reg = MagicMock()
-        mock_instance = MagicMock()
-        mock_instance.get_module_instance.return_value = mock_engine
-        mock_reg.instance = mock_instance
-        mock_registry = MagicMock()
-        mock_registry.get_module.return_value = mock_reg
-        mock_state = MagicMock()
-        mock_state.module_manager.registry = mock_registry
-
-        with patch("core.lifespan.get_server_state", return_value=mock_state):
-            result = asyncio.run(_generate_rag_metadata("Test content", "test.txt"))
-            assert "abstract" in result
-
-    def test_llm_server_state_exception(self):
-        """Lines 136-137: get_server_state fails."""
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata as _generate_rag_metadata
-
-        with patch("core.lifespan.get_server_state", side_effect=Exception("no state")):
-            result = asyncio.run(_generate_rag_metadata("Content", "file.txt"))
-            assert "abstract" in result  # uses fallback

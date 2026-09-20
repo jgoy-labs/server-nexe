@@ -1,9 +1,11 @@
 """The document header agrees with the sentence that names it (#1063).
 
-`core/context_budget.py::_doc_framing` already answers "Answer based on the
-ATTACHED DOCUMENT..." in the turn's language. The header the framing sentence
-refers to, built by `core/turn/assemble.py::_build_document_context`, used to
-be Catalan no matter what: with the default `NEXE_LANG=en`, a model would read
+`core/context_budget.py::_doc_framing` answers "Answer based on the ATTACHED
+DOCUMENT..." in the turn's language — since #1072; when this test was written
+it read `NEXE_LANG` instead, which is what the note at the bottom is about.
+The header the framing sentence refers to, built by
+`core/turn/assemble.py::_build_document_context`, used to be Catalan no
+matter what: with the default `NEXE_LANG=en`, a model would read
 that sentence and then find a block titled "DOCUMENT ADJUNTAT" right after it.
 `core/endpoints/chat_rag.py` treats this correspondence as deliberate — "labels
 per language — must match system prompt references" — and this was the one
@@ -103,14 +105,15 @@ async def test_a_real_spanish_turn_gets_the_spanish_header(
     would go unnoticed by an English conversation, which would get the right
     header by coincidence. Spanish exposes it.
 
-    Only the header is asserted, not the whole prompt: `_doc_framing`
-    (`core/context_budget.py`), the sentence that CITES the header, is a
-    separate and wider divergence — it reads `NEXE_LANG` (the server's
-    voice), not `ctx.lang` (the conversation's), and that split is not
-    #1063's claim to fix (see the finding's notes). This repo's own `.env`
-    sets `NEXE_LANG=ca`, which is exactly what reproduces it here: after this
-    fix, a Spanish conversation gets a Spanish header sitting under a
-    Catalan framing sentence — the same invariant broken from the other side.
+    Only the header is asserted here, not the whole prompt: the sentence that
+    CITES the header was a separate and wider divergence — `_doc_framing` read
+    `NEXE_LANG` (the server's voice) and not `ctx.lang` (the conversation's),
+    so this fix left a Spanish header sitting under a Catalan framing
+    sentence, the same invariant broken from the other side. That was #1072,
+    fixed since; the pair is asserted together in
+    `tests/core/turn/test_1072_scaffolding_speaks_the_turn_lang.py`. Kept
+    narrow on purpose: this test guards the header's own wiring, and a test
+    that grows to cover its neighbour stops telling you which half broke.
 
     Mutation: drop `lang=ctx.lang` from the `budget` adapter's call to
     `rc._build_turn_context` and this goes red — the fake engine receives the

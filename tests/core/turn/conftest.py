@@ -293,7 +293,8 @@ class TurnLab:
         ctx.lab_wire_chunks = chunks
         return ctx
 
-    async def api(self, *, session_id: str, entry: str = "api", message: str = "hola"):
+    async def api(self, *, session_id: str, entry: str = "api", message: str = "hola",
+                  content=None, messages=None):
         """One real `/v1/chat/completions` turn through `api_adapters`.
 
         `body.stream` is False: this door's `generate` is opaque with respect
@@ -301,6 +302,13 @@ class TurnLab:
         `adapters_api.py`'s docstring), so its streaming shape is not a
         different walk of TURN_STEPS; it is the same walk with another object
         in `ctx.wire`.
+
+        `content` (#1081) overrides the plain-string `message` with a
+        list of OpenAI content parts (text + inline image) when a test needs
+        the multi-part shape; `message` still names the session/turn.
+
+        `messages` (#1081 review) replaces the whole one-message list, for
+        the multi-turn histories a real vision client sends.
         """
         from fastapi import BackgroundTasks
 
@@ -309,9 +317,12 @@ class TurnLab:
         from core.turn.context import TurnContext
         from core.turn.run import run_turn
 
+        if messages is not None:
+            _msgs = [Message(**m) if isinstance(m, dict) else m for m in messages]
+        else:
+            _msgs = [Message(role="user", content=content if content is not None else message)]
         body = ChatCompletionRequest(
-            messages=[Message(role="user", content=message)],
-            use_rag=True, stream=False, engine="ollama",
+            messages=_msgs, use_rag=True, stream=False, engine="ollama",
         )
         request = make_request(self.app_state)
         request.scope["headers"] = [

@@ -39,6 +39,7 @@ step, and the other three run for themselves through
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import Any
 
@@ -62,7 +63,10 @@ from core.turn.gate import GateBusy, Priority, _gate_wait_s, gate_for
 from core.turn.post_commit import queue_for
 from core.turn.authorize import authorize_turn
 from core.turn.run import Adapters, TurnShortCircuit
-from core.turn.validate import sanitize_user_text, validate_turn
+from core.turn.validate import parse_content_parts, sanitize_user_text, validate_turn
+
+
+logger = logging.getLogger(__name__)
 
 
 def _chat():
@@ -108,20 +112,72 @@ def _write_memory_news(ctx: TurnContext) -> None:
             ctx.wire.setdefault("nexe_" + name.lower().replace("-", "_"), value)
 
 
+def _peel_content_parts(ctx: TurnContext) -> None:
+    """Turn every multi-part `content` into plain text, keeping ONE image.
+
+    The image kept is the most RECENT one in the conversation, not the one
+    on the last message (#1081 review). A vision client re-sends its whole
+    history: the image rides on turn 1 and the follow-up question ("and what
+    colour is the one on the left?") arrives on turn 3 with no parts at all.
+    Reading only the last user message dropped that image on the floor — no
+    log, no header, `has_image` False, and an answer about nothing.
+
+    One image per turn is still the premise the engines are built on
+    (`_images_arg = [image_b64]`), so older images are dropped — but counted
+    and said out loud, which is the half that was missing.
+    """
+    image_b64 = image_type = None
+    older_images = 0
+    # Backwards: the first image found walking from the newest message is the
+    # one this turn should carry.
+    for msg in reversed(ctx.body.messages):
+        if isinstance(msg.content, str):
+            continue
+        text, msg_image, msg_image_type = parse_content_parts(msg.content)
+        if msg_image:
+            if image_b64 is None:
+                image_b64, image_type = msg_image, msg_image_type
+            else:
+                older_images += 1
+        msg.content = text
+    if image_b64:
+        ctx.attachments["image_b64"] = image_b64
+        ctx.attachments["image_type"] = image_type
+    if older_images:
+        logger.warning(
+            "%d older image(s) in the request history dropped — /v1 carries "
+            "one image per turn, the most recent one",
+            older_images,
+        )
+    last_user = next(
+        (m for m in reversed(ctx.body.messages) if m.role == "user"), None
+    )
+    ctx.message = (last_user.content if last_user else None) or ""
+
+
 def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
     """The adapter table for one request. Built per request because
     `persist_assistant_turn` needs this request's `BackgroundTasks`."""
 
     async def validate(ctx: TurnContext) -> None:
         chat = _chat()
+        # #1081: a message's `content` can be a list of OpenAI content
+        # parts (text + inline image) instead of a plain string. Every
+        # consumer downstream (mirror, sanitize, memory extraction) expects a
+        # string — the UI door has always kept `image_b64` OUT of the message
+        # text the same way — so parts are peeled apart HERE, once, and
+        # `ctx.body.messages` never carries anything but text again.
+        #
+        # BEFORE `_validate_chat_request`, not after: that function runs
+        # `validate_string_input` over every non-user message, which answers
+        # 400 "Input must be a string" for a list. The schema accepts parts
+        # on any role, and the OpenAI SDKs really do send a `system` that
+        # way — so the door that accepts the shape has to normalise it first.
+        _peel_content_parts(ctx)
         chat._validate_chat_request(ctx.body)
-        ctx.message = next(
-            (m.content for m in reversed(ctx.body.messages) if m.role == "user"), None
-        ) or ""
-        # C4.1: the shared `validate` (core/turn/validate.py). This door carries
-        # no attachments, so all it adds today is the empty-message 400 the UI
-        # door has always answered — one validate means one answer to "there is
-        # no turn here", not two.
+        # C4.1: the shared `validate` (core/turn/validate.py) — including the
+        # image check, now that this door can carry one: `attachments` above
+        # is what `validate_turn` decodes and size-checks.
         await validate_turn(ctx)
 
     async def sanitize(ctx: TurnContext) -> None:
@@ -247,22 +303,20 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         # ahead of whatever `recall` found — narrowing only ever removes
         # `user_knowledge`, so `ctx.recall_text` can still carry
         # nexe_documentation/personal_memory results alongside a document.
-        # NOT the same block the UI builds, and the difference is deliberate
-        # until someone decides otherwise (audited 19/09, left open):
-        #   * the UI appends `_doc_framing` to the user's message ("answer
-        #     based on the ATTACHED DOCUMENT…", `core/context_budget.py:234`).
-        #     Doing that here would EDIT the client's own `messages` array,
-        #     which an OpenAI-compatible API has no business doing.
-        #   * the document travels this door's RAG path, so it arrives under
-        #     "Use this retrieved information to answer if relevant"
-        #     (`_RAG_CONTEXT_LABELS[…]["intro"]`), and under this door's RAG
-        #     budget: `_trim_rag_context` is called with `document_chars=0` and
-        #     `history_ratio=0.0`, so a long client-supplied history can drop
-        #     the document entirely (measured: gone at ~30k chars of history,
-        #     with only a WARNING in the log).
-        # Converging the two means deciding whose shape is right, which is C4.4
-        # work, not a fix to smuggle into an adjustment pass.
+        # The SAME block the UI builds, since the framing moved behind the
+        # presentation port. Both halves of the old divergence are closed, and
+        # the reason each one existed is worth keeping:
+        #   * the sentence citing the document was missing here because adding
+        #     it meant appending to the user's message, which an
+        #     OpenAI-compatible API has no business doing. It does not mean
+        #     that any more: the prose travels inside the context turn pair
+        #     this door ALREADY inserts, so the client's `messages` array is
+        #     still never edited — only added to, as it always was.
+        #   * the document used to ride this door's RAG budget with
+        #     `document_chars=0`, so a long client history dropped it whole
+        #     (#1079, measured: gone at ~30k chars with only a WARNING).
         context_text = ctx.recall_text
+        document_chars = 0
         attached_doc = ctx.attachments.get("document")
         if attached_doc:
             from core.turn.assemble import _build_document_context
@@ -270,9 +324,20 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
                 attached_doc, context_window=ctx.context_window, lang=ctx.lang,
             )
             context_text = document_context + context_text
+            # C4.4: how much of this block is the user's own upload. Without
+            # it the budget treats the document as more retrieved text and a
+            # long client history drops it whole — for turns the window fit
+            # was about to drop anyway (see `_trim_rag_context`).
+            document_chars = len(document_context)
         ctx.prompt, ctx.recall_text = chat._assemble_v1_messages(
             ctx.body, ctx.system_prompt, context_text, ctx.clock_line,
-            ctx.lang, ctx.context_window,
+            ctx.lang, ctx.context_window, document_chars,
+            bool(ctx.recall_text), ctx.app_state,
+            # #1081: the `validate` step above writes `image_b64` when the
+            # client sent content parts, so this is live at this door since
+            # this step — the port carried the shape one commit before the door
+            # could fill it.
+            has_image=bool(ctx.attachments.get("image_b64")),
         )
         # #976: what the budget planned and what got assembled are not the same
         # thing — the cascade fits again per candidate, this is the first pass.
@@ -308,10 +373,13 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         released = False
         _gen_started = time.monotonic()
         try:
+            _image_b64 = ctx.attachments.get("image_b64")
             response, served_by, fallback_from, reason, served_model = await chat._dispatch_through_cascade(
                 ctx.body, ctx.request, ctx.prompt, ctx.message or None,
                 ctx.session_id, ctx.engine, ctx.engine_fallback_from,
                 cancel_event=cancel_event,
+                # #1081: same shape as the UI door's `_images_arg`.
+                images=[_image_b64] if _image_b64 else None,
             )
             # I8 (C2.5): the cascade may have tried more than one engine, but
             # `served_by` is the one that actually generated — a retry that

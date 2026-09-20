@@ -32,12 +32,21 @@ logger = logging.getLogger(__name__)
 
 
 #: #1063: the header used to be Catalan no matter what. The sentence that
-#: CITES it — `context_budget._doc_framing` — already answers in the turn's
+#: CITES it — `context_budget._doc_framing` — must answer in the SAME
 #: language; with `NEXE_LANG=en` (the default) a model reading "Answer based
 #: on the ATTACHED DOCUMENT" would find a block titled "DOCUMENT ADJUNTAT"
 #: right after it. `core/endpoints/chat_rag.py` treats that correspondence as
 #: a deliberate invariant ("labels per language — must match system prompt
 #: references"); this was the one label that broke it.
+#:
+#: ⚠️ #1072: this comment used to say the citing sentence "already answers in
+#: the turn's language", and that was NOT true — `_doc_framing` resolved out
+#: of `NEXE_LANG`, so fixing the header alone left the pair split the OTHER
+#: way (English header, Catalan sentence, with this repo's own `.env`). The
+#: sentence follows the turn now too: `_assemble_engine_messages` passes its
+#: `lang` down to `_inject_context_into_messages`. Fixing one half of a
+#: correspondence on the assumption that the other half was already right is
+#: what made this survive a fix that went looking straight at it.
 #:
 #: Same shape as `_doc_framing` (`core/context_budget.py`) and
 #: `_COLLECTIONS_OFF_NOTES` (`core/turn/prompt.py`): a module dict keyed by
@@ -269,8 +278,8 @@ async def _build_turn_context(
 
 
 def _assemble_engine_messages(
-    turn: PromptParts, system_prompt: str, _lang: str, message: str, session, _continue: bool,
-    engine=None, *, clock_line: str = "",
+    turn: PromptParts, system_prompt: str, lang: str, message: str, session, _continue: bool,
+    engine=None, *, clock_line: str = "", app_state=None, has_image: bool = False,
 ) -> tuple[list, int]:
     """Engine payload: history, context budget, injection, on-demand clock.
 
@@ -352,7 +361,8 @@ def _assemble_engine_messages(
     else:
         engine_messages, _doc_truncated_pct, _ctx_injected = _inject_context_into_messages(
             engine_messages, message, document_context, rag_context,
-            _budget, available_chars, history_chars,
+            _budget, available_chars, history_chars, lang, app_state,
+            has_image=has_image,
         )
     # B030/#851: the data-not-instructions rule is armed
     # UNCONDITIONALLY by _finalize_system_prompt, which runs in

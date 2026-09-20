@@ -201,9 +201,17 @@ class TestWebUiInjectContext:
         assert "EXCLUSIVAMENT" not in context
         # The data-only commitment lives in the assistant ack turn.
         assert msgs[1]["content"] == _UNTRUSTED_ACK["ca"]
-        # The final user turn keeps the answer-from-document framing + question.
-        assert "DOCUMENT ADJUNTAT" in msgs[-1]["content"]
-        assert msgs[-1]["content"].rstrip().endswith("pregunta de l'usuari")
+        # The sentence that cites the document travels WITH the block, after
+        # the closing delimiter — re-aimed when the framing moved behind the
+        # presentation port. It used to be glued onto the user's message, which
+        # is the very thing layer 2d stopped doing for retrieved content; its
+        # own words ("del bloc de context anterior") say where it belongs.
+        assert "DOCUMENT ADJUNTAT" in context
+        assert context.index("Respon basant-te") > _CLOSE_RE.search(context).start()
+        # And the user's message is now exactly what the user typed. This is
+        # the assertion that was loosened before, not a weaker one: it used to
+        # accept the framing sentence in front of it.
+        assert msgs[-1]["content"] == "pregunta de l'usuari"
 
     def test_plain_message_does_not_flag(self):
         msgs, _, ctx_injected = self._call()

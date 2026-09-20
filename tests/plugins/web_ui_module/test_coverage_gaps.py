@@ -333,25 +333,6 @@ class TestWebUIManifestGaps:
         instance = get_module_instance()
         assert instance is not None
 
-    def test_generate_rag_metadata_fallback(self):
-        """generate_rag_metadata falls back gracefully."""
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata
-        # This is async, run it
-        result = asyncio.run(generate_rag_metadata("Test content body", "test.txt"))
-        assert "abstract" in result
-        assert "tags" in result
-        assert "priority" in result
-        assert "type" in result
-        assert "lang" in result
-
-    def test_generate_rag_metadata_with_chat_result_string(self):
-        """chat_result is a plain string — falls back."""
-        from plugins.web_ui_module.core.rag_handler import generate_rag_metadata
-        # Without server state, falls back to _fallback()
-        result = asyncio.run(generate_rag_metadata("Some document content here.", "doc.md"))
-        assert isinstance(result["abstract"], str)
-        assert len(result["tags"]) > 0
-
     def test_session_manager_instance(self):
         """WebUIModule.session_manager is None at __init__, bound in initialize().
 

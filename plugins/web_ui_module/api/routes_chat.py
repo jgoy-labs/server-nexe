@@ -15,7 +15,6 @@ from dataclasses import dataclass
 import asyncio
 import inspect
 import logging
-import os as _os
 import re as _re
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Depends, Request as FastAPIRequest
@@ -629,39 +628,6 @@ async def _yield_model_loading_check(engine, model_name: str, engine_name: str):
             yield f"\x00[MODEL_LOADING:{_safe_model}|{engine_name}]\x00"
     except Exception as e:
         logger.debug("Model loaded check failed for %s: %s", model_name, e)
-
-
-def _inject_image_block(messages: list) -> list:
-    """Prepend a localised image-context block to the last user message if present."""
-    _img_blocks = {
-        "ca": (
-            "[IMATGE ADJUNTA]\n"
-            "L'usuari ha adjuntat una imatge a aquest missatge. "
-            "Analitza la imatge i incorpora-la a la teva resposta. "
-            "Prioritza el que veus a la imatge per sobre de memòries anteriors.\n"
-            "[FI IMATGE]"
-        ),
-        "es": (
-            "[IMAGEN ADJUNTA]\n"
-            "El usuario ha adjuntado una imagen a este mensaje. "
-            "Analiza la imagen e incorpórala a tu respuesta. "
-            "Prioriza lo que ves en la imagen por encima de memorias anteriores.\n"
-            "[FIN IMAGEN]"
-        ),
-        "en": (
-            "[ATTACHED IMAGE]\n"
-            "The user has attached an image to this message. "
-            "Analyze the image and incorporate it into your response. "
-            "Prioritize what you see in the image over previous memories.\n"
-            "[END IMAGE]"
-        ),
-    }
-    _lang_key2 = _os.environ.get("NEXE_LANG", "en").split("-")[0].lower()
-    _img_block = _img_blocks.get(_lang_key2, _img_blocks["en"])
-    if messages and messages[-1]["role"] == "user":
-        messages[-1] = dict(messages[-1])
-        messages[-1]["content"] = f"{_img_block}\n\n{messages[-1]['content']}"
-    return messages
 
 
 async def _accumulate_nonstreaming_response(chat_result, response_chunks: list) -> None:
@@ -1489,13 +1455,10 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     _clock_line = time_context_line(message, _lang)
                     messages, _doc_truncated_pct = _assemble_engine_messages(
                         _turn, system_prompt, _lang, message, session, _continue,
-                        engine, clock_line=_clock_line,
+                        engine, clock_line=_clock_line, app_state=request.app.state,
+                        has_image=bool(image_b64),
                     )
                     response_chunks: list[str] = []
-
-                    # When an image is attached, wrap with context block (same pattern as documents)
-                    if image_b64:
-                        messages = _inject_image_block(messages)
 
                     # Adapt to different chat signatures
                     import inspect

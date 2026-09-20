@@ -14,8 +14,6 @@ www.jgoy.net · https://server-nexe.org
 import logging
 from fastapi import APIRouter, Depends
 
-from plugins.web_ui_module.core.rag_handler import generate_rag_metadata  # noqa: F401 — re-export
-
 # RAG header parser via the core porter (plugins/ must not import memory/).
 try:
     from core.rag_header import parse_rag_header  # noqa: F401

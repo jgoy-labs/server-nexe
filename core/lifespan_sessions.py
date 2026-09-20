@@ -102,6 +102,23 @@ def _expose_memory_helper(app, server_state) -> None:
     app.state.memory_helper = helper
 
 
+async def _startup_context_presenter(server_state) -> None:
+    """Create the process-wide ContextPresenter — how retrieved context frames
+    itself, one piece for both doors instead of one per door."""
+    from core.context_presentation import attach_context_presenter
+    attach_context_presenter(server_state)
+
+
+def _expose_context_presenter(app, server_state) -> None:
+    """Mirror the presenter onto `app.state`, same reason as its neighbours:
+    `frame_for(ctx.app_state, ...)` is what the `budget` step reads."""
+    presenter = getattr(server_state, "context_presenter", None)
+    if presenter is None:
+        logger.warning("ContextPresenter not attached on server_state — turns will use the default framing")
+        return
+    app.state.context_presenter = presenter
+
+
 async def _startup_file_handler(server_state) -> None:
     """Create the process-wide FileHandler (C4.3-b) — the web UI module used to
     build its own; now the core owns it, so /v1 can attach documents too."""

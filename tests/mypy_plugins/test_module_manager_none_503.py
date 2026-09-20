@@ -4,7 +4,7 @@ Server Nexe
 Location: tests/onada4_mypy_plugins/test_cluster17_module_manager_none_503.py
 Description: Blind tests — scenario (module_manager.registry None cross-file).
 
-scenario: routes_chat.py L575/592 and rag_handler.py L57 access
+scenario: routes_chat.py L575/592 accesses
 `module_manager.registry` without a guard. If get_server_state().module_manager
 is None (startup race or failed initialization), AttributeError → absorbed
 by except Exception → response_text "Error: ..." → HTTP 200 (NOT 503).

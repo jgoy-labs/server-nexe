@@ -403,10 +403,12 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             ui["rag_count"] = turn.rag_count
             messages, doc_truncated_pct = rc._assemble_engine_messages(
                 turn, ctx.system_prompt, ctx.lang, ctx.message, ctx.session, False, ctx.engine,
-                clock_line=ctx.clock_line,
+                clock_line=ctx.clock_line, app_state=ctx.app_state,
+                # #1081: the image note now travels through the same
+                # ContextShape/ContextFraming port as the document's, instead
+                # of mutating `messages[-1]` after assembly.
+                has_image=bool(ctx.attachments.get("image_b64")),
             )
-            if ctx.attachments.get("image_b64"):
-                messages = rc._inject_image_block(messages)
             ctx.prompt = messages
             ui["doc_truncated_pct"] = doc_truncated_pct
             ui["compacted"] = ctx.session.compaction_count > 0 and ctx.session.context_summary is not None

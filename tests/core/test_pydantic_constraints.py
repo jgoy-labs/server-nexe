@@ -120,6 +120,50 @@ class TestChatPydanticConstraints:
         # Not 422: payload passed Pydantic. May be 400 (sanitizer), 404/503 (engine), etc.
         assert r.status_code != 422, f"Boundary 8000 chars must not 422: {r.text}"
 
+    def test_image_content_part_oversized_data_uri_rejected(self, chat_client):
+        """#1081: the dual-limit trap — a data: URI this big cannot be
+        a real image under `MAX_IMAGE_BYTES` (10 MB, ~13.98M b64 chars), so
+        Pydantic rejects it before `decode_image_attachment` ever runs."""
+        from core.endpoints.chat_schemas import MAX_IMAGE_DATA_URI_LENGTH
+
+        oversized_uri = "data:image/png;base64," + ("A" * MAX_IMAGE_DATA_URI_LENGTH)
+        payload = {
+            "messages": [{"role": "user", "content": [
+                {"type": "image_url", "image_url": {"url": oversized_uri}},
+            ]}],
+            "stream": False, "use_rag": False,
+        }
+        r = chat_client.post("/v1/chat/completions", json=payload, headers=_HEADERS)
+        assert r.status_code == 422, f"Expected 422 (Pydantic), got {r.status_code}: {r.text}"
+
+    def test_image_content_part_within_ceiling_passes_validation(self, chat_client):
+        """A real image's data URI (well under the 10 MB ceiling) must not be
+        rejected by Pydantic — the mistake this ceiling exists to fix (`content`'s old
+        flat max_length=8000 would have 422'd this)."""
+        real_sized_b64 = "A" * 100_000  # ~75 KB decoded, nowhere near either ceiling
+        payload = {
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": "what is this?"},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{real_sized_b64}"}},
+            ]}],
+            "stream": False, "use_rag": False,
+        }
+        r = chat_client.post("/v1/chat/completions", json=payload, headers=_HEADERS)
+        assert r.status_code != 422, f"A within-ceiling image must not 422: {r.text}"
+
+    def test_content_parts_list_over_max_length_rejected(self, chat_client):
+        """5 parts (the cap is 4, #1081) → 422. Anti-DoS on the LIST
+        itself — `parse_content_parts` keeps only the first image and logs the
+        rest, this stops a payload of thousands of empty parts reaching it."""
+        payload = {
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": "x"} for _ in range(5)
+            ]}],
+            "stream": False, "use_rag": False,
+        }
+        r = chat_client.post("/v1/chat/completions", json=payload, headers=_HEADERS)
+        assert r.status_code == 422, f"Expected 422 (Pydantic), got {r.status_code}: {r.text}"
+
     def test_more_than_100_messages_rejected(self, chat_client):
         """101 messages in conversation → 422 (Pydantic max_length on messages list)."""
         payload = {

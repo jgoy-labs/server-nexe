@@ -23,11 +23,12 @@ from core.security.input_sanitizers import validate_string_input
 
 from .chat_schemas import Message, ChatCompletionRequest
 from core.log_redact import redact_user_content
+from core.context_presentation import ContextShape, frame_for
 from .chat_sanitization import (
     _sanitize_rag_context,
     _sanitize_sse_token,
-    untrusted_context_turns,
-    wrap_untrusted_context,
+    context_turns_for,
+    note_turns_for,
     MAX_RAG_CONTEXT_LENGTH,
     MAX_CHAT_INPUT_LENGTH,
     DEFAULT_CONTEXT_WINDOW,
@@ -268,7 +269,52 @@ def get_effective_context_window(engine: str, app_state: Any = None) -> int:
     return resolve_context_window(engine, app_state)
 
 
-def _trim_rag_context(safe_context: str, messages: list, effective_ctx_window: int = None) -> str:
+#: Chars held back for the model's reply in this door's budget. Named because
+#: `_history_chars_for_budget` and the `compute_context_budget` call below have
+#: to subtract the SAME number: two literals that split one total are two
+#: literals that drift apart, and the drift would be silent — the document
+#: would just start fitting a little worse than the arithmetic says.
+V1_RESPONSE_BUFFER_CHARS = 500
+
+
+def _history_chars_for_budget(
+    history_chars: int, document_chars: int,
+    max_context_chars: int, system_chars: int, message_chars: int,
+) -> int:
+    """How much of the client's history the budget should count (C4.4).
+
+    All of it, unless a document is attached and counting all of it would
+    leave the document no room. The turn's document does not lose to history
+    that `_fit_v1_messages_to_window` (#976) is about to drop anyway — that
+    was the old behaviour and it cost the document whole, silently, for turns
+    the very next step then trimmed.
+
+    A history that already fits under the cap comes back untouched, so the
+    ordinary turn computes exactly the budget it always did. Lives on its own
+    rather than inside `_trim_rag_context` because that function was at the
+    complexity ceiling and this is a question with its own name.
+    """
+    if document_chars <= 0:
+        return history_chars
+    cap = max(
+        0,
+        max_context_chars - system_chars - message_chars
+        - V1_RESPONSE_BUFFER_CHARS - document_chars,
+    )
+    if history_chars <= cap:
+        return history_chars
+    logger.info(
+        "Document attached: history counted as %d of %d chars for the budget "
+        "(the rest is dropped by the window fit anyway)",
+        cap, history_chars,
+    )
+    return cap
+
+
+def _trim_rag_context(
+    safe_context: str, messages: list, effective_ctx_window: int = None,
+    document_chars: int = 0, scaffold_chars: int = 0,
+) -> str:
     """Trim RAG context to what the turn's budget actually leaves for it.
 
     ``effective_ctx_window`` (MC-090) is the real context window of the serving
@@ -301,11 +347,25 @@ def _trim_rag_context(safe_context: str, messages: list, effective_ctx_window: i
     that overrun WAS ours and is fixed: the security rule is now appended
     before the budget is taken, as /ui/chat has always done.
 
-    ``history_ratio=0`` on purpose. That floor exists to stop a big attached
-    document from crowding out earlier turns (Bug 32), and this path has no
-    documents — ``document_chars`` is always 0 here. Reserving a share of the
-    budget for a history that is complete (the client sent all of it; it will
-    not grow inside this request) reserves it for nobody.
+    ``history_ratio=0`` on purpose, and that half of the reasoning still
+    holds: the floor exists to stop a big attached document from crowding out
+    earlier turns (Bug 32), and reserving a share of the budget for a history
+    that is complete (the client sent all of it; it will not grow inside this
+    request) reserves it for nobody.
+
+    The OTHER half — "this path has no documents, ``document_chars`` is always
+    0 here" — stopped being true at #1078, when `budget` started folding an
+    attached document into this same block. What that left behind was worse
+    than the sentence: the budget counted the client's history whole, went
+    negative on it, and dropped the retrieved block with the document inside,
+    while ``_fit_v1_messages_to_window`` (#976) ran next and dropped those same
+    old turns anyway. The document was given up for history that was already
+    on its way out.
+
+    So ``document_chars`` arrives now, and when it is set the history that
+    enters the arithmetic is CAPPED at what is left once the document has its
+    place. Not a bigger budget — the same one, told the truth about what is in
+    it. With no document the numbers are byte-for-byte what they were.
 
     No numbers in this docstring, deliberately. Three earlier versions of it
     quoted measured tables and all three drifted — one described a budget
@@ -333,22 +393,37 @@ def _trim_rag_context(safe_context: str, messages: list, effective_ctx_window: i
     message_chars = len(_non_system[-1].get('content', '') or '') if _non_system else 0
     history_chars = sum(len(m.get('content', '') or '') for m in _non_system[:-1])
 
+    # C4.4: the framing prose is part of what this turn ships, so it comes out
+    # of the same budget the payload does, and it comes out FIRST — everything
+    # below has to reason about the same total, or the history cap would be
+    # computed against room that is already spoken for. Subtracted and never
+    # branched on: this function sits one point under the complexity ceiling,
+    # and an `if` here would put it on the baseline for an arithmetic detail.
+    max_context_chars = resolve_max_context_chars(window_tokens=ctx_window) - scaffold_chars
+
+    history_chars = _history_chars_for_budget(
+        history_chars, document_chars, max_context_chars, system_chars, message_chars,
+    )
+
     budget = compute_context_budget(
-        max_context_chars=resolve_max_context_chars(window_tokens=ctx_window),
+        max_context_chars=max_context_chars,
         system_chars=system_chars,
         history_chars=history_chars,
         message_chars=message_chars,
-        document_chars=0,
-        history_ratio=0.0,  # no documents on this path — see the docstring
-        response_buffer=500,
+        document_chars=document_chars,
+        history_ratio=0.0,  # see the docstring
+        response_buffer=V1_RESPONSE_BUFFER_CHARS,
     )
     available_chars = budget["available_chars"]
 
     if available_chars <= 0:
         # #965's lesson: silent context loss is the bug. The UI route warns here
         # too (_inject_context_into_messages) — same event, same visibility.
+        # Naming the document matters: this warning used to say "retrieved
+        # context" for a block that had the user's own upload inside it.
         logger.warning(
-            "Dropping retrieved context: budget exhausted (available_chars=%d, history=%d)",
+            "Dropping retrieved context%s: budget exhausted (available_chars=%d, history=%d)",
+            " INCLUDING THE ATTACHED DOCUMENT" if document_chars > 0 else "",
             available_chars, history_chars,
         )
         return ""
@@ -362,14 +437,37 @@ def _trim_rag_context(safe_context: str, messages: list, effective_ctx_window: i
     return safe_context
 
 
-def _inject_rag_context_into_messages(messages: list, context_text: str, server_lang: str, effective_ctx_window: int = None) -> bool:
-    """Inject RAG context as its own turn pair before the last user message (in-place).
+def _insert_before_last_user(messages: list, turns: list[dict]) -> bool:
+    """Splice `turns` immediately before the last user-role message, in place.
 
-    Returns whether anything was actually injected. The caller reports RAG as
-    active from that, not from having retrieved something: since F-D block 4
-    the turn's budget can leave no room at all, and a server that answers
-    "X-Nexe-RAG-Status: active" after dropping the context is telling the
-    client the model saw sources it never saw.
+    Shared tail for every kind of scaffolding this door injects (doc/RAG
+    block, #1081 image note): the client's array only ever gets turns
+    inserted before its own last user message, never appended after it.
+    Returns whether anything was spliced in.
+    """
+    if not turns:
+        return False
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i]['role'] == 'user':
+            messages[i:i] = turns
+            return True
+    return False
+
+
+def _inject_rag_context_into_messages(
+    messages: list, context_text: str, server_lang: str,
+    effective_ctx_window: int = None, document_chars: int = 0,
+    has_rag: bool = False, app_state=None, has_image: bool = False,
+) -> bool:
+    """Inject RAG/document/image scaffolding before the last user message (in-place).
+
+    Returns whether RAG/document context was actually injected. The caller
+    reports RAG as active from that, not from having retrieved something:
+    since F-D block 4 the turn's budget can leave no room at all, and a
+    server that answers "X-Nexe-RAG-Status: active" after dropping the
+    context is telling the client the model saw sources it never saw.
+    `has_image` (#1081) does not affect this flag: the image note is
+    independent trusted scaffolding, never untrusted retrieved content.
 
     B030 (RT-01): the retrieved content is wrapped in nonce'd delimiters with a
     data-not-instructions intro, and the system message gets the static RAG
@@ -379,38 +477,70 @@ def _inject_rag_context_into_messages(messages: list, context_text: str, server_
     B030 layer 2d (turn separation): the wrapped block travels in a separate
     user turn + assistant data-only acknowledgement, inserted BEFORE the last
     user message — the user's question arrives clean and keeps its authority,
-    instead of the document speaking with the user's voice.
+    instead of the document speaking with the user's voice. The image note
+    (#1081) follows the same rule with its own neutral ack (`note_turns_for`)
+    and is spliced in closest to the real message, after any doc/RAG block.
     """
-    if not (context_text and messages):
-        return False
-    safe_context = _sanitize_rag_context(context_text, effective_ctx_window)
-    safe_context = _trim_rag_context(safe_context, messages, effective_ctx_window)
-    if not safe_context:
-        # F-D block 4: the trim can now come back empty (the turn's budget is
-        # spent), where before it always kept at least a slice. Injecting the
-        # turn pair anyway would hand the model a "use this retrieved
-        # information:" block with nothing in it — and cost a prefix-cache miss
-        # to say nothing. _trim_rag_context has already logged why.
-        return False
-    _labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])
-    _instruction = _labels["intro"]
-    wrapped = wrap_untrusted_context(f"{_instruction}\n{safe_context}", server_lang)
-    for i in range(len(messages) - 1, -1, -1):
-        if messages[i]['role'] == 'user':
-            messages[i:i] = untrusted_context_turns(wrapped, server_lang)
-            break
-    else:
-        # No user turn to insert before: nothing was injected.
-        return False
+    _injected = False
+    # #1081: built BEFORE the trim, because what the note pair occupies is
+    # part of what this turn ships — the same reason `legend`/`closing` are
+    # counted below. Leaving it out let the assembled prompt grow past the
+    # budget by ~200 chars on every image turn, which is exactly the promise
+    # `WRAPPER_SLACK` exists to keep honest (ADR-009).
+    _note_turns = note_turns_for(app_state, server_lang, has_image=has_image)
+    _note_chars = sum(len(t.get("content") or "") for t in _note_turns)
+    if context_text and messages:
+        framing = frame_for(
+            app_state,
+            ContextShape(
+                lang=server_lang, has_document=document_chars > 0, has_rag=has_rag,
+            ),
+        )
+        # Asked here only for its LENGTH: the payload has to be trimmed BEFORE
+        # the turns are composed, and what the prose occupies is part of what
+        # the turn ships. `context_turns_for` asks again for the words
+        # themselves — the same answer, because the port is text selection and
+        # not I/O by contract (`core/context_presentation/port.py`), so a
+        # presenter with state would be breaking that contract, not this call
+        # site.
+        safe_context = _sanitize_rag_context(context_text, effective_ctx_window)
+        safe_context = _trim_rag_context(
+            safe_context, messages, effective_ctx_window, document_chars,
+            len(framing.legend) + len(framing.closing) + _note_chars,
+        )
+        if safe_context:
+            # F-D block 4: the trim can come back empty (the turn's budget is
+            # spent), where before it always kept at least a slice. Injecting
+            # the turn pair anyway would hand the model a "use this retrieved
+            # information:" block with nothing in it — and cost a
+            # prefix-cache miss to say nothing. _trim_rag_context has already
+            # logged why.
+            turns = context_turns_for(
+                app_state, safe_context, server_lang,
+                has_document=document_chars > 0, has_rag=has_rag,
+            )
+            _injected = _insert_before_last_user(messages, turns)
+    # #1081: independent of the RAG/document branch above — a turn can carry
+    # an image with no document and no retrieval, and `note_turns_for`
+    # returns `[]` (a no-op splice) when there is nothing to say.
+    if _note_turns and not _insert_before_last_user(messages, _note_turns):
+        # The splice reports "nothing inserted" and the old `for...else` here
+        # used to act on exactly that signal. Dropping the return value would
+        # leave the model told nothing about an image it is about to receive.
+        logger.warning(
+            "Image note dropped: no user message in the request to insert it before",
+        )
     # #851: la regla de seguretat s'arma INCONDICIONALMENT al caller
     # (_build_rag_and_system_prompt) — aquí només corria amb context i
     # partia el namespace de la caché de prefix entre torns amb/sense RAG.
-    return True
+    return _injected
 
 
 def _assemble_v1_messages(
     body: ChatCompletionRequest, system_prompt: str, context_text: str,
     clock_line: str, server_lang: str, effective_ctx_window: int = None,
+    document_chars: int = 0, has_rag: bool = False, app_state=None,
+    has_image: bool = False,
 ) -> tuple[list[dict], str]:
     """The `budget` step at this door: the messages list the engine is given.
 
@@ -441,7 +571,10 @@ def _assemble_v1_messages(
     # planned a prompt ~490 chars smaller than the one it then sent.
     _ensure_system_message(messages, system_prompt)
 
-    _injected = _inject_rag_context_into_messages(messages, context_text, server_lang, effective_ctx_window)
+    _injected = _inject_rag_context_into_messages(
+        messages, context_text, server_lang, effective_ctx_window, document_chars,
+        has_rag, app_state, has_image=has_image,
+    )
 
     # F-D block 1: clock on demand — parity with the UI route. Never the
     # system prompt (would poison the prefix cache for the whole
@@ -457,7 +590,7 @@ def _assemble_v1_messages(
 async def _dispatch_to_engine(
     engine: str, messages: list[dict], body: ChatCompletionRequest,
     request: Request, app_state: Any, last_user_msg: Optional[str], session_id: Optional[str] = None,
-    cancel_event: Any = None,
+    cancel_event: Any = None, images: Optional[list[str]] = None,
 ) -> Any:
     """Route the chat request to the resolved backend engine (Ollama, MLX, or llama.cpp).
 
@@ -469,15 +602,23 @@ async def _dispatch_to_engine(
     in-process engines whose token loop can check it. Ollama keeps its own
     ``httpx`` timeout (a deadline shorter than that timeout still wins,
     since either one ending the call is enough).
+
+    ``images`` (#1081): a single base64 string in a list, same shape
+    the UI door's `_start_engine_call` has always passed — which engine
+    actually reads it is that engine's own decision, never this door's.
     """
     if engine.lower() == "ollama":
-        return await _forward_to_ollama(messages, body, app_state, last_user_msg, session_id=session_id)
+        return await _forward_to_ollama(
+            messages, body, app_state, last_user_msg, session_id=session_id, images=images,
+        )
     elif engine.lower() == "mlx":
-        return await _forward_to_mlx(messages, body, request, cancel_event=cancel_event)
+        return await _forward_to_mlx(messages, body, request, cancel_event=cancel_event, images=images)
     elif engine.lower() in ["llama_cpp", "llama.cpp", "llamacpp"]:
-        return await _forward_to_llama_cpp(messages, body, request, cancel_event=cancel_event)
+        return await _forward_to_llama_cpp(messages, body, request, cancel_event=cancel_event, images=images)
     else:
-        return await _forward_to_ollama(messages, body, app_state, last_user_msg, session_id=session_id)
+        return await _forward_to_ollama(
+            messages, body, app_state, last_user_msg, session_id=session_id, images=images,
+        )
 
 
 def _persist_v1_turn_from_response(
@@ -583,10 +724,15 @@ async def _dispatch_through_cascade(
     body: ChatCompletionRequest, request: Request, messages: list[dict],
     last_user_msg: Optional[str], session_id: str, engine: str,
     preferred_fallback: Optional[str], *, cancel_event: Any = None,
+    images: Optional[list[str]] = None,
 ) -> tuple:
     """Try the resolved engine, then the rest of the cascade. Returns
     ``(response, engine_that_answered, fallback_from, fallback_reason,
     model_that_answered)``.
+
+    ``images`` (#1081): threaded unchanged to every candidate in the
+    cascade — an image that one engine cannot read is not a reason to skip
+    it, the same "the engine decides" rule the UI door has always followed.
 
     The last element is #1054: the engine's NAME is not the model's, and the
     turn's LLM counter had no way to reach the second one — every streamed /v1
@@ -629,7 +775,7 @@ async def _dispatch_through_cascade(
             )
             response = await _dispatch_to_engine(
                 candidate, attempt_messages, body, request, request.app.state, last_user_msg, session_id,
-                cancel_event=cancel_event,
+                cancel_event=cancel_event, images=images,
             )
         except Exception as exc:
             _record_engine_metrics(candidate, "error", start_time)
