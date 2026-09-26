@@ -87,7 +87,20 @@ def check_storage_paths() -> Dict[str, Any]:
     }
 
 def check_rag_sources(module) -> Dict[str, Any]:
-  """Check: Verify health of each RAG source."""
+  """Check: the module can name the sources the chat retrieves from.
+
+  ADR-008 E2: this used to walk `module._sources` (one PersonalityRAG) and
+  call each one's `health()`. The real sources (`core/rag/`) have no
+  `health()` — whether their store answers is `check_qdrant_available`'s
+  question, asked once, not per source — so what is left to check is that the
+  list is there.
+
+  The three system collections are ALWAYS in `list_sources()`, whatever the
+  registry holds. That is load-bearing: the registry is empty on a default
+  install, and a check fed only `registered_names()` would report `fail`,
+  turn the aggregate `unhealthy` and hold readiness down
+  (`core/endpoints/root.py`) on a server whose chat retrieves just fine.
+  """
   i18n = get_i18n()
   try:
     if not module._initialized:
@@ -97,42 +110,20 @@ def check_rag_sources(module) -> Dict[str, Any]:
         "message": i18n.t("rag.health.module_not_initialized_no_sources", "Module not initialized - no sources loaded")
       }
 
-    if not module._sources:
+    sources = module.list_sources()
+    if not sources:
       return {
         "name": "rag_sources",
         "status": "fail",
         "message": i18n.t("rag.health.no_sources_registered", "No RAG sources registered")
       }
 
-    sources_health = {}
-    all_healthy = True
-
-    for name, source in module._sources.items():
-      try:
-        source_health = source.health()
-        sources_health[name] = source_health
-
-        if source_health.get("status") in ["unhealthy", "degraded"]:
-          all_healthy = False
-
-      except Exception as e:
-        sources_health[name] = {"status": "unhealthy", "error": str(e)}
-        all_healthy = False
-
-    if all_healthy:
-      return {
-        "name": "rag_sources",
-        "status": "pass",
-        "message": i18n.t("rag.health.sources_healthy", "{count} sources healthy", count=len(module._sources)),
-        "sources": sources_health
-      }
-    else:
-      return {
-        "name": "rag_sources",
-        "status": "fail",
-        "message": i18n.t("rag.health.sources_unhealthy", "Some sources unhealthy ({count} total)", count=len(module._sources)),
-        "sources": sources_health
-      }
+    return {
+      "name": "rag_sources",
+      "status": "pass",
+      "message": i18n.t("rag.health.sources_available", "{count} sources available", count=len(sources)),
+      "sources": sources
+    }
 
   except Exception as e:
     return {
@@ -236,7 +227,7 @@ def check_health(module) -> Dict[str, Any]:
       "name": module.name,
       "version": module.version,
       "initialized": module._initialized,
-      "sources": list(module._sources.keys()) if module._initialized else [],
+      "sources": module.list_sources() if module._initialized else [],
       "stats": module._stats if module._initialized else {}
     }
 

@@ -70,7 +70,7 @@ def set_grace_period_active(*args, **kwargs): pass
 # a SUCCESSFUL authentication and turned a valid key into a 500. The server would
 # stop authenticating because its audit log broke, which is the opposite of what
 # #1005 decided ("a missing plugin never turns a valid key into a 500"). It is
-# the same rule `memory/rag/module.py` already applies to its metric writes: the
+# the same rule `core/endpoints/chat_rag.py` already applies to its metric writes: the
 # work is already done, so the bookkeeping cannot be allowed to replace the
 # answer. What is lost is still reported here, never swallowed.
 _AUDIT_WARN_WINDOW_SECONDS = 300.0

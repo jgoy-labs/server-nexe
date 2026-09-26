@@ -394,6 +394,10 @@ class TestNotImplemented:
     Some return 501 (Not Implemented), others 403 (the security plugin
     blocks the request before reaching the handler). Both codes indicate
     that the endpoint is not functional in v0.8.
+
+    The /v1/rag/* and /v1/documents/ stubs were RETIRED (ADR-008 E2): they
+    must answer 404, and these tests guard that the surface does not come
+    back.
     """
 
     def _require_server_alive(self):
@@ -403,8 +407,8 @@ class TestNotImplemented:
         except requests.exceptions.ConnectionError:
             pytest.skip("Server not accessible (possible prior crash)")
 
-    def test_rag_search_501(self):
-        """POST /v1/rag/search → 501 or 403 (not implemented)"""
+    def test_rag_search_404(self):
+        """POST /v1/rag/search → 404 (ADR-008 E2: the 501 stub was retired)"""
         self._require_server_alive()
         r = requests.post(
             f"{BASE_URL}/v1/rag/search",
@@ -412,12 +416,12 @@ class TestNotImplemented:
             headers=HEADERS,
             timeout=5
         )
-        assert r.status_code in (403, 501), (
-            f"Expected 403 or 501, received {r.status_code}"
+        assert r.status_code == 404, (
+            f"Expected 404 (retired route), received {r.status_code}"
         )
 
-    def test_rag_add_501(self):
-        """POST /v1/rag/add → 501 or 403 (not implemented)"""
+    def test_rag_add_404(self):
+        """POST /v1/rag/add → 404 (ADR-008 E2: the 501 stub was retired)"""
         self._require_server_alive()
         r = requests.post(
             f"{BASE_URL}/v1/rag/add",
@@ -425,20 +429,20 @@ class TestNotImplemented:
             headers=HEADERS,
             timeout=5
         )
-        assert r.status_code in (403, 501), (
-            f"Expected 403 or 501, received {r.status_code}"
+        assert r.status_code == 404, (
+            f"Expected 404 (retired route), received {r.status_code}"
         )
 
-    def test_rag_delete_501(self):
-        """DELETE /v1/rag/documents/{id} → 501 or 403 (not implemented)"""
+    def test_rag_delete_404(self):
+        """DELETE /v1/rag/documents/{id} → 404 (ADR-008 E2: the 501 stub was retired)"""
         self._require_server_alive()
         r = requests.delete(
             f"{BASE_URL}/v1/rag/documents/test-doc-id",
             headers=HEADERS,
             timeout=5
         )
-        assert r.status_code in (403, 501), (
-            f"Expected 403 or 501, received {r.status_code}"
+        assert r.status_code == 404, (
+            f"Expected 404 (retired route), received {r.status_code}"
         )
 
     def test_embeddings_encode_501(self):
@@ -466,14 +470,14 @@ class TestNotImplemented:
             f"Expected 501, received {r.status_code}"
         )
 
-    def test_documents_list_501(self):
-        """GET /v1/documents/ → 501 Not Implemented"""
+    def test_documents_list_404(self):
+        """GET /v1/documents/ → 404 (ADR-008 E2: the 501 stub was retired)"""
         self._require_server_alive()
         r = requests.get(
             f"{BASE_URL}/v1/documents/",
             headers=HEADERS,
             timeout=5
         )
-        assert r.status_code == 501, (
-            f"Expected 501, received {r.status_code}"
+        assert r.status_code == 404, (
+            f"Expected 404 (retired route), received {r.status_code}"
         )

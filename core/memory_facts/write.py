@@ -11,9 +11,10 @@ different junk regex, and the only "skip the first turn" guard. A fact was
 therefore kept or dropped depending on which wire format the client asked for.
 
 One filter (the union of both), one first-turn rule (applied everywhere), and a
-coroutine instead of two async generators: since C2.2 memory.write runs on the
-post-commit queue, where nobody is listening to a wire, so yielding sentinels
-from here was writing letters to an empty room.
+coroutine instead of two async generators. It writes, and says what it kept
+(`WriteOutcome.kept`, `note_kept`); the door's `emit` turns that into its own
+wire — since 25/09 memory.write runs inline before `emit` again (ADR-007 §6
+amended, #1098), so the turn that saved is the turn that says so.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -206,7 +207,19 @@ def filter_facts(facts: list, deleted_facts: list, user_text: str = "") -> list:
 
 async def persist_facts(facts: list, port, session_id: str) -> int:
     """Save filtered facts to memory. Returns the count of actually saved facts."""
+    saved, _kept = await persist_facts_kept(facts, port, session_id)
+    return saved
+
+
+async def persist_facts_kept(facts: list, port, session_id: str) -> tuple[int, list]:
+    """Save filtered facts; return (newly saved, facts that are in memory now).
+
+    A duplicate is already remembered, so it is in the second list — what the
+    user is told was kept. A storage error is in neither: the one thing a
+    door must never call "saved" is a fact that is not there (#1098).
+    """
     saved_count = 0
+    kept: list = []
     for fact in facts:
         try:
             result = await port.save_to_memory(
@@ -216,9 +229,11 @@ async def persist_facts(facts: list, port, session_id: str) -> int:
             )
             if result.get("document_id"):
                 saved_count += 1
+                kept.append(fact)
                 logger.info("MEM_SAVE: %s", redact_user_content(fact))
             elif result.get("duplicate"):
                 # Legitimate no-op: the fact is already stored.
+                kept.append(fact)
                 logger.debug("MEM_SAVE skip (dedup): %s", redact_user_content(fact))
             else:
                 # MC-016: a storage error is NOT a dedup skip — make it visible.
@@ -229,7 +244,7 @@ async def persist_facts(facts: list, port, session_id: str) -> int:
         except Exception as e:
             # MC-016: an exception while saving must not be silently swallowed.
             logger.warning("MEM_SAVE failed (exception): %s", e)
-    return saved_count
+    return saved_count, kept
 
 
 #: One junk filter for both doors: the union of the streaming path's
@@ -246,6 +261,22 @@ JUNK_RE = _re.compile(
     ),
     _re.IGNORECASE,
 )
+
+
+def note_kept(usage: dict, saved: int, kept: list) -> None:
+    """Record on the turn what memory kept, for the door's `emit` (#1098).
+
+    `usage["memory_saved"]` counts the facts stored new this turn;
+    `usage["memory_kept"]` lists every fact that is in memory because of it
+    (new or already there), once each. Both the intent step (D6) and
+    `memory.write` add here, so a turn has ONE note — before 25/09 a D6 turn
+    could carry two [MEM:n] with different meanings.
+    """
+    usage["memory_saved"] = usage.get("memory_saved", 0) + (saved or 0)
+    listed = usage.setdefault("memory_kept", [])
+    for fact in kept or []:
+        if fact not in listed:
+            listed.append(fact)
 
 
 def is_first_turn(session) -> bool:
@@ -274,12 +305,66 @@ def user_text_of(session) -> str:
     return f"{text} {summary}".strip()
 
 
+#: Words every fact is made of, whoever it is about: sharing one of these with
+#: the user's message proves nothing (ca/es/en).
+_GENERIC_WORDS = frozenset({
+    "usuari", "usuaria", "usuario", "user", "agrada", "agraden", "gusta", "gustan",
+    "likes", "like", "loves", "prefereix", "prefiere", "prefers", "viu", "vive",
+    "lives", "nom", "nombre", "name", "named", "called", "llama", "diu", "dice",
+    "treballa", "trabaja", "works", "molt", "mucho", "very", "much", "vol", "quiere",
+    "wants", "recordi", "recorda", "recuerda", "remember", "seva", "suya", "their",
+    "teva", "tuya", "your", "aquest", "aquesta", "este", "esta", "this", "that",
+    # function words of 3+ letters, present in almost any sentence
+    "que", "qui", "del", "dels", "els", "les", "per", "pel", "amb", "una", "uns",
+    "com", "son", "hola", "los", "las", "con", "por", "para", "como", "the", "and",
+    "for", "with", "his", "her", "has", "have", "are", "was", "not", "you",
+})
+_WORD_RE = _re.compile(r"\w+", _re.UNICODE)
+
+
+def grounded_in_user_text(fact: str, user_text: str) -> bool:
+    """True when ``fact`` shares a telling word with what the user wrote.
+
+    The opening-turn rule (25/09): a fact the user's own words back is kept
+    ("em dic Aran i visc a Vic" → Aran, Vic); one the model brought is not —
+    the prompt's example names (#831), an invented taste. Telling = a number,
+    or 3+ letters and not a word every fact is made of. Accent-folded both
+    sides, so "tè" matches "te" and "Àngel" matches "angel". If the user really
+    is called Joan, "Joan" is in their words and the fact stays.
+    """
+    haystack = set(_WORD_RE.findall(fold_accents(user_text or "").lower()))
+    for word in _WORD_RE.findall(fold_accents(fact or "").lower()):
+        if word in _GENERIC_WORDS:
+            continue
+        if (word.isdigit() or len(word) >= 3) and word in haystack:
+            return True
+    return False
+
+
+def _opening_turn_facts(facts: list, session) -> list:
+    """The opening turn's facts that the user's own words back.
+
+    25/09 (Jordi): "em dic Aran, recorda-ho" as the opening message used to be
+    dropped whole. Keep what the user said; drop what the model brought (the
+    prompt's example names, invented tastes).
+    """
+    user_text = user_text_of(session)
+    grounded = [f for f in facts if grounded_in_user_text(f, user_text)]
+    if len(grounded) < len(facts):
+        logger.info(
+            "MEM_SAVE skip (first turn, not in the user's words): %d fact(s) dropped",
+            len(facts) - len(grounded),
+        )
+    return grounded
+
+
 def will_write(facts: list, session, rag_collections=None, *, saved_by_intent: bool = False) -> bool:
     """Whether `write_facts` can store anything at all for this turn.
 
-    The deterministic guards only — memory switched off, opening turn, the
-    intent step already owning this turn's fact — not the per-fact ones (junk,
-    dedup, a hallucinated name), which need the facts themselves. A door that
+    The deterministic guards only — memory switched off, the intent step
+    already owning this turn's fact — not the per-fact ones (junk, dedup, a
+    hallucinated name, an opening turn's fact not in the user's words), which
+    need the facts themselves. A door that
     shows a "saving…" indicator must ask this BEFORE showing it: the indicator
     is cleared by the [MEM:n] that never comes when the answer is "nothing to
     save", and the user is left with a spinner that spins forever
@@ -289,9 +374,7 @@ def will_write(facts: list, session, rag_collections=None, *, saved_by_intent: b
         return False
     if not memory_saves_enabled(rag_collections):
         return False
-    if saved_by_intent:
-        return False
-    return not is_first_turn(session)
+    return not saved_by_intent
 
 
 @dataclass
@@ -300,6 +383,9 @@ class WriteOutcome:
 
     saved: int = 0
     facts: list = field(default_factory=list)
+    #: The facts that are in memory after this write — newly stored or already
+    #: there (dedup). The only list a door may show as "saved" (#1098).
+    kept: list = field(default_factory=list)
     #: True only when at least one fact reached `engine.chat()` through the
     #: atomiser. It is NOT `bool(facts)`, and it is NOT `engine is not None`:
     #: a fact without a conjunction is stored as written and costs nothing
@@ -356,10 +442,9 @@ async def write_facts(
         )
         return WriteOutcome()
     if is_first_turn(session):
-        logger.info(
-            "MEM_SAVE skip (first turn, likely hallucination): %d fact(s) dropped", len(facts),
-        )
-        return WriteOutcome()
+        facts = _opening_turn_facts(facts, session)
+        if not facts:
+            return WriteOutcome()
 
     candidates: list = []
     engine_called = False
@@ -381,5 +466,5 @@ async def write_facts(
             candidates.append(raw)
 
     filtered = filter_facts(candidates, getattr(session, "_recently_deleted_facts", []), user_text_of(session))
-    saved = await persist_facts(filtered, port, session.id)
-    return WriteOutcome(saved=saved, facts=filtered, engine_called=engine_called)
+    saved, kept = await persist_facts_kept(filtered, port, session.id)
+    return WriteOutcome(saved=saved, facts=filtered, kept=kept, engine_called=engine_called)

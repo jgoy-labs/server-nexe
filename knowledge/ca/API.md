@@ -97,6 +97,7 @@ Chat completion compatible amb OpenAI amb suport RAG i streaming.
 - `temperature`: 0.0-2.0 (per defecte 0.7)
 - `top_p`: 0 < top_p ≤ 1 (null per defecte) — nucleus sampling; null deixa que cada motor usi el seu propi default (≈ 0.9)
 - `max_tokens`: null = utilitza el per defecte del model, maxim 32000
+- `reasoning_effort` (o `reasoning: {"effort": ...}`): `"none"` o absent = el model no raona (per defecte); qualsevol altre valor = raona, i el raonament torna apart de la resposta, com a `reasoning` (`message.reasoning`, o `delta.reasoning` en streaming). Encara no hi ha nivells: qualsevol valor que no sigui `"none"` vol dir encès.
 
 **Marcadors de streaming** (injectats al flux SSE, parsejats per la UI):
 - `[MODEL:name]` — model actiu
@@ -105,7 +106,7 @@ Chat completion compatible amb OpenAI amb suport RAG i streaming.
 - `[RAG_ITEM:nexe_documentation|0.82]` — detall per font (col·leccio primer, despres puntuacio; nomes 2 camps)
 - `[MEM:2]` — nombre de fets auto-guardats via MEM_SAVE
 - `[COMPACT:N]` — indicador de compactacio de context
-- `[THINKING]` / `[/THINKING]` — thinking tokens (models Ollama com qwen3.5)
+- `<think>…</think>` — el raonament del model, nomes al stream de la UI web (es mostra al bloc desplegable de pensar); `/v1` l'envia com a `reasoning`
 - `[DOC_TRUNCATED:XX%]` — percentatge de document descartat per limit de context (nou 2026-04-02)
 
 **Final del flux — per que s'ha aturat la resposta** (nou 2026-08-31):
@@ -185,15 +186,9 @@ El camp **no hi es** quan no s'ha tallat res. Si passen les dues coses alhora ma
 }
 ```
 
-## Endpoints RAG (prefix: /v1/rag)
+## Endpoints RAG retirats (/v1/rag, /v1/documents)
 
-> ⚠️ **NO IMPLEMENTAT (stub):** aquests endpoints retornen HTTP 501. Reservats per a una versió futura.
-
-| Endpoint | Metode | Auth | Descripcio |
-|----------|--------|------|-------------|
-| `/v1/rag/search` | POST | Si | Cerca semantica al magatzem de vectors RAG (stub, 501) |
-| `/v1/rag/add` | POST | Si | Afegir documents al magatzem de vectors RAG (stub, 501) |
-| `/v1/rag/documents/{id}` | DELETE | Si | Esborrar document del RAG (stub, 501) |
+`/v1/rag/search`, `/v1/rag/add`, `DELETE /v1/rag/documents/{id}` i `GET /v1/documents/` eren stubs que retornaven 501; s'han eliminat i ara responen **404**. La recuperacio es fa dins el xat (`use_rag` a `/v1/chat/completions`); una cerca semantica directa en una col·leccio es `POST /v1/memory/search`.
 
 ## Endpoints d'embeddings (prefix: /v1/embeddings)
 
@@ -250,7 +245,7 @@ Aquests endpoints serveixen la interficie web i els utilitza el frontend JavaScr
 | `/ui/files` | GET | Si | per defecte | Llistar fitxers pujats |
 | `/ui/files/cleanup` | POST | Si | 5/min | Netejar fitxers temporals |
 
-**Pujada:** Accepta .txt, .md, .pdf. Chunking dinamic segons mida del document (800/1000/1200/1500 chars). Validacio de magic bytes (SEC-004). Metadades generades sense LLM (instantani). Documents aillats a la sessio de pujada via session_id.
+**Pujada:** Accepta PDF, .docx, .xlsx, .pptx, .epub, text, codi font i dades (.csv, .json, .xml, .yaml, .toml) — veure RAG.md. Chunking dinamic segons mida del document (800/1000/1200/1500 chars). Validacio de magic bytes (SEC-004). Metadades generades sense LLM (instantani). Documents aillats a la sessio de pujada via session_id.
 
 ## Comandes CLI d'encriptacio
 
@@ -266,7 +261,7 @@ Aquestes son comandes CLI (no endpoints HTTP):
 
 `/v1/chat/completions` es parcialment compatible amb el format de l'API d'OpenAI:
 
-**Suportat:** array de messages, model, temperature, max_tokens, stream, top_p
+**Suportat:** array de messages, model, temperature, max_tokens, stream, top_p, reasoning_effort (el raonament torna com a `reasoning`)
 **Camps extra:** use_rag (boolean), engine (string)
 **No implementat:** /v1/embeddings/encode i /v1/embeddings/models (stubs, retornen 501), /v1/models, /v1/completions (legacy)
 

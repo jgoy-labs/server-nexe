@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
 from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, mark_served_model, resolve_loaded_model_name, persist_v1_turn
-from ._streaming import TokenBridge, _prepend_chunk, format_sse_chunk, format_sse_done, SSE_DONE
+from ._streaming import TokenBridge, _prepend_chunk, format_engine_token, format_sse_done, SSE_DONE
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ async def _mlx_stream_generator(
     top_p: Optional[float] = None,
     cancel_event=None,
     images: Optional[List[str]] = None,
+    thinking_enabled: bool = False,
 ):
     """SSE generator for MLX streaming.
 
@@ -64,6 +65,7 @@ async def _mlx_stream_generator(
                 top_p=top_p,
                 cancel_event=cancel_event,
                 images=images,
+                thinking_enabled=thinking_enabled,
             )
             bridge.set_done(result=result)
         except Exception as e:
@@ -77,7 +79,9 @@ async def _mlx_stream_generator(
         try:
             async for token in bridge:
                 got_any_token = True
-                yield format_sse_chunk(token, model_name, "mlx")
+                sse = format_engine_token(token, model_name, "mlx")  # ADR-010
+                if sse is not None:
+                    yield sse
 
             await mlx_task
         except asyncio.CancelledError:
@@ -189,6 +193,7 @@ async def _forward_to_mlx(
             session_id=session_id, max_tokens=request.max_tokens,
             temperature=request.temperature, top_p=request.top_p,
             cancel_event=cancel_event, images=images,
+            thinking_enabled=request.wants_reasoning(),
         )
         # Peek the first chunk BEFORE committing to a StreamingResponse: an
         # error before any token reaches the client raises here as a real
@@ -205,5 +210,6 @@ async def _forward_to_mlx(
         messages=user_messages, system=system_msg, session_id=session_id,
         max_tokens=request.max_tokens, temperature=request.temperature,
         top_p=request.top_p, cancel_event=cancel_event, images=images,
+        thinking_enabled=request.wants_reasoning(),  # ADR-010: off unless asked
     )
     return build_openai_response(result, model_name, "mlx")

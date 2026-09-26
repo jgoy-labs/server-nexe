@@ -33,7 +33,7 @@ Pregunta sobre projectes en curs, preferencies, terminis. El sistema **MEM_SAVE*
 
 **Per a qui:** professionals que treballen amb documents sensibles (legal, medic, consultoria) i no poden pujar-los a serveis cloud.
 
-Puja `.txt`, `.md` o `.pdf` i s'indexen automaticament al RAG. Consulta'ls en llenguatge natural. Cada document queda **aillat per sessio** — no es creua context entre converses sense voler-ho.
+Puja PDF, Word, Excel, PowerPoint, EPUB, text, codi o dades (CSV, JSON...) i s'indexen automaticament al RAG. Consulta'ls en llenguatge natural. Cada document queda **aillat per sessio** — no es creua context entre converses sense voler-ho.
 
 **Exemple:** puja contractes i pregunta *"Quines clausules de rescissio mencionen penalitzacio economica?"*
 

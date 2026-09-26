@@ -1,8 +1,9 @@
 """Tests for the non-streaming helpers of the UI door.
 
 The memory-intent handlers these used to sit beside moved to the core in C3.1
-(tests/core/memory_facts/test_intents.py); what stays here belongs to
-postprocess/memory.write, which are still the plugin's (C3.2/C3.3).
+(tests/core/memory_facts/test_intents.py); the arming of a model's
+[MEM_DELETE:] followed at C4.5 (tests/core/memory_facts/test_deletes.py).
+What stays here belongs to memory.write and the cleaner.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -12,10 +13,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 # Import helpers (will exist after refactor)
 # ---------------------------------------------------------------------------
 from core.memory_facts.write import write_facts
-from plugins.web_ui_module.api.routes_chat import (
-    _clean_nonstreaming_text,
-    _arm_mem_deletes_nonstreaming,
-)
+# C4.4: the non-streaming cleaner is the core's one cleaner now.
+from core.turn.text.clean import clean_model_text as _clean_nonstreaming_text
 
 
 # ---------------------------------------------------------------------------
@@ -134,48 +133,3 @@ class TestWriteFacts:
         session = _make_session(messages=[{"role": "user", "content": "a"}, {"role": "user", "content": "b"}])
         # Must not raise
         await write_facts(["I like jazz"], session, mh)
-
-
-# ===========================================================================
-# _arm_mem_deletes_nonstreaming (B028: model tags arm confirmation, never delete)
-# ===========================================================================
-
-class TestArmMemDeletesNonstreaming:
-    @pytest.mark.asyncio
-    async def test_arms_pending_and_returns_question_without_deleting(self):
-        mh = _make_memory_helper()
-        mh.preview_delete_from_memory.return_value = {
-            "success": True, "candidates": [_candidate("fact one")],
-        }
-        session = _make_session()
-        question = await _arm_mem_deletes_nonstreaming(["fact one", "fact two"], session, mh)
-        mh.delete_from_memory.assert_not_called()
-        mh.delete_memory_entries.assert_not_called()
-        assert session._pending_partial_delete["entries"] == [_candidate("fact one")]
-        assert "[PENDING_DELETE:" in question
-
-    @pytest.mark.asyncio
-    async def test_no_match_returns_empty_and_no_pending(self):
-        mh = _make_memory_helper()
-        mh.preview_delete_from_memory.return_value = {"success": True, "candidates": []}
-        session = _make_session()
-        question = await _arm_mem_deletes_nonstreaming(["unknown topic"], session, mh)
-        assert question == ""
-        assert not session._pending_partial_delete
-
-    @pytest.mark.asyncio
-    async def test_skips_short_facts(self):
-        mh = _make_memory_helper()
-        session = _make_session()
-        question = await _arm_mem_deletes_nonstreaming(["ab", "x"], session, mh)
-        mh.preview_delete_from_memory.assert_not_called()
-        assert question == ""
-
-    @pytest.mark.asyncio
-    async def test_handles_exception_gracefully(self):
-        mh = _make_memory_helper()
-        mh.preview_delete_from_memory.side_effect = RuntimeError("crash")
-        session = _make_session()
-        # Must not raise
-        question = await _arm_mem_deletes_nonstreaming(["some fact"], session, mh)
-        assert question == ""

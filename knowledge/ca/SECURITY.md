@@ -74,7 +74,6 @@ El rate limiting s'aplica a **tots els endpoints** — tant a l'API (`/v1/*`) co
 | /v1/chat/completions | 20/min | hardcoded a `core/endpoints/chat.py` |
 | /v1/memory/store | 30/min | hardcoded a `memory/memory/api/v1.py` |
 | /v1/memory/search | 60/min | hardcoded a `memory/memory/api/v1.py` |
-| /v1/rag/* | — | stubs, retornen 501 |
 | /ui/upload | 5/min | hardcoded a `plugins/web_ui_module/api/routes_files.py` |
 
 **Nota:** Els límits per endpoint de dalt estan fixats al codi font (decorador `@limiter.limit()`), **no** són configurables via `.env`. Les úniques variables d'entorn que es llegeixen realment són `NEXE_RATE_LIMIT_GLOBAL` (per defecte 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) i `NEXE_RATE_LIMIT_HEALTH` (1000/min) — vegeu `core/security/rate_limiting.py` i `core/dependencies.py`. Les variables `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` només apareixen comentades a `.env.example` i el codi no les llegeix (reservades per a implementació futura).

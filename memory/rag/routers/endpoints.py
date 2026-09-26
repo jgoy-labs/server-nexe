@@ -8,8 +8,8 @@ Description: API endpoints for the RAG module (health/info introspection).
 WS6-01/WS6-02: the standalone /rag/{document,search,upload,files/stats}
 surface was retired — it was an ephemeral in-memory substring matcher plus
 a file-upload path whose FileRAGSource never existed (permanent 501). The
-real RAG lives in the chat pipeline (MemoryAPI/Qdrant); the public
-contract keeps only the /v1/rag/* 501 stubs documented in API.md.
+real RAG lives in the chat pipeline (MemoryAPI/Qdrant). ADR-008 E2 retired
+the /v1/rag/* 501 stubs as well; only health/info are left here.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

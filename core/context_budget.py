@@ -108,6 +108,11 @@ def resolve_max_context_chars(engine=None, *, window_tokens: int = None) -> int:
     return int(window_tokens * CHARS_PER_TOKEN_ESTIMATE * PROMPT_BUDGET_RATIO)
 
 
+# #998: the ceiling `compute_context_budget` clamps the history ratio to.
+_HISTORY_RATIO_MAX = 0.9
+_warned_history_clamp = False
+
+
 def resolve_history_ratio() -> float:
     """The share of the turn budget reserved as a floor for the history (#977).
 
@@ -133,8 +138,21 @@ def resolve_history_ratio() -> float:
     this docstring said the policy lived in one place "now that both /ui/chat
     and /v1 budget a turn"; the correction that gave /v1 its own ratio left
     that sentence behind.
+
+    #998: `_ratio_env` accepts (0, 1], but `compute_context_budget` clamps the
+    ratio to 0.9. A value above that is still returned unchanged (the clamp
+    stays where it is); what changes is that it no longer happens in silence.
+    Logged once per process, not per turn.
     """
-    return _ratio_env('NEXE_HISTORY_CONTEXT_RATIO', 0.30)
+    global _warned_history_clamp
+    ratio = _ratio_env('NEXE_HISTORY_CONTEXT_RATIO', 0.30)
+    if ratio > _HISTORY_RATIO_MAX and not _warned_history_clamp:
+        _warned_history_clamp = True
+        logger.warning(
+            "NEXE_HISTORY_CONTEXT_RATIO=%s is above %s — clamped to %s",
+            ratio, _HISTORY_RATIO_MAX, _HISTORY_RATIO_MAX,
+        )
+    return ratio
 
 
 def compute_context_budget(
@@ -166,7 +184,7 @@ def compute_context_budget(
           - doc_truncated_pct: % of the document that was cut (0 if none)
           - doc_kept_chars: chars of the document that are sent
     """
-    history_ratio = max(0.0, min(0.9, history_ratio))
+    history_ratio = max(0.0, min(_HISTORY_RATIO_MAX, history_ratio))
     # `history_reserve` is actually
     # the "minimum floor" reserved for history. The real history
     # (`history_effective`) can grow above this floor if messages

@@ -52,9 +52,10 @@ from core.endpoints.chat_sanitization import _filter_rag_injection
 # this replaced (`routes_files.py:34-37` via `routes.py:20-23`) fell back to
 # None, and an upload without a header is a supported upload.
 try:
-    from core.rag_header import parse_rag_header
+    from core.rag_header import parse_rag_header, rag_chunk_prefix
 except ImportError:  # pragma: no cover - exercised by the manifest coverage test
     parse_rag_header = None  # type: ignore[assignment]
+    rag_chunk_prefix = None  # type: ignore[assignment]
 import core.memory_facts as memory_facts
 
 logger = logging.getLogger(__name__)
@@ -141,16 +142,23 @@ def _build_base_doc_metadata(filename: str, content_size: int) -> dict:
 
 
 def _apply_rag_header_metadata(doc_metadata: dict, rag_header, body_content: str, filename: str) -> None:
-    """Update doc_metadata in-place from a RAG header (valid or fallback simple)."""
+    """Update doc_metadata in-place from a RAG header (valid or fallback simple).
+
+    #1071: the header's `type` is stored as `doc_type`. Under `type` it was
+    overwritten by `save_document_chunks`, which sets `type=document_chunk`
+    for the recall session filter to work. The header's `collection` is kept
+    as `declared_collection`: informative only, it routes nothing — uploads
+    are indexed in user_knowledge, and a hit's collection is the one searched.
+    """
     if rag_header.is_valid:
         doc_metadata.update({
             "doc_id": rag_header.id,
             "abstract": rag_header.abstract,
             "tags": rag_header.tags,
             "priority": rag_header.priority,
-            "type": rag_header.type,
+            "doc_type": rag_header.type,
             "lang": rag_header.lang,
-            "collection": rag_header.collection,
+            "declared_collection": rag_header.collection,
         })
         logger.info(f"RAG header found: id={rag_header.id}, priority={rag_header.priority}")
     else:
@@ -161,10 +169,28 @@ def _apply_rag_header_metadata(doc_metadata: dict, rag_header, body_content: str
             "abstract": " ".join(body_content.split())[:300],
             "tags": [_stem],
             "priority": "P2",
-            "type": "docs",
+            "doc_type": "docs",
             "lang": _lang,
         })
         logger.info(f"No RAG header — metadata simple per '{filename}'")
+
+
+def _chunks_for_index(chunks: list, filename: str, rag_header) -> list:
+    """The chunks as the index gets them: each behind the document's prefix.
+
+    #1071 (b): the same `[Document]`/`[Abstract]` prefix the knowledge ingest
+    has always put there, so an uploaded chunk is found by what its document
+    is about too. Only the index gets it — the copy attached to the session
+    is the plain text. The abstract only when the header is valid (see
+    `rag_chunk_prefix`). Filename and abstract are the user's: they go
+    through `_filter_rag_injection` with the rest of the text in
+    `save_document_chunks`.
+    """
+    if rag_chunk_prefix is None:
+        return chunks
+    abstract = rag_header.abstract if rag_header and rag_header.is_valid else ""
+    prefix = rag_chunk_prefix(filename, abstract)
+    return [prefix + chunk for chunk in chunks]
 
 
 async def _index_document_chunks(*, chunks, filename, session_id, metadata, app_state) -> dict:
@@ -321,7 +347,7 @@ async def attach_to_session(
     # index, and the answer says so via `ingested`.
     ingestion_result = await _index_document_chunks(
         app_state=app_state,
-        chunks=chunks,
+        chunks=_chunks_for_index(chunks, filename, rag_header),
         filename=filename,
         session_id=session_id or "web_ui_upload",
         metadata=doc_metadata,

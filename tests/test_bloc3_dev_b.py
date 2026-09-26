@@ -61,7 +61,9 @@ def test_bug18_read_file_latin1_fallback(tmp_path: Path, caplog):
     # Write "àéíòú" in latin-1 (cp1252)
     f.write_bytes("àéíòú".encode("latin-1"))
 
-    with caplog.at_level(logging.INFO, logger="core.ingest.ingest_knowledge"):
+    # The fallback chain moved to the shared loader registry (ADR-008 E3), and
+    # its log line with it.
+    with caplog.at_level(logging.INFO, logger="core.files.loaders.text"):
         content = read_file(f)
 
     assert "àéíòú" in content
@@ -79,7 +81,7 @@ def test_bug18_read_file_utf8_no_warning(tmp_path: Path, caplog):
     f = tmp_path / "hola_utf8.md"
     f.write_text("àéíòú\n## header", encoding="utf-8")
 
-    with caplog.at_level(logging.INFO, logger="core.ingest.ingest_knowledge"):
+    with caplog.at_level(logging.INFO, logger="core.files.loaders.text"):
         content = read_file(f)
 
     assert "àéíòú" in content

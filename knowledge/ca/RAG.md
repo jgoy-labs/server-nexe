@@ -119,9 +119,10 @@ server-nexe te un sistema de memoria automatica similar a ChatGPT o Claude. El m
 **Com funciona:**
 1. El prompt del sistema instrueix el model per extreure fets: noms, feines, ubicacions, preferencies, projectes, terminis
 2. El model genera marcadors `[MEM_SAVE: fet]` dins la seva resposta
-3. routes_chat.py parseja aquests marcadors i els elimina del flux visible
-4. Els fets es guarden a la col·leccio `personal_memory`
-5. La UI mostra l'indicador `[MEM:N]` amb el recompte de fets guardats
+3. El servidor llegeix aquests marcadors al nucli (el mateix codi per a la Web UI, el CLI i `/v1`) i els treu de la resposta
+4. Al mateix torn, quan la resposta s'ha acabat, els fets es filtren (brossa, coses oblidades fa poc, noms que l'usuari no ha escrit) i es guarden a la col·leccio `personal_memory` — uns 15 ms per fet
+5. Aleshores el servidor diu què ha guardat: el marcador `[MEM:N:fet1|fet2]` (badge de la Web UI, `💾 Desat` al CLI), `memory_facts` a la resposta JSON de la Web UI, `nexe_memory_facts` a `/v1`. Nomes aixo compta com a desat: un `[MEM_SAVE:]` que el servidor ha refusat no surt mai com a desat
+6. Al primer missatge d'una conversa nomes es guarden els fets que surten de les paraules de l'usuari (un model petit de vegades s'inventa fets o copia els exemples del prompt)
 
 **Deteccio d'intents (trilingue ca/es/en):**
 - **Guardar:** "Recorda que...", "Guarda a memoria", "Remember that..."
@@ -203,7 +204,7 @@ Els documents pujats via la Web UI s'indexen a la col·leccio `user_knowledge` a
 - Els documents persisteixen dins la sessio (no s'esborren en recarregar la pagina)
 - Les metadades es generen sense LLM (instantani, no cal model)
 
-**Formats suportats:** .txt, .md, .pdf (amb validacio de magic bytes SEC-004)
+**Formats suportats:** .pdf, .docx, .xlsx, .pptx, .epub, text (.txt, .md), codi font (.py, .js, .ts, .java, .go, .rs, .sql...) i dades (.csv, .json, .xml, .yaml, .toml). La llista surt d'un sol registre de carregadors (`core/files/loaders`), el mateix per a les pujades i per a la carpeta `knowledge/`. Validacio de contingut (SEC-004): els PDF han de començar per `%PDF`, els formats Office/EPUB han de ser un zip (i es refusen si declaren descomprimir-se a mes de 200 MB), i el text ha de ser UTF-8. Mai s'accepten `.env`, `.ini`, `.conf`, `.cfg`, `.properties` ni `.pkl`. Encara no: `.doc`/`.xls` antics, `.rtf`, imatges/OCR.
 **Chunking per a pujades:** Dinamic segons mida del document — 800 chars (<20K), 1000 (<100K), 1200 (<300K), 1500 (>=300K). Si el document te capcalera RAG valida, s'utilitza el chunk_size especificat.
 
 ## Ingestio de documents
@@ -299,4 +300,4 @@ storage/vectors/
 - `POST /v1/chat/completions` — Xat amb RAG (use_rag: true per defecte)
 - `POST /v1/memory/store` — Guardar text a una col·leccio (usa MemoryService quan esta inicialitzat, en cas contrari fa fallback a una escriptura directa a Qdrant per resiliencia)
 - `POST /v1/memory/search` — Cerca semantica directa en una col·leccio
-- `DELETE /v1/rag/documents/{id}` — **[planificat, NO implementat]** retorna 501 Not Implemented (router tagged `future`; els tres endpoints `/v1/rag/*` — search, add, documents/{id} — encara no estan operatius)
+- Els antics stubs `/v1/rag/*` (search, add, documents/{id}) s'han retirat i responen 404: la recuperacio es la del xat, la cerca directa es `/v1/memory/search`

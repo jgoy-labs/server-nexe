@@ -153,7 +153,7 @@ Tauri v2 desktop application for macOS (DMG), Linux (AppImage), and Windows ARM6
 <td width="50%">
 
 ### Document Upload with Session Isolation
-Upload `.txt`, `.md` or `.pdf` and they're automatically indexed for RAG. Each document is only visible within the session it was uploaded in — no cross-contamination between sessions.
+Upload PDF, Word, Excel, PowerPoint, EPUB, plain text, source code or data files (CSV, JSON, XML, YAML) and they're automatically indexed for RAG. Each document is only visible within the session it was uploaded in — no cross-contamination between sessions.
 
 </td>
 <td width="50%">
@@ -439,6 +439,7 @@ server-nexe is built on the shoulders of these amazing open-source projects:
 - [Rich](https://github.com/Textualize/rich) — Beautiful terminal formatting
 - [marked.js](https://marked.js.org) — Markdown rendering in web UI
 - [PyPDF](https://github.com/py-pdf/pypdf) — PDF text extraction for RAG
+- [python-docx](https://github.com/python-openxml/python-docx), [openpyxl](https://openpyxl.readthedocs.io), [python-pptx](https://github.com/scanny/python-pptx) and [lxml](https://lxml.de) — Word, Excel, PowerPoint, EPUB and XML text extraction
 - [rumps](https://github.com/jaredks/rumps) — macOS menu bar integration
 
 **Security & Monitoring**

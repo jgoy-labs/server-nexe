@@ -394,7 +394,7 @@ Facts the model tags with `[MEM_SAVE:]` are persisted on the UI path (`memory_he
 - `[MODEL_LOADING]` / `[MODEL_READY]` — model load state
 - `[RAG_AVG:score]` — average RAG relevance
 - `[RAG_ITEM:collection|score]` — per-collection RAG detail (collection first, then score)
-- `[MEM:N]` — number of facts saved to memory
+- `[MEM:N:fact1|fact2]` — what memory kept this turn, as the server confirms it (N = new facts; the list includes facts already remembered)
 - `[COMPACT:N]` — context compaction indicator
 - `[DOC_TRUNCATED:XX%]` — document truncation warning for context limit (new 2026-04-02)
 
@@ -529,7 +529,7 @@ Starting in v0.9.9, server-nexe supports **per-session toggling of thinking toke
 - **400 retry fallback:** if the model is NOT thinking-capable and the user enables it, the server returns 400 and the UI offers automatic retry without thinking.
 - **`NEXE_OLLAMA_THINK` env var:** controls the global default for Ollama models (`true`/`false`).
 
-Thinking tokens are emitted in the stream with `[THINKING]…[/THINKING]` markers and the UI renders them as a collapsible orange block.
+The engine returns the model's reasoning apart from the answer (ADR-010); the web UI receives it as `<think>…</think>` in its stream and renders it as a collapsible orange block. `/v1` sends it as `reasoning` only when the request asks (`reasoning_effort`).
 
 ## MLX Models — Compatibility
 

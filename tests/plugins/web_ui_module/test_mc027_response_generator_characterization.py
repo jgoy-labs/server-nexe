@@ -30,12 +30,20 @@ from core.memory_facts.intent_texts import text as _intent_text
 from starlette.datastructures import State
 from starlette.requests import Request as StarletteRequest
 
-from plugins.web_ui_module.api.routes_chat import _StreamThinkParser
+from core.turn.text.think import StreamThinkParser
+from plugins.web_ui_module.core.latex_sanitizer import LatexStreamBuffer
+
 from tests.plugins.web_ui_module.test_chat_inner_behavior import (
     _app_modules,
     _Harness,
     _make_server_state,
 )
+
+
+def _StreamThinkParser(model_name):
+    """C4.4: the parser is the core's; the web door composes it with its LaTeX
+    buffer. The characterisation below pins THAT composition, byte for byte."""
+    return StreamThinkParser(model_name, visible_buffer=LatexStreamBuffer())
 
 
 def _connected_request(server_state=None):
@@ -414,7 +422,7 @@ class TestThinkOnlyPlaceholderBehavioural:
         Mutation: skipping _think_only_placeholder, or gating the persist on a
         non-empty clean_response only -> no placeholder saved -> RED.
         """
-        from plugins.web_ui_module.api.routes_chat import _THINK_ONLY_PLACEHOLDER
+        from core.turn.text.clean import THINK_ONLY_PLACEHOLDER as _THINK_ONLY_PLACEHOLDER
 
         engine = _ContentThinkOnlyEngine()
         h = _Harness(intent="chat")

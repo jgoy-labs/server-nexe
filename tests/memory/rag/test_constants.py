@@ -98,12 +98,13 @@ class TestManifestCapabilities:
 
   def test_capabilities_reflect_retired_surface(self):
     """WS6-01/02: the standalone /rag surface (keyword_search substring
-    matcher, temp_upload_rag, catalog_rag) was retired. The manifest must
-    advertise only the surviving PersonalityRAG source and must never
-    over-claim vector_search (B114: it was never vector search)."""
+    matcher, temp_upload_rag, catalog_rag) was retired, and ADR-008 E2
+    retired PersonalityRAG. The manifest must advertise only what the module
+    still does (introspect the chat's sources) and must never over-claim
+    vector_search (B114: it was never vector search)."""
     caps = MANIFEST.get("capabilities", [])
-    assert "personality_rag" in caps
+    assert caps == ["source_introspection"]
     assert "vector_search" not in caps
-    # The retired substring/upload/catalog capabilities must be gone.
-    for retired in ("keyword_search", "temp_upload_rag", "catalog_rag"):
+    # The retired substring/upload/catalog/personality capabilities must be gone.
+    for retired in ("keyword_search", "temp_upload_rag", "catalog_rag", "personality_rag"):
       assert retired not in caps, f"retired capability still advertised: {retired}"

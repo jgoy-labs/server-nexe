@@ -54,13 +54,17 @@ invisible here and needs a behavioural test; `steps.py` says why for each, and
 `tests/core/turn/test_folded_is_measured.py` pins the count so that narrowing
 the watch is a visible act rather than a silent one.
 
-`DESIGN_DEGRADATIONS` is the other half of the same budget: the two limits C3
-declared in writing and left for C4 to close.
+`DESIGN_DEGRADATIONS` is the other half of the same budget: the limits C3
+declared in writing and left for C4 to close. Two at C3; one since C4.5.
 
 * `postprocess` — `adapters_api.py`: in streaming the model's memory tags have
-  already been forwarded to the client by the time the step runs.
-* `reprompt` — `adapters_api.py`: `/v1` does not spend the second generation
-  D3 asks for when an answer cleans down to nothing but tags.
+  already been forwarded to the client by the time the step runs. Closes at
+  C4.6, when `/v1` walks `stream_turn` like the web door.
+* `reprompt` — CLOSED at C4.5 (26/09). `/v1`'s JSON reply spends the second
+  generation D3 asks for, through `core/turn/policy.py::reprompt_chunks` — the
+  one call the web door makes too. Its streaming shape cannot yet: the answer
+  is generated inside the forwarder, after the turn, which is the `postprocess`
+  limit above and not a second one.
 
 The other `degraded` entries an API turn can record are environment guards — a
 missing `session_manager`/`memory_helper`, an engine with no live module — and
@@ -83,5 +87,6 @@ from __future__ import annotations
 FOLDED_BASELINE: dict[str, int] = {"api": 0, "ui": 0}
 
 #: The step ids whose degradation is a DESIGN limit C3 declared and C4 closes,
-#: as opposed to an environment guard firing. A healthy turn records neither.
-DESIGN_DEGRADATIONS: frozenset[str] = frozenset({"postprocess", "reprompt"})
+#: as opposed to an environment guard firing. A healthy turn records none.
+#: `reprompt` left the set at C4.5; `postprocess` leaves it at C4.6.
+DESIGN_DEGRADATIONS: frozenset[str] = frozenset({"postprocess"})

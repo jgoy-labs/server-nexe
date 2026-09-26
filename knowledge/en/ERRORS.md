@@ -145,7 +145,7 @@ The tray menu (see `INSTALLATION.md` — Tray App (NexeTray, macOS)) has a direc
 | Data type | Where it may appear in the log |
 |-----------|-------------------------------|
 | **Conversations** | Fragments of messages you sent to the chat (truncated to 200 chars by default, but still readable) |
-| **RAG results** | Chunks of documents you uploaded (`.txt`, `.md`, `.pdf`) |
+| **RAG results** | Chunks of documents you uploaded (PDF, Word, Excel, text...) |
 | **Personal memory** | Facts stored via MEM_SAVE (names, preferences, projects) |
 | **Local paths** | `/Users/you/...` and folder names from your machine |
 | **Session IDs** | Activity identifiers (useful for correlation, not personal per se) |

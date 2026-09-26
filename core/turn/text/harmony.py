@@ -2,7 +2,8 @@
 ────────────────────────────────────
 Server Nexe
 Author: Jordi Goy
-Location: plugins/web_ui_module/core/harmony_filter.py
+Location: core/turn/text/harmony.py
+    (C4.4: moved as is from plugins/web_ui_module/core/harmony_filter.py)
 Description: Stateful stream filter for gpt-oss "harmony" output (B027a).
     Rewrites <|channel|>analysis<|message|>…<|channel|>final<|message|>…
     into the canonical <think>…</think> convention the chat pipeline

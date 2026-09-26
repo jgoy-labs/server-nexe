@@ -334,12 +334,12 @@ class TestRequestSizeLimiterFinal:
 
 class TestV1ImportFailures:
 
-    def test_rag_v1_import_failure(self):
-        """Lines 94-95: ImportError for RAG API v1."""
-        # The import happens at module level. We verify the router works
-        # without RAG routes.
+    def test_rag_v1_routes_are_retired(self):
+        """ADR-008 E2: the RAG API v1 stubs are no longer imported nor
+        mounted — the router carries no /v1/rag or /v1/documents route."""
         from core.endpoints.v1 import router_v1
-        assert router_v1 is not None
+        paths = [r.path for r in router_v1.routes if hasattr(r, "path")]
+        assert not [p for p in paths if p.startswith(("/v1/rag", "/v1/documents"))]
 
     def test_v1_router_has_routes(self):
         """Lines 100-101, 106-107, 112-113: verify routes exist despite import errors."""
@@ -352,8 +352,7 @@ class TestV1ImportFailures:
         import importlib
         # Save and temporarily break imports
         saved = {}
-        for mod_name in ["memory.rag.api.v1", "memory.embeddings.api.v1",
-                         "memory.rag_sources.file.api.v1", "memory.memory.api.v1"]:
+        for mod_name in ["memory.embeddings.api.v1", "memory.memory.api.v1"]:
             saved[mod_name] = sys.modules.get(mod_name)
             sys.modules[mod_name] = None
 
@@ -1022,34 +1021,26 @@ class TestBaseChunkerFinal:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 17. memory/rag/api/v1.py — lines 52-54, 86-88, 116-118
+# 17. memory/rag/api/v1.py — retired (ADR-008 E2)
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestRagApiV1:
+    """The source is gone, so no one can mount the 501 stubs (or load
+    PersonalityRAG) again without re-adding a file. Checked on the SOURCE
+    files, not by import: a checkout that had them keeps untracked
+    `__pycache__/` directories after the pull, and an empty directory still
+    imports as a namespace package. The HTTP side (404) is pinned in
+    tests/core/endpoints/test_v1.py::TestRetiredRoutes."""
 
-    def test_rag_search_returns_501(self):
-        """Lines 52-54: search endpoint raises 501."""
-        from memory.rag.api.v1 import rag_search_v1
-        from fastapi import HTTPException
-        with pytest.raises(HTTPException) as exc:
-            asyncio.run(rag_search_v1())
-        assert exc.value.status_code == 501
+    _ROOT = Path(__file__).resolve().parent.parent
 
-    def test_rag_add_returns_501(self):
-        """Lines 86-88: add endpoint raises 501."""
-        from memory.rag.api.v1 import rag_add_documents_v1
-        from fastapi import HTTPException
-        with pytest.raises(HTTPException) as exc:
-            asyncio.run(rag_add_documents_v1())
-        assert exc.value.status_code == 501
+    def test_rag_api_v1_module_is_gone(self):
+        assert list((self._ROOT / "memory" / "rag").glob("api/**/*.py")) == []
 
-    def test_rag_delete_returns_501(self):
-        """Lines 116-118: delete endpoint raises 501."""
-        from memory.rag.api.v1 import rag_delete_document_v1
-        from fastapi import HTTPException
-        with pytest.raises(HTTPException) as exc:
-            asyncio.run(rag_delete_document_v1("doc-123"))
-        assert exc.value.status_code == 501
+    def test_rag_sources_namespace_is_gone(self):
+        """PersonalityRAG, base (SearchRequest/SearchHit/AddDocumentRequest)
+        and the /v1/documents stub all lived under memory/rag_sources/."""
+        assert list((self._ROOT / "memory").glob("rag_sources/**/*.py")) == []
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1093,13 +1084,12 @@ class TestRagModuleFinal:
         assert not m._initialized
 
     def test_search_invalid_source(self):
-        """Lines 276-280: search with unknown source."""
+        """search with unknown source."""
         from memory.rag.module import RAGModule
-        from memory.rag_sources.base import SearchRequest
         m = RAGModule.get_instance()
         asyncio.run(m.initialize())
         with pytest.raises(ValueError, match="Unknown RAG source"):
-            asyncio.run(m.search(SearchRequest(query="test"), source="invalid"))
+            asyncio.run(m.search("test", source="invalid"))
 
     def test_get_source_invalid(self):
         """Lines 322-326: get_source with unknown name."""
@@ -1182,33 +1172,20 @@ class TestRagHealthFinal:
         assert result["status"] == "warn"
 
     def test_check_rag_sources_no_sources(self):
-        """Lines 172-177: no sources registered."""
+        """no sources listed -> fail (defensive)."""
         from memory.rag.health import check_rag_sources
         mock_module = MagicMock()
         mock_module._initialized = True
-        mock_module._sources = {}
-        result = check_rag_sources(mock_module)
-        assert result["status"] == "fail"
-
-    def test_check_rag_sources_unhealthy(self):
-        """Lines 186-192: some sources unhealthy."""
-        from memory.rag.health import check_rag_sources
-        mock_source = MagicMock()
-        mock_source.health.return_value = {"status": "unhealthy"}
-        mock_module = MagicMock()
-        mock_module._initialized = True
-        mock_module._sources = {"test": mock_source}
+        mock_module.list_sources.return_value = []
         result = check_rag_sources(mock_module)
         assert result["status"] == "fail"
 
     def test_check_rag_sources_exception(self):
-        """Lines 190-192: source.health() raises."""
+        """listing the sources raises -> fail, not a crash."""
         from memory.rag.health import check_rag_sources
-        mock_source = MagicMock()
-        mock_source.health.side_effect = Exception("broken")
         mock_module = MagicMock()
         mock_module._initialized = True
-        mock_module._sources = {"bad": mock_source}
+        mock_module.list_sources.side_effect = Exception("broken")
         result = check_rag_sources(mock_module)
         assert result["status"] == "fail"
 
@@ -1217,7 +1194,7 @@ class TestRagHealthFinal:
         from memory.rag.health import check_health
         mock_module = MagicMock()
         mock_module._initialized = True
-        mock_module._sources = {}
+        mock_module.list_sources.return_value = []
         mock_module.module_id = "test"
         mock_module.name = "test"
         mock_module.version = "1.0"

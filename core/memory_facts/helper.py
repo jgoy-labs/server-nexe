@@ -774,13 +774,19 @@ class MemoryHelper:
 
     @staticmethod
     def _deduplicate_results(all_results: list, limit: int) -> list:
-        """Sort by score descending and deduplicate by first 200 chars of content."""
+        """Sort by score descending and deduplicate by the whole content.
+
+        #1091: the key used to be the first 200 chars ("chunks from same doc
+        are similar"). A document with a RAG header carries the same
+        `[Document]`/`[Abstract]` prefix on every chunk, so all its chunks
+        shared those 200 chars and recall kept one per document (336 ca KB
+        chunks → 35). Only exact duplicates collapse now.
+        """
         all_results.sort(key=lambda x: x["score"], reverse=True)
         _seen_content: set = set()
         deduped = []
         for r in all_results:
-            # Use first 200 chars as dedup key (chunks from same doc are similar)
-            _key = r["content"][:200].strip()
+            _key = r["content"].strip()
             if _key not in _seen_content:
                 _seen_content.add(_key)
                 deduped.append(r)

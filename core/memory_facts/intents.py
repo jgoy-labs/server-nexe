@@ -65,6 +65,9 @@ class IntentOutcome:
     #: both parrot it, and past the first turn it became a second, paraphrased
     #: entry that the 0.80 dedup could not see).
     saved_by_intent: bool = False
+    #: The fact this turn's save left in memory (stored or already there) —
+    #: what a door may show as saved (#1098). Empty when storage failed.
+    kept_facts: list = field(default_factory=list)
     #: Extra data the UI turns into its own sentinels; other doors use headers.
     deleted_facts: list = field(default_factory=list)
     pending_delete_fact: Optional[str] = None
@@ -145,32 +148,64 @@ def delete_confirm_question(candidates: list) -> str:
     return _t("delete.confirm", items=items + "\n", profile_warn=warn)
 
 
+#: A NEW first-person predicate after "i/y/and" — "visc a Vic i (que) treballo
+#: de fuster" is two facts, "m'agraden la vainilla i els macarrons" is one. Only
+#: these verbs split: an unknown one keeps the fact whole, which is the old
+#: behaviour, never a wrong cut (#1056).
+_FIRST_PERSON_SPLIT = re.compile(
+    r"\s+(?:i|y|and)\s+(?:que\s+|that\s+)?(?=(?:"
+    r"visc|treballo|estudio|tinc|sóc|soc|em dic|m'agrada|m'agraden|parlo|prefereixo|faig|"
+    r"vivo|trabajo|tengo|soy|me llamo|me gusta|me gustan|hablo|prefiero|hago|"
+    r"i live|i work|i study|i have|i am|i'm|my name is|i like|i speak|i prefer|"
+    r"live|work|study|have|am|like|speak|prefer"
+    r")\b)",
+    re.IGNORECASE,
+)
+
+
+def split_first_person(content: str) -> list:
+    """"recorda que A i B" → [A, B] when B starts a new first-person predicate (#1056)."""
+    parts = [p.strip(" .,;") for p in _FIRST_PERSON_SPLIT.split(content)]
+    parts = [p for p in parts if p]
+    return parts if len(parts) >= 2 else [content]
+
+
 async def _save(extracted_content: str, message: str, session_id: str, rag_collections, port) -> IntentOutcome:
     """D6: save the fact and hand the turn back to the model.
 
     The fact is persisted here, deterministically, before anything is generated:
-    whatever the model then answers, the memory is already written.
+    whatever the model then answers, the memory is already written. A request
+    that carries two facts ("recorda que visc a Vic i que treballo de fuster")
+    is stored as two (#1056) — one card each, so forgetting one leaves the other.
     """
     content_to_save = (extracted_content.strip() if extracted_content else message).rstrip("?!").strip()
     if not content_to_save:
         return IntentOutcome(kind="save", memory_action="save", continue_turn=True)
 
-    result = await port.save_to_memory(
-        content=content_to_save,
-        session_id=session_id,
-        metadata={"original_message": message, "type": "user_fact"},
-        collections=rag_collections,
-    )
-    saved = bool(result["success"] and result.get("document_id"))
-    if not saved and not result.get("duplicate"):
-        logger.warning("memory intent 'save' did not persist: %s", result.get("message", "unknown"))
+    saved = 0
+    kept: list = []
+    for fact in split_first_person(content_to_save):
+        result = await port.save_to_memory(
+            content=fact,
+            session_id=session_id,
+            metadata={"original_message": message, "type": "user_fact"},
+            collections=rag_collections,
+        )
+        if result["success"] and result.get("document_id"):
+            saved += 1
+            kept.append(fact)
+        elif result.get("duplicate"):
+            kept.append(fact)
+        else:
+            logger.warning("memory intent 'save' did not persist: %s", result.get("message", "unknown"))
     return IntentOutcome(
         kind="save",
         memory_action="save",
-        mem_saved=1 if saved else 0,
-        # The port has seen this fact this turn (stored, or refused as a
-        # duplicate of what is already there) — either way `memory.write` must
-        # not write what the model repeats about it.
+        mem_saved=saved,
+        kept_facts=kept,
+        # The port has seen this turn's facts (stored, or refused as duplicates
+        # of what is already there) — either way `memory.write` must not write
+        # what the model repeats about them.
         saved_by_intent=True,
         continue_turn=True,
     )
@@ -210,10 +245,14 @@ async def _delete(extracted_content: str, session, rag_collections, port) -> Int
     )
 
 
-async def _delete_confirm(session, port, message: str) -> IntentOutcome:
+async def _delete_confirm(session, port, message: str, *, explicit_reference: bool = False) -> IntentOutcome:
     """Execute a confirmed partial delete by exact id (B028 2-turn flow).
 
     B093: profile entries require an explicit reference, not a bare "yes".
+    `explicit_reference` (C4.5) is the caller vouching that `message` IS the
+    pending entry (the web dialog sends back the very text it showed): a click
+    on the shown entry names it, even when its words are all too short for
+    `references_entry` to count any ("el meu gos es diu Tro").
     """
     pending = getattr(session, "_pending_partial_delete", None) or {}
     session._pending_partial_delete = None
@@ -221,7 +260,7 @@ async def _delete_confirm(session, port, message: str) -> IntentOutcome:
     content = pending.get("content", "")
     if not entries:
         return IntentOutcome(kind="delete", text=_t("delete.nothing_pending"), memory_action="delete")
-    if _has_profile_entry(entries) and not references_entry(message, entries):
+    if _has_profile_entry(entries) and not explicit_reference and not references_entry(message, entries):
         return IntentOutcome(kind="delete", text=_t("delete.blocked"), memory_action="delete_blocked")
 
     result = await port.delete_memory_entries(entries)

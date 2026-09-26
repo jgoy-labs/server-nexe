@@ -316,14 +316,19 @@ NexeUI.extend({
         const close = (confirmed) => {
             overlay.remove();
             if (confirmed) {
+                // C4.5: the server deletes THE entry this session has pending, by id;
+                // `fact` is the text the dialog showed — the reference the confirmation names.
                 this.fetchWithCsrf('/ui/memory/confirm-delete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fact })
+                    body: JSON.stringify({ fact, session_id: this.currentSessionId })
                 }).then(r => r.json()).then(result => {
                     if ((result.deleted || 0) > 0) {
                         const facts = (result.deleted_facts || []).map(f => f.text || f).join(', ');
                         this.addMessageToChat('assistant', `${this.t('delete_done')}: "${facts}"`);
+                    } else if (result.detail || result.message) {
+                        // Nothing pending any more, or a profile entry B093 refused: say what the server said.
+                        this.addMessageToChat('assistant', `↩️ ${result.detail || result.message}`);
                     }
                 }).catch(() => {});
             } else {

@@ -15,7 +15,6 @@ from dataclasses import dataclass
 import asyncio
 import inspect
 import logging
-import re as _re
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Depends, Request as FastAPIRequest
 from fastapi.responses import StreamingResponse
@@ -33,7 +32,6 @@ from plugins.web_ui_module.api.turn_adapters import ui_adapters
 from core.turn.assemble import _assemble_engine_messages, _build_turn_context
 from core.turn.prompt import _build_turn_system_prompt
 
-from core.log_redact import redact_user_content
 from core.chat_prompt import time_context_line
 from core.context_budget import (  # noqa: F401 — re-exported for tests and callers
     compute_context_budget,
@@ -41,12 +39,16 @@ from core.context_budget import (  # noqa: F401 — re-exported for tests and ca
 )
 import core.memory_facts as memory_facts
 from core.memory_facts import intents as memory_intents
-from core.memory_facts import extract as memory_extract
+from core.memory_facts import deletes as memory_deletes
 from core.memory_facts.write import will_write, write_facts
 import core.turn.policy as policy
 from core.endpoints.chat_engines._common import extract_engine_text as _engine_text
-from plugins.web_ui_module.core.harmony_filter import HarmonyStreamFilter
 from plugins.web_ui_module.core.latex_sanitizer import LatexStreamBuffer, latex_to_unicode
+# C4.4: the model's text format is the core's; this door keeps its alphabet.
+from core.turn.text import clean as text_clean
+from core.turn.errors import is_oom_error
+from core.turn.persist import persist_assistant_turn, persist_partial_assistant
+from core.turn.stream import Delta, Failed, Ready, StreamFlags, Whole, engine_events
 
 logger = logging.getLogger(__name__)
 
@@ -58,202 +60,6 @@ logger = logging.getLogger(__name__)
 # - Only letters (including accents/cyrillic), digits, spaces, and safe punctuation
 # - Explicitly rejected: <, >, [, ], {, }, |, `, \x00-\x1f
 # - Nested MEM_SAVE rejected (one MEM_SAVE inside another)
-
-# ─── Re-prompt override ─────────────────────────────────────────────────────
-# When a model emits ONLY [MEM_SAVE: ...] without a conversational response,
-# we resend the message with this override added to the system prompt.
-# Unknown/invented memory-tag shapes (seen live 04/07: qwen3.5:4b emitted
-# "[MEM_OBLIT: …]" — not MEM_SAVE, not MEM_DELETE, not an memory_extract._OBLIT_RE variant —
-# and it leaked RAW to the UI). Known tags are extracted/stripped upstream;
-# whatever [MEM*_X: …] survives is model confusion: strip it, log it, never
-# act on it.
-
-# ─── Context header patterns (compiled once) ─────────────────────────────────
-_CTX_HEADERS_RE = _re.compile(
-    # (?:FI\s+)?CONTEXT(?:\s+hex)? covers [CONTEXT], [FI CONTEXT] and the
-    # nonce'd B030 variants ([CONTEXT a1b2c3d4], [FI CONTEXT a1b2c3d4]).
-    # #1063: DOCUMENT ADJUNTAT only had its Catalan spelling here, unlike every
-    # other label above — added ATTACHED DOCUMENT / DOCUMENTO ADJUNTO now that
-    # the header itself can be emitted in any of the three. Pre-existing and
-    # separate from that fix: `core/turn/assemble.py`'s header line has never
-    # carried brackets ("DOCUMENT ADJUNTAT (file):", not "[DOCUMENT ADJUNTAT]"),
-    # so this branch does not strip it in ANY language — only a model that
-    # echoes the bracketed shape back verbatim is caught. Not closed here.
-    r'\[(?:(?:FI\s+)?CONTEXT(?:\s+[0-9a-f]{6,16})?|MEMORIA DE L\'USUARI|MEMORIA DEL USUARIO|'
-    r'USER MEMORY|DOCUMENTACI[ÓO] DEL SISTEMA|SYSTEM DOCUMENTATION|'
-    r'DOCUMENTACI[ÓO] T[EÈ]CNICA|TECHNICAL DOCUMENTATION|'
-    r'DOCUMENT ADJUNTAT|ATTACHED DOCUMENT|DOCUMENTO ADJUNTO|'
-    r'FI DOCUMENT|END DOCUMENT|FIN DOCUMENTO)\]',
-    _re.IGNORECASE
-)
-
-
-
-
-def _parse_chunk(chunk: Any) -> tuple[str, str]:
-    """Extreu (content, thinking) d'un chunk de l'engine."""
-    content = ""
-    thinking = ""
-    if isinstance(chunk, dict):
-        if "message" in chunk:
-            thinking = chunk["message"].get("thinking", "")
-            content = chunk["message"].get("content", "")
-        elif "content" in chunk:
-            content = chunk["content"]
-        elif "response" in chunk:
-            content = chunk["response"]
-    elif isinstance(chunk, str):
-        content = chunk
-    return content, thinking
-
-
-# MC-004: precompiled once (these subs run per stream chunk in _normalize_content).
-_PIPE_TAG_RE = _re.compile(r'<\|[^|]+\|>')
-_ANGLE_TAG_RE = _re.compile(r'[◁◀][^▷▶]*[▷▶]')
-
-
-def _normalize_content(content: str, model_name: str) -> str:
-    """Normalize GPT-OSS and pipe tags for the specific model."""
-    if "gpt-oss" in model_name.lower():
-        content = content.replace('<|analysis|>', '<think>')
-        content = content.replace('<|assistant|>', '</think>')
-    else:
-        content = content.replace('<|thinking|>', '<think>')
-        content = content.replace('<|/thinking|>', '</think>')
-    content = _PIPE_TAG_RE.sub('', content)
-    content = _ANGLE_TAG_RE.sub('', content)
-    return content
-
-
-def _process_content_think_tags(content: str, in_think: bool) -> tuple[str, bool, bool]:
-    """Split the visible part of a chunk with embedded <think> tags (qwq:32b, etc.).
-
-    Returns (visible, in_think_new, found_thinking).
-    """
-    if '<think>' not in content and '</think>' not in content and not in_think:
-        return content, False, False
-    vis_parts: list[str] = []
-    sc = 0
-    found_thinking = False
-    while sc < len(content):
-        if in_think:
-            te = content.find('</think>', sc)
-            if te >= 0:
-                in_think = False
-                sc = te + 8
-            else:
-                break
-        else:
-            ts = content.find('<think>', sc)
-            if ts >= 0:
-                if ts > sc:
-                    vis_parts.append(content[sc:ts])
-                in_think = True
-                found_thinking = True
-                sc = ts + 7
-            else:
-                vis_parts.append(content[sc:])
-                break
-    return ''.join(vis_parts), in_think, found_thinking
-
-
-class _StreamThinkParser:
-    """Per-request streaming FSM extracted from response_generator (MC-027 F1).
-
-    Owns the cross-chunk think / content-think / harmony / latex state and turns
-    each engine chunk's ``(content, thinking)`` into ``(wire_tokens, full_delta)``:
-
-      - ``wire_tokens``: the strings to yield to the client — already ``<think>``
-        wrapped, harmony/latex filtered and ``[MEMORIA: ...]`` stripped (visible).
-      - ``full_delta``: the raw text to append to ``full_response`` — think tags
-        included, pre-latex — what ``_clean_full_response`` later strips at persist.
-
-    The visible/raw split is load-bearing (INV-HIGH-07): the wire shows the buffered
-    visible form while ``full_response`` keeps the raw content so think/harmony tags
-    can be removed at persist time. ``feed()`` and ``flush()`` both return
-    ``(wire, full_delta)``; ``flush()`` closes any open harmony ``<think>`` (B027a)
-    and drains the pending latex buffer. Behaviour is byte-equivalent to the inline
-    loop it replaces.
-    """
-
-    def __init__(self, model_name: "str | None") -> None:
-        self._model_name = model_name
-        self._in_thinking = False
-        self._in_content_think = False
-        self._latex_buf = LatexStreamBuffer()
-        # B027a: gpt-oss emits harmony channel tags (<|channel|>analysis<|message|>…)
-        # split across chunks — a stateless replace cannot pair them and the
-        # reasoning leaked into the visible bubble. Stateful filter → canonical
-        # <think>. Only instantiated for gpt-oss; other models use _normalize_content.
-        self._harmony_buf = (
-            HarmonyStreamFilter()
-            if "gpt-oss" in str(model_name).lower() else None
-        )
-        self.has_any_thinking = False
-
-    def feed(self, content: str, thinking: str) -> "tuple[list[str], str]":
-        wire: list[str] = []
-        full = ""
-        # Stream thinking tokens wrapped in <think> tags (open/close on transition)
-        if thinking:
-            if not self._in_thinking:
-                self._in_thinking = True
-                self.has_any_thinking = True
-                wire.append("<think>")
-                full += "<think>"
-            wire.append(thinking)
-            full += thinking
-        elif self._in_thinking:
-            # Transition: thinking done, close tag
-            self._in_thinking = False
-            wire.append("</think>")
-            full += "</think>"
-
-        if content:
-            if self._harmony_buf is not None:
-                content = self._harmony_buf.feed(content)
-            else:
-                content = _normalize_content(content, self._model_name)
-        if content:
-            full += content
-            # Separate embedded <think> blocks in content (qwq:32b, etc.)
-            visible, self._in_content_think, _found_thinking = _process_content_think_tags(
-                content, self._in_content_think
-            )
-            if _found_thinking:
-                self.has_any_thinking = True
-            # Bug B-mem-visible: strip [MEMORIA: ...] from visible output — gpt-oss:20b
-            # emits this tag instead of [MEM_SAVE: ...]. Processed in clean_response;
-            # here we hide it from the user.
-            if visible and memory_extract._MEMORIA_RE.search(visible):
-                visible = memory_extract._MEMORIA_RE.sub('', visible)
-            if visible:
-                emit = self._latex_buf.feed(visible)
-                if emit:
-                    wire.append(emit)
-        return wire, full
-
-    def flush(self) -> "tuple[list[str], str]":
-        wire: list[str] = []
-        full = ""
-        # Flush harmony leftovers (closes an open <think>)
-        if self._harmony_buf is not None:
-            _harmony_tail = self._harmony_buf.flush()
-            if _harmony_tail:
-                full += _harmony_tail
-                _h_visible, self._in_content_think, _f = _process_content_think_tags(
-                    _harmony_tail, self._in_content_think
-                )
-                if _h_visible:
-                    emit = self._latex_buf.feed(_h_visible)
-                    if emit:
-                        wire.append(emit)
-        # Flush any buffered LaTeX pending at end of stream
-        _latex_tail = self._latex_buf.flush()
-        if _latex_tail:
-            wire.append(_latex_tail)
-        return wire, full
-
 
 def _build_mem_stats(
     session: Any,
@@ -309,134 +115,6 @@ async def _yield_response_headers(
         yield f"\x00[DOC_TRUNCATED:{doc_truncated_pct}]\x00"
 
 
-def _clean_full_response(full_response: str, user_input: str = "") -> tuple[str, list, list]:
-    """Clean the full response and extract MEM_SAVE and MEM_DELETE tags.
-
-    Returns (clean_response, mem_saves, mem_deletes).
-    The PENDING_DELETE yield must be done by the caller.
-    """
-    clean_response = full_response
-    clean_response = _re.sub(r"<think>[\s\S]*?</think>\s*", "", clean_response)
-    clean_response = _re.sub(r'<\|[^|]+\|>', '', clean_response)
-    clean_response = _re.sub(r'[◁◀][^▷▶]*[▷▶]', '', clean_response)
-    _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', clean_response, _re.IGNORECASE)
-    if _m:
-        clean_response = _m.group(1).strip()
-    else:
-        clean_response = _re.sub(r'^analysis\s*', '', clean_response, flags=_re.IGNORECASE).strip()
-    clean_response = _CTX_HEADERS_RE.sub('', clean_response).strip()
-    # C3.2: reading the model's memory tags is the core's job now — the same
-    # reading /v1 does, so a tag means the same thing at both doors.
-    return memory_extract.extract_memory_tags(clean_response, user_input=user_input)
-
-
-# Placeholder persisted for a think-only assistant turn (B125).
-_THINK_ONLY_PLACEHOLDER = "…"
-
-
-def _think_only_placeholder(clean_response: str, full_response: str) -> str:
-    """B125: keep an assistant turn even when the model produced only thinking.
-
-    When the model emits a turn that cleans down to nothing (e.g. think-only
-    output), no assistant message gets persisted. ``get_context_messages()``
-    then sees two consecutive ``user`` turns and drops the newer one as a
-    duplicate role — silently losing the user's next message. Returning a
-    placeholder keeps the user/assistant alternation intact.
-
-    A genuinely empty turn (``full_response`` empty, e.g. an upstream
-    exception) is left untouched so nothing spurious is saved.
-    """
-    if not clean_response and full_response:
-        return _THINK_ONLY_PLACEHOLDER
-    return clean_response
-
-
-def _extract_reprompt_chunk_content(chunk) -> tuple[str, bool]:
-    """Extract text content from a reprompt chunk. Returns (content, skip).
-
-    skip=True means the chunk is a pure thinking token and should be discarded.
-    """
-    if isinstance(chunk, dict) and "message" in chunk:
-        if chunk["message"].get("thinking", ""):
-            return "", True
-        return chunk["message"].get("content", ""), False
-    if isinstance(chunk, dict):
-        return chunk.get("content", chunk.get("response", "")) or "", False  # type: ignore[return-value]
-    if isinstance(chunk, str):
-        return chunk, False
-    return "", False
-
-
-def _filter_reprompt_think_tags(content: str, in_think: bool) -> tuple[str, bool]:
-    """Strip <think>…</think> tags inline, updating in_think state. Returns (filtered_content, in_think).
-
-    B124: a chunk that carries a COMPLETE ``<think>…</think>`` plus trailing
-    visible text must keep that visible text. The close tag is matched on the
-    ORIGINAL chunk (previously it was searched in the already-truncated
-    pre-``<think>`` slice, so the text after ``</think>`` was discarded and
-    in_think wrongly stayed True — the visible reply was lost).
-    """
-    before = content.split('<think>')[0] if '<think>' in content else ""
-    if '<think>' in content:
-        in_think = True
-    if '</think>' in content:
-        # visible = text before this chunk's <think> (if any) + text after </think>
-        return before + content.split('</think>')[-1], False
-    if in_think:
-        return "", True
-    return content, in_think
-
-
-async def _yield_reprompt(
-    engine: Any,
-    model_name: str,
-    sig: Any,
-    lang: str,
-    system_prompt: str,
-    messages: list,
-    mem_saves: list,
-    thinking_enabled: bool,
-    rp_out: list,
-):
-    """Re-prompt when the response is empty but there are MEM_SAVEs.
-
-    Yields filtered chunks (no think, no MEM_SAVE).
-    If the response is OK, rp_out[0] = accumulated clean_response.
-    The fallback (yield 'Memory saved: ...') lives one level up, in
-    `_yield_reprompt_when_only_mem_saves`.
-    """
-    _fallback_facts = [f.strip() for f in mem_saves if f and f.strip()]
-    if not _fallback_facts:
-        return
-    _lang_short = lang[:2] if lang else "ca"
-    _rp_override = policy.REPROMPT_OVERRIDE.get(_lang_short, policy.REPROMPT_OVERRIDE["en"])
-    _rp_system = system_prompt + _rp_override
-    try:
-        if 'model' in sig.parameters:
-            logger.info("Re-prompt: empty after MEM_SAVE, re-calling %s", model_name)
-            _rp_msgs = [{"role": "system", "content": _rp_system}] + messages
-            _rp_result = engine.chat(model=model_name, messages=_rp_msgs, stream=True,
-                                     thinking_enabled=thinking_enabled)
-            _rp_response = ""
-            _rp_in_think = False
-            async for _rp_chunk in _rp_result:
-                _rp_content, _skip = _extract_reprompt_chunk_content(_rp_chunk)
-                if _skip:
-                    continue
-                _rp_content, _rp_in_think = _filter_reprompt_think_tags(_rp_content, _rp_in_think)
-                if _rp_in_think:
-                    continue
-                _rp_content = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]', '', _rp_content)
-                if _rp_content:
-                    _rp_response += _rp_content
-                    yield _rp_content
-            if _rp_response.strip():
-                rp_out.append(_rp_response.strip())
-                logger.info("Re-prompt OK: %d chars", len(_rp_response.strip()))
-    except Exception as e:
-        logger.warning("Re-prompt failed: %s", e)
-
-
 def render_intent_for_ui(outcome: "memory_intents.IntentOutcome") -> str:
     """The web UI's alphabet for a memory command: the core answered with data,
     this adds the sentinels `nexe-chat.js` reads. The core stays wire-agnostic
@@ -448,172 +126,47 @@ def render_intent_for_ui(outcome: "memory_intents.IntentOutcome") -> str:
     if outcome.pending_delete_fact is not None:
         # PENDING_DELETE marker: the web UI shows its confirmation dialog. Text
         # confirmation ("si") works in parallel via session._pending_partial_delete.
-        fact = outcome.pending_delete_fact.replace("|", "\\|")[:200]
-        rendered += f"\x00[PENDING_DELETE:{fact}]\x00"
+        rendered += pending_delete_sentinel(outcome.pending_delete_fact)
     return rendered
 
 
-# B126 v2: name claims are no longer blanket-junk here either — the contextual
-# guard (NAME_CLAIM_RE + user_text check) in core.memory_facts.write
-# replaces them, in parity with the streaming path (_filter_facts).
-
-def _clean_nonstreaming_text(response_text: str) -> str:
-    """Strip think/GPT-OSS tags and extract the final answer section."""
-    response_text = _re.sub(r"<think>[\s\S]*?</think>\s*", "", response_text)
-    response_text = _re.sub(r'<\|[^|]+\|>', '', response_text)
-    _m = _re.search(r'(?:assistant\s*)?final\s*([\s\S]+)$', response_text, _re.IGNORECASE)
-    if _m:
-        return _m.group(1).strip()
-    return _re.sub(r'^analysis\s*', '', response_text, flags=_re.IGNORECASE).strip()
-
-
-async def _arm_mem_deletes_nonstreaming(
-    mem_deletes: list,
-    session,
-    memory_helper,
-) -> str:
-    """B028: model-emitted MEM_DELETE tags must NOT delete directly.
-
-    The streaming path already routes them through a confirmation
-    ([PENDING_DELETE:] → UI dialog); the non-streaming path used to execute
-    them straight away — a RAG-injected document could erase memory with zero
-    human in the loop. Now: preview the first valid fact, arm the 2-turn
-    confirmation, and return the question to append to the response.
-    """
-    for _del_fact in mem_deletes:
-        _del_fact = _del_fact.strip()
-        if not _del_fact or len(_del_fact) < 3:
-            continue
-        try:
-            preview = await memory_helper.preview_delete_from_memory(_del_fact)
-            candidates = preview.get("candidates", [])
-            if preview.get("success") and candidates:
-                best = candidates[:1]
-                session._pending_partial_delete = {"content": _del_fact, "entries": best}
-                logger.info("MEM_DELETE (model tag, no-stream): pending confirmation for %s", redact_user_content(_del_fact))
-                return render_intent_for_ui(memory_intents.IntentOutcome(
-                    kind="delete_pending",
-                    text=memory_intents.delete_confirm_question(best),
-                    pending_delete_fact=best[0].get("text", "") if best else "",
-                ))
-            logger.info("MEM_DELETE (model tag, no-stream): no match for %s", redact_user_content(_del_fact))
-        except Exception as e:
-            logger.warning("MEM_DELETE preview failed (no-stream): %s", e)
-    return ""
+def pending_delete_sentinel(fact: str) -> str:
+    """The web UI's token for "confirm this forget?": `nexe-chat.js` opens its
+    dialog on it and the CLI asks (`_report_memory`). Since C4.5 it carries the
+    ENTRY's text on both wire shapes (the JSON path did; the stream carried the
+    model's phrase), because that text is what the dialog sends back to
+    `/ui/memory/confirm-delete` as the confirmed reference (B093)."""
+    safe = (fact or "").replace("\x00", "").replace("|", "\\|")[:200]
+    return f"\x00[PENDING_DELETE:{safe}]\x00"
 
 
 @dataclass
-class NonStreamRepromptContext:
-    """El que el re-prompt de #856 necessita i que viu dins `_handle_chat_engine`.
-
-    `_yield_reprompt` demana engine/model/sig/lang/system_prompt/messages i
-    thinking_enabled. Al camí streaming els porta `StreamingChatContext`; el camí
-    no-streaming no tenia cap vehicle, i per això acea60f1 (31/07) va portar-hi
-    només la segona meitat de la xarxa (la confirmació) i no el re-prompt. Això
-    és el vehicle: els mateixos valors, capturats al mateix lloc, sense
-    reconstruir el torn ni duplicar-ne la preparació.
-    """
+class RepromptSetup:
+    """This door's way of asking its engine once more — `policy.reprompt_chunks`'s
+    `call` (C4.5): what `generate` had in hand when the engine started, kept as
+    DATA so two turns that differ only in `ctx.entry` compare equal (the I1
+    contract test reads the door's scratch). Ollama-shaped engines only, as it
+    has always been: MLX and llama.cpp run through a queue and a worker thread
+    (`_start_engine_call`) that was never wired for a second call. Returning
+    None for them lets the core SAY it skipped, where `_yield_reprompt` used to
+    skip in silence."""
     engine: Any
-    model_name: "str | None"
     sig: Any
-    lang: str
-    system_prompt: str
+    model_name: "str | None"
     messages: list
     thinking_enabled: bool
 
-
-async def _reprompt_nonstreaming(
-    ctx: "NonStreamRepromptContext", mem_saves: list,
-) -> str:
-    """Re-prompt del camí no-streaming. Torna "" si no rendeix text.
-
-    Mateix generador que el camí streaming (`_yield_reprompt`, la font única):
-    allà els trossos es van emetent al client a mesura que arriben; aquí no hi
-    ha res a qui emetre'ls, així que es consumeixen i el que compta és el text
-    acumulat que el generador deixa a `rp_out`. Els errors ja els empassa
-    `_yield_reprompt` (log + res), de manera que un re-prompt que falla acaba
-    igual que un que no rendeix: cadena buida i, més amunt, la confirmació.
-    """
-    _rp_out: list = []
-    async for _chunk in _yield_reprompt(
-        ctx.engine, ctx.model_name, ctx.sig, ctx.lang,
-        ctx.system_prompt, ctx.messages, mem_saves,
-        ctx.thinking_enabled, _rp_out,
-    ):
-        pass
-    return _rp_out[0] if _rp_out else ""
+    def __call__(self, system_prompt: str):
+        if "model" not in self.sig.parameters:
+            return None
+        full = [{"role": "system", "content": system_prompt}] + list(self.messages)
+        return self.engine.chat(
+            model=self.model_name, messages=full, stream=True, thinking_enabled=self.thinking_enabled,
+        )
 
 
-async def _postprocess_nonstreaming(
-    response_text: str,
-    session,
-    memory_helper,
-    message: str,
-    memory_action: Optional[str],
-    rag_collections: "list | None" = None,
-    reprompt_ctx: "NonStreamRepromptContext | None" = None,
-) -> tuple[str, Optional[str], int, list]:
-    """The non-streaming `postprocess` step: returns
-    (response_text, memory_action, mem_deleted_delta, mem_saves).
-
-    Everything the old (single-call) non-stream handler did EXCEPT writing the
-    facts to memory — that is the turn's `memory.write` step, which runs after
-    the turn is on disk (ADR-007 I3; decision of 06/09/2026). `mem_saves` is
-    handed to the caller, who runs `core.memory_facts.write.write_facts` afterwards
-    (C1.4, 06/09/2026: the facade that called both in the old order had no
-    production caller left — removed).
-    """
-    response_text = _clean_nonstreaming_text(response_text)
-    # TUR-NS-MEMORIA: normalise the [MEMORIA:] alias → [MEM_SAVE:] (mirror of
-    # the streaming _clean_full_response) so models that emit it (e.g.
-    # gpt-oss:20b) get the fact SAVED and the raw tag stripped — without this,
-    # the non-stream path leaks [MEMORIA:] raw to the JSON/disk response and
-    # never persists the fact (parity with stream broken).
-    response_text = memory_extract._MEMORIA_RE.sub(lambda m: f'[MEM_SAVE: {m.group(1)}]', response_text)
-    # Bug 17: Extract [MEM_SAVE: ...] facts with strict validation before strip
-    _mem_saves_ns = memory_extract._extract_safe_mem_saves(response_text, user_input=message)
-    response_text = _re.sub(r'\[MEM_SAVE:[^\[\]\n\r\t]{1,250}\]\s*', '', response_text).strip()
-    # F1 fix: if the model generated inline MEM_SAVE, reflect it in memory_action
-    # (the facts themselves are written by the caller's `memory.write`, after disk).
-    # C3 review (08/09): only when there is no memory_action yet. A D6 "save"
-    # already ran deterministically at the `intent` step, before this text
-    # existed — the model parroting its own confirmation back as another
-    # inline tag (common on small models, live-tested 08/09) must not relabel
-    # that already-completed, already-counted save as the unreliable
-    # "mem_save_inline" bucket. /v1's postprocess (core/turn/adapters_api.py)
-    # never overwrote memory_action for this reason; the UI door diverged.
-    if _mem_saves_ns and not memory_action:
-        memory_action = "mem_save_inline"
-    # Bug 18: Extract [MEM_DELETE: ...] and [OLVIDA/OBLIT/FORGET: ...] (non-streaming)
-    response_text = memory_extract._OBLIT_RE.sub(lambda m: f'[MEM_DELETE: {m.group(2)}]', response_text)
-    _mem_deletes_ns = memory_extract._MEM_DELETE_RE.findall(response_text)
-    mem_deleted_delta = 0
-    if _mem_deletes_ns:
-        response_text = _re.sub(r'\[MEM_DELETE:[^\[\]\n\r\t]{1,250}\]\s*', '', response_text).strip()
-        # B028: arm the 2-turn confirmation instead of deleting directly.
-        _confirm_q = await _arm_mem_deletes_nonstreaming(_mem_deletes_ns, session, memory_helper)
-        if _confirm_q:
-            response_text = f"{response_text}\n\n{_confirm_q}" if response_text else _confirm_q
-            memory_action = "delete_pending"
-    # Last pass (parity with _clean_full_response): invented [MEM_*] variants
-    # must never reach the client.
-    response_text = memory_extract._strip_unknown_mem_tags(response_text)
-    # #856: a turn that cleans down to ONLY the MEM_SAVE tag left the client
-    # with 200 + empty body here, while the streaming path re-prompted and,
-    # failing that, emitted a confirmation. Seen live 31/07 (glm-4.7-flash
-    # answered a bare hallucinated directive in 0.58 s). The re-prompt itself
-    # needs engine/sig/system_prompt/messages, which stay local to
-    # _handle_chat_engine — so this path landed straight on the same fallback
-    # text the streaming one uses when its re-prompt yields nothing.
-    # 23/08: la paritat es completa — el context del torn ara viatja fins aquí
-    # (NonStreamRepromptContext) i el re-prompt es prova PRIMER, com al camí
-    # streaming; la confirmació queda com el que sempre havia de ser: l'última
-    # xarxa quan el segon intent tampoc rendeix text.
-    if not response_text and _mem_saves_ns and reprompt_ctx is not None and policy.reprompt_enabled():
-        response_text = await _reprompt_nonstreaming(reprompt_ctx, _mem_saves_ns)
-    if not response_text:
-        response_text = policy.mem_save_fallback_text(_mem_saves_ns)
-    return response_text, memory_action, mem_deleted_delta, _mem_saves_ns
+def reprompt_call_for(engine, sig, model_name, messages: list, thinking_enabled: bool) -> RepromptSetup:
+    return RepromptSetup(engine, sig, model_name, messages, thinking_enabled)
 
 
 async def _yield_model_loading_check(engine, model_name: str, engine_name: str):
@@ -632,7 +185,6 @@ async def _yield_model_loading_check(engine, model_name: str, engine_name: str):
 
 async def _accumulate_nonstreaming_response(chat_result, response_chunks: list) -> None:
     """Accumulate chunks from a non-streaming chat_result into response_chunks."""
-    import inspect
     if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
         async for chunk in chat_result:
             if isinstance(chunk, dict) and "message" in chunk and "content" in chunk["message"]:
@@ -684,30 +236,10 @@ class StreamingChatContext:
     # dedupes consecutive roles keeping only the latest, which would erase
     # the first half of the answer).
     continue_mode: bool = False
-
-
-@dataclass
-class _StreamFlags:
-    """Per-request flags the engine loop hands back to the streaming body.
-
-    `_yield_engine_chunks` cannot return values while it is yielding, so the
-    three flags it discovers travel on this object instead. `full_response`
-    deliberately does NOT live here: it stays a bare local of
-    `_generate_streaming_response`, accumulated at the yield site, so a client
-    disconnect finds the partial text exactly where MC-116 expects it.
-    """
-    # FD-S5: truncation marker state. Set by the in-band sentinel (MLX
-    # via queue_generator) or by an Ollama done_reason=='length' chunk.
-    trunc: bool = False
-    trunc_continuable: bool = False
-    has_any_thinking: bool = False
-    # #1040 (C2.4): the exception `_yield_engine_chunks` caught mid-stream, if
-    # any. The generator itself only has room to turn it into wire text (see
-    # `_stream_error_notice`); this is the out-of-band channel that lets the
-    # caller (`generate_stream`) mark the turn PARTIAL after the fact — the
-    # error is already committed to the wire by the time this is read, so the
-    # turn cannot be retried, only recorded as broken.
-    error: "Exception | None" = None
+    # C4.5: the `TurnContext` the core policy reads (gate, I8, language). The
+    # adapters have the real one; the `continue` path, which never walks the
+    # turn map, hands a bare one built in `_handle_chat_engine` (dies at C4.6).
+    turn: Any = None
 
 
 def _oom_notice(err_msg: str, lang: str) -> str:
@@ -737,57 +269,6 @@ def _oom_notice(err_msg: str, lang: str) -> str:
     return table.get(lang, table["en"])
 
 
-def _apply_trunc_sentinels(chunk: Any, flags: _StreamFlags) -> bool:
-    """Read the FD-S5 truncation sentinels off a chunk. True = skip the chunk.
-
-    Two shapes, and only the first one is skippable:
-      - the in-band `__nexe_trunc__` sentinel (MLX, via queue_generator), which
-        carries no text and must never be mixed with a content yield;
-      - an Ollama passthrough `done` chunk with done_reason == 'length', which
-        may still carry content for `_parse_chunk` — so it is NOT skipped.
-    """
-    if isinstance(chunk, dict) and chunk.get("__nexe_trunc__"):
-        flags.trunc = True
-        flags.trunc_continuable = bool(chunk.get("continuable"))
-        return True
-    if (
-        isinstance(chunk, dict)
-        and chunk.get("done")
-        and chunk.get("done_reason") == "length"
-    ):
-        flags.trunc = True
-    return False
-
-
-def _is_oom_error(err_msg: str) -> bool:
-    """True when an engine's error text describes an out-of-memory failure.
-
-    Shared by `_stream_error_notice` (which message to show) and
-    `_classify_engine_error` (#1040, C2.4: which ADR-007 §8 class to record —
-    Fatal, since closing other applications or switching engines is a step
-    the user must take, not something a retry on the next engine fixes).
-    """
-    return any(k in err_msg for k in (
-        "Insufficient Memory", "OutOfMemory",
-        "Memòria insuficient", "Memoria insuficiente",
-        "Not enough memory",
-    ))
-
-
-def _classify_engine_error(exc: Exception) -> str:
-    """ADR-007 §8 class for an exception caught mid-stream (#1040, C2.4).
-
-    Used only to annotate `ctx.error` for the trace — C2 does not yet act on
-    the class (that starts with C2.5's deadline/budget work). OOM is Fatal
-    (the user must free memory or switch engines); anything else caught here
-    is the current engine failing at this moment, i.e. Retryable in the
-    sense that a fresh turn against a different engine could still succeed —
-    though this turn itself, with tokens already on the wire, cannot be.
-    """
-    err_msg = repr(exc) if not str(exc) else str(exc)
-    return "Fatal" if _is_oom_error(err_msg) else "Retryable"
-
-
 def _stream_error_notice(exc: Exception, lang: "str | None") -> str:
     """Chat-body text for an exception raised mid-generation (MC-133).
 
@@ -801,7 +282,7 @@ def _stream_error_notice(exc: Exception, lang: "str | None") -> str:
     # sees a curated message below.
     logger.error("Streaming error: %s", err_msg, exc_info=True)
     _lk = lang[:2] if lang else "ca"
-    if _is_oom_error(err_msg):
+    if is_oom_error(err_msg):
         return f"\n⚠️ {_oom_notice(err_msg, _lk)}"
     # MC-133: do not echo the raw exception text (err_msg) — it can
     # carry internal paths/state. Surface a generic, localized notice.
@@ -831,192 +312,58 @@ def _gen_truncated_token(
     return f"\x00[GEN_TRUNCATED:{_cont_flag}]\x00"
 
 
-async def _yield_engine_chunks(ctx: "StreamingChatContext", flags: _StreamFlags):
-    """Consume the engine's stream, yielding `(wire_token, full_delta)` pairs.
+async def _yield_engine_chunks(ctx: "StreamingChatContext", flags: StreamFlags):
+    """The engine's events in this door's alphabet: `(wire_token, full_delta)`.
 
-    The caller owns `full_response`: each pair carries either a token for the
-    wire or text to accumulate (never both), so the caller can do
-    `full_response += delta` at the same point the inline loop did — before the
-    wire tokens of that chunk go out — and a disconnect leaves the partial text
-    where MC-116 expects it. A pair whose token is None is accumulation only.
-
-    The `except Exception` stays with the loop it guards. GeneratorExit is a
-    BaseException, so a client disconnect still tears this generator down
-    instead of being turned into an error notice.
+    C4.4: the loop is the core's (`core.turn.stream.engine_events`); what is
+    left here is the web door's presentation — the MODEL_READY sentinel, the
+    LaTeX buffer, the localized error notice. The caller owns `full_response`:
+    a pair whose token is None is accumulation only, and it comes before the
+    wire tokens of its chunk, so a disconnect leaves the partial text where
+    MC-116 expects it.
     """
-    try:
-        # Handle both AsyncIterator (streaming) and direct coroutine response (non-streaming)
-        if inspect.isasyncgen(ctx.chat_result) or hasattr(ctx.chat_result, '__aiter__'):
-            _first_chunk = True
-            # MC-027 F1: the per-request think/content-think/harmony/latex FSM
-            # lives in _StreamThinkParser. feed() returns (wire_tokens, full_delta):
-            # the wire gets the visible/buffered form, full_response keeps the raw
-            # text so _clean_full_response can strip tags at persist (INV-HIGH-07).
-            _think_parser = _StreamThinkParser(ctx.model_name)
-            async for chunk in ctx.chat_result:
-                if _apply_trunc_sentinels(chunk, flags):
-                    continue
-                content, thinking = _parse_chunk(chunk)
-
-                # Model loaded — any chunk = model is responding
-                if _first_chunk:
-                    _first_chunk = False
-                    yield "\x00[MODEL_READY]\x00", ""
-
-                _wire, _full_delta = _think_parser.feed(content, thinking)
-                yield None, _full_delta
-                for _tok in _wire:
-                    yield _tok, ""
-                flags.has_any_thinking = _think_parser.has_any_thinking
-            # Flush harmony leftovers (closes an open <think>) +
-            # any buffered LaTeX pending at end of stream
-            _wire, _full_delta = _think_parser.flush()
-            yield None, _full_delta
-            for _tok in _wire:
-                yield _tok, ""
-        else:
-            # Fallback for non-streaming engines
+    async for ev in engine_events(ctx.chat_result, ctx.model_name, flags,
+                                  visible_buffer=LatexStreamBuffer()):
+        if isinstance(ev, Ready):
             yield "\x00[MODEL_READY]\x00", ""
-            result = await ctx.chat_result if inspect.iscoroutine(ctx.chat_result) else ctx.chat_result
-            content = _engine_text(result)
-            if content:
-                yield latex_to_unicode(content), content
-    except Exception as e:
-        flags.error = e
-        yield _stream_error_notice(e, ctx.lang), ""
+        elif isinstance(ev, Delta):
+            yield None, ev.full
+            for _tok in ev.wire:
+                yield _tok, ""
+        elif isinstance(ev, Whole):
+            yield latex_to_unicode(ev.text), ev.text
+        elif isinstance(ev, Failed):
+            yield _stream_error_notice(ev.exc, ctx.lang), ""
 
 
-async def _yield_mem_delete_prompts(ctx: "StreamingChatContext", mem_deletes: list):
-    """Arm each MEM_DELETE and yield its confirm-dialog token (MC-117).
-
-    Body moved verbatim out of `_generate_streaming_response` (MC-027 F3): same
-    arming order, same entries=[:1], same TUR-PHANTOM-DEL rule that the token
-    only surfaces for a fact that actually armed a pending delete.
-    """
-    for _del_fact in mem_deletes:
-        _encoded = _del_fact.replace('|', '\\|')
-        # MC-117: arm the 2-turn TEXT confirmation (a typed "sí" next
-        # turn), not only the UI dialog. Mirrors the non-stream arming
-        # (_handle_delete_intent) so the documented behaviour holds.
-        # Arm BEFORE emitting the UI token so a typed "sí" / dialog
-        # click never races a not-yet-set flag, and a failed preview
-        # never leaves a dead confirm button visible. entries=[:1] is
-        # intentional (B028/RT-04: best global match only, no cross-
-        # collection collateral — identical to the non-stream path).
-        _df = _del_fact.strip()
-        _armed = False
-        if _df and not getattr(ctx.session, "_pending_partial_delete", None):
-            try:
-                _preview = await ctx.memory_helper.preview_delete_from_memory(_df)
-                _cands = _preview.get("candidates", [])
-                if _preview.get("success") and _cands:
-                    ctx.session._pending_partial_delete = {"content": _df, "entries": _cands[:1]}
-                    _armed = True
-            except Exception:
-                logger.debug("MC-117: preview_delete_from_memory failed in stream", exc_info=True)
-        # TUR-PHANTOM-DEL: surface the confirm-dialog token ONLY when THIS
-        # fact actually armed a pending delete. A failed/empty/raising
-        # preview (Memory API down, or the common "forget X not stored"
-        # case → success but candidates=[]) must NOT leave a dead confirm
-        # button — parity with the non-stream _arm_mem_deletes_nonstreaming,
-        # which only emits the token on success+candidates. This is the
-        # invariant the MC-117 comment above already declares.
-        if _armed:
-            yield f"\x00[PENDING_DELETE:{_encoded}]\x00"
-
-
-async def _yield_reprompt_when_only_mem_saves(
-    ctx: "StreamingChatContext", clean_response: str, mem_saves: list, rp_out: list,
+async def _arm_and_reprompt(
+    ctx: StreamingChatContext, clean_response: str, mem_saves: list, mem_deletes: list, out: list,
 ):
-    """Re-prompt (or fall back) when the turn produced only [MEM_SAVE: ...].
-
-    No-op unless the visible response is empty AND there are mem_saves. On the
-    fallback path the confirmation text is BOTH yielded and appended to
-    `rp_out`, so the caller assigns `clean_response = rp_out[0]` for either
-    outcome — the split the inline `if/else` used to make.
-    """
+    """The two moves `postprocess_stream` makes, for the `continue` path (C4.5):
+    the core's delete rule and the core's second call. Yields the wire tokens;
+    the final clean text is left in `out` (a generator cannot return a value
+    while it yields). Dies with the path at C4.6."""
+    armed = await memory_deletes.arm_pending_deletes(
+        ctx.session, mem_deletes, ctx.memory_helper, ctx.rag_collections,
+    )
+    if armed is not None:
+        yield pending_delete_sentinel(armed.pending_delete_fact)
     if clean_response or not mem_saves:
+        out.append(clean_response)
         return
-    if policy.reprompt_enabled():
-        async for _chunk in _yield_reprompt(
-            ctx.engine, ctx.model_name, ctx.sig, ctx.lang,
-            ctx.system_prompt, ctx.messages, mem_saves,
-            ctx.thinking_enabled, rp_out,
-        ):
-            yield _chunk
-    if not rp_out:
-        _fallback = policy.mem_save_fallback_text(mem_saves)
-        if _fallback:
-            rp_out.append(_fallback)
-            yield _fallback
-            logger.info("Re-prompt fallback: confirmation message")
-
-
-def _persist_assistant_turn(
-    ctx: "StreamingChatContext",
-    clean_response: str,
-    full_response: str,
-    stats: dict,
-    trunc: bool,
-    trunc_continuable: bool,
-) -> None:
-    """Write the assistant turn into the session (FD-S6 merge or add_message).
-
-    Sync on purpose: it is called from the streaming body between
-    `_save_session_to_disk` and the `_assistant_saved` flag, and that ordering
-    is what keeps the single-persist contract (INV-CRIT-03) intact — an `await`
-    here would open a cancellation point in the middle of it.
-    """
-    if ctx.continue_mode and ctx.session.messages \
-            and ctx.session.messages[-1].get("role") == "assistant":
-        # FD-S6: MERGE the tail into the truncated turn — direct
-        # concatenation, no separator (the tail resumes mid-sentence).
-        # Never add_message: get_context_messages dedupes consecutive
-        # assistant turns keeping only the LATEST, which would erase
-        # the first half of the answer.
-        _last = ctx.session.messages[-1]
-        _last["content"] += clean_response
-        if trunc and trunc_continuable:
-            # Chained continue (truncated again): extend the raw so
-            # the NEXT continue prompt stays an exact token prefix.
-            if _last.get("gen_raw"):
-                _last["gen_raw"] += full_response
-            else:
-                _last["gen_raw"] = _last["content"]
-        else:
-            _last.pop("gen_raw", None)  # completed: drop the raw
-    else:
-        ctx.session.add_message("assistant", clean_response, stats=stats)
-        if trunc and trunc_continuable and ctx.session.messages:
-            # FD-S6: persist the RAW generation next to the clean
-            # content. With thinking ON the clean text's re-render
-            # diverges token-wise from the KV cache entry — gen_raw is
-            # what makes the future continue prompt an exact prefix.
-            ctx.session.messages[-1]["gen_raw"] = full_response
-
-
-def _persist_partial_assistant(ctx: "StreamingChatContext", full_response: str) -> None:
-    """Best-effort persist of an interrupted turn (MC-116), for the `finally`.
-
-    Sync on purpose: the caller runs this while unwinding a GeneratorExit, where
-    awaiting is not an option. Never raises — a failure to save a partial turn
-    must not replace the original teardown.
-    """
-    try:
-        _partial_clean, _, _ = _clean_full_response(full_response, ctx.message)
-        _partial_clean = _think_only_placeholder(_partial_clean, full_response)
-        if _partial_clean and ctx.continue_mode and ctx.session.messages \
-                and ctx.session.messages[-1].get("role") == "assistant":
-            # FD-S6 (MC-116): interrupted continue → merge the partial
-            # tail in-place, same no-separator contract as the clean
-            # path (add_message would trip the consecutive-role dedupe).
-            ctx.session.messages[-1]["content"] += _partial_clean
-            ctx.session.messages[-1].pop("gen_raw", None)
-        elif _partial_clean:
-            ctx.session.add_message("assistant", _partial_clean, stats={"interrupted": True})
-            ctx.session_mgr._save_session_to_disk(ctx.session)
-    except Exception:
-        logger.warning("MC-116: could not persist partial assistant on stream interruption", exc_info=True)
+    parts: list[str] = []
+    async for chunk in policy.reprompt_chunks(
+        ctx.turn, mem_saves,
+        call=reprompt_call_for(ctx.engine, ctx.sig, ctx.model_name, ctx.messages, ctx.thinking_enabled),
+        engine_name=ctx.engine_name, model=ctx.model_name,
+    ):
+        parts.append(chunk)
+        yield chunk
+    text = policy.second_answer_text(parts)
+    if not text:
+        text = policy.empty_reply_text(ctx.lang)
+        yield text
+    out.append(text)
 
 
 async def _generate_streaming_response(ctx: StreamingChatContext):
@@ -1033,7 +380,7 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
     The phases live in `_yield_*` / `_persist_*` helpers (2026-08-20, CCN 66 -> 20);
     what stays here is the sequence, the three bare locals, and the accumulation of
     `full_response` at the yield site. The engine loop reports its truncation and
-    thinking flags back on a `_StreamFlags`, since a generator cannot return while
+    thinking flags back on a `StreamFlags`, since a generator cannot return while
     it yields.
     """
     _assistant_saved = False  # MC-116
@@ -1052,7 +399,7 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
 
         import time as _time_mod
         _stream_start_t = _time_mod.time()
-        _flags = _StreamFlags()
+        _flags = StreamFlags()
         # The pairs are (wire token | None, text to accumulate). `full_response`
         # grows HERE, at the same point the inline loop grew it — before the
         # chunk's wire tokens go out — so a disconnect mid-stream leaves the
@@ -1066,7 +413,7 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
             logger.info("Model did not produce thinking tokens (model decides when to think)")
 
         # Save clean response (no think/GPT-OSS tags) to session/disk
-        clean_response, _mem_saves, _mem_deletes = _clean_full_response(full_response, ctx.message)
+        clean_response, _mem_saves, _mem_deletes = text_clean.clean_full_response(full_response, ctx.message)
 
         # FD-S5: tell the client the answer was cut by the token ceiling.
         # Its OWN yield (a marker split across reads would not be parsed).
@@ -1076,25 +423,18 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
         if _trunc_tok:
             yield _trunc_tok
 
-        async for _del_tok in _yield_mem_delete_prompts(ctx, _mem_deletes):
-            yield _del_tok
-
-        # Re-prompt: if the model emitted ONLY [MEM_SAVE: ...] without
-        # a conversational response, resend with system prompt without
-        # MEM_SAVE instructions so it generates a natural response.
-        _rp_out = []
-        async for _chunk in _yield_reprompt_when_only_mem_saves(
-            ctx, clean_response, _mem_saves, _rp_out,
-        ):
-            yield _chunk
-        if _rp_out:
-            clean_response = _rp_out[0]
+        # C4.5: the same core rule the adapters run (`core.memory_facts.deletes`,
+        # `core.turn.policy`), so this path keeps no copy of its own.
+        _tail: list = []
+        async for _tok in _arm_and_reprompt(ctx, clean_response, _mem_saves, _mem_deletes, _tail):
+            yield _tok
+        clean_response = _tail[0] if _tail else clean_response
 
         # B125: persist a placeholder for a think-only turn so
         # the next user message is not dropped as a duplicate role.
         if not clean_response and full_response:
             logger.info("Think-only turn: persisting placeholder assistant message (B125)")
-        clean_response = _think_only_placeholder(clean_response, full_response)
+        clean_response = text_clean.think_only_placeholder(clean_response, full_response)
 
         if clean_response:
             # C3.3: the same core write both doors use. This path (the pre-C1.3
@@ -1122,9 +462,9 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
                 ctx.session, ctx.rag_count, ctx.rag_items, ctx.model_name,
                 _elapsed, len(full_response), _mem_saved_count, _mem_saves,
             )
-            _persist_assistant_turn(
-                ctx, clean_response, full_response, _stats,
-                _flags.trunc, _flags.trunc_continuable,
+            persist_assistant_turn(
+                ctx.session, clean_response, full_response, _stats,
+                _flags.trunc, _flags.trunc_continuable, resume=ctx.continue_mode,
             )
             ctx.session_mgr._save_session_to_disk(ctx.session)
             _assistant_saved = True  # MC-116
@@ -1155,7 +495,9 @@ async def _generate_streaming_response(ctx: StreamingChatContext):
         # where cancel_event is not wired). Persist a best-effort assistant
         # turn so the session isn't left with an orphan 'user' message.
         if not _assistant_saved and full_response:
-            _persist_partial_assistant(ctx, full_response)
+            persist_partial_assistant(
+                ctx.session, ctx.session_mgr, full_response, ctx.message, resume=ctx.continue_mode,
+            )
 
 
 def _start_engine_call(
@@ -1330,20 +672,14 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         memory_helper,
         message: str,
         request: FastAPIRequest,
-    ) -> tuple[str, Optional[str], Any, "NonStreamRepromptContext | None"]:
-        """Returns (response_text, model_name, streaming_response_or_None, reprompt_ctx).
+    ) -> tuple[str, Optional[str], Any]:
+        """Returns (response_text, model_name, streaming_response_or_None).
 
-        `reprompt_ctx` és el que #856 necessita al camí no-streaming (re-prompt);
-        és None si cap engine ha arribat a preparar el torn.
+        Only the `continue` path calls this since C1.3; the re-prompt context
+        it used to return as a 4th element (#856) left with C4.5 — the second
+        call is the core's now (`policy.reprompt_chunks`).
         """
         model_name = None
-        # #856: el context del re-prompt es capta dins el bucle d'engines, quan
-        # el torn ja està preparat. S'inicialitza AQUÍ, abans de qualsevol
-        # `try`, perquè el retorn del camí d'error (get_server_state() que peta,
-        # cap engine viu) el troba definit igualment — inicialitzar-lo a dins
-        # feia que aquell retorn petés amb UnboundLocalError i el 200 degradat
-        # es convertís en un 500.
-        _reprompt_ctx: "NonStreamRepromptContext | None" = None
         image_b64 = body.get("image_b64")
         stream = body.get("stream", False)
         # FD-S6: continue mode — resume the last assistant turn.
@@ -1464,15 +800,6 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                     import inspect
                     sig = inspect.signature(engine.chat)
 
-                    # #856: el re-prompt del camí no-streaming necessita aquests
-                    # locals, que moren en sortir d'aquí. Es capturen ara, que
-                    # són vius, i viatgen amb el retorn.
-                    _reprompt_ctx = NonStreamRepromptContext(
-                        engine=engine, model_name=model_name, sig=sig, lang=_lang,
-                        system_prompt=system_prompt, messages=messages,
-                        thinking_enabled=thinking_enabled,
-                    )
-
                     chat_result = _start_engine_call(
                         engine, engine_name, sig, model_name, system_prompt, messages,
                         stream=stream, image_b64=image_b64, thinking_enabled=thinking_enabled,
@@ -1505,6 +832,15 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                             disconnect_monitor_task=_disconnect_monitor_task,
                             rag_collections=body.get("rag_collections"),
                             continue_mode=_continue,
+                            # C4.5: what the core policy reads. This path has no
+                            # turn of its own (it never walks TURN_STEPS), so the
+                            # re-prompt's gate slot and I8 entry land on this one.
+                            turn=TurnContext(
+                                turn_id=uuid4().hex, entry="ui", streaming=True,
+                                app_state=request.app.state, session_id=session.id,
+                                session=session, message=message, lang=_lang,
+                                system_prompt=system_prompt,
+                            ),
                         )
                         _returning_stream = True
                         return "", model_name, StreamingResponse(
@@ -1522,7 +858,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                                 # next message, orphaning everything before it.
                                 "X-Session-Id": session.id,
                             }
-                        ), _reprompt_ctx
+                        )
 
                     # Handle non-streaming response accumulation
                     await _accumulate_nonstreaming_response(chat_result, response_chunks)
@@ -1570,8 +906,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             if not _returning_stream and not _disconnect_monitor_task.done():
                 _disconnect_monitor_task.cancel()
 
-    # Strip MEM_SAVE tags and extract facts (non-streaming path)
-        return response_text or "", model_name, None, _reprompt_ctx
+        return response_text or "", model_name, None
 
 
     async def _chat_inner(request: FastAPIRequest, body: Dict[str, Any], _auth):
@@ -1609,10 +944,7 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
                  if m.get("role") == "user"),
                 "",
             )
-            # El 4t element (context de re-prompt de #856) no aplica al camí
-            # continue: aquí no hi ha extracció de MEM_SAVE ni cos buit a cobrir
-            # — el torn es reprèn i el text es fusiona amb l'anterior.
-            response_text, model_name, _streaming_resp, _ = await _handle_chat_engine(
+            response_text, model_name, _streaming_resp = await _handle_chat_engine(
                 body, _c_session, memory_facts.helper_for(request.app.state), _last_user, request
             )
             if _streaming_resp is not None:

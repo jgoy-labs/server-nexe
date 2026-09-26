@@ -136,6 +136,43 @@ class TestSave:
 # delete — still a command: it short-circuits
 # ═══════════════════════════════════════════════════════════════
 
+class TestTwoFactsInOneSave:
+    """#1056: "recorda que visc a Vic i que treballo de fuster" was ONE card —
+    forgetting where you live also forgot your job. Split before a known
+    first-person verb only; anything else stays whole, as before."""
+
+    @pytest.mark.parametrize("content, parts", [
+        ("visc a Vic i que treballo de fuster", ["visc a Vic", "treballo de fuster"]),
+        ("em dic Aran i tinc 8 anys", ["em dic Aran", "tinc 8 anys"]),
+        ("vivo en Vic y trabajo de carpintero", ["vivo en Vic", "trabajo de carpintero"]),
+        ("I live in Vic and I work as a carpenter", ["I live in Vic", "I work as a carpenter"]),
+    ])
+    def test_a_second_first_person_predicate_is_a_second_fact(self, content, parts):
+        assert intents.split_first_person(content) == parts
+
+    @pytest.mark.parametrize("content", [
+        "m'agraden la vainilla i els macarrons",   # a list, one predicate
+        "el gat i el gos es diuen Mite i Bru",     # "i" inside the subject
+        "el meu peix es diu Bombolla",
+    ])
+    def test_a_list_or_a_single_fact_stays_whole(self, content):
+        assert intents.split_first_person(content) == [content]
+
+    async def test_each_fact_is_its_own_card_and_both_are_told(self):
+        port = _port()
+        port.save_to_memory.side_effect = [
+            {"success": True, "document_id": "d1"},
+            {"success": False, "duplicate": True},
+        ]
+        outcome = await _resolve("save", "visc a Vic i que treballo de fuster", port=port,
+                                 message="Recorda que visc a Vic i que treballo de fuster")
+        saved = [c.kwargs["content"] for c in port.save_to_memory.await_args_list]
+        assert saved == ["visc a Vic", "treballo de fuster"]
+        assert outcome.mem_saved == 1, "only the new one counts as stored"
+        assert outcome.kept_facts == ["visc a Vic", "treballo de fuster"], "the duplicate is remembered too"
+        assert outcome.saved_by_intent is True
+
+
 class TestDelete:
 
     async def test_match_arms_confirmation_and_deletes_nothing(self):

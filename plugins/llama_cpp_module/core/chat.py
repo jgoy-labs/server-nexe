@@ -19,6 +19,7 @@ from .config import LlamaCppConfig
 from .model_pool import ModelPool
 from core.utils import compute_system_hash
 from plugins._shared.chat_node import make_threadsafe_callback, base_chat_result
+from core.turn.reasoning import finish_split, wrap_for_split
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,14 @@ class LlamaCppChatNode:
         # Capture event loop for thread-safe streaming
         loop = asyncio.get_running_loop()
 
-        threadsafe_callback = make_threadsafe_callback(loop, stream_callback)
+        # ADR-010: a model served here writes its reasoning INTO the text
+        # (<think> tags, or gpt-oss harmony); this plugin splits it and hands
+        # the caller {thinking, content} chunks. There is no switch to turn a
+        # model's reasoning off from here: `thinking_enabled` is not honoured,
+        # and what the model writes is split, not hidden.
+        split = {"starts_inside": False, "harmony": "gpt-oss" in str(self.config.model_path).lower()}
+        to_bridge, structured_cb = wrap_for_split(stream_callback, split)
+        threadsafe_callback = make_threadsafe_callback(loop, to_bridge)
 
         try:
             # Get model from pool (handles cache/reset automatically)
@@ -186,6 +194,8 @@ class LlamaCppChatNode:
                     ),
                 )
 
+            reasoning_text, response_text = finish_split(structured_cb, split, result["text"])
+
             elapsed_ms = int((time.time() - start_time) * 1000)
 
             tokens_per_second = 0.0
@@ -211,7 +221,7 @@ class LlamaCppChatNode:
 
             return {
                 **base_chat_result(
-                    response=result["text"],
+                    response=response_text,
                     model_used=self.config.model_path,
                     elapsed_ms=elapsed_ms,
                     tokens=result["tokens"],
@@ -222,6 +232,7 @@ class LlamaCppChatNode:
                     system_prompt=system,
                 ),
                 "session_id": session_id,
+                "thinking": reasoning_text,  # ADR-010: apart from the answer
                 "cache_hit": cache_hit,  # Restored for compatibility
                 "timing": timing,
             }

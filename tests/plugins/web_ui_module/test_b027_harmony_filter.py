@@ -13,7 +13,7 @@ www.jgoy.net · https://server-nexe.org
 
 import pytest
 
-from plugins.web_ui_module.core.harmony_filter import HarmonyStreamFilter
+from core.turn.text.harmony import HarmonyStreamFilter
 
 
 def _run(chunks):

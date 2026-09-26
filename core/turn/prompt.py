@@ -149,9 +149,10 @@ def _resolve_session_lang(session, user_text: str) -> str:
       però MAI es sembra — un guess no es fixa, la 1a detecció real decidirà.
     - el llindar del canvi es mesura sobre el TEXT NATURAL (codi/URLs fora):
       "thanks mate https://…" no és un canvi d'idioma.
-    - histèresi de 2 torns: calen 2 deteccions consecutives del MATEIX idioma
-      nou per flipar. Una enganxada de traça/log en anglès enmig d'una
-      conversa catalana no invalida el prefix; un canvi genuí paga 1 torn.
+    - canvi al 1r missatge clar (decisió d'en Jordi, 25/09): la histèresi de
+      2 torns es va treure quan la detecció va passar a exigir seguretat
+      (`core.lang_detect._MIN_RELATIVE_DISTANCE`) — el soroll ja no arriba
+      aquí com a detecció, i un canvi genuí no ha de pagar un torn de retard.
     """
     sticky = getattr(session, "lang", None)
     detected = _detect_lang_or_none(user_text)
@@ -165,14 +166,9 @@ def _resolve_session_lang(session, user_text: str) -> str:
         and detected != sticky
         and natural_text_len(user_text) >= _STICKY_LANG_MIN_SWITCH_CHARS
     ):
-        if getattr(session, "lang_pending", None) == detected:
-            session.lang = detected
-            session.lang_pending = None
-            return detected
-        session.lang_pending = detected
-        return sticky
-    if detected == sticky and getattr(session, "lang_pending", None) is not None:
-        session.lang_pending = None  # la conversa reafirma l'sticky → candidat fora
+        session.lang = detected
+        session.lang_pending = None
+        return detected
     return sticky
 
 

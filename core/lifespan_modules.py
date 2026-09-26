@@ -136,13 +136,13 @@ def _resolve_knowledge_path_for_auto_ingest(project_root) -> Path:
 
 
 def _collect_files_to_ingest(knowledge_path) -> list:
-    """Collect all supported document files under knowledge_path."""
-    from core.ingest.ingest_knowledge import SUPPORTED_EXTENSIONS
-    files_to_ingest: list = []
-    for ext in SUPPORTED_EXTENSIONS:
-        files_to_ingest.extend(knowledge_path.glob(f"**/*{ext}"))
-    files_to_ingest.extend(knowledge_path.glob("**/*.pdf"))
-    return [f for f in files_to_ingest if not f.name.startswith('.')]
+    """Collect all supported document files under knowledge_path.
+
+    The ingest's own discovery, not a copy of it (ADR-008 E3): the copy is how
+    this list and the ingest's disagreed about `.pdf` before.
+    """
+    from core.ingest.ingest_knowledge import _discover_documents
+    return _discover_documents(knowledge_path)
 
 
 def _embedding_model_name() -> str:
@@ -416,7 +416,9 @@ async def start_memory_service_v1(app, server_state) -> None:
                     if getattr(_sc, "is_sidecar", False):
                         vectors_dir = Path(_sc.vectors_dir)
                     else:
-                        vectors_dir = Path(project_root) / "storage" / "vectors"
+                        # #1053: honour NEXE_QDRANT_PATH in standalone too.
+                        from memory.memory._paths import resolve_qdrant_path
+                        vectors_dir = resolve_qdrant_path(Path(project_root) / "storage" / "vectors", root=Path(project_root))
                 except Exception:
                     # AP-G01: log diagnòstic sense canviar el fallback al path per defecte
                     logger.debug("SidecarConfig unavailable resolving vectors_dir", exc_info=True)

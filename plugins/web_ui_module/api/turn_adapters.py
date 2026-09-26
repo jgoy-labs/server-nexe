@@ -48,14 +48,20 @@ from core.turn.deadline import resolve_deadline_s
 from core.turn.gate import GateBusy, Priority, _gate_wait_s, gate_for
 import core.memory_facts as memory_facts
 from core.memory_facts import intents
-from core.memory_facts.write import write_facts
+from core.memory_facts import deletes as memory_deletes
+from core.memory_facts.write import needs_atomising, note_kept, write_facts
+import core.turn.policy as policy
 from core.sessions.compactor import compact_session
 from core.turn.post_commit import queue_for
+from core.turn.errors import classify_engine_error
+from core.turn.persist import persist_assistant_turn, persist_partial_assistant
+from core.turn.stream import StreamFlags
+from core.turn.text import clean as text_clean
 from core.turn.prompt import _resolve_session_lang, turn_system_prompt
 from core.turn.recall import _build_rag_context, collections_for_turn
 from core.turn.run import Adapters, TurnShortCircuit
 from core.turn.validate import (
-    jailbreak_speed_bump,
+    jailbreak_notice,
     parse_top_p,
     sanitize_user_text,
     validate_turn,
@@ -93,6 +99,20 @@ async def _switch_model(engine, engine_name: str, model_name: str) -> None:
         await switch_engine_model(engine, engine_name, model_name)
 
 
+def _serve_with(ctx: TurnContext, engine_obj, ui: dict) -> None:
+    """The engine that answers becomes the turn's — and so does its window.
+
+    C4.4: `ctx.context_window` is set at `engine` against the first candidate
+    and is documented as the SERVING engine's window. On a fallback the
+    prompt was already refitted to the new one (`_refit_for`); the field was
+    not, and anything reading it after `generate` got the wrong engine's.
+    """
+    if ui["candidates"] and engine_obj is not ui["candidates"][0][1]:
+        from core.context_window import ask_engine_window  # deferred, as above
+        ctx.context_window = ask_engine_window(engine_obj)
+    ctx.engine = engine_obj
+
+
 def _refit_for(engine, system_prompt: str, messages: list) -> list:
     """#976 on a fallback engine: the prompt was fitted to the window of the
     engine that was resolved; another one may hold less."""
@@ -118,28 +138,60 @@ def _last_results(ctx: TurnContext) -> dict:
 
 def _last_results_sentinels(ctx: TurnContext) -> list[str]:
     """The UI's alphabet for that news: the sentinels `nexe-chat.js` already
-    paints (:643 COMPACT, :762 MEM). They ride in `emit`, which is the last step
+    paints (:643 COMPACT; MEM left the queue on 25/09, see `_mem_sentinel`). They ride in `emit`, which is the last step
     of the turn — so they reach the client at the END of the next answer's
     stream, not before it. The frontend clears them wherever they land."""
     out = []
     results = _last_results(ctx)
-    saved = (results.get("memory.write") or {}).get("saved") or 0
     compacted = (results.get("compact") or {}).get("compacted") or 0
-    if saved:
-        out.append(f"\x00[MEM:{saved}]\x00")
     if compacted:
         out.append(f"\x00[COMPACT:{compacted}]\x00")
     return out
+
+
+def _mem_sentinel(ctx: TurnContext) -> str:
+    """`\x00[MEM:n:fact1|fact2]\x00` for what this turn left in memory, or "".
+
+    n = facts stored new; the list = every fact in memory because of this turn
+    (a duplicate is remembered too). `|` separates facts, so it is folded out
+    of each one; NUL never reaches a sentinel. The badge and the CLI read ONLY
+    this — a model's `[MEM_SAVE:]` is a request, not a confirmation (#1098).
+    """
+    kept = [
+        str(f).replace("|", "/").replace("\x00", "").strip()
+        for f in (ctx.usage.get("memory_kept") or [])
+    ]
+    kept = [f for f in kept if f]
+    saved = ctx.usage.get("memory_saved", 0) or 0
+    if not kept and not saved:
+        return ""
+    return f"\x00[MEM:{saved}:{'|'.join(kept)}]\x00" if kept else f"\x00[MEM:{saved}]\x00"
+
+
+async def _atomiser_slot(ctx: TurnContext, engine):
+    """(engine, gate, slot) for `memory.write`'s atomiser.
+
+    The atomiser costs an LLM call, so it only runs where an engine is already
+    in hand — the streaming path, exactly as before C3.3. Inline since 25/09,
+    after `generate` gave its slot back: take it again, and only when a fact
+    will reach the engine. Busy -> no engine, the fact is stored whole — what
+    the atomiser's own failure does. The caller releases a non-None slot.
+    """
+    if engine is None or not any(needs_atomising(f) for f in ctx.facts):
+        return None, None, None
+    gate = gate_for(ctx.app_state)
+    try:
+        slot = await gate.acquire(Priority.USER_TURN, holder=ctx.turn_id, timeout=_gate_wait_s())
+    except GateBusy:
+        return None, None, None
+    return engine, gate, slot
 
 
 def _last_results_fields(ctx: TurnContext) -> dict:
     """The same news for a JSON reply."""
     results = _last_results(ctx)
     fields = {}
-    saved = (results.get("memory.write") or {}).get("saved") or 0
     compacted = (results.get("compact") or {}).get("compacted") or 0
-    if saved:
-        fields["memory_saved_last_turn"] = saved
     if compacted:
         fields["compacted_last_turn"] = compacted
     return fields
@@ -216,7 +268,12 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         `core/turn/validate.py` for why C4.1 does not converge it.
         """
         ctx.message = sanitize_user_text(ctx.message)
-        ctx.message = jailbreak_speed_bump(ctx.message)
+        # The notice is for this turn's prompt, never the user's stored text:
+        # glued to ctx.message it was saved to the history and repeated on
+        # every later turn (26/09). `budget` adds it.
+        notice = jailbreak_notice(ctx.message)
+        if notice:
+            ctx.usage["security_notice"] = notice
 
     async def session(ctx: TurnContext) -> None:
         ctx.session = session_mgr.get_or_create_session(ctx.body.get("session_id"))
@@ -280,7 +337,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         )
         ui["memory_action"] = outcome.memory_action
         ui["mem_deleted"] += outcome.mem_deleted
-        ctx.usage["memory_saved"] = ctx.usage.get("memory_saved", 0) + outcome.mem_saved
+        note_kept(ctx.usage, outcome.mem_saved, outcome.kept_facts)
         # C3 review (08/09): `memory.write` needs to know D6 already owns this
         # turn's fact. Not derived from `memory_action` — postprocess can
         # overwrite that to "delete_pending" in the same turn, and a `recall`
@@ -402,7 +459,9 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             ctx.recall_text = turn.rag_context
             ui["rag_count"] = turn.rag_count
             messages, doc_truncated_pct = rc._assemble_engine_messages(
-                turn, ctx.system_prompt, ctx.lang, ctx.message, ctx.session, False, ctx.engine,
+                turn, ctx.system_prompt, ctx.lang,
+                ctx.usage.get("security_notice", "") + ctx.message,
+                ctx.session, False, ctx.engine,
                 clock_line=ctx.clock_line, app_state=ctx.app_state,
                 # #1081: the image note now travels through the same
                 # ContextShape/ContextFraming port as the document's, instead
@@ -463,11 +522,10 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                     chat_result, sig, messages, thinking_enabled = await _prepare_call(
                         ctx, index, engine_name, engine_obj, cancel_event, stream=False,
                     )
-                    # #856: what the non-streaming re-prompt needs, captured live.
-                    ui["reprompt_ctx"] = rc.NonStreamRepromptContext(
-                        engine=engine_obj, model_name=ui["model_name"], sig=sig, lang=ctx.lang,
-                        system_prompt=ctx.system_prompt, messages=messages,
-                        thinking_enabled=thinking_enabled,
+                    # C4.5: how this door asks the engine once more, if the
+                    # turn cleans down to nothing but tags (`postprocess`).
+                    ui["reprompt_call"] = rc.reprompt_call_for(
+                        engine_obj, sig, ui["model_name"], messages, thinking_enabled,
                     )
                     chunks: list[str] = []
                     await rc._accumulate_nonstreaming_response(chat_result, chunks)
@@ -479,7 +537,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                             ms=(time.monotonic() - _call_started) * 1000.0,
                         )
                         ctx.response = text
-                        ctx.engine = engine_obj
+                        _serve_with(ctx, engine_obj, ui)
                         ui["engine_name"] = engine_name
                         return
                 except Exception as exc:
@@ -501,17 +559,37 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             await gate.release(slot)
 
     async def postprocess_json(ctx: TurnContext) -> None:
+        """C4.5: the same three moves the streaming shape makes — the core's
+        cleaner, the core's delete rule, the core's re-prompt — instead of the
+        plugin's own copy of them (`_postprocess_nonstreaming`, gone)."""
         ui = _ui(ctx)
         if not ctx.response or ctx.response.startswith("Error:"):
             return
-        text, memory_action, mem_deleted_delta, mem_saves = await rc._postprocess_nonstreaming(
-            ctx.response, ctx.session, ui["memory_helper"], ctx.message, ui["memory_action"],
-            ctx.body.get("rag_collections"), ui.get("reprompt_ctx"),
+        clean, facts, deletes = text_clean.clean_full_response(ctx.response, ctx.message)
+        # C3 review (08/09): inline tags label the turn only when no
+        # memory_action exists yet. A D6 "save" already ran deterministically at
+        # `intent`; the model parroting its own confirmation back as another
+        # tag (common on small models) must not relabel that real, counted save
+        # as the unreliable "mem_save_inline" bucket. /v1 never overwrote it.
+        if facts and not ui["memory_action"]:
+            ui["memory_action"] = "mem_save_inline"
+        armed = await memory_deletes.arm_pending_deletes(
+            ctx.session, deletes, ui["memory_helper"], ctx.body.get("rag_collections"),
         )
-        ctx.response = text
-        ui["memory_action"] = memory_action
-        ui["mem_deleted"] += mem_deleted_delta
-        ctx.facts = mem_saves
+        if armed is not None:
+            question = rc.render_intent_for_ui(armed)
+            clean = f"{clean}\n\n{question}" if clean else question
+            ui["memory_action"] = armed.memory_action
+        if not clean and facts:
+            parts: list[str] = []
+            async for chunk in policy.reprompt_chunks(
+                ctx, facts, call=ui.get("reprompt_call"),
+                engine_name=ui.get("engine_name") or "", model=ui.get("model_name"),
+            ):
+                parts.append(chunk)
+            clean = policy.second_answer_text(parts) or policy.empty_reply_text(ctx.lang)
+        ctx.response = clean
+        ctx.facts = facts
 
     async def persist_simple(ctx: TurnContext) -> None:
         """The JSON reply and every short-circuited turn (a memory command's
@@ -536,8 +614,10 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             "session_id": ctx.session.id,
             "intent": ctx.intent,
             "memory_action": _ui(ctx).get("memory_action"),
-            # D6: how many facts the intent step saved in THIS turn (0 normally).
+            # #1098: what THIS turn stored new (D6 or memory.write), and every
+            # fact it left in memory — the only list a client may call saved.
             "memory_saved": ctx.usage.get("memory_saved", 0),
+            "memory_facts": list(ctx.usage.get("memory_kept") or []),
             # C3.3: what the PREVIOUS turn's background work finished doing.
             **_last_results_fields(ctx),
             # C2.0: one id to grep for in `turn.trace` log lines. `ctx.wire`
@@ -571,7 +651,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             ctx.partial = True
             ctx.error = {
                 "step": "generate",
-                "class": rc._classify_engine_error(flags.error),
+                "class": classify_engine_error(flags.error),
                 "message": str(flags.error),
             }
 
@@ -621,8 +701,11 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 raise _internal_error(ctx, exc) from exc
 
             chat_result, sig, messages, thinking_enabled = started
-            ctx.engine = engine_obj
+            _serve_with(ctx, engine_obj, ui)
             ui["engine_name"] = engine_name
+            ui["reprompt_call"] = rc.reprompt_call_for(
+                engine_obj, sig, ui["model_name"], messages, thinking_enabled,
+            )
             stream_ctx = rc.StreamingChatContext(
                 model_name=ui["model_name"], rag_count=ui["rag_count"], rag_items=ctx.recall,
                 compacted=ui["compacted"], doc_truncated_pct=ui["doc_truncated_pct"],
@@ -641,7 +724,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             async for token in rc._yield_model_loading_check(engine_obj, stream_ctx.model_name, engine_name):
                 yield token
             ui["stream_start_t"] = time.time()
-            flags = rc._StreamFlags()
+            flags = StreamFlags()
             ui["flags"] = flags
             # `ctx.response` holds the RAW text while generating (what the old
             # body called full_response); `postprocess` turns it into the clean
@@ -661,31 +744,38 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         stream_ctx, flags = ui["stream_ctx"], ui["flags"]
         full_response = ctx.response
         ui["full_response"] = full_response
-        clean_response, mem_saves, mem_deletes = rc._clean_full_response(full_response, ctx.message)
+        clean_response, mem_saves, mem_deletes = text_clean.clean_full_response(full_response, ctx.message)
         # FD-S5: its OWN yield (a marker split across reads would not be parsed).
         trunc_token = rc._gen_truncated_token(flags.trunc, flags.trunc_continuable, clean_response)
         if trunc_token:
             yield trunc_token
-        async for token in rc._yield_mem_delete_prompts(stream_ctx, mem_deletes):
-            yield token
-        reprompt_out: list = []
-        # I8 (C2.5): _yield_reprompt_when_only_mem_saves is a no-op unless
-        # clean_response is empty AND there are facts — same condition it
-        # checks internally, so a turn that never re-prompts adds no entry.
-        _will_reprompt = not clean_response and bool(mem_saves)
-        _rp_started = time.monotonic()
-        async for chunk in rc._yield_reprompt_when_only_mem_saves(stream_ctx, clean_response, mem_saves, reprompt_out):
-            yield chunk
-        if _will_reprompt:
-            record_llm_call(
-                ctx, step="reprompt", engine=ui.get("engine_name") or "",
-                ms=(time.monotonic() - _rp_started) * 1000.0,
-            )
-        if reprompt_out:
-            clean_response = reprompt_out[0]
+        # C4.5: one delete rule and one re-prompt for every door, in the core.
+        # The I8 entry for the second call is the core's too — counted only
+        # when an engine was really asked (this path used to count it whenever
+        # the reply was empty, flag off or engine skipped alike).
+        armed = await memory_deletes.arm_pending_deletes(
+            stream_ctx.session, mem_deletes, stream_ctx.memory_helper, stream_ctx.rag_collections,
+        )
+        if armed is not None:
+            yield rc.pending_delete_sentinel(armed.pending_delete_fact)
+        if not clean_response and mem_saves:
+            parts: list[str] = []
+            async for chunk in policy.reprompt_chunks(
+                ctx, mem_saves, call=ui.get("reprompt_call"),
+                engine_name=ui.get("engine_name") or "", model=stream_ctx.model_name,
+            ):
+                parts.append(chunk)
+                yield chunk
+            # The wire got the chunks as they came (the web client strips a tag
+            # itself); what is persisted and shown on reload is the joined,
+            # clean text — or the neutral stand-in when nothing is left.
+            clean_response = policy.second_answer_text(parts)
+            if not clean_response:
+                clean_response = policy.empty_reply_text(ctx.lang)
+                yield clean_response
         if not clean_response and full_response:
             logger.info("Think-only turn: persisting placeholder assistant message (B125)")
-        ctx.response = rc._think_only_placeholder(clean_response, full_response)
+        ctx.response = text_clean.think_only_placeholder(clean_response, full_response)
         ctx.facts = mem_saves
 
     async def persist_stream(ctx: TurnContext) -> None:
@@ -705,7 +795,9 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             # the error text is already on the wire. Same treatment either way:
             # persist what was generated as a partial turn, never as complete.
             if not ui.get("assistant_saved") and full_response:
-                rc._persist_partial_assistant(stream_ctx, full_response)
+                persist_partial_assistant(
+                    stream_ctx.session, stream_ctx.session_mgr, full_response, stream_ctx.message,
+                )
                 ui["assistant_saved"] = True
             _cancel_monitor(ctx)
             # C2.3: `emit` never runs on this path (AFTER_CANCEL is only
@@ -723,7 +815,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             stream_ctx.session, stream_ctx.rag_count, stream_ctx.rag_items, stream_ctx.model_name,
             elapsed, len(full_response), 0, ctx.facts,
         )
-        rc._persist_assistant_turn(stream_ctx, clean_response, full_response, stats, flags.trunc, flags.trunc_continuable)
+        persist_assistant_turn(stream_ctx.session, clean_response, full_response, stats, flags.trunc, flags.trunc_continuable)
         session_mgr._save_session_to_disk(stream_ctx.session)
         ui["assistant_saved"] = True
 
@@ -742,12 +834,12 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 yield char
             session_mgr.release_lease(ctx.session_id, ctx.turn_id)  # C2.3
             return
-        saved = ctx.usage.get("memory_saved", 0)
-        if saved:
-            # D6: "remember that ..." no longer answers instead of the model —
-            # the note that it was saved rides after the answer, as a sentinel
-            # `nexe-chat.js` already paints (:762).
-            yield f"\x00[MEM:{saved}]\x00"
+        note = _mem_sentinel(ctx)
+        if note:
+            # #1098: what THIS turn kept (D6 and/or memory.write, which now runs
+            # before emit) rides after the answer — the facts the server
+            # confirms, never the model's own tags.
+            yield note
         if ctx.response:
             # #859/#965: the turn that fills the window warns about the one after
             # it. Deferred import: a plugin must not pull core at import time.
@@ -760,12 +852,10 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
     async def memory_write(ctx: TurnContext) -> None:
         """C3.3: one coroutine for both wire formats, and the same code /v1 runs.
 
-        The two async generators this replaces yielded `[SAVING]`/`[MEM:n]` into
-        the stream. Since C2.2 this step runs on the post-commit queue, where
-        `_enqueue_post_commit` drains a generator without forwarding a single
-        chunk: those sentinels reached nobody in production. What the user sees
-        now is published for the NEXT turn (`post_commit_result` ->
-        `take_last_results`), which is the decision of 06/09 finally wired.
+        25/09 (ADR-007 §6 amended): inline again, before `emit`. On the queue
+        (C2.2 → 25/09) what it saved was told one turn late, and the UI badged
+        the model's own tags instead (#1098). It notes what it kept on the turn
+        (`note_kept`) and `emit` sends it as `[MEM:n:facts]`.
         """
         if not ctx.facts:
             return
@@ -773,17 +863,22 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         stream_ctx = ui.get("stream_ctx")
         session = stream_ctx.session if stream_ctx is not None else ctx.session
         started = time.monotonic()
-        outcome = await write_facts(
-            ctx.facts, session, ui["memory_helper"],
-            # The atomiser costs an LLM call, so it only runs where an engine is
-            # already in hand — the streaming path, exactly as before C3.3.
-            engine=(stream_ctx.engine if stream_ctx is not None else None),
-            model_name=ui.get("model_name") or "",
-            sig=(getattr(stream_ctx, "sig", None) if stream_ctx is not None else None),
-            lang=ctx.lang or "ca",
-            rag_collections=ctx.body.get("rag_collections"),
-            saved_by_intent=bool(ctx.usage.get("saved_by_intent")),
+        engine, gate, slot = await _atomiser_slot(
+            ctx, stream_ctx.engine if stream_ctx is not None else None,
         )
+        try:
+            outcome = await write_facts(
+                ctx.facts, session, ui["memory_helper"],
+                engine=engine,
+                model_name=ui.get("model_name") or "",
+                sig=(getattr(stream_ctx, "sig", None) if stream_ctx is not None else None),
+                lang=ctx.lang or "ca",
+                rag_collections=ctx.body.get("rag_collections"),
+                saved_by_intent=bool(ctx.usage.get("saved_by_intent")),
+            )
+        finally:
+            if slot is not None:
+                await gate.release(slot)
         ctx.facts = outcome.facts
         if outcome.engine_called:
             # I8 (C2.5): one bucket entry for the whole atomisation pass.
@@ -795,8 +890,8 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 ctx, step="memory.write", engine=ui.get("engine_name") or "",
                 ms=(time.monotonic() - started) * 1000.0,
             )
+        note_kept(ctx.usage, outcome.saved, outcome.kept)
         if outcome.saved:
-            ctx.usage.setdefault("post_commit_result", {})["memory.write"] = {"saved": outcome.saved}
             _record_saved_facts(session, outcome, session_mgr)
 
     async def compact(ctx: TurnContext) -> None:

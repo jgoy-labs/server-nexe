@@ -11,6 +11,7 @@ www.jgoy.net · https://server-nexe.org
 
 import os
 import logging
+import codecs
 import re
 import httpx
 from typing import Dict, Any, AsyncGenerator, Optional, Union
@@ -20,6 +21,76 @@ logger = logging.getLogger(__name__)
 
 # Configurable CLI timeout via environment variable
 CLI_HEALTH_TIMEOUT = float(os.getenv('NEXE_CLI_HEALTH_TIMEOUT', '5.0'))
+
+
+_SAVE_RE = re.compile(r"\[(?:MEM_SAVE|MEMORIA):\s*([^\]]+)\]", re.IGNORECASE)
+
+
+class UiStreamReader:
+    """/ui/chat's wire, read the way the web client reads it.
+
+    Sentinels (\x00[NAME]\x00, \x00[NAME:value]\x00) become metadata even when
+    a read splits them; the model's <think> block becomes reasoning (the core's
+    one splitter, ADR-010); memory tags and section labels leave the answer
+    (the core's one filter) and the saved facts are reported apart.
+    """
+
+    def __init__(self) -> None:
+        from core.turn.reasoning import ReasoningSplitter
+        from core.turn.text.tags import TagStreamFilter
+
+        self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        self._pending = ""
+        self._split = ReasoningSplitter()
+        self._tags = TagStreamFilter(memory=True, labels=True)
+
+    def _sentinels(self, text: str) -> "tuple[str, list[dict]]":
+        buf, self._pending = self._pending + text, ""
+        plain: list[str] = []
+        metas: list[dict] = []
+        i = 0
+        while True:
+            j = buf.find("\x00[", i)
+            if j < 0:
+                rest = buf[i:]
+                if rest.endswith("\x00"):  # maybe the start of a sentinel
+                    self._pending, rest = "\x00", rest[:-1]
+                plain.append(rest)
+                break
+            plain.append(buf[i:j])
+            k = buf.find("]\x00", j)
+            if k < 0:
+                self._pending = buf[j:]
+                break
+            name, _, value = buf[j + 2:k].partition(":")
+            metas.append({"type": "metadata", name: value if _ else "1"})
+            i = k + 2
+        return "".join(plain).replace("\x00", ""), metas
+
+    def _items(self, reasoning: str, answer: str, final: bool = False) -> list:
+        items: list = []
+        if reasoning:
+            items.append({"type": "reasoning", "text": reasoning})
+        clean = self._tags.feed(answer) + (self._tags.flush() if final else "")
+        if clean:
+            items.append(clean)
+        return items
+
+    def feed(self, chunk: bytes) -> list:
+        plain, metas = self._sentinels(self._decoder.decode(chunk))
+        return metas + self._items(*self._split.feed(plain))
+
+    def close(self) -> list:
+        plain, metas = self._sentinels(self._decoder.decode(b"", final=True))
+        plain += self._pending.replace("\x00", "")
+        self._pending = ""
+        r1, a1 = self._split.feed(plain)
+        r2, a2 = self._split.flush()
+        items = metas + self._items(r1 + r2, a1 + a2, final=True)
+        saved = [m.group(1).strip() for t in self._tags.dropped for m in _SAVE_RE.finditer(t)]
+        if saved:
+            items.append({"type": "memory_tags", "saved": saved})
+        return items
 
 class NexeAPIClient:
     """Client to interact with the Nexe Server API."""
@@ -101,10 +172,6 @@ class NexeAPIClient:
                 logger.error("Create session error: %s", e)
         return None
 
-    # Regex for inline metadata markers: \x00[KEY:VALUE]\x00
-    _MARKER_RE = re.compile(r'\x00\[(\w+):([^\]]*)\]\x00')
-    _MEM_MARKER = "\x00[MEM]\x00"
-
     async def chat_ui_stream(self, message: str, session_id: str, *,
                              rag_threshold: Optional[float] = None,
                              rag_collections: Optional[list] = None) -> AsyncGenerator[Union[str, dict], None]:
@@ -113,8 +180,13 @@ class NexeAPIClient:
         Uses server sessions, personal_memory RAG, and intent detection.
 
         Yields:
-            str: text chunks
-            dict: metadata markers (e.g. {"type": "metadata", "MODEL": "qwen3.5:2b"})
+            str: the answer's text, clean — no <think>, memory tags or section
+                labels (the web client strips the same things before painting)
+            dict: {"type": "metadata", NAME: value} for every \x00[NAME:value]\x00
+                sentinel (a sentinel without value gives "1"), even split
+                across reads; {"type": "reasoning", "text": ...} for the model's
+                reasoning; {"type": "memory_tags", "saved": [...]} at the end,
+                the facts the model marked to remember.
         """
         url = f"{self.base_url}/ui/chat"
         payload = {"message": message, "session_id": session_id, "stream": True}
@@ -130,27 +202,31 @@ class NexeAPIClient:
                         error_msg = await response.aread()
                         yield f"Server error ({response.status_code}): {error_msg.decode()}"
                         return
+                    reader = UiStreamReader()
                     async for chunk in response.aiter_bytes():
-                        text = chunk.decode("utf-8", errors="replace")
-
-                        # Parse inline metadata markers
-                        metadata = {}
-                        for match in self._MARKER_RE.finditer(text):
-                            metadata[match.group(1)] = match.group(2)
-                        text = self._MARKER_RE.sub("", text)
-
-                        # Parse MEM marker (no value)
-                        if self._MEM_MARKER in text:
-                            metadata["MEM"] = "1"
-                            text = text.replace(self._MEM_MARKER, "")
-
-                        if metadata:
-                            yield {"type": "metadata", **metadata}
-                        if text:
-                            yield text
+                        for item in reader.feed(chunk):
+                            yield item
+                    for item in reader.close():
+                        yield item
             except httpx.ConnectError:
                 yield "❌ Error: Could not connect to Nexe server. Make sure './nexe go' is running."
 
+    async def memory_confirm_delete(self, fact: str, session_id: str) -> Dict[str, Any]:
+        """Confirm the forget this session has pending — the web UI's dialog does
+        the same POST. Since C4.5 the server deletes THE pending entry, by id;
+        `fact` is the text it showed, the reference the confirmation names."""
+        url = f"{self.base_url}/ui/memory/confirm-delete"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.post(
+                    url, json={"fact": fact, "session_id": session_id}, headers=self.headers,
+                )
+                if response.status_code == 200:
+                    return response.json()
+                logger.error("confirm-delete failed: HTTP %s", response.status_code)
+            except Exception as e:
+                logger.error("confirm-delete error: %s", e)
+        return {}
 
     async def memory_store(self, content: str, metadata: Optional[Dict] = None) -> bool:
         """Store content in RAG memory."""

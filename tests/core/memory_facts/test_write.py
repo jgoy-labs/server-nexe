@@ -24,12 +24,14 @@ from core.memory_facts.write import (
 class _FakeSession:
     """Minimal session stub — no MagicMock, so getattr() behaves naturally."""
 
-    def __init__(self, session_id="test-sess", deleted_facts=None, turns=2):
+    def __init__(self, session_id="test-sess", deleted_facts=None, turns=2, user_text=None):
         self.id = session_id
         # `turns` user messages: 1 is an opening turn, 2+ is a conversation.
+        # `user_text` is what the user wrote in each (the opening-turn rule
+        # reads it); by default a text no fact below is grounded in.
         self.messages = []
         for i in range(turns):
-            self.messages.append({"role": "user", "content": f"missatge {i}"})
+            self.messages.append({"role": "user", "content": user_text or f"missatge {i}"})
             self.messages.append({"role": "assistant", "content": "ok"})
         if deleted_facts is not None:
             self._recently_deleted_facts = deleted_facts
@@ -118,12 +120,45 @@ class TestFilters:
 
 
 class TestFirstTurn:
-    """The guard the JSON path had and the streaming path did not."""
+    """The opening turn (25/09, Jordi): keep what the user's own words back,
+    drop what the model brought. Until then every opening-turn fact was
+    dropped — "em dic Aran, recorda-ho" as a first message was lost, while the
+    UI said "saved" (#1098)."""
 
-    async def test_a_first_turn_saves_nothing(self, port):
+    async def test_a_first_turn_fact_the_user_never_wrote_is_dropped(self, port):
         outcome = await write_facts(["L'usuari viu a Manresa"], _FakeSession(turns=1), port)
         assert outcome.saved == 0
         port.save_to_memory.assert_not_awaited()
+
+    async def test_a_first_turn_keeps_what_the_user_said(self, port):
+        session = _FakeSession(turns=1, user_text="Hola! Em dic Aran i visc a Vic. Recorda-ho.")
+        outcome = await write_facts(["User's name is Aran", "User lives in Vic"], session, port)
+        assert outcome.saved == 2
+        assert outcome.kept == ["User's name is Aran", "User lives in Vic"]
+
+    async def test_the_prompts_example_name_is_dropped(self, port):
+        """#831: a small model copied the prompt's example ("et dius Joan")."""
+        session = _FakeSession(turns=1, user_text="Hola, bon dia")
+        outcome = await write_facts(["L'usuari es diu Joan"], session, port)
+        assert outcome.saved == 0
+
+    async def test_a_user_really_called_joan_is_kept(self, port):
+        """Jordi, 25/09: "i si algú es diu Joan de debò?" — then it is in his words."""
+        session = _FakeSession(turns=1, user_text="Em dic Joan, recorda-ho")
+        outcome = await write_facts(["L'usuari es diu Joan"], session, port)
+        assert outcome.saved == 1
+
+    async def test_an_invented_taste_is_dropped(self, port):
+        session = _FakeSession(turns=1, user_text="Hola, què tal?")
+        outcome = await write_facts(["L'usuari li agrada l'amor romàntic"], session, port)
+        assert outcome.saved == 0
+
+    def test_generic_words_do_not_ground_a_fact(self):
+        from core.memory_facts.write import grounded_in_user_text
+
+        # "agrada" and "usuari" are in every fact; sharing them proves nothing.
+        assert not grounded_in_user_text("L'usuari li agrada el cafè", "m'agrada el te verd")
+        assert grounded_in_user_text("L'usuari li agrada el tè verd", "m'agrada el te verd")
 
     async def test_a_second_turn_saves(self, port):
         outcome = await write_facts(["L'usuari viu a Manresa"], _FakeSession(turns=2), port)
@@ -161,16 +196,21 @@ class TestFailuresAreNotSilent:
         port.save_to_memory = AsyncMock(return_value={"success": False, "message": "disk full"})
         outcome = await write_facts(["L'usuari viu a Manresa"], _FakeSession(), port)
         assert outcome.saved == 0
+        # #1098: the one thing a door must never call "saved" is a fact that is not there.
+        assert outcome.kept == []
 
     async def test_a_duplicate_does_not_count_as_saved(self, port):
         port.save_to_memory = AsyncMock(return_value={"success": False, "duplicate": True})
         outcome = await write_facts(["L'usuari viu a Manresa"], _FakeSession(), port)
         assert outcome.saved == 0
+        # ...but it IS in memory: remembered, so the badge may list it (#1098).
+        assert outcome.kept == ["L'usuari viu a Manresa"]
 
     async def test_an_exception_while_saving_does_not_break_the_turn(self, port):
         port.save_to_memory = AsyncMock(side_effect=RuntimeError("db crash"))
         outcome = await write_facts(["L'usuari viu a Manresa"], _FakeSession(), port)
         assert outcome.saved == 0
+        assert outcome.kept == []
 
 
 class TestBothDoorsRunIt:
@@ -202,7 +242,9 @@ class TestBothDoorsRunIt:
         await api_adapters(BackgroundTasks())["memory.write"](ctx)
 
         state.memory_helper.save_to_memory.assert_awaited_once()
-        assert ctx.usage["post_commit_result"]["memory.write"]["saved"] == 1
+        # 25/09 (#1098): inline, so the turn itself carries the note for `emit`.
+        assert ctx.usage["memory_saved"] == 1
+        assert ctx.usage["memory_kept"] == ["L'usuari viu a Manresa"]
 
 
 class TestTheIntentStepOwnsTheFact:
@@ -346,7 +388,9 @@ class TestTheNewsReachesTheNextTurn:
 
         chunks = [c async for c in ui_adapters(MagicMock(), streaming=True)["emit"](ctx)]
 
-        assert "\x00[MEM:2]\x00" in chunks
+        # 25/09 (#1098): memory is written inline and told on its own turn; a
+        # memory result from the queue is not news for this wire any more.
+        assert not any(c.startswith("\x00[MEM:") for c in chunks)
         assert "\x00[COMPACT:1]\x00" in chunks
 
     async def test_the_news_is_never_told_twice(self):
@@ -441,10 +485,12 @@ class TestTheSpinnerNeverHangs:
 
         assert will_write(["un fet"], _FakeSession(), ["user_knowledge"]) is False
 
-    def test_an_opening_turn_means_no_spinner(self):
+    def test_an_opening_turn_is_a_per_fact_question(self):
+        """25/09: an opening turn keeps the facts grounded in the user's words,
+        so it is no longer a deterministic "no" — the per-fact filters decide."""
         from core.memory_facts.write import will_write
 
-        assert will_write(["un fet"], _FakeSession(turns=1)) is False
+        assert will_write(["un fet"], _FakeSession(turns=1)) is True
 
     def test_a_normal_turn_does_show_it(self):
         from core.memory_facts.write import will_write
@@ -472,7 +518,7 @@ class TestTheSpinnerNeverHangs:
         from core.memory_facts.write import will_write
 
         cases = [
-            (["un fet"], _FakeSession(turns=1), None, False),
+            (["L'usuari viu a Manresa"], _FakeSession(turns=1, user_text="visc a Manresa"), None, False),
             (["un fet"], _FakeSession(turns=2), ["user_knowledge"], False),
             (["L'usuari viu a Manresa"], _FakeSession(turns=2), None, False),
             (["L'usuari viu a Manresa"], _FakeSession(turns=2), None, True),

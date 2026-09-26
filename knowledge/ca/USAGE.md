@@ -5,7 +5,7 @@ id: nexe-usage-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Com fer servir server-nexe 1.0.7: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) amb thinking toggle, memoria automatica MEM_SAVE, MEM_DELETE (threshold 0.20) amb confirmacio clear_all 2-torns, pujada de documents PDF/TXT, comandes d'encriptacio. Exemples d'API amb curl i Python. Com instal-lar models, com canviar d'idioma (NEXE_LANG), com gestionar la memoria."
+abstract: "Com fer servir server-nexe 1.0.7: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) amb thinking toggle, memoria automatica MEM_SAVE, MEM_DELETE (threshold 0.20) amb confirmacio clear_all 2-torns, pujada de documents (PDF, Word, Excel, PowerPoint, EPUB, text, codi, CSV/JSON), comandes d'encriptacio. Exemples d'API amb curl i Python. Com instal-lar models, com canviar d'idioma (NEXE_LANG), com gestionar la memoria."
 tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
 chunk_size: 600
 priority: P1
@@ -83,6 +83,7 @@ A macOS amb l'app de safata instal·lada, el servidor arrenca automaticament en 
 | `./nexe chat` | Xat interactiu per CLI |
 | `./nexe chat` | La memoria RAG esta activada per defecte (no existeix cap flag `--rag`; `--no-rag` s'accepta pero s'ignora — el pipeline sempre gestiona el context) |
 | `./nexe chat --verbose` | Xat amb detall de pesos RAG per font |
+| `./nexe chat --show-thinking` | Mostra el raonament del model sencer (per defecte es plega en una linia gris). Els fets desats i esborrats es mostren com a `💾 Desat` i `🗑 Esborrat`, i si el model vol oblidar alguna cosa et demana confirmacio (s/n) |
 | `./nexe status` | Estat del servidor |
 | `./nexe modules` | Llistar moduls carregats i CLIs |
 | `./nexe memory store "text"` | Guardar text a memoria |
@@ -124,7 +125,7 @@ Acces a `http://127.0.0.1:9119/ui`. Requereix clau API (guardada a localStorage 
 
 ### Pujada de documents
 
-Puja documents via el boto del clip a l'entrada del xat. Suportats: .txt, .md, .pdf.
+Puja documents via el boto del clip a l'entrada del xat. Suportats: PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), EPUB, text i Markdown, codi font (.py, .js, .ts, .java, .go, .rs, .sql...) i dades (.csv, .json, .xml, .yaml, .toml). No s'accepten .doc ni .xls antics, ni imatges escanejades (sense OCR).
 
 - Documents indexats a la col·leccio `user_knowledge` amb session_id
 - Nomes visibles dins la sessio de pujada (sense contaminacio entre sessions)
@@ -140,7 +141,7 @@ El model extreu i guarda automaticament fets de les converses:
 - L'usuari diu "Oblida el meu nom" -> MEM_DELETE: cerca per similitud (**threshold 0.20** des de v0.9.9, abans 0.70), esborra la coincidencia mes propera, guard anti-re-save
 - Propera conversa: "Com em dic?" -> RAG recupera "name=Jordi" -> el model respon correctament
 
-No calen comandes extra. Funciona tant al CLI com a la Web UI. Indicadors: el badge `[MEM:N]` mostra el recompte de fets guardats.
+No calen comandes extra. Funciona tant al CLI com a la Web UI. Indicadors: el badge de desat llista els fets que el servidor ha guardat de debo, al mateix missatge (`💾 Desat: …` al CLI). Si el model diu que ho recordara pero no s'ha guardat res, no surt cap badge.
 
 ### Esborrat total (`CLEAR_ALL`) — confirmació 2-torns
 

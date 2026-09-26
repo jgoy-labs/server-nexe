@@ -3,7 +3,7 @@
 Server Nexe
 Author: Jordi Goy 
 Location: memory/rag/cli.py
-Description: %s", info.get("description", "N/A"))
+Description: Command-line interface for the RAG module (info, health, search, sources).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -14,6 +14,7 @@ import argparse
 import sys
 import logging
 import json
+import os
 from typing import Optional
 
 from .module import RAGModule
@@ -88,10 +89,7 @@ class RAGCLI:
         logger.info(" - %s", cap)
       logger.info("\nStats:")
       stats = info.get("stats", {})
-      logger.info(" Documents added:   %s", stats.get("documents_added", 0))
       logger.info(" Searches performed: %s", stats.get("searches_performed", 0))
-      logger.info(" Total chunks:    %s", stats.get("total_chunks", 0))
-      logger.info(" Cache hit rate:   %.1f%%", stats.get("cache_hit_rate", 0) * 100)
       logger.info("\nConfig:")
       config = info.get("config", {})
       for key, value in config.items():
@@ -137,19 +135,9 @@ class RAGCLI:
 
       sources_check = next((c for c in checks if c.get("name") == "rag_sources"), None)
       if sources_check and "sources" in sources_check:
-        logger.info("\nSources Health:")
-        for source_name, source_health in sources_check["sources"].items():
-          s_status = source_health.get("status", "unknown")
-          s_icon = {
-            "healthy": "[OK]",
-            "degraded": "[WARN]",
-            "unhealthy": "[FAIL]"
-          }.get(s_status, "[??]")
-          logger.info(" %s %s", s_icon, source_name)
-          if "num_chunks" in source_health:
-            logger.info("   Chunks: %s", source_health["num_chunks"])
-          if "num_documents" in source_health:
-            logger.info("   Documents: %s", source_health["num_documents"])
+        logger.info("\nSources:")
+        for source_name in sources_check["sources"]:
+          logger.info(" - %s", source_name)
 
       if args.json:
         logger.info("\nJSON Output:")
@@ -163,43 +151,47 @@ class RAGCLI:
 
   async def cmd_search(self, args) -> int:
     """
-    Perform a test search.
+    Perform a test search, through the same sources the chat uses.
+
+    ADR-008 E2: `RAGModule.search` asks `source_for(name)` with the real
+    MemoryAPI, so what this prints is what the turn would retrieve from that
+    source. Without `--source` every listed source is searched in turn.
 
     Returns:
       0 if success, 1 if error
     """
     try:
-      from memory.rag_sources.base import SearchRequest
-
+      module = self._require_module()
       query = args.query
       top_k = args.top_k
-      source = args.source
+      sources = [args.source] if args.source else module.list_sources()
 
       logger.info("\nRAG Search")
       logger.info("=" * 60)
       logger.info("Query: %s", query)
       logger.info("Top K: %s", top_k)
-      logger.info("Source: %s\n", source)
+      logger.info("Lang: %s", args.lang)
+      logger.info("Sources: %s\n", ", ".join(sources))
 
-      request = SearchRequest(query=query, top_k=top_k)
-      results = await self._require_module().search(request, source=source)
+      found = 0
+      for source in sources:
+        results = await module.search(query, source=source, top_k=top_k, lang=args.lang)
+        if not results:
+          continue
+        found += len(results)
+        logger.info("%s (%s):", source, len(results))
+        logger.info("-" * 60)
+        for i, hit in enumerate(results, 1):
+          score = getattr(hit, 'score', 0.0)
+          text = getattr(hit, 'text', None) or str(hit)
+          metadata = getattr(hit, 'metadata', {})
 
-      if not results:
+          logger.info("%s. [%.3f] %s", i, score, text[:100] + "..." if len(text) > 100 else text)
+          if metadata and args.verbose:
+            logger.info("  Metadata: %s", metadata)
+
+      if not found:
         logger.info("No results found.")
-        return 0
-
-      logger.info("Results (%s):", len(results))
-      logger.info("-" * 60)
-
-      for i, hit in enumerate(results, 1):
-        score = getattr(hit, 'score', 0.0)
-        text = getattr(hit, 'text', str(hit))
-        metadata = getattr(hit, 'metadata', {})
-
-        logger.info("%s. [%.3f] %s", i, score, text[:100] + "..." if len(text) > 100 else text)
-        if metadata and args.verbose:
-          logger.info("  Metadata: %s", metadata)
-
       return 0
 
     except Exception as e:
@@ -208,14 +200,13 @@ class RAGCLI:
 
   async def cmd_sources(self, args) -> int:
     """
-    List available RAG sources.
+    List the sources the chat retrieves from (system + registered).
 
     Returns:
       0 if success, 1 if error
     """
     try:
-      module = self._require_module()
-      sources = module.list_sources()
+      sources = self._require_module().list_sources()
 
       logger.info("\nRAG Sources")
       logger.info("=" * 60)
@@ -225,23 +216,7 @@ class RAGCLI:
         return 0
 
       for source_name in sources:
-        try:
-          source = module.get_source(source_name)
-          health = source.health() if hasattr(source, 'health') else {}
-          status = health.get("status", "unknown")
-          status_icon = {
-            "healthy": "[OK]",
-            "degraded": "[WARN]",
-            "unhealthy": "[FAIL]"
-          }.get(status, "[??]")
-
-          logger.info("%s %s", status_icon, source_name)
-          if "num_documents" in health:
-            logger.info("  Documents: %s", health["num_documents"])
-          if "num_chunks" in health:
-            logger.info("  Chunks: %s", health["num_chunks"])
-        except Exception as e:
-          logger.info("[??] %s - Error: %s", source_name, e)
+        logger.info(" - %s", source_name)
 
       return 0
 
@@ -287,13 +262,19 @@ def create_parser() -> argparse.ArgumentParser:
     "-k", "--top-k",
     type=int,
     default=5,
-    help="Number of results (default: 5)"
+    help="Cap on results per source (default: 5; a source never returns more than its own tuned top_k)"
   )
   search_parser.add_argument(
     "-s", "--source",
     type=str,
-    default="personality",
-    help="RAG source to search (default: personality)"
+    default=None,
+    help="RAG source to search (default: every source listed by 'sources')"
+  )
+  search_parser.add_argument(
+    "-l", "--lang",
+    type=str,
+    default=os.getenv("NEXE_LANG", "en"),
+    help="Query language; user_knowledge filters by it (default: $NEXE_LANG or en)"
   )
   search_parser.add_argument(
     "-v", "--verbose",

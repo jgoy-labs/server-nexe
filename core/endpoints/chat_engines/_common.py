@@ -298,9 +298,20 @@ def persist_v1_turn(app_state: Any, session_id: str, response_text: str, *, part
     whatever reached the client before that — the caller (the MLX/llama.cpp
     stream generators) still calls this instead of dropping the text, so an
     interrupted /v1 reply is not silently lost from the mirrored session.
+
+    C4.4-b: what is saved is the model's ANSWER, cleaned like the web door's
+    (`clean_full_response`: no <think>, harmony or memory tags). A reply that
+    cleans down to nothing keeps its turn with the B125 placeholder, so the
+    history never holds two user turns in a row.
     """
     if not app_state or not session_id or not response_text or not response_text.strip():
         return
+    # Deferred: core.turn.text.clean -> core.memory_facts -> core.endpoints
+    # -> this module would close a cycle at import time.
+    from core.turn.text.clean import clean_full_response, think_only_placeholder
+
+    clean, _facts, _deletes = clean_full_response(response_text)
+    response_text = think_only_placeholder(clean, response_text)
     try:
         session_mgr = getattr(app_state, "session_manager", None)
         if session_mgr is None:
@@ -379,7 +390,18 @@ def extract_engine_text(result) -> str:
 
 
 def build_openai_response(result: dict, model_name: str, engine_prefix: str) -> dict:
-    """Build an OpenAI-compatible chat completion response from an engine result."""
+    """Build an OpenAI-compatible chat completion response from an engine result.
+
+    ADR-010: an engine that split its model's reasoning returns it as
+    `thinking`; it travels as `message.reasoning`. Whether the client keeps
+    it is the turn's decision (`postprocess`), not this builder's.
+    """
+    message = {
+        "role": "assistant",
+        "content": _sanitize_sse_token(result.get("response", "")),
+    }
+    if result.get("thinking"):
+        message["reasoning"] = _sanitize_sse_token(result["thinking"])
     return {
         "id": f"{engine_prefix}-{uuid.uuid4().hex}",
         "object": "chat.completion",
@@ -387,10 +409,7 @@ def build_openai_response(result: dict, model_name: str, engine_prefix: str) -> 
         "model": model_name,
         "choices": [{
             "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": _sanitize_sse_token(result.get("response", "")),
-            },
+            "message": message,
             # The engines already compute this (MLX carries it in its result
             # dict, and _compute_continuable reads the same field). Hardcoding
             # "stop" told an OpenAI client a ceiling-cut answer was complete,

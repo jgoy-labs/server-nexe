@@ -142,8 +142,6 @@ def test_the_retry_closes_the_think_block_it_inherited(monkeypatch):
     follows — including the whole retry. Exercised against the real parser,
     not just by asserting the string was emitted.
     """
-    from plugins.web_ui_module.api.routes_chat import _process_content_think_tags
-
     node = _node()
     emitted: list[str] = []
     calls = {"n": 0}
@@ -171,15 +169,19 @@ def test_the_retry_closes_the_think_block_it_inherited(monkeypatch):
         "stream_callback": lambda tok: emitted.append(tok),
     }))
 
-    assert "</think>\n" in emitted, f"no closer was emitted: {emitted}"
+    raws = [t["raw"] for t in emitted]
+    assert "</think>\n" in raws, f"no closer was emitted: {raws}"
 
-    # Replay the real parser over exactly what went down the wire, in order.
-    in_think = False
-    visible = ""
-    for token in emitted:
-        part, in_think, _ = _process_content_think_tags(token, in_think)
-        visible += part
-    assert "caramels" in visible, f"the answer stayed inside the think block: {visible!r}"
+    # ADR-010: the plugin hands the caller {thinking, content}; the answer of
+    # the retry must land in content, the starved reasoning in thinking —
+    # read the way the core reads every engine chunk.
+    from core.turn.text.chunks import parse_chunk
+
+    parts = [parse_chunk(t) for t in emitted]
+    answer = "".join(c for c, _ in parts)
+    reasoning = "".join(t for _, t in parts)
+    assert "caramels" in answer, f"the answer stayed inside the think block: {emitted!r}"
+    assert "Let me work" in reasoning and "Let me work" not in answer
 
 
 def test_a_failing_retry_keeps_the_first_pass_instead_of_losing_the_turn(monkeypatch):
@@ -212,5 +214,8 @@ def test_a_failing_retry_keeps_the_first_pass_instead_of_losing_the_turn(monkeyp
     }))
 
     assert calls["n"] == 2, "the retry must have been attempted"
-    assert out["response"] == STARVED["text"], "pass 1 must survive a failed retry"
+    # ADR-010: pass 1 was reasoning only — it survives as the turn's
+    # reasoning, apart from an (empty) answer, instead of posing as one.
+    assert out["thinking"] == STARVED["text"][len("<think>"):], "pass 1 must survive a failed retry"
+    assert out["response"] == ""
     assert out.get("thinking_retry") is False

@@ -31,12 +31,13 @@ Failure policy (ADR-007 §8), the same in both:
     adapter can mark it partial) and runs nothing that spends an LLM call or
     writes memory (`AFTER_CANCEL`).
 
-Post-commit steps (ADR-007 §6, C2.2): `memory.write` and `compact` never run
+Post-commit steps (ADR-007 §6, C2.2; amended 25/09): `compact` never runs
 INLINE when a `post_commit` queue is passed in — the engine hands the adapter
 to the queue instead of calling it, records "queued", and moves on. `emit`
 (and the wire it built) is unaffected: the turn's answer never waited on
-these two steps, only on generating it. With `post_commit=None` (the default)
-they run exactly as before — every existing caller is unchanged.
+it, only on generating it. With `post_commit=None` (the default) it runs
+inline like every other step. `memory.write` runs inline, before `emit`, so
+the turn that saved is the turn that says so (#1098).
 
 The GPS is born here (ADR-007 §9, C1 §4 of the pipeline plan): every step
 leaves `ctx.outcomes[id]` and `ctx.usage["steps"][id]` (ms, outcome, kind).
@@ -84,7 +85,11 @@ AFTER_CANCEL: frozenset[str] = frozenset({"persist_assistant_turn"})
 #: Steps that move to the background queue (ADR-007 §6, C2.2) instead of
 #: running inline — never reached by AFTER_SHORT_CIRCUIT or AFTER_CANCEL, so a
 #: cancelled or short-circuited turn queues neither (unchanged from before).
-POST_COMMIT: frozenset[str] = frozenset({"memory.write", "compact"})
+#: 25/09 (ADR-007 §6 amended): `memory.write` is back inline, before `emit` —
+#: queued, the news of what it saved reached the client one turn late and the
+#: UI badged the model's own text instead (#1098). Only `compact` (up to ~100 s)
+#: stays off the critical path.
+POST_COMMIT: frozenset[str] = frozenset({"compact"})
 
 
 class TurnShortCircuit(Exception):
@@ -134,12 +139,13 @@ def _record(ctx: TurnContext, step: Step, outcome: str, started: float, *, error
     ctx.usage.setdefault("steps", {})[step.id] = entry
 
 
-def _should_queue(ctx: TurnContext, step: Step) -> bool:
-    """#1040 (C2.4): a PARTIAL turn's `memory.write` is skipped, never queued —
-    facts atomized from a reply that broke mid-generation are not trustworthy.
-    `compact` is independent of this turn's own outcome (it summarises the
-    session's history, not this reply) and always queues regardless."""
-    return not (step.id == "memory.write" and ctx.partial)
+def _skipped_for_partial(ctx: TurnContext, step: Step) -> bool:
+    """#1040 (C2.4): a PARTIAL turn's `memory.write` is skipped — facts
+    atomized from a reply that broke mid-generation are not trustworthy.
+    Inline or queued alike (it was a queue-only check while memory.write lived
+    on the queue). `compact` is independent of this turn's own outcome (it
+    summarises the session's history, not this reply) and always runs."""
+    return step.id == "memory.write" and ctx.partial
 
 
 def _finish_ok(
@@ -315,18 +321,18 @@ async def run_turn(
     """The whole turn, no streaming. Every adapter is a coroutine; the finished
     context comes back with `response`, `wire`, `outcomes` and `usage` filled.
 
-    `post_commit`, when given, diverts `POST_COMMIT` steps (memory.write,
-    compact) to the queue instead of awaiting them here — AFTER_SHORT_CIRCUIT
+    `post_commit`, when given, diverts `POST_COMMIT` steps (`compact`; until
+    25/09 also memory.write) to the queue instead of awaiting them here — AFTER_SHORT_CIRCUIT
     never includes them, so the tail loop below never has to check.
     """
     _check_adapters(adapters, steps, streaming=False)
     ctx.streaming = False
     steps = list(steps)
     for index, step in enumerate(steps):
+        if _skipped_for_partial(ctx, step):
+            _mark_skipped(ctx, [step])
+            continue
         if post_commit is not None and step.id in POST_COMMIT:
-            if not _should_queue(ctx, step):
-                _mark_skipped(ctx, [step])
-                continue
             started = time.perf_counter()
             _enqueue_post_commit(ctx, step, adapters[step.id], post_commit)
             _record(ctx, step, "queued", started)
@@ -441,11 +447,11 @@ async def _run_steps(
     inner: Optional[AsyncIterator[Any]] = None
     try:
         for step in steps:
+            if _skipped_for_partial(ctx, step):
+                _mark_skipped(ctx, [step])
+                done.add(step.id)
+                continue
             if post_commit is not None and step.id in POST_COMMIT:
-                if not _should_queue(ctx, step):
-                    _mark_skipped(ctx, [step])
-                    done.add(step.id)
-                    continue
                 started = time.perf_counter()
                 _enqueue_post_commit(ctx, step, adapters[step.id], post_commit)
                 _record(ctx, step, "queued", started)

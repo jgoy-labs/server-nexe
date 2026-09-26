@@ -55,6 +55,7 @@ from .vlm_runner import (  # noqa: F401
     _prompt_has_open_think_prefix,
 )
 from plugins._shared.chat_node import make_threadsafe_callback, base_chat_result
+from core.turn.reasoning import finish_split, wrap_for_split
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +259,12 @@ class MLXChatNode:
                 raise ValueError(
                     "continue_final is not supported on the VLM path"
                 )
+            # ADR-010: this engine's model writes its reasoning INTO the text;
+            # the plugin that knows how is the one that splits it, and hands
+            # the caller {thinking, content} chunks.
+            split = await self._reasoning_split(loop, is_vlm, thinking_enabled, continue_final)
+            to_bridge, structured_cb = wrap_for_split(stream_callback, split)
+            threadsafe_callback = make_threadsafe_callback(loop, to_bridge)
             # Pin MLX calls to the dedicated single-worker executor so all
             # operations share one thread and the per-thread default_stream
                 # stays consistent across turns (see _MLX_EXECUTOR docstring).
@@ -321,6 +328,8 @@ class MLXChatNode:
                 continue_final=continue_final,
             )
 
+            reasoning_text, response_text = finish_split(structured_cb, split, result["text"])
+
             elapsed_ms = int((time.time() - start_time) * 1000)
 
             context_used = result["prompt_tokens"] + result["tokens"]
@@ -360,7 +369,7 @@ class MLXChatNode:
 
             return {
                 **base_chat_result(
-                    response=result["text"],
+                    response=response_text,
                     model_used=self.config.model_path,
                     elapsed_ms=elapsed_ms,
                     tokens=result["tokens"],
@@ -387,6 +396,9 @@ class MLXChatNode:
                 # #984: this answer came from the no-thinking retry, because the
                 # first pass spent the whole ceiling inside <think>.
                 "thinking_retry": result.get("thinking_retry", False),
+                # ADR-010: the reasoning, apart from the answer ("" when the
+                # model did not reason or the split does not apply).
+                "thinking": reasoning_text,
                 "continuable": self._compute_continuable(result, is_vlm),
                 "peak_memory_mb": round(result.get("peak_memory_mb", 0), 1),
                 "prompt_tps": round(prompt_tps, 1),
@@ -532,6 +544,26 @@ class MLXChatNode:
             )
             return result
         return {**retried, "thinking_retry": True}
+
+    async def _reasoning_split(self, loop, is_vlm: bool, thinking_enabled: bool,
+                               continue_final: bool) -> Optional[Dict[str, bool]]:
+        """How this turn's text is split into reasoning and answer (ADR-010).
+
+        None for `continue_final`: FD-S6 resumes a truncated turn from its
+        exact raw text, the legacy path that dies at C4.6 — left untouched.
+        gpt-oss writes harmony channels. A text-path template that opens
+        <think> in the prompt means the model starts INSIDE the block (the VLM
+        runner re-emits a synthetic opener itself, so it does not).
+        """
+        if continue_final:
+            return None
+        harmony = "gpt-oss" in str(self.config.model_path).lower()
+        starts_inside = False
+        if thinking_enabled and not is_vlm and not harmony:
+            # the probe may load the model: MLX work stays on its own thread
+            # `is True`: a probe that cannot answer must not change the turn
+            starts_inside = (await loop.run_in_executor(_MLX_EXECUTOR, self._template_opens_think)) is True
+        return {"starts_inside": starts_inside, "harmony": harmony}
 
     def _template_opens_think(self) -> bool:
         """Whether this model's chat template pre-opens ``<think>`` in the prompt.

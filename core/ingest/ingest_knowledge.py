@@ -12,7 +12,9 @@ Usage:
     # Or via CLI:
     ./nexe knowledge ingest
 
-Supported formats: .txt, .md, .pdf (requires pypdf)
+Supported formats: every extension the loader registry knows
+(core/files/loaders — text, markdown, code, CSV/JSON/XML/YAML/TOML, PDF,
+DOCX/XLSX/PPTX/EPUB).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -34,11 +36,13 @@ sys.path.insert(0, str(PROJECT_ROOT))
 logger = logging.getLogger(__name__)
 
 from core.endpoints.chat_sanitization import _filter_rag_injection  # noqa: E402
+from core.files.loaders import LoaderError, UnsupportedFormatError, extract_text, supported_extensions  # noqa: E402
 from core.memory_access import DOCS_COLLECTION, KNOWLEDGE_COLLECTION  # noqa: E402
 from memory.memory.constants import DEFAULT_VECTOR_SIZE  # noqa: E402
 from memory.memory.config import resolve_ingest_config  # noqa: E402
 from memory.memory.precomputed_loader import PrecomputedKB  # noqa: E402
 from memory.rag.header_parser import parse_rag_header, VALID_PRIORITIES  # noqa: E402  # after sys.path setup
+from core.rag_header import rag_chunk_prefix  # noqa: E402
 
 import os as _os  # noqa: E402  # after sys.path setup
 _LANG = _os.environ.get("NEXE_LANG", "en")
@@ -46,9 +50,9 @@ _I18N = {
     "title":          {"ca": "NEXE KNOWLEDGE INGESTION", "es": "NEXE KNOWLEDGE INGESTION", "en": "NEXE KNOWLEDGE INGESTION"},
     "add_docs":       {"ca": "Afegeix els teus documents a la carpeta 'knowledge/'", "es": "Añade tus documentos a la carpeta 'knowledge/'", "en": "Add your documents to the 'knowledge/' folder"},
     "folder_created": {"ca": "Carpeta '{p}' creada.", "es": "Carpeta '{p}' creada.", "en": "Folder '{p}' created."},
-    "add_and_rerun":  {"ca": "Afegeix documents (.txt, .md, .pdf) i torna a executar.", "es": "Añade documentos (.txt, .md, .pdf) y vuelve a ejecutar.", "en": "Add documents (.txt, .md, .pdf) and run again."},
+    "add_and_rerun":  {"ca": "Afegeix documents (.md, .txt, .pdf, .docx...) i torna a executar.", "es": "Añade documentos (.md, .txt, .pdf, .docx...) y vuelve a ejecutar.", "en": "Add documents (.md, .txt, .pdf, .docx...) and run again."},
     "no_docs":        {"ca": "No hi ha documents a '{p}'", "es": "No hay documentos en '{p}'", "en": "No documents found in '{p}'"},
-    "formats":        {"ca": "Formats suportats: .txt, .md, .pdf", "es": "Formatos soportados: .txt, .md, .pdf", "en": "Supported formats: .txt, .md, .pdf"},
+    "formats":        {"ca": "Formats suportats: {f}", "es": "Formatos soportados: {f}", "en": "Supported formats: {f}"},
     "example":        {"ca": "Exemple:", "es": "Ejemplo:", "en": "Example:"},
     "found_docs":     {"ca": "[1/4] Trobats {n} documents", "es": "[1/4] Encontrados {n} documentos", "en": "[1/4] Found {n} documents"},
     "connecting":     {"ca": "[2/4] Connectant amb Qdrant...", "es": "[2/4] Conectando con Qdrant...", "en": "[2/4] Connecting to Qdrant..."},
@@ -98,8 +102,15 @@ DEFAULT_TYPE = "docs"
 DEFAULT_OVERLAP_FACTOR = 10  # overlap = max(50, chunk_size // factor)
 DEFAULT_OVERLAP_FLOOR = 50
 
-# Supported file extensions
-SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text"}
+# Supported file extensions — the loader registry's, the same list uploads use
+# (ADR-008 E3, #1070). Before E3 this set left `.pdf` out and every consumer
+# globbed it separately, with a weaker reader than the upload path.
+SUPPORTED_EXTENSIONS = supported_extensions()
+
+
+def formats_list() -> str:
+    """The supported extensions as one sorted, human-readable line."""
+    return ", ".join(sorted(SUPPORTED_EXTENSIONS))
 
 
 from core.ingest.chunking import chunk_text  # noqa: E402  # after sys.path setup
@@ -158,10 +169,7 @@ def _build_file_items(
     perf_chunking_ns_ref[0] += time.perf_counter_ns() - _t0_chunk
 
     priority_weight = 4 - VALID_PRIORITIES.index(doc_priority) if doc_priority in VALID_PRIORITIES else 2
-    header_text = f"[Document: {filename}]\n"
-    if doc_abstract:
-        header_text += f"[Abstract: {doc_abstract}]\n"
-    header_text += "\n"
+    header_text = rag_chunk_prefix(filename, doc_abstract)
 
     batch_items = [
         {
@@ -232,55 +240,24 @@ def _emit_perf_log(perf_record: dict) -> None:
     logger.info(line)
 
 
-def _read_text_with_fallback(file_path: Path) -> str:
-    """Reads text with encoding fallback.
-
-    Bug 18 (2026-04-06) — previously `read_text(encoding="utf-8")` raised
-    UnicodeDecodeError for latin-1/cp1252 files and they were silently ignored
-    (ingests ended up with lost chunks without any warning). Now we try a
-    chain of common encodings and warn via logger.info when not UTF-8.
-    """
-    # cp1252 BEFORE latin-1. latin-1 accepts
-    # all bytes 0-255 by construction, so it would never fall through to cp1252
-    # if it came first. Windows-1252 smart quotes/em-dashes would appear
-    # as invisible control characters. By trying cp1252 first we preserve
-    # that fidelity for real Windows files.
-    encodings = ("utf-8", "utf-8-sig", "cp1252", "latin-1")
-    last_err: UnicodeDecodeError | None = None
-    for enc in encodings:
-        try:
-            content = file_path.read_text(encoding=enc)
-            if enc != "utf-8":
-                logger.info(
-                    "File %s read with fallback encoding %s", file_path, enc
-                )
-            return content
-        except UnicodeDecodeError as exc:
-            last_err = exc
-            continue
-    logger.warning(
-        "File %s could not be decoded with encodings %s: %s",
-        file_path, encodings, last_err,
-    )
-    return ""
-
-
 def read_file(file_path: Path) -> str:
-    """Read file content based on extension."""
-    ext = file_path.suffix.lower()
+    """Read a knowledge document with the loader its extension names.
 
-    if ext in {".txt", ".md", ".markdown", ".text"}:
-        return _read_text_with_fallback(file_path)
+    ADR-008 E3 (#1070): the same registry uploads go through, so the knowledge
+    folder gains every upload format and — the part that was a real gap — the
+    B026 PDF pipeline (layout retry for glued pages, NFKC), which this reader
+    did not have. Text keeps the Bug 18 encoding fallback chain.
 
-    elif ext == ".pdf":
-        from pypdf import PdfReader
-        reader = PdfReader(file_path)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
-        return text
-
-    return ""
+    Returns "" for an unsupported extension or content the loader cannot read
+    (logged); a missing file raises.
+    """
+    try:
+        return extract_text(file_path)
+    except UnsupportedFormatError:
+        return ""
+    except LoaderError as e:
+        logger.warning("Skipping %s: %s", file_path, e)
+        return ""
 
 
 async def _ingest_from_precomputed(
@@ -342,12 +319,20 @@ def _resolve_knowledge_path(folder, lang) -> Path:
 
 
 def _discover_documents(knowledge_path) -> list[Path]:
-    """Discover all supported documents recursively under the knowledge path."""
-    files: list[Path] = []
-    for ext in SUPPORTED_EXTENSIONS:
-        files.extend(knowledge_path.glob(f"**/*{ext}"))
-    files.extend(knowledge_path.glob("**/*.pdf"))
-    return [f for f in files if not f.name.startswith('.')]
+    """Every supported document under the knowledge path, recursively, sorted.
+
+    Hidden files AND anything inside a hidden folder are skipped: a knowledge
+    root without a language subfolder holds `.embeddings/manifest.json`, which
+    became a "document" the day `.json` did (ADR-008 E3).
+    """
+    knowledge_path = Path(knowledge_path)
+    files = [
+        f for f in knowledge_path.rglob("*")
+        if f.suffix.lower() in SUPPORTED_EXTENSIONS
+        and f.is_file()
+        and not any(part.startswith(".") for part in f.relative_to(knowledge_path).parts)
+    ]
+    return sorted(files)
 
 
 def _print_ingestion_header(files) -> None:
@@ -577,7 +562,7 @@ async def ingest_knowledge(
 
     if not files:
         log(f"[INFO] {_t('no_docs', p=knowledge_path)}")
-        log(f"       {_t('formats')}")
+        log(f"       {_t('formats', f=formats_list())}")
         log(f"\n       {_t('example')}")
         log("         cp ~/Documents/manual.pdf knowledge/")
         log("         python -m core.ingest.ingest_knowledge")

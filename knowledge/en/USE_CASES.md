@@ -33,7 +33,7 @@ Ask about ongoing projects, preferences, deadlines. The **MEM_SAVE** system auto
 
 **For whom:** professionals who work with sensitive documents (legal, medical, consulting) and cannot upload them to cloud services.
 
-Upload `.txt`, `.md` or `.pdf` and they are automatically indexed in RAG. Query them in natural language. Each document is **isolated per session** — no cross-contamination between conversations without you wanting it.
+Upload PDF, Word, Excel, PowerPoint, EPUB, text, code or data files (CSV, JSON...) and they are automatically indexed in RAG. Query them in natural language. Each document is **isolated per session** — no cross-contamination between conversations without you wanting it.
 
 **Example:** upload contracts and ask *"Which termination clauses mention financial penalties?"*
 

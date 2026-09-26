@@ -36,6 +36,7 @@ www.jgoy.net · https://server-nexe.org
 import pytest
 from fastapi.responses import StreamingResponse
 
+from core.turn.policy import empty_reply_text
 from tests.plugins.web_ui_module.test_chat_inner_behavior import (
     _Harness,
     _make_server_state,
@@ -44,6 +45,10 @@ from tests.plugins.web_ui_module.test_chat_inner_behavior import (
 
 _ONLY_TAG = "[MEM_SAVE: l'usuari es diu Aran]"
 _SECOND_TURN = "Molt bé, Aran, ho tindré present."
+
+
+#: C4.5: what the user reads when the second call is off or yields nothing.
+_ACKS = {empty_reply_text(lang) for lang in ("ca", "es", "en")}
 
 
 class _MemSaveThenAnswerEngine:
@@ -169,8 +174,9 @@ class TestG10ReprompFlagD3:
         if expect_reprompt_call:
             assert result["response"] == _SECOND_TURN
         else:
-            assert "Memòria desada" in result["response"]
-            assert "l'usuari es diu Aran" in result["response"]
+            # C4.5: no second call → the neutral stand-in, never a "saved" (decision 1).
+            assert result["response"] in _ACKS, result["response"]
+            assert "Memòria desada" not in result["response"]
 
     async def test_flag_off_keeps_stream_and_nonstream_in_parity(self, monkeypatch):
         monkeypatch.setenv("NEXE_REPROMPT_IF_ONLY_MEMSAVE", "false")
@@ -190,4 +196,4 @@ class TestG10ReprompFlagD3:
             body += chunk if isinstance(chunk, str) else chunk.decode()
 
         assert _visible_stream_text(body) == result["response"].strip()
-        assert "Memòria desada" in result["response"]
+        assert result["response"] in _ACKS, result["response"]

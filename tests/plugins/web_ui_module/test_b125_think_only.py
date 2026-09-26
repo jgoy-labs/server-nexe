@@ -12,7 +12,8 @@ www.jgoy.net · https://server-nexe.org
 """
 import inspect
 
-from plugins.web_ui_module.api import routes_chat
+from core.turn.text.clean import think_only_placeholder
+from plugins.web_ui_module.api import routes_chat, turn_adapters
 from core.sessions import ChatSession
 
 
@@ -21,15 +22,15 @@ from core.sessions import ChatSession
 class TestThinkOnlyPlaceholder:
     def test_think_only_returns_placeholder(self):
         """Model produced output (thinking) but it cleaned to empty → placeholder."""
-        assert routes_chat._think_only_placeholder("", "<think>reasoning</think>") == "…"
+        assert think_only_placeholder("", "<think>reasoning</think>") == "…"
 
     def test_non_empty_clean_response_is_unchanged(self):
         """A real answer is never replaced by the placeholder."""
-        assert routes_chat._think_only_placeholder("hola", "<think>x</think>hola") == "hola"
+        assert think_only_placeholder("hola", "<think>x</think>hola") == "hola"
 
     def test_genuinely_empty_turn_stays_empty(self):
         """No full_response (e.g. upstream exception) → nothing is fabricated."""
-        assert routes_chat._think_only_placeholder("", "") == ""
+        assert think_only_placeholder("", "") == ""
 
 
 # ── Why it matters: real ChatSession context re-pairing ──────────────────────
@@ -70,8 +71,11 @@ def test_placeholder_is_wired_into_response_generator():
     Without this, the helper could be tested in isolation while the real route
     silently stops calling it (test-theatre). We assert the exact call site.
     """
-    src = inspect.getsource(routes_chat)
-    assert "_think_only_placeholder(clean_response, full_response)" in src, (
-        "the streaming route must call _think_only_placeholder before persisting "
-        "the assistant turn (B125)"
-    )
+    # C4.4: the helper is the core's now; the streaming turn persists through
+    # turn_adapters (and the `continue` path still through routes_chat).
+    for module in (routes_chat, turn_adapters):
+        src = inspect.getsource(module)
+        assert "think_only_placeholder(clean_response, full_response)" in src, (
+            f"{module.__name__} must call think_only_placeholder before persisting "
+            "the assistant turn (B125)"
+        )

@@ -31,6 +31,10 @@ def current_lang() -> str:
 #: has no text of its own — the note travels as [MEM:n]/memory_saved.
 TEXTS: dict[str, dict[str, str]] = {
     "ca": {
+        # C4.5 (decision of 26/09): what the user reads when the model wrote
+        # only memory tags and no second reply came — neutral, never "saved":
+        # the server's [MEM:n:facts] note is the only word on that (#1098).
+        "reply.ack": "D'acord.",
         "delete.empty": "Què vols que oblidi?",
         "delete.not_found": 'No he trobat res sobre "{fact}" a la memòria.',
         "delete.error": "Error: {error}",
@@ -51,6 +55,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "clear_all.error": "Error esborrant la memòria: {error}",
     },
     "es": {
+        "reply.ack": "De acuerdo.",
         "delete.empty": "¿Qué quieres que olvide?",
         "delete.not_found": 'No he encontrado nada sobre "{fact}" en la memoria.',
         "delete.error": "Error: {error}",
@@ -71,6 +76,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "clear_all.error": "Error borrando la memoria: {error}",
     },
     "en": {
+        "reply.ack": "Okay.",
         "delete.empty": "What do you want me to forget?",
         "delete.not_found": 'Nothing found about "{fact}" in memory.',
         "delete.error": "Error: {error}",
@@ -92,9 +98,14 @@ TEXTS: dict[str, dict[str, str]] = {
     },
 }
 
-def text(key: str, **kwargs) -> str:
-    """The text for `key` in the server's language, English as the fallback."""
-    lang = current_lang()
+def text(key: str, *, lang: "str | None" = None, **kwargs) -> str:
+    """The text for `key` in the server's language, English as the fallback.
+
+    `lang` (C4.5) picks the TURN's language instead: a reply that stands in
+    for the model's answer speaks the conversation's language, not the
+    server's — the same rule the re-prompt override has always followed.
+    """
+    lang = (lang or current_lang()).split("-")[0].lower()
     table = TEXTS.get(lang) or TEXTS[DEFAULT_LANG]
     template = table.get(key) or TEXTS[DEFAULT_LANG].get(key, key)
     try:

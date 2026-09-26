@@ -10,9 +10,11 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
+import copy
 import functools
 import hashlib
 import logging
+import time
 import unicodedata
 from typing import Any, Optional
 
@@ -34,8 +36,128 @@ from core.rag.collections import (  # noqa: F401  (re-export, see above)
     RAG_MEMORY_THRESHOLD,
     source_for,
 )
+from core.rag.registry import registered_names
 
 logger = logging.getLogger(__name__)
+
+# #1004 / ADR-008 E2: RAG_SEARCHES and RAG_SEARCH_DURATION are written HERE,
+# once per source per turn. They used to be written in `RAGModule.search`,
+# which the server never called, so both series stayed at zero while the chat
+# retrieved on every turn. Guarded (#1005): instrumentation must never take
+# retrieval down with it, and says so out loud when it cannot load.
+try:
+    from core.metrics.registry import RAG_SEARCHES, RAG_SEARCH_DURATION
+except ImportError as _metrics_exc:  # pragma: no cover - see test_1004
+    RAG_SEARCHES = None  # type: ignore[assignment]
+    RAG_SEARCH_DURATION = None  # type: ignore[assignment]
+    logger.warning(
+        "RAG metrics unavailable (%s): core_rag_searches_total and "
+        "core_rag_search_duration_seconds will stay at zero; retrieval is unaffected",
+        _metrics_exc,
+    )
+
+# The import succeeding is not the same as the write succeeding; see
+# _record_search_metrics.
+_metrics_write_failed_reported = False
+
+
+def _record_search_metrics(source: str, elapsed_seconds: float) -> None:
+    """Publish one source's search attempt to Prometheus (#1004, ADR-008 E2).
+
+    Counted AND timed on both outcomes: the metrics carry only a `source`
+    label, so a counter that dropped failures would under-report load exactly
+    when the backend breaks, and a histogram that dropped them would lose the
+    slow timeouts that are the point of a latency histogram. Same rule for
+    both keeps `core_rag_search_duration_seconds_count` equal to
+    `core_rag_searches_total`.
+
+    Nothing here can reach the turn. It runs from a `finally`, where a raise
+    would REPLACE the search's outcome — and the realistic trigger (adding a
+    `status` label to the registry makes every `labels(source=...)` raise)
+    touches no retrieval code at all. So the write is fenced, and a failure is
+    reported once per process: it is deterministic (the same mismatch on every
+    search) and a turn fires one search per source.
+    """
+    global _metrics_write_failed_reported
+    if RAG_SEARCHES is None or RAG_SEARCH_DURATION is None:
+        return
+    try:
+        RAG_SEARCHES.labels(source=source).inc()
+        RAG_SEARCH_DURATION.labels(source=source).observe(elapsed_seconds)
+    except Exception as exc:
+        # Deliberately bare: whatever prometheus_client throws, the retrieval
+        # that already ran must still be the answer.
+        if not _metrics_write_failed_reported:
+            _metrics_write_failed_reported = True
+            logger.warning(
+                "RAG metrics write failed for source %r: %s — "
+                "core_rag_searches_total and core_rag_search_duration_seconds "
+                "will stay flat until the process restarts; retrieval is "
+                "unaffected. Not repeated for later searches.",
+                source, exc,
+            )
+
+
+class _StampedHit:
+    """A read-only view of a hit that could not take a `collection` itself
+    (frozen, slotted, or a model that refuses unknown fields). Every other
+    attribute reads through to the original."""
+
+    __slots__ = ("_hit", "collection")
+
+    def __init__(self, hit: Any, collection: str) -> None:
+        object.__setattr__(self, "_hit", hit)
+        object.__setattr__(self, "collection", collection)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(object.__getattribute__(self, "_hit"), name)
+
+
+def _stamp_collection(results: list, source_name: str) -> list:
+    """Give every hit that lacks a `collection` the name of the source that
+    returned it (ADR-008 D4, sealed at E2).
+
+    Downstream reads `getattr(r, "collection", ...)` twice: the per-turn stats
+    (`rag_items`, which showed "?") and the section a hit lands in. Stamping
+    here, where the source is still known, fixes the first; the second is
+    unchanged by design — a name that is not one of the system collections
+    still lands in the knowledge section.
+
+    The source's own objects are never mutated: a hit may be shared (a cache,
+    a registered source's fixture), so the stamp goes on a shallow copy, or on
+    a read-through view when the copy refuses the attribute. A hit that
+    already names its collection is passed through untouched.
+    """
+    stamped = []
+    for hit in results:
+        existing = getattr(hit, "collection", None)
+        if isinstance(existing, str) and existing:
+            stamped.append(hit)
+            continue
+        try:
+            clone = copy.copy(hit)
+            setattr(clone, "collection", source_name)
+            stamped.append(clone)
+        except Exception:
+            stamped.append(_StampedHit(hit, source_name))
+    return stamped
+
+
+async def _search_source(source: Any, memory: Any, query: RAGQuery) -> list:
+    """Ask one source, and account for it: metrics on both outcomes, and the
+    source's name on every hit that came back without one.
+
+    A source that raises still propagates (the contract says it must not, and
+    the orchestrator's degradation handles one that does) — only after the
+    attempt has been counted and timed.
+    """
+    name = source.name()
+    started = time.perf_counter()
+    try:
+        results = await source.search(memory, query)
+    finally:
+        _record_search_metrics(name, time.perf_counter() - started)
+    return _stamp_collection(results, name)
 
 
 @functools.lru_cache(maxsize=1)
@@ -68,6 +190,14 @@ async def _discover_collection_names(memory: Any) -> list[str]:
     without editing this file — the list used to be 3 hardcoded literals.
     The 3 known collections keep MC-001's fixed order; anything discovered
     beyond them (a plugin's own collection) is searched too, appended after.
+
+    E1b (ADR-008): a REGISTERED source is searchable too, whether or not the
+    store reports a collection by that name. Without this union a source could
+    register and never be asked anything — and E3's document module is exactly
+    the case that does not have to be a Qdrant collection to have something to
+    say. The union also runs when discovery FAILED and we fell back to the
+    system defaults: losing a registered source because Qdrant hiccuped would
+    be the silent kind of degradation this file exists to avoid.
     """
     try:
         infos = await memory.list_collections()
@@ -77,6 +207,7 @@ async def _discover_collection_names(memory: Any) -> list[str]:
         logger.debug("RAG: collection discovery unavailable, using system defaults: %s", list_err)
         names = []
     names = names or list(SYSTEM_COLLECTIONS)
+    names = list(dict.fromkeys([*names, *registered_names()]))
     return sorted(names, key=lambda n: (_KNOWN_ORDER.get(n, len(_KNOWN_ORDER)), n))
 
 # RAG context labels per language (must match system prompt references)
@@ -99,15 +230,6 @@ _RAG_CONTEXT_LABELS = {
 }
 
 
-def _rag_result_to_text(result: Any) -> str:
-    """Normalize RAG results to plain text for context injection."""
-    if isinstance(result, dict):
-        return result.get("content") or result.get("text") or str(result)
-    if hasattr(result, "text"):
-        return result.text
-    return str(result)
-
-
 async def build_rag_context(
     last_user_msg: str,
     app_state: Any,
@@ -118,7 +240,7 @@ async def build_rag_context(
     threshold_override: Optional[float] = None,
 ) -> tuple[str, list[tuple[str, float]]]:
     """
-    Build RAG context from MemoryAPI collections, with fallback to RAG module.
+    Build RAG context by asking every retrieval source (ADR-008) with MemoryAPI.
 
     Args:
         last_user_msg: The last user message to search for
@@ -188,7 +310,7 @@ async def build_rag_context(
             # gather preserves argument order, so all_results keeps the original
             # docs→knowledge→memory ordering that dedup/context rely on.
             per_collection = await asyncio.gather(*(
-                source.search(memory, query) for source in sources
+                _search_source(source, memory, query) for source in sources
             ))
             all_results: list = []
             for results in per_collection:
@@ -226,12 +348,36 @@ async def build_rag_context(
 # ─── Private helpers ─────────────────────────────────────────────────────────
 
 
+def _has_text(r: Any) -> bool:
+    """#1075: `SearchResult.text` is `Optional[str]`. A hit with no usable
+    text has nothing to contribute to the context."""
+    text = getattr(r, "text", None)
+    return isinstance(text, str) and bool(text)
+
+
 def _deduplicate_results(results: list) -> list:
-    """Remove results with duplicate content (sha256 of first 500 chars)."""
+    """Remove results with duplicate content (sha256 of the whole text).
+
+    #1091: the key used to be the first 500 chars. The knowledge ingest puts
+    `[Document: …]` + `[Abstract: …]` in front of every chunk, and a long
+    abstract filled those 500 chars — two DIFFERENT chunks of one document
+    hashed the same and the document gave at most one chunk per turn (336
+    distinguishable chunks of the ca KB → 181). Only exact duplicates collapse
+    now; for texts of 500 chars or fewer nothing changes.
+
+    #1075: hits whose `text` is not a non-empty str are skipped (debug log)
+    instead of raising, which used to cost the whole turn its context.
+    """
     seen: set = set()
     unique = []
     for r in results:
-        h = hashlib.sha256(r.text[:500].encode()).hexdigest()
+        if not _has_text(r):
+            logger.debug(
+                "RAG: skipping hit with no text (collection=%s, id=%s)",
+                getattr(r, "collection", "?"), getattr(r, "id", "?"),
+            )
+            continue
+        h = hashlib.sha256(r.text.encode()).hexdigest()
         if h not in seen:
             seen.add(h)
             unique.append(r)
@@ -253,6 +399,9 @@ def _format_results(results: list, server_lang: str = "en") -> str:
     labels = _RAG_CONTEXT_LABELS.get(server_lang, _RAG_CONTEXT_LABELS["en"])
     buckets: dict[str, list[str]] = {"docs": [], "knowledge": [], "memory": []}
     for r in results:
+        # #1075: never write "None" into the context for a text-less hit.
+        if not _has_text(r):
+            continue
         collection = getattr(r, "collection", None)
         key = (
             "docs" if collection == DOCS_COLLECTION

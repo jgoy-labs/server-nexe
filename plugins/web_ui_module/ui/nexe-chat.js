@@ -190,13 +190,30 @@ NexeUI.extend({
         return { text: stripped, facts };
     },
 
+    // What memory kept this turn, as the SERVER confirms it (#1098):
+    // [MEM:n:fact1|fact2] (n = stored new), [MEM:n] from the continue path,
+    // [MEM:0] = looked, kept nothing. `mem` is {saved, facts} so far; returns
+    // it updated plus the chunk without the sentinel. The only way the badge
+    // learns anything — a model's own [MEM_SAVE:] is a request, not a save.
+    _readMemSentinel(chunk, mem) {
+        let saved = mem.saved;
+        let facts = mem.facts;
+        const rest = chunk.replace(/\x00\[MEM:?(\d*)(?::(.*?))?\]\x00/g, (match, n, listed) => { // eslint-disable-line no-control-regex
+            const kept = listed ? listed.split('|').filter(Boolean) : [];
+            facts = [...new Set(facts.concat(kept))];
+            saved = saved || kept.length > 0 || parseInt(n || '1', 10) > 0;
+            return '';
+        });
+        return { chunk: rest, saved, facts, seen: rest !== chunk };
+    },
+
     // Control tags that leak into the visible answer. The patterns do not
     // overlap, so order does not matter — but the SET does: anything missing
     // here reaches the user as literal [MODEL:...] noise in the message.
     _stripLeakedTags(text) {
         text = text.replace(/\[ACTION\]:\s*[^\n]*/g, '');
         text = text.replace(/\[MODEL:[^\]]+\]/g, '');
-        text = text.replace(/\[MEM:\d+\]/g, '');
+        text = text.replace(/\[MEM:\d+(?::[^\]]*)?\]/g, '');
         text = text.replace(/\[MEM\]/g, '');
         // Strip [DEL:N:...] tokens from final render
         text = text.replace(/\[DEL:\d+:.+?\]/g, '');
@@ -462,7 +479,7 @@ NexeUI.extend({
             // user had not pressed send.
             if (response.status === 409) {
                 let detail = null;
-                try { detail = (await response.json()).detail; } catch (_) { /* non-JSON error body */ }
+                try { detail = (await response.json()).detail; } catch { /* non-JSON error body */ }
                 if (detail && detail.code === 'session_leased' && detail.lease) {
                     const since = new Date(detail.lease.since);
                     const timeStr = isNaN(since) ? detail.lease.since : since.toLocaleTimeString();
@@ -501,6 +518,9 @@ NexeUI.extend({
                 const turnSessionId = servedSession || this.currentSessionId;
                 let assistantMessageDiv = null;
                 let memorySaved = false;
+                // #1098: the facts the SERVER says memory kept ([MEM:n:f1|f2]).
+                // The model's own [MEM_SAVE:] text is a request, never this.
+                let memFacts = [];
                 let memoryDeleted = false;
                 let deletedCount = 0;
                 let deletedFacts = [];
@@ -603,12 +623,21 @@ NexeUI.extend({
                 const ctx = { assistantMessageDiv, startThinkBlock, closeThinkBlock };
 
 
+                // A sentinel cut between two reads would leak as text and never
+                // match: hold an unclosed \x00[ tail until the next read.
+                let sentinelCarry = '';
                 try {
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
 
-                        let chunk = decoder.decode(value, { stream: true });
+                        let chunk = sentinelCarry + decoder.decode(value, { stream: true });
+                        sentinelCarry = '';
+                        const openAt = chunk.lastIndexOf('\x00[');
+                        if (openAt !== -1 && chunk.indexOf(']\x00', openAt) === -1) {
+                            sentinelCarry = chunk.slice(openAt);
+                            chunk = chunk.slice(0, openAt);
+                        }
 
                         // Detect MODEL token (model actually used)
                         const modelMatch = chunk.match(/\x00\[MODEL:([^\]]+)\]\x00/); // eslint-disable-line no-control-regex
@@ -758,10 +787,10 @@ NexeUI.extend({
                                 if (statsBar) statsBar.appendChild(el);
                             }
                         }
-                        // Detect saved memory count token [MEM:N] or [MEM]
-                        if (chunk.match(/\x00\[MEM:?\d*\]\x00/)) { // eslint-disable-line no-control-regex
-                            memorySaved = true;
-                            chunk = chunk.replace(/\x00\[MEM:?\d*\]\x00/g, ''); // eslint-disable-line no-control-regex
+                        // What memory kept this turn, as the server confirms it (#1098).
+                        const memRead = this._readMemSentinel(chunk, { saved: memorySaved, facts: memFacts });
+                        if (memRead.seen) {
+                            ({ saved: memorySaved, facts: memFacts, chunk } = memRead);
                             const savingEl = document.getElementById('nexe-mem-saving');
                             if (savingEl) savingEl.remove();
                         }
@@ -821,24 +850,23 @@ NexeUI.extend({
                             st.fullResponse = this._cleanModelTags(st.fullResponse);
                         }
                     }
-                    // Strip [MEM_SAVE: ...] from final render and collect facts for stats badge
+                    // Strip the model's [MEM_SAVE: ...] from the final render. Only
+                    // strip: whether anything was SAVED is the server's word
+                    // (memFacts, from [MEM:n:...]) — #1098, the badge used to
+                    // say "saved" for tags the server had refused.
                     const _main = this._extractMemSave(st.fullResponse);
                     st.fullResponse = _main.text;
-                    // The badge lists each fact once; a Set keeps first-seen order,
-                    // which is what the hand-rolled _seenFacts guard did here.
-                    const memFacts = [...new Set(_main.facts)];
-                    if (memFacts.length > 0) {
-                        memorySaved = true;
+                    if (_main.facts.length > 0) {
                         // Clean up orphaned MEM_SAVE remnants (intro lines ending in ":", lone dots)
                         st.fullResponse = st.fullResponse.replace(/\n[^\n]*:\s*\n\s*\.\s*\n/g, '\n');
                         st.fullResponse = st.fullResponse.replace(/\n\s*\.\s*\n/g, '\n');
                         st.fullResponse = st.fullResponse.replace(/\n{3,}/g, '\n\n');
                     }
-                    // Guard: if the response is empty after removing MEM_SAVE
-                    // (backend does re-prompt, but for safety we keep UI fallback)
-                    if (!st.fullResponse.trim() && memFacts.length > 0) {
-                        console.info('[nexe] Empty response after MEM_SAVE — backend should have re-prompted. Facts:', memFacts);
-                        st.fullResponse = '\u2705 ' + memFacts.join(', ');
+                    // An answer that was only tags: the backend re-prompts (#856).
+                    // No "✅ facts" stand-in here any more — it claimed a save
+                    // the server had not confirmed (#1098).
+                    if (!st.fullResponse.trim() && _main.facts.length > 0) {
+                        console.info('[nexe] Empty response after MEM_SAVE — backend should have re-prompted.');
                     }
                     // Strip model tags that leak into visible text
                     st.fullResponse = this._stripLeakedTags(st.fullResponse);

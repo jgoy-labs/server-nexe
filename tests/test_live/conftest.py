@@ -119,7 +119,25 @@ def _build_env() -> dict[str, str]:
     data_dir = Path(merged.get("NEXE_DATA_DIR", str(PROJECT_ROOT / ".test_data")))
     _ensure_onboarding_state(data_dir)
     merged["NEXE_DATA_DIR"] = str(data_dir)
+    if not _real_storage_allowed():
+        # .env's NEXE_QDRANT_PATH=storage/vectors is relative to the CWD, not
+        # to NEXE_DATA_DIR (#1053): a live run spawned "in isolation" still
+        # wrote memories into the real DEV store. Absolute, under the test dir.
+        merged["NEXE_QDRANT_PATH"] = str((data_dir / "vectors").resolve())
     return merged
+
+
+def _real_storage_allowed() -> bool:
+    return os.getenv("NEXE_TEST_ALLOW_REAL_STORAGE") == "1"
+
+
+def _may_reuse_running_server() -> bool:
+    """A server already up at the DEFAULT url runs on the real storage: the
+    live tests store facts, poison strings and canaries and clean none up —
+    that is how the DEV memory filled with test facts (seen 25/09: "em dic
+    Aran", "User: AAAA…"). Reuse it only when asked: an explicit NEXE_TEST_URL
+    (a sidecar, a staging box) or NEXE_TEST_ALLOW_REAL_STORAGE=1."""
+    return "NEXE_TEST_URL" in os.environ or _real_storage_allowed()
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -135,6 +153,14 @@ def nexe_server() -> Generator[str, None, None]:
     Compatible with Tauri sidecar: set NEXE_TEST_URL env var before running.
     """
     if _is_up(NEXE_TEST_URL):
+        if not _may_reuse_running_server():
+            pytest.fail(
+                f"A Nexe server is already running at {NEXE_TEST_URL} — on the REAL "
+                "storage. The live tests write memories into it. Stop it (./nexe stop) "
+                "so the suite starts its own isolated one, or set "
+                "NEXE_TEST_ALLOW_REAL_STORAGE=1 to accept writing there.",
+                pytrace=False,
+            )
         yield NEXE_TEST_URL
         return  # external server — do not terminate
 

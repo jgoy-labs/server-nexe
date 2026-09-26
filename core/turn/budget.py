@@ -25,7 +25,8 @@ def record_llm_call(
     """Append one LLM call to `ctx.usage["llm"]`.
 
     Called from every place a turn actually pays for an inference: `generate`
-    (both doors), the re-prompt (`_yield_reprompt`/`_reprompt_nonstreaming`),
+    (both doors), the re-prompt (`core.turn.policy.reprompt_chunks`, both doors
+    since C4.5 — and only when an engine was really asked),
     per-fact atomization (`_atomize_fact_llm`) and `compact_session` — the
     last two run inside a post-commit job (C2.2), against the SAME `ctx` the
     turn built, so their calls land in the same bucket as the inline ones.

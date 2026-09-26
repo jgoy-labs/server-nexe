@@ -47,10 +47,12 @@ class TestV1Root:
         endpoints = data["endpoints"]
         assert "workflows" in endpoints
         assert "chat" in endpoints
-        assert "rag" in endpoints
         assert "embeddings" in endpoints
-        assert "documents" in endpoints
         assert "memory" in endpoints
+        # ADR-008 E2: the /v1/rag and /v1/documents stubs were retired; the
+        # listing must not advertise them.
+        assert "rag" not in endpoints
+        assert "documents" not in endpoints
 
 
 class TestV1Health:
@@ -84,17 +86,12 @@ import logging  # noqa: E402  # grouped with the test class below
 class TestV1ImportErrors:
     """Test that ImportError branches are handled gracefully."""
 
-    def test_rag_import_error_logged(self, caplog):
-        """Lines 94-95: RAG import failure is caught and logged."""
-        with patch.dict('sys.modules', {'memory.rag.api.v1': None}):
-            # Force reimport to trigger the try/except
-            import sys
-            # The imports happen at module load time, so we verify
-            # the router still works even if some imports failed
-            app = make_app()
-            client = TestClient(app)
-            resp = client.get("/v1")
-            assert resp.status_code == 200
+    def test_rag_routes_are_not_mounted(self):
+        """ADR-008 E2: the /v1/rag/* stubs (and the import that mounted them)
+        are gone — no route under /v1/rag may exist on the router."""
+        from core.endpoints.v1 import router_v1
+        paths = [r.path for r in router_v1.routes if hasattr(r, "path")]
+        assert [p for p in paths if p.startswith("/v1/rag")] == []
 
     def test_embeddings_import_error_logged(self, caplog):
         """Lines 100-101: Embeddings import failure is caught and logged."""
@@ -103,12 +100,11 @@ class TestV1ImportErrors:
         resp = client.get("/v1")
         assert resp.status_code == 200
 
-    def test_documents_import_error_logged(self, caplog):
-        """Lines 106-107: Documents import failure is caught and logged."""
-        app = make_app()
-        client = TestClient(app)
-        resp = client.get("/v1")
-        assert resp.status_code == 200
+    def test_documents_routes_are_not_mounted(self):
+        """ADR-008 E2: /v1/documents/ (a 501 stub) is gone from the router."""
+        from core.endpoints.v1 import router_v1
+        paths = [r.path for r in router_v1.routes if hasattr(r, "path")]
+        assert [p for p in paths if p.startswith("/v1/documents")] == []
 
     def test_memory_import_error_logged(self, caplog):
         """Lines 112-113: Memory import failure is caught and logged."""
@@ -126,3 +122,22 @@ class TestV1ImportErrors:
         resp_health = client.get("/v1/health")
         assert resp_root.status_code == 200
         assert resp_health.status_code == 200
+
+
+class TestRetiredRoutes:
+    """ADR-008 E2: the 501 stubs in front of PersonalityRAG were deleted, so
+    the surface now answers 404. Pinned per route so the retired surface
+    cannot come back quietly (the same guard as the live-API tests, which
+    need a running server)."""
+
+    @pytest.mark.parametrize("method,path", [
+        ("post", "/v1/rag/search"),
+        ("post", "/v1/rag/add"),
+        ("delete", "/v1/rag/documents/doc-123"),
+        ("get", "/v1/documents/"),
+    ])
+    def test_retired_route_is_404(self, method, path):
+        client = TestClient(make_app())
+        kwargs = {"json": {"query": "q"}} if method == "post" else {}
+        resp = getattr(client, method)(path, **kwargs)
+        assert resp.status_code == 404, (path, resp.status_code, resp.text[:200])

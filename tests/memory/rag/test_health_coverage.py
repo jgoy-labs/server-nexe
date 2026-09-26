@@ -1,7 +1,7 @@
 """
 Additional coverage tests for memory/rag/health.py
 Covers: check_qdrant_available exception branches, check_storage_paths not writable,
-        check_rag_sources source health exception, check_health exception path,
+        check_rag_sources listing exception, check_health exception path,
         check_disk_space warn/degrade (never fail-by-value)
 """
 
@@ -96,31 +96,16 @@ class TestCheckStoragePathsCoverage:
 
 class TestCheckRagSourcesCoverage:
 
-    def test_source_health_exception(self):
-        """When a source's health() raises exception."""
-        mock_source = MagicMock()
-        mock_source.health.side_effect = Exception("health error")
-
+    def test_listing_sources_raises(self):
+        """When listing the sources raises, the check reports fail with the
+        reason instead of taking check_health down with it."""
         mock_module = MagicMock()
         mock_module._initialized = True
-        mock_module._sources = {"broken": mock_source}
+        mock_module.list_sources.side_effect = Exception("registry error")
 
         result = check_rag_sources(mock_module)
         assert result["status"] == "fail"
-        assert "broken" in result["sources"]
-        assert result["sources"]["broken"]["status"] == "unhealthy"
-
-    def test_source_degraded_status(self):
-        """When a source reports degraded status."""
-        mock_source = MagicMock()
-        mock_source.health.return_value = {"status": "degraded"}
-
-        mock_module = MagicMock()
-        mock_module._initialized = True
-        mock_module._sources = {"degraded_src": mock_source}
-
-        result = check_rag_sources(mock_module)
-        assert result["status"] == "fail"
+        assert "registry error" in result["message"]
 
 
 class TestCheckDiskSpaceCoverage:
@@ -178,7 +163,7 @@ class TestCheckHealthCoverage:
         """Module with warn status."""
         mock_module = MagicMock()
         mock_module._initialized = True
-        mock_module._sources = {}  # Will cause rag_sources fail
+        mock_module.list_sources.return_value = []  # Will cause rag_sources fail
         mock_module.module_id = "TEST"
         mock_module.name = "rag"
         mock_module.version = "0.1"

@@ -152,29 +152,20 @@ async def test_the_engine_field_names_the_engine_at_both_doors(caplog):
     assert by_id["t-engine-ui"]["engine"] == "_EngineModule"
 
 
-async def test_the_queued_work_gets_its_own_final_trace_line(caplog):
-    """#1060: `memory.write`/`compact` run AFTER the wire closes, against the
-    same `ctx`, so the line emitted at the end of the turn cannot contain their
-    LLM calls — in production `total_calls`/`total_ms` were under-reported on
-    every turn that wrote a fact, and the one test that looked (I8's) never saw
-    it because its lab runs those steps inline (`post_commit_queue = None`).
-
-    A REAL queue is what makes the gap appear. The bill is compared against the
-    engine's OWN call counter, not a literal: the first line is allowed to be
-    short, but it has to SAY so (`post_commit_pending`), and the last line has
-    to add up.
-
-    Mutation guard: drop the `emit_turn_trace(ctx)` from `_enqueue_post_commit`'s
-    `finally` and this goes red — one line instead of two, and the bill stays at
-    one call while the engine was asked twice.
+async def test_the_turn_line_bills_the_atomisers_call(caplog):
+    """#1060 found the turn's trace line under-billed: `memory.write` ran on the
+    queue AFTER the line was emitted, so its atomiser call was missing (a second
+    line corrected it). Since 25/09 (#1098) `memory.write` runs inline before
+    `emit`, so the turn's OWN line must already carry that call — compared
+    against the engine's own counter, not a literal. The second-line mechanism
+    stays for `compact`, the one step still queued.
     """
     caplog.set_level(logging.INFO, logger=TRACE_LOGGER)
     engine = _CountingMemSaveEngine()
     state = _state_with_real_queue(engine)
 
     h = _Harness(intent="chat")
-    # C3.3: an opening turn stores no fact at all, and a turn that stores
-    # nothing queues nothing — there would be no second line to look for.
+    # History, so the opening-turn rule does not decide what gets written.
     h.session.add_message("user", "hola, em dic Aran")
     h.session.add_message("assistant", "Hola!")
     result = await h.call({"message": "em dic Aran", "stream": True}, server_state=state)
@@ -182,21 +173,8 @@ async def test_the_queued_work_gets_its_own_final_trace_line(caplog):
         pass
 
     lines = _trace_records(caplog)
-    assert len(lines) == 1, "the turn's own line is emitted when the wire closes, as always"
     first = json.loads(lines[0].message.removeprefix("turn.trace "))
-    assert "memory.write" in first["post_commit_pending"]
-    assert first["llm"]["total_calls"] == 1, "only `generate` can have arrived by now"
-
-    queue = queue_for(state)
-    queue.start()
-    await queue.drain()
-    await queue.stop()
-
-    lines = _trace_records(caplog)
-    assert len(lines) > 1, "the queued step finished without ever correcting the trace"
-    last = json.loads(lines[-1].message.removeprefix("turn.trace "))
-    assert last["turn_id"] == first["turn_id"], "the correction belongs to another turn"
-    assert last["post_commit_pending"] == [], "nothing outstanding: this is the final word"
-    assert engine.calls == 2, "the atomiser never ran — there was no missing call to find"
-    assert last["llm"]["total_calls"] == engine.calls
-    assert [c["step"] for c in last["llm"]["calls"]] == ["generate", "memory.write"]
+    assert "memory.write" not in first.get("post_commit_pending", []), "memory.write is not queued any more"
+    assert engine.calls == 2, "the atomiser never ran — there was no call to bill"
+    assert first["llm"]["total_calls"] == engine.calls, "the turn's own line misses the atomiser's call"
+    assert [c["step"] for c in first["llm"]["calls"]] == ["generate", "memory.write"]

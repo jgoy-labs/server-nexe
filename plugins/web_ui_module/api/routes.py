@@ -93,7 +93,7 @@ def create_router(module_instance) -> APIRouter:
     register_session_routes(router, session_mgr=session_mgr, require_ui_auth=_require_ui_auth)
     register_file_routes(router, session_mgr=session_mgr, file_handler=file_handler, require_ui_auth=_require_ui_auth)
     register_chat_routes(router, session_mgr=session_mgr, require_ui_auth=_require_ui_auth)
-    register_memory_routes(router, require_ui_auth=_require_ui_auth)
+    register_memory_routes(router, session_mgr=session_mgr, require_ui_auth=_require_ui_auth)
 
     # Open an external https?:// URL in the system default browser.
     # Used by the sidecar UI to open footer links (server-nexe.com, GitHub,

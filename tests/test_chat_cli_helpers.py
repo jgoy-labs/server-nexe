@@ -118,9 +118,16 @@ class TestProcessMetadataChunk:
         assert state["rag_items"] == [("nexe_documentation", 0.85)]
 
     def test_mem_flag_set(self):
+        # The reader hands the sentinel's value as text: \x00[MEM:1:es diu Aran]\x00 (#1098).
         state = {"model_name": None, "rag_count": 0, "rag_avg": 0.0, "rag_items": [], "mem_saved": False, "compact_count": 0}
-        _process_metadata_chunk({"MEM": True}, state)
+        _process_metadata_chunk({"MEM": "1:es diu Aran"}, state)
         assert state["mem_saved"] is True
+        assert state["saved_facts"] == ["es diu Aran"]
+
+    def test_mem_zero_is_not_saved(self):
+        state = {"model_name": None, "rag_count": 0, "rag_avg": 0.0, "rag_items": [], "mem_saved": False, "compact_count": 0}
+        _process_metadata_chunk({"MEM": "0"}, state)
+        assert state["mem_saved"] is False
 
     def test_empty_chunk_no_change(self):
         state = {"model_name": None, "rag_count": 0, "rag_avg": 0.0, "rag_items": [], "mem_saved": False, "compact_count": 0}

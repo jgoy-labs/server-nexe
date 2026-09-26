@@ -207,7 +207,8 @@ def server_state() -> MagicMock:
 
 
 @contextlib.contextmanager
-def door_patches(server_state: Any, memory_helper: Any, answer: str = FAKE_ANSWER):
+def door_patches(server_state: Any, memory_helper: Any, answer: str = FAKE_ANSWER,
+                 answers: Optional[list] = None):
     """The four things a turn must not really do in a unit test, patched the
     same way for every caller and every argument.
 
@@ -222,8 +223,12 @@ def door_patches(server_state: Any, memory_helper: Any, answer: str = FAKE_ANSWE
       dispatches over HTTP to a real Ollama. It answers with exactly the text
       `_FakeEngine` streams at the other door, so the two doors' `ctx.response`
       are comparable and any difference is the pipeline's, not the fake's.
+      `answers` (C4.5) gives it one reply per call instead — for the turns
+      that ask the engine twice (the re-prompt).
     """
     ollama_reply = {"choices": [{"message": {"role": "assistant", "content": answer}}]}
+    replies = [{"choices": [{"message": {"role": "assistant", "content": a}}]} for a in (answers or [])]
+    forward = AsyncMock(side_effect=replies) if replies else AsyncMock(return_value=ollama_reply)
 
     async def _no_rag(*_args, **_kwargs):
         return "", []
@@ -232,8 +237,7 @@ def door_patches(server_state: Any, memory_helper: Any, answer: str = FAKE_ANSWE
          patch("core.memory_facts.helper_for", return_value=memory_helper), \
          patch("core.endpoints.chat_rag.build_rag_context", new=_no_rag), \
          patch("core.endpoints.chat.build_rag_context", new=_no_rag), \
-         patch("core.endpoints.chat._forward_to_ollama",
-               new=AsyncMock(return_value=ollama_reply)):
+         patch("core.endpoints.chat._forward_to_ollama", new=forward):
         yield
 
 
@@ -252,9 +256,11 @@ class TurnLab:
         self.session_manager = session_manager
         self.memory_helper = memory_helper
         self.server_state = server_state
+        #: C4.5: what the API door's engine answers, call after call (None = FAKE_ANSWER once).
+        self.api_answers: Optional[list] = None
 
     def _patches(self):
-        return door_patches(self.server_state, self.memory_helper)
+        return door_patches(self.server_state, self.memory_helper, answers=self.api_answers)
 
     async def ui(self, *, streaming: bool, session_id: str, entry: str = "ui",
                  message: str = "hola", body_extra: Optional[dict] = None):

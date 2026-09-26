@@ -89,3 +89,54 @@ def test_append_language_reminder():
     out = append_language_reminder("PROMPT", "fr")
     assert out.startswith("PROMPT")
     assert out.rstrip().endswith("(Reply entirely in French.)")
+
+
+# 25/09: with all 75 languages on and no floor, short Catalan lines were
+# "detected" as Latin/French/Italian at ~0.06 confidence, and the first one
+# seeded the session language. They must give NO signal (install language).
+@pytest.mark.parametrize("message", [
+    "Hola com vas?",
+    "Qui ets?",
+    "Com et dius?",
+    "Bon dia, com estàs?",
+    "Quant fa 17 per 23?",
+    "I que saps del mon?",
+    "Hola, com et dius i on vius?",
+])
+def test_a_short_ambiguous_line_is_no_signal(message):
+    from core.lang_detect import detect_user_lang_or_none
+
+    assert detect_user_lang_or_none(message) is None
+
+
+@pytest.mark.parametrize(("message", "expected"), [
+    ("¿Puedes explicarme cómo funciona la memoria?", "es"),
+    ("Can we switch to English please?", "en"),
+    ("Wie geht es dir heute?", "de"),
+    ("Olá, tudo bem com você hoje?", "pt"),
+    ("Bonjour, comment ça va aujourd'hui?", "fr"),
+    ("Ciao, come stai oggi?", "it"),
+    ("Ik wil graag weten hoe dit werkt", "nl"),
+    ("Jak się masz dzisiaj?", "pl"),
+])
+def test_a_clear_sentence_still_detects_in_any_language(message, expected):
+    from core.lang_detect import detect_user_lang_or_none
+
+    assert detect_user_lang_or_none(message) == expected
+
+
+# 25/09, live: "Et pregunto que com vas?" (Catalan without accents) → es, and
+# it seeded the session in Spanish. On a ca install a close call goes home.
+@pytest.mark.parametrize(("message", "expected"), [
+    ("Et pregunto que com vas?", "ca"),
+    ("Vull saber que fas i com funciones", "ca"),
+    ("Puedes decirme que tal estas hoy amigo?", "es"),
+    ("¿Puedes explicarme cómo funciona la memoria?", "es"),
+    ("Can you tell me who you are please?", "en"),
+    ("Bonjour, comment ça va aujourd'hui?", "fr"),
+])
+def test_a_close_call_goes_to_the_install_language(monkeypatch, message, expected):
+    from core.lang_detect import detect_user_lang_or_none
+
+    monkeypatch.setenv("NEXE_LANG", "ca")
+    assert detect_user_lang_or_none(message) == expected

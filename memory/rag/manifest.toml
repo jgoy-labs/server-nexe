@@ -55,10 +55,11 @@ required = [
 
 [capabilities]
 # WS6-01/02: the standalone /rag surface (keyword_search substring matcher,
-# temp_upload_rag, catalog_rag) was retired. Only the internal PersonalityRAG
-# source (chat pipeline fallback) and health/info introspection remain.
+# temp_upload_rag, catalog_rag) was retired. ADR-008 E2: so was the internal
+# PersonalityRAG source; the module only introspects the chat's sources
+# (core/rag/) and searches them from the CLI.
 exposed = [
-  "personality_rag"
+  "source_introspection"
 ]
 
 # ─────────────────────────────────────────────────────────────
@@ -128,10 +129,6 @@ max_concurrent_searches = 3
 default_top_k = 5
 min_similarity = 0.7
 max_results = 50
-
-[config.sources]
-# WS6-01/02: only the personality source survives (chat fallback).
-personality = true
 
 # ─────────────────────────────────────────────────────────────
 # PATHS & RESOURCES

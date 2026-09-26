@@ -74,7 +74,6 @@ Rate limiting is applied to **all endpoints** — both the API (`/v1/*`) and the
 | /v1/chat/completions | 20/min | hardcoded in `core/endpoints/chat.py` |
 | /v1/memory/store | 30/min | hardcoded in `memory/memory/api/v1.py` |
 | /v1/memory/search | 60/min | hardcoded in `memory/memory/api/v1.py` |
-| /v1/rag/* | — | stubs, return 501 |
 | /ui/upload | 5/min | hardcoded in `plugins/web_ui_module/api/routes_files.py` |
 
 **Note:** The per-endpoint limits above are fixed in source code (`@limiter.limit()` decorator), **not** configurable via `.env`. The only environment variables that are actually read are `NEXE_RATE_LIMIT_GLOBAL` (default 100/min), `NEXE_RATE_LIMIT_PUBLIC` (30/min), `NEXE_RATE_LIMIT_AUTHENTICATED` (300/min), `NEXE_RATE_LIMIT_ADMIN` (100/min) and `NEXE_RATE_LIMIT_HEALTH` (1000/min) — see `core/security/rate_limiting.py` and `core/dependencies.py`. The `NEXE_RATE_LIMIT_CHAT/MEMORY/RAG/UPLOAD/DEFAULT` variables only appear commented out in `.env.example` and the code does not read them (reserved for future implementation).

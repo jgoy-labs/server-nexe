@@ -53,20 +53,10 @@ async def v1_root(request: Request):
         "status": "implemented",
         "description": "Upload a document, attach it to a session, index it for RAG"
       },
-      "rag": {
-        "base": "/v1/rag",
-        "status": "not-implemented",
-        "description": "RAG search endpoints (handlers return 501)",
-      },
       "embeddings": {
         "base": "/v1/embeddings",
         "status": "not-implemented",
         "description": "Text embeddings endpoints (handlers return 501)",
-      },
-      "documents": {
-        "base": "/v1/documents",
-        "status": "not-implemented",
-        "description": "Document processing endpoints (handlers return 501)",
       },
       "memory": {
         "base": "/v1/memory",
@@ -98,23 +88,16 @@ async def v1_health(request: Request):
     "timestamp": request.state.i18n.get_current_time() if hasattr(request.state, 'i18n') else None
   })
 
-try:
-  from memory.rag.api.v1 import router as rag_v1_router
-  router_v1.include_router(rag_v1_router)
-except ImportError as e:
-  logger.warning("Could not import RAG API v1: %s", e)
+# ADR-008 E2: /v1/rag/{search,add,documents/{id}} and /v1/documents/ were
+# retired. They were 501 stubs in front of a module (PersonalityRAG) that the
+# chat never used; they now answer 404. Retrieval is the chat's (`chat_rag`),
+# upload is /v1/attachments.
 
 try:
   from memory.embeddings.api.v1 import router as embeddings_v1_router
   router_v1.include_router(embeddings_v1_router)
 except ImportError as e:
   logger.warning("Could not import Embeddings API v1: %s", e)
-
-try:
-  from memory.rag_sources.file.api.v1 import router as documents_v1_router
-  router_v1.include_router(documents_v1_router)
-except ImportError as e:
-  logger.warning("Could not import Documents API v1: %s", e)
 
 try:
   from memory.memory.api.v1 import router as memory_v1_router

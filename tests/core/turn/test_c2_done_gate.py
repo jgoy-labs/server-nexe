@@ -1,24 +1,20 @@
-"""The C2 "done" gate (ADR-007 §6/§7, the plan's definition of done for C2):
-between `persist_assistant_turn` and the end of `emit`, ZERO calls to
-`engine.chat()` — checked here end-to-end, through the REAL adapter tables
-(`ui_adapters`/`api_adapters`), not just the fake-adapter unit tests
-`test_post_commit_queue.py` already covers at the `run.py` level.
+"""The C2 "done" gate (ADR-007 §6/§7), as amended on 25/09.
 
-The property only holds with a REAL `PostCommitQueue` attached
-(`attach_post_commit_queue`) — without one, `memory.write`/`compact` run
-INLINE, which is the pre-C2.2 behaviour every other test harness still
-relies on (`test_no_queue_means_inline_exactly_as_before`). `/v1` needs no
-queue to prove the same property: `memory.write`/`compact` are `_folded`
-there (no adapter ever calls the engine for them today), checked below by
-inspecting the adapter table itself rather than driving a turn.
+C2.2 moved `memory.write` AND `compact` to the post-commit queue, and this
+file used to check that nothing called the engine between
+`persist_assistant_turn` and the end of `emit`. On 25/09 (#1098, Jordi)
+`memory.write` came back INLINE, before `emit`: on the queue, what it saved
+reached the client one turn late and the UI badged the model's own tags
+instead. What stays true, checked here through the REAL adapter tables with a
+REAL `PostCommitQueue` attached:
 
-Mutation (exercised by hand before merging, see the diari): removing
-`memory.write` from `core.turn.run.POST_COMMIT` turns BOTH
-`test_ui_stream_makes_no_second_engine_call_before_the_wire_closes` and
-`test_ui_json_makes_no_second_engine_call_before_the_response_returns` red
-— the fact is saved (JSON) / the engine gets a second `.chat()` call
-(stream) before the response ever returns, because `memory.write` ran
-inline instead of being queued.
+  * UI stream: the atomiser's call happens BEFORE the wire closes, the wire
+    carries `[MEM:...]`, and the queue has nothing left to do for memory;
+  * UI JSON: the fact is stored before the response returns;
+  * /v1: `memory.write` never calls the engine; `compact` is still queued.
+
+Mutation: putting `memory.write` back into `core.turn.run.POST_COMMIT` turns
+both UI tests red.
 """
 from __future__ import annotations
 
@@ -49,6 +45,11 @@ class _CountingMemSaveEngine:
 
     def chat(self, model, messages, stream=False, images=None, thinking_enabled=False, **_):
         self.calls += 1
+        if _is_atomiser_call(messages):
+            # Answer the fact splitter the way a real model does: one fact per
+            # line. Answering it with the conversation instead made every
+            # atomised fact junk, and "saved" was never checkable here.
+            return self._atomised(stream)
         if stream:
             return self._astream()
         # The atomizer's own call (not the turn's) asks with stream=True but
@@ -64,6 +65,21 @@ class _CountingMemSaveEngine:
 
     async def is_model_loaded(self, model_name):
         return True
+
+    def _atomised(self, stream):
+        text = "L'usuari es diu Aran\nL'usuari viu a Barcelona"
+        if not stream:
+            return {"message": {"content": text}, "done": True}
+
+        async def _one():
+            yield {"message": {"content": text}}
+        return _one()
+
+
+def _is_atomiser_call(messages) -> bool:
+    from core.memory_facts.write import _ATOMIZER_SYSTEM
+    first = (messages or [{}])[0]
+    return first.get("role") == "system" and first.get("content") in _ATOMIZER_SYSTEM.values()
 
 
 def _state_with_real_queue(engine):
@@ -81,75 +97,60 @@ def _state_with_real_queue(engine):
     return state
 
 
-async def test_ui_stream_makes_no_second_engine_call_before_the_wire_closes():
+async def test_ui_stream_saves_and_tells_before_the_wire_closes():
+    """25/09 (ADR-007 §6 amended): `memory.write` runs INLINE, before `emit`,
+    even with a real queue attached — the turn that saved is the turn that says
+    so. The atomiser's call (the second `engine.chat()`) is made before the wire
+    closes, and the wire carries what memory kept. Nothing about memory is left
+    for the queue."""
     engine = _CountingMemSaveEngine()
-    state = _state_with_real_queue(engine)  # REAL queue — memory.write must be queued, not inline
+    state = _state_with_real_queue(engine)  # REAL queue — memory.write must NOT go to it
 
     h = _Harness(intent="chat")
-    # C3.3: the first-turn guard (the JSON path's, now both paths') drops every
-    # fact of an opening turn — without history this gate would pass by accident,
-    # with memory.write running and saving nothing. Same reason the JSON twin
-    # below already gave a session some history.
+    # History, so the opening-turn rule does not decide this test.
     h.session.add_message("user", "hola, em dic Aran")
     h.session.add_message("assistant", "Hola!")
     result = await h.call({"message": "em dic Aran", "stream": True}, server_state=state)
     assert isinstance(result, StreamingResponse)
 
-    async for _ in result.body_iterator:
-        pass  # drain the whole wire — everything up to and including `emit`
+    wire = ""
+    async for chunk in result.body_iterator:
+        wire += chunk if isinstance(chunk, str) else chunk.decode()
 
-    assert engine.calls == 1, (
-        "the wire closed with a second engine.chat() call already made — "
-        "memory.write ran inline instead of being queued"
+    assert engine.calls == 2, (
+        "the wire closed before the atomiser ran — memory.write was queued "
+        "instead of running inline"
     )
+    assert h.mh.save_to_memory.called, "the fact was not saved before the wire closed"
+    assert "\x00[MEM:" in wire, "the turn that saved did not say so on its own wire"
 
     queue = queue_for(state)
     queue.start()
     await queue.drain()
     await queue.stop()
 
-    assert engine.calls == 2, "memory.write never ran at all, even after drain()"
+    assert engine.calls == 2, "the queue made another engine call — memory.write ran twice"
 
 
-async def test_ui_json_makes_no_second_engine_call_before_the_response_returns():
-    """The JSON path has NO atomiser (`write_facts` only atomises with an engine) —
-    "this path has no atomizer, so a combined fact ... persists whole" is the
-    function's own comment — so it never calls `engine.chat()` at all, queued
-    or not. The gate this test can actually check for JSON is therefore
-    narrower than the streaming one: zero EXTRA engine calls before the
-    response returns, and the fact genuinely lands in memory only after
-    `drain()` — proving the work was queued, not skipped."""
+async def test_ui_json_saves_before_the_response_returns():
+    """The JSON path has NO atomiser (`write_facts` only atomises with an
+    engine), so it never calls `engine.chat()` for memory. What it must do
+    since 25/09: store the fact before the response returns, and say so in
+    the response itself (`memory_facts`)."""
     engine = _CountingMemSaveEngine()
     state = _state_with_real_queue(engine)
 
     h = _Harness(intent="chat")
-    # B126 v2 (core/memory_facts/write.py): write_facts drops every fact
-    # of a FIRST turn as a likely hallucination — unrelated to C2, but it
-    # would make this gate pass by accident (memory.write runs and saves
-    # nothing). A session with prior history is what
-    # test_json_saves_the_turn_before_its_facts (C2.2) uses for the same
-    # reason.
     h.session.add_message("user", "hola, em dic Aran")
     h.session.add_message("assistant", "Hola!")
     result = await h.call({"message": "recorda que visc a Barcelona", "stream": False}, server_state=state)
     assert isinstance(result, dict)
 
-    assert engine.calls == 1, (
-        "the JSON response returned with a second engine.chat() call already "
-        "made — memory.write ran inline instead of being queued"
-    )
-    assert not h.mh.save_to_memory.called, (
-        "the fact was already saved before the response returned — "
-        "memory.write ran inline instead of being queued"
-    )
-
-    queue = queue_for(state)
-    queue.start()
-    await queue.drain()
-    await queue.stop()
-
     assert engine.calls == 1, "memory.write called the engine — it has no atomizer, this would be new"
-    assert h.mh.save_to_memory.called, "memory.write never ran at all, even after drain()"
+    assert h.mh.save_to_memory.called, (
+        "the response returned before the fact was saved — memory.write was "
+        "queued instead of running inline"
+    )
 
 
 async def test_v1_never_calls_the_engine_for_memory_write():

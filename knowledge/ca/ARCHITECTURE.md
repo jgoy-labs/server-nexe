@@ -395,7 +395,7 @@ Els fets que el model marca amb `[MEM_SAVE:]` es persisteixen al camí de la UI 
 - `[MODEL_LOADING]` / `[MODEL_READY]` — estat de carrega del model
 - `[RAG_AVG:score]` — mitjana de rellevancia RAG
 - `[RAG_ITEM:collection|score]` — detall RAG per col·lecció (col·lecció primer, després score)
-- `[MEM:N]` — nombre de fets guardats a memoria
+- `[MEM:N:fet1|fet2]` — el que la memoria ha guardat aquest torn, confirmat pel servidor (N = fets nous; la llista inclou els que ja recordava)
 - `[COMPACT:N]` — indicador de compactacio de context
 - `[DOC_TRUNCATED:XX%]` — avis de document truncat per limit de context (nou 2026-04-02)
 
@@ -545,7 +545,7 @@ A partir de v0.9.9, server-nexe suporta **activació/desactivació de thinking t
 - **Fallback 400 retry:** si el model NO és thinking-capable i l'usuari l'activa, el servidor retorna 400 i la UI ofereix retry automàtic sense thinking.
 - **Env var `NEXE_OLLAMA_THINK`:** controla el default global per a models Ollama (`true`/`false`).
 
-Els thinking tokens s'emeten al streaming amb marcadors `[THINKING]…[/THINKING]` i la UI els renderitza com a bloc col·lapsable taronja.
+El motor retorna el raonament del model apart de la resposta (ADR-010); la UI web el rep com a `<think>…</think>` al seu stream i el renderitza com a bloc col·lapsable taronja. `/v1` l'envia com a `reasoning` nomes quan la peticio ho demana (`reasoning_effort`).
 
 ## Models MLX — Compatibilitat
 

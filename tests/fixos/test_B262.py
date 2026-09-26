@@ -78,36 +78,26 @@ class TestResolveSessionLangPolicy:
         assert rc._resolve_session_lang(s, msg) == "ca"
         assert s.lang == "ca"
 
-    def test_single_long_foreign_turn_does_not_flip(self, monkeypatch):
-        """Review #850 (histèresi): UNA enganxada de traça/log en anglès enmig
-        d'una conversa catalana no pot invalidar el prefix."""
+    def test_a_long_foreign_turn_flips_at_once(self, monkeypatch):
+        """25/09 (decisió d'en Jordi): el canvi és al 1r missatge clar. La
+        histèresi de 2 torns de #850 existia perquè la detecció no era segura;
+        des que ho és (`_MIN_RELATIVE_DISTANCE`), un canvi genuí no ha de pagar
+        un torn de retard. Contrapartida acceptada: una traça en anglès de ≥25
+        caràcters enganxada en una conversa catalana també canvia l'idioma."""
         monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: "en", raising=False)
         s = _session(lang="ca")
-        msg = "TypeError: cannot read property of undefined at Object.render at main"
-        assert rc._resolve_session_lang(s, msg) == "ca"
-        assert s.lang == "ca"
-        assert s.lang_pending == "en", "el candidat queda pendent de confirmació"
-
-    def test_two_consecutive_detections_flip(self, monkeypatch):
-        monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: "en", raising=False)
-        s = _session(lang="ca")
-        m1 = "can we please switch to english now?"
-        m2 = "yes, from now on let's continue in english"
-        assert rc._resolve_session_lang(s, m1) == "ca"  # 1r torn: candidat
-        assert rc._resolve_session_lang(s, m2) == "en"  # 2n torn: flip
+        assert rc._resolve_session_lang(s, "can we please switch to english now?") == "en"
         assert s.lang == "en" and s.lang_pending is None
 
-    def test_reaffirming_sticky_clears_pending(self, monkeypatch):
-        detections = iter(["en", "ca", "en"])
+    def test_it_switches_back_just_as_fast(self, monkeypatch):
+        detections = iter(["en", "ca"])
         monkeypatch.setattr(
             rc, "_detect_lang_or_none", lambda m: next(detections), raising=False
         )
         s = _session(lang="ca")
         long = "aquesta és una frase prou llarga per superar el llindar del gate"
-        rc._resolve_session_lang(s, long)   # en → pending
-        rc._resolve_session_lang(s, long)   # ca → neteja pending
-        assert s.lang_pending is None
-        assert rc._resolve_session_lang(s, long) == "ca"  # en de nou → torna a pending, no flip
+        assert rc._resolve_session_lang(s, long) == "en"
+        assert rc._resolve_session_lang(s, long) == "ca"
         assert s.lang == "ca"
 
     def test_same_lang_long_message_keeps_sticky(self, monkeypatch):
@@ -169,7 +159,7 @@ class TestLangHintPlumbs:
 
     def test_companion_b007_genuine_switch_still_invalidates(self):
         """Review #850: contrapart pel flux sticky del contracte b007 — un canvi
-        GENUÍ d'idioma (2 torns llargs confirmats) SÍ canvia el hash."""
+        GENUÍ d'idioma SÍ canvia el hash (des del 25/09, al 1r torn clar)."""
         lingua = pytest.importorskip("lingua", reason="cal lingua per la detecció real")
         assert lingua
         session = _session()
@@ -183,8 +173,9 @@ class TestLangHintPlumbs:
             lang = rc._resolve_session_lang(session, m)
             system, _ = rc._build_system_prompt_with_time(m, _now=_FIXED_NOW, lang_hint=lang)
             hashes.append(compute_system_hash(system))
-        assert hashes[0] == hashes[1], "1r torn EN = candidat, encara no flipa"
-        assert hashes[2] != hashes[0], (
-            "el canvi genuí confirmat ha de ser una invalidació legítima (b007)"
+        # 25/09: el canvi és al 1r missatge clar — el 2n torn ja invalida.
+        assert hashes[1] != hashes[0], (
+            "el canvi genuí ha de ser una invalidació legítima (b007)"
         )
+        assert hashes[2] == hashes[1], "un cop canviat, l'idioma es manté"
         assert session.lang == "en"

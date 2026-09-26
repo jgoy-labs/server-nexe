@@ -10,7 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Annotated, List, Literal, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
 from core.turn.validate import MAX_IMAGE_BYTES
 
@@ -132,5 +132,18 @@ class ChatCompletionRequest(BaseModel):
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)  # Validated range
     top_p: Optional[float] = Field(default=None, gt=0.0, le=1.0)  # Nucleus sampling (OpenAI-compat; gt=0 excludes the degenerate empty-nucleus value that engines treat divergently)
     max_tokens: Optional[int] = Field(default=None, ge=1, le=32000)  # Prevent DoS via huge values
+    # ADR-010: whether the model reasons, and whether its reasoning comes back
+    # (as `reasoning`, apart from `content`). The shapes Ollama's /v1 accepts:
+    # `reasoning_effort` or `reasoning: {effort}`; "none" is off, any other
+    # level is on (levels themselves are not graded yet). Absent = OFF, the
+    # web UI's default too (decision of 25/09).
+    reasoning_effort: Optional[str] = Field(default=None, max_length=20)
+    reasoning: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(protected_namespaces=())
+
+    def wants_reasoning(self) -> bool:
+        effort = self.reasoning_effort
+        if effort is None and isinstance(self.reasoning, dict):
+            effort = self.reasoning.get("effort")
+        return effort is not None and str(effort).strip().lower() != "none"

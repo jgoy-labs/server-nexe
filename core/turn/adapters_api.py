@@ -50,10 +50,11 @@ from core.endpoints.chat_engines._common import (
     build_openai_response,
     derive_session_id,
     mirror_v1_conversation,
+    served_model_of,
 )
 from core.memory_facts import intents
-from core.memory_facts.extract import extract_memory_tags
-from core.memory_facts.write import write_facts
+from core.memory_facts.deletes import arm_pending_deletes
+from core.memory_facts.write import note_kept, write_facts
 from core.turn import policy
 from core.turn.budget import record_llm_call
 from core.turn.cancel import start_disconnect_monitor
@@ -63,6 +64,9 @@ from core.turn.gate import GateBusy, Priority, _gate_wait_s, gate_for
 from core.turn.post_commit import queue_for
 from core.turn.authorize import authorize_turn
 from core.turn.run import Adapters, TurnShortCircuit
+from core.turn.reasoning import split_text
+from core.turn.text.clean import clean_full_response
+from core.turn.text.sse import SseCleaner
 from core.turn.validate import parse_content_parts, sanitize_user_text, validate_turn
 
 
@@ -74,6 +78,12 @@ def _chat():
     # API's tests patch attributes ON core.endpoints.chat.
     import core.endpoints.chat as chat_mod
     return chat_mod
+
+
+def _wants_reasoning(ctx: TurnContext) -> bool:
+    """ADR-010: /v1 reasons only when the request asks (`reasoning_effort`)."""
+    wants = getattr(ctx.body, "wants_reasoning", None)
+    return callable(wants) and wants() is True
 
 
 def _content_of(response: Any) -> str:
@@ -88,15 +98,93 @@ def _content_of(response: Any) -> str:
     return (response.get("message") or {}).get("content") or ""
 
 
+def _v1_reprompt_call(ctx: TurnContext):
+    """This door's way of asking its engine once more — `policy.reprompt_chunks`'s
+    `call` (C4.5). The same cascade `generate` walked, non-streaming, with the
+    turn's prompt under the override; the reply's reasoning is set apart as
+    `postprocess` does with the first one (ADR-010), kept only if asked for."""
+    chat = _chat()
+
+    def call(system_prompt: str):
+        prompt = list(ctx.prompt)
+        if prompt and isinstance(prompt[0], dict) and prompt[0].get("role") == "system":
+            prompt[0] = {**prompt[0], "content": system_prompt}
+        else:
+            prompt.insert(0, {"role": "system", "content": system_prompt})
+
+        async def chunks():
+            response, _served_by, _fallback_from, _reason, _model = await chat._dispatch_through_cascade(
+                ctx.body, ctx.request, prompt, ctx.message or None,
+                ctx.session_id, ctx.engine, ctx.engine_fallback_from,
+            )
+            inline_reasoning, answer = split_text(_content_of(response))
+            apart = ""
+            if isinstance(response, dict):
+                first = (response.get("choices") or [{}])[0] or {}
+                apart = (first.get("message") or {}).get("reasoning") or ""
+            reasoning = apart + inline_reasoning
+            if reasoning and _wants_reasoning(ctx) and isinstance(ctx.wire, dict):
+                message = ctx.wire["choices"][0]["message"]
+                message["reasoning"] = (message.get("reasoning") or "") + reasoning
+            if answer:
+                yield answer
+
+        return chunks()
+
+    return call
+
+
+async def _arm_pending_delete(ctx: TurnContext, deletes: list, clean: str) -> str:
+    """C4.5: the model's [MEM_DELETE:] tags arm the same confirmation the web
+    door arms (`core.memory_facts.deletes`), instead of landing in a usage field
+    nobody read. The question rides in the content; the entry to confirm, in
+    `nexe_pending_delete` / `X-Nexe-Pending-Delete`. The "sí" of the next turn
+    is the `intent` step's job (C3.1). Returns the content to send."""
+    helper = getattr(ctx.app_state, "memory_helper", None)
+    if ctx.session is None or helper is None:
+        return clean
+    armed = await arm_pending_deletes(
+        ctx.session, deletes, helper, getattr(ctx.body, "rag_collections", None),
+    )
+    if armed is None:
+        return clean
+    ctx.usage["memory_action"] = armed.memory_action
+    ctx.usage["pending_delete"] = armed.pending_delete_fact
+    return f"{clean}\n\n{armed.text}" if clean else armed.text
+
+
+async def _second_reply(ctx: TurnContext, facts: list) -> str:
+    """D3, whole (C4.5): a turn whose whole answer was [MEM_SAVE:] tags gets the
+    second generation the web door has spent since #856 — through the one core
+    policy, inside the gate, counted once. Until now this door wrote it down as
+    `degraded["reprompt"]` and answered with a confirmation built from the
+    model's tags. Nothing back → the neutral stand-in, in the turn's language."""
+    parts: list[str] = []
+    async for chunk in policy.reprompt_chunks(
+        ctx, facts, call=_v1_reprompt_call(ctx),
+        # I8 names the model: the one the JSON reply says answered — the same
+        # source `generate` read (`served_model_of`), not a new usage bucket.
+        engine_name=ctx.engine or "", model=served_model_of(ctx.wire),
+    ):
+        parts.append(chunk)
+    return policy.second_answer_text(parts) or policy.empty_reply_text(ctx.lang)
+
+
 def _memory_news(ctx: TurnContext) -> dict:
-    """What the client is told about memory: this turn's intent (C3.1) and what
-    the previous turn's background work finished doing (C3.3)."""
+    """What the client is told about memory: this turn's intent (C3.1), what
+    THIS turn stored (D6 and `memory.write`, inline before `emit` since 25/09)
+    and what the previous turn's background work finished doing (C3.3).
+    `Memory-Saved-Last-Turn` stays for clients that read it; memory no longer
+    runs in the background, so it is never sent (0 is skipped)."""
     last = ctx.usage.get("last_results") or {}
     return {
         "Memory-Action": ctx.usage.get("memory_action") or "",
         "Memory-Saved": ctx.usage.get("memory_saved", 0),
         "Memory-Saved-Last-Turn": (last.get("memory.write") or {}).get("saved") or 0,
         "Compacted-Last-Turn": (last.get("compact") or {}).get("compacted") or 0,
+        # C4.5: the entry a model's [MEM_DELETE:] left waiting for the user's
+        # "sí" — what the web UI's dialog shows, said in this door's alphabet.
+        "Pending-Delete": ctx.usage.get("pending_delete") or "",
     }
 
 
@@ -110,6 +198,10 @@ def _write_memory_news(ctx: TurnContext) -> None:
             ctx.wire.headers[f"X-Nexe-{name}"] = str(value)
         elif isinstance(ctx.wire, dict):
             ctx.wire.setdefault("nexe_" + name.lower().replace("-", "_"), value)
+    kept = ctx.usage.get("memory_kept") or []
+    if kept and isinstance(ctx.wire, dict):
+        # The facts themselves only in a body: a header is no place for them.
+        ctx.wire.setdefault("nexe_memory_facts", list(kept))
 
 
 def _peel_content_parts(ctx: TurnContext) -> None:
@@ -391,6 +483,10 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
                 ms=(time.monotonic() - _gen_started) * 1000.0,
             )
             ctx.wire = response
+            if served_by != ctx.engine:
+                # C4.4: a fallback engine answered — its window is the turn's
+                # now (`context_window` is the SERVING engine's, context.py).
+                ctx.context_window = chat.get_effective_context_window(served_by, ctx.app_state)
             ctx.engine = served_by
             ctx.engine_fallback_from = fallback_from
             ctx.engine_fallback_reason = reason
@@ -403,11 +499,18 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
                 # this forwarder up; until then the slot follows the object).
                 released = True
                 inner = response.body_iterator
+                # C4.4-b: the model's format is cleaned here, on the one seam
+                # the three engine forwarders share — /v1 no longer streams
+                # <think>, harmony channels or memory tags to its client.
+                cleaner = SseCleaner(served_model, keep_reasoning=_wants_reasoning(ctx))
 
                 async def _release_after(inner=inner):
                     try:
                         async for chunk in inner:
-                            yield chunk
+                            for out in cleaner.rewrite(chunk):
+                                yield out
+                        for out in cleaner.close():
+                            yield out
                     finally:
                         await gate.release(slot)
                         _stop_cancellation()
@@ -457,8 +560,13 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
             # memory-off switch structurally dead at this door.
             rag_collections=getattr(ctx.body, "rag_collections", None),
         )
-        ctx.usage["memory_saved"] = ctx.usage.get("memory_saved", 0) + outcome.mem_saved
+        note_kept(ctx.usage, outcome.mem_saved, outcome.kept_facts)
         ctx.usage["memory_action"] = outcome.memory_action
+        if outcome.pending_delete_fact is not None:
+            # C4.5: the entry a typed "oblida" left pending, in this door's
+            # alphabet (nexe_pending_delete / X-Nexe-Pending-Delete) — the same
+            # field a model's [MEM_DELETE:] fills at `postprocess`.
+            ctx.usage["pending_delete"] = outcome.pending_delete_fact
         # C3 review (08/09): same signal as the other door — D6 already owns
         # this turn's fact, so `memory.write` drops what the model repeats.
         ctx.usage["saved_by_intent"] = outcome.saved_by_intent
@@ -473,36 +581,39 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
     async def postprocess(ctx: TurnContext) -> None:
         """C3.2: the model's memory tags are read at this door too.
 
-        JSON only: in streaming the text has already left through the SSE
-        forwarder by the time this runs, so a tag the model emitted mid-stream
-        is already at the client. The sentinel FSM that lets the UI door strip
-        them from a live stream is unified for both in C4 — until then this is
-        a written limit, not a silent one.
+        C4.4: the JSON reply is cleaned with the core's one cleaner first
+        (<think>, harmony, <|…|>) — the web door's. In streaming, the tags
+        never reach the client (`SseCleaner`, in `generate`), but this door's
+        turn has ended before the stream is generated, so the FACTS in a
+        streamed reply are not read: a written limit, closed when /v1 walks
+        `stream_turn` like the web door (C4.6).
         """
         if not isinstance(ctx.wire, dict):
             ctx.usage.setdefault("degraded", {})["postprocess"] = (
-                "streaming: tags already forwarded to the client (C4)"
+                "streaming: tags stripped, facts not extracted (C4.6)"
             )
             return
         try:
             message = ctx.wire["choices"][0]["message"]
         except (KeyError, IndexError, TypeError):
             return
-        clean, facts, deletes = extract_memory_tags(message.get("content") or "", user_input=ctx.message)
+        # ADR-010: reasoning a model still wrote INTO the text joins the
+        # reasoning the engine already set apart; the client keeps it only if
+        # it asked. The answer goes through the one cleaner, as in C4.4.
+        inline_reasoning, content = split_text(message.get("content") or "")
+        reasoning = (message.get("reasoning") or "") + inline_reasoning
+        if reasoning and _wants_reasoning(ctx):
+            message["reasoning"] = reasoning
+        else:
+            message.pop("reasoning", None)
+        clean, facts, deletes = clean_full_response(content, user_input=ctx.message)
+        if deletes:
+            clean = await _arm_pending_delete(ctx, deletes, clean)
         if not clean and facts:
-            # C3.5 (D3, partly): a turn whose whole answer was [MEM_SAVE:] tags
-            # used to leave /v1 with a 200 and an EMPTY body — the UI door has
-            # answered with this confirmation since #856. What is NOT done here
-            # is the other half of D3: re-entering `generate` for a second, real
-            # reply. That costs an LLM call from inside postprocess and is
-            # written down as pending rather than improvised.
-            clean = policy.mem_save_fallback_text(facts)
-            ctx.usage.setdefault("degraded", {})["reprompt"] = "no second generation at /v1 yet (D3)"
+            clean = await _second_reply(ctx, facts)
         message["content"] = clean
         ctx.response = clean
         ctx.facts = facts
-        if deletes:
-            ctx.usage["mem_deletes"] = deletes
 
     async def memory_write(ctx: TurnContext) -> None:
         """C3.3: /v1 stores the facts its model marked, like the other door.
@@ -533,8 +644,8 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         if outcome.engine_called:
             record_llm_call(ctx, step="memory.write", engine=ctx.engine or "",
                             ms=(time.monotonic() - started) * 1000.0)
-        if outcome.saved:
-            ctx.usage.setdefault("post_commit_result", {})["memory.write"] = {"saved": outcome.saved}
+        # 25/09: inline, before `emit` — this turn's own note (#1098).
+        note_kept(ctx.usage, outcome.saved, outcome.kept)
 
     async def compact(ctx: TurnContext) -> None:
         """C3.4: /v1 summarises a long conversation too.

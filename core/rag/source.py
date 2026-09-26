@@ -77,6 +77,7 @@ class RAGSource(Protocol):
         (#899), and `memory/` is degradable by decision (#888, see
         `core/memory_access.py`). A source that raises would put the chat's
         availability in the hands of its own store, which is the thing
-        `RAGModule.search` does and the reason it never reached the turn.
+        the pre-E2 `RAGModule.search` did and the reason it never reached
+        the turn (ADR-008 E2: `RAGModule` is now a facade over these sources).
         """
         ...

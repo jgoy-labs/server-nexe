@@ -10,10 +10,11 @@ always wins a slot over background work).
 Fake adapters and a fake `run` callable throughout — no route, no plugin, no
 real engine. Mirrors the posture of test_run_turn.py / test_engine_gate.py.
 
-Mutation check (exercised by hand before merging, see the diari): removing
-`memory.write` from `POST_COMMIT` (core/turn/run.py) turns
-`test_post_commit_steps_are_queued_not_run_inline` red — the step runs inline
-again and shows up in `calls` before `drain()`.
+25/09 (ADR-007 §6 amended, #1098): `memory.write` left the queue and runs
+inline, before `emit`; only `compact` is post-commit. Mutation: putting
+`memory.write` back into `POST_COMMIT` turns
+`test_post_commit_steps_are_queued_not_run_inline` and
+`test_memory_write_runs_inline_before_emit_even_with_a_queue` red.
 """
 from __future__ import annotations
 
@@ -31,7 +32,9 @@ from core.turn.steps import TURN_STEPS
 pytestmark = pytest.mark.asyncio
 
 ALL_IDS = tuple(step.id for step in TURN_STEPS)
-INLINE_IDS = tuple(sid for sid in ALL_IDS if sid not in ("memory.write", "compact"))
+# 25/09 (ADR-007 §6 amended, #1098): only `compact` is post-commit now —
+# `memory.write` runs inline, before `emit`.
+INLINE_IDS = tuple(sid for sid in ALL_IDS if sid != "compact")
 
 
 def _ctx(**kwargs) -> TurnContext:
@@ -72,8 +75,8 @@ async def test_post_commit_steps_are_queued_not_run_inline():
     q = PostCommitQueue(EngineGate(slots=1))
     ctx = await run_turn(_ctx(), _fake_adapters(calls), post_commit=q)
 
-    assert list(calls) == list(INLINE_IDS), "post-commit steps must not run before drain()"
-    assert ctx.outcomes["memory.write"] == "queued"
+    assert list(calls) == list(INLINE_IDS), "compact must not run before drain()"
+    assert ctx.outcomes["memory.write"] == "ok", "memory.write is inline since 25/09"
     assert ctx.outcomes["compact"] == "queued"
 
     q.start()
@@ -82,16 +85,14 @@ async def test_post_commit_steps_are_queued_not_run_inline():
     assert set(calls) == set(ALL_IDS)
 
 
-async def test_compact_runs_before_memory_write_regardless_of_enqueue_order():
-    """TURN_STEPS enqueues memory.write before compact (map order), but
-    COMPACT (priority 1) must be drained before MEMORY_WRITE (priority 2)."""
+async def test_memory_write_runs_inline_before_emit_even_with_a_queue():
+    """#1098: the turn that saved must be the turn that says so — memory.write
+    runs before `emit` (which sends the note) and never reaches the queue."""
     calls: list[str] = []
     q = PostCommitQueue(EngineGate(slots=1))
     await run_turn(_ctx(), _fake_adapters(calls), post_commit=q)
-    q.start()
-    await q.drain()
-    await q.stop()
-    assert calls.index("compact") < calls.index("memory.write")
+    assert calls.index("persist_assistant_turn") < calls.index("memory.write") < calls.index("emit")
+    assert "memory.write" not in q.pending(_ctx().session_id)
 
 
 async def test_cancelled_stream_queues_nothing():

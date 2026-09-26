@@ -157,6 +157,25 @@ async def _validate_ollama_model(host: str, model_name: str) -> tuple[str, list]
     return model_name, chat_models
 
 
+def _think_for(request) -> bool:
+    """ADR-010: the request decides (off unless asked); `NEXE_OLLAMA_THINK`,
+    when set, still overrides it for this whole door, as it always has."""
+    env = os.getenv("NEXE_OLLAMA_THINK")
+    if env is not None and env.strip():
+        return env.strip().lower() == "true"
+    wants = getattr(request, "wants_reasoning", None)
+    return callable(wants) and wants() is True
+
+
+def _without_think(payload: dict) -> Optional[dict]:
+    """The same request with reasoning off, for a model that refuses it (the
+    web UI's plugin has retried this way since B119); None if already off."""
+    if not payload.get("think"):
+        return None
+    logger.warning("Retrying model %s without thinking — it rejects think:true (400)", payload.get("model"))
+    return {**payload, "think": False}
+
+
 def _build_ollama_payload(
     request, messages: List[Dict], model_name: str, images: Optional[List[str]] = None,
 ) -> dict:
@@ -183,7 +202,7 @@ def _build_ollama_payload(
         "model": model_name,
         "messages": messages,
         "stream": request.stream,
-        "think": os.getenv("NEXE_OLLAMA_THINK", "false").lower() == "true",  # NEVER default true — 400 on non-thinking models
+        "think": _think_for(request),
         "options": options
     }
     if images:
@@ -222,6 +241,28 @@ def _ollama_streaming_response(
     ), payload.get("model") or "")
 
 
+def _openai_message(message: dict) -> dict:
+    """Ollama's message in the OpenAI shape: its native `thinking` becomes
+    `reasoning` (ADR-010) instead of travelling as an unknown key."""
+    out = {"role": message.get("role", "assistant"),
+           "content": _sanitize_sse_token(message.get("content", "") or "")}
+    if message.get("thinking"):
+        out["reasoning"] = _sanitize_sse_token(message["thinking"])
+    return out
+
+
+def _reasoning_sse(data: dict) -> tuple[str, int]:
+    """ADR-010: Ollama's native reasoning on one stream line, as a
+    `delta.reasoning` chunk, and its size for the B104 byte cap (which the
+    answer's branch enforces on the running total; `num_predict` bounds a
+    generation that only reasons)."""
+    thinking = _sanitize_sse_token(data.get("message", {}).get("thinking", "") or "")
+    if not thinking:
+        return "", 0
+    size = len(thinking.encode("utf-8", errors="replace"))
+    return f"data: {json.dumps({'choices': [{'delta': {'reasoning': thinking}}]})}\n\n", size
+
+
 async def _ollama_blocking_response(
     url: str, payload: dict,
     fallback_from: Optional[str], fallback_reason: Optional[str]
@@ -230,6 +271,9 @@ async def _ollama_blocking_response(
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(url, json=payload, timeout=_OLLAMA_STREAM_TIMEOUT)
+            retry = _without_think(payload) if resp.status_code == 400 else None
+            if retry is not None:
+                resp = await client.post(url, json=retry, timeout=_OLLAMA_STREAM_TIMEOUT)
             if resp.status_code != 200:
                 try:
                     error_detail = resp.json().get("error", "Unknown Ollama error")
@@ -244,7 +288,7 @@ async def _ollama_blocking_response(
                 "model": raw.get("model", ""),
                 "choices": [{
                     "index": 0,
-                    "message": raw.get("message", {"role": "assistant", "content": ""}),
+                    "message": _openai_message(raw.get("message") or {}),
                     # A blocking call only returns once generation is over, so
                     # `done` is always True and cannot tell why it stopped.
                     # Ollama puts the reason in `done_reason` — the same field
@@ -307,6 +351,11 @@ async def _ollama_stream_generator(
     try:
         async with httpx.AsyncClient(timeout=_OLLAMA_STREAM_TIMEOUT) as client:
             async with client.stream("POST", url, json=payload) as resp:
+                retry = _without_think(payload) if resp.status_code == 400 else None
+                if retry is not None:
+                    async for chunk in _ollama_stream_generator(url, retry, app_state, user_msg, session_id=session_id):
+                        yield chunk
+                    return
                 if resp.status_code != 200:
                     err_str = _sanitize_sse_token(f"Ollama stream failed with status {resp.status_code}")
                     yield f"data: {json.dumps({'error': err_str})}\n\n"
@@ -321,6 +370,10 @@ async def _ollama_stream_generator(
                         data = json.loads(line)
                         content = _sanitize_sse_token(data.get("message", {}).get("content", ""))
                         done = data.get("done", False)
+                        reasoning_sse, reasoning_bytes = _reasoning_sse(data)
+                        _response_bytes += reasoning_bytes
+                        if reasoning_sse:
+                            yield reasoning_sse
 
                         if content:
                             # B104: hard byte cap, symmetric with TokenBridge._cap_triggered

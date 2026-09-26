@@ -19,11 +19,14 @@ from core.turn.steps import GIVEN_BY_DOOR, TURN_STEPS, StepKind
 # engine's context window (`get_effective_context_window(engine)` at the API,
 # `ask_engine_window(engine)` inside the UI's engine loop). A budget computed
 # before knowing the engine would be a budget for the wrong window.
+# 2026-09-25 (ADR-007 §6 amended, #1098): `memory.write` moved before `emit` —
+# inline again, so the turn that saved is the turn whose wire says what it
+# kept. Still after `persist_assistant_turn` (I3: disk before memory).
 EXPECTED_ORDER = (
     "validate", "authorize", "sanitize", "session", "persist_user_turn",
     "intent", "recall", "clock", "system_prompt", "engine", "budget",
-    "generate", "postprocess", "persist_assistant_turn", "emit",
-    "memory.write", "compact",
+    "generate", "postprocess", "persist_assistant_turn", "memory.write",
+    "emit", "compact",
 )
 
 # The four steps ADR-007 names explicitly as must-have and non-replaceable

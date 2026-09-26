@@ -12,7 +12,8 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import re as _re
+
+from core.turn.text.clean import clean_model_text
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +21,12 @@ _SYSTEM_MSG = "Ets un assistent que fa resums breus i precisos de converses."
 
 
 def _clean_for_compact(txt: str) -> str:
-    """Cleans thinking tags for compaction."""
-    txt = _re.sub(r'<think>.*?</think>', '', txt, flags=_re.DOTALL)
-    txt = _re.sub(r'<\|thinking\|>.*?<\|/thinking\|>', '', txt, flags=_re.DOTALL)
-    return txt.strip()
+    """Cleans the model's format out of a message before compaction.
+
+    C4.4: the same cleaner as the reply itself (`clean_model_text`), which
+    keeps this function's own <|thinking|> pair branch.
+    """
+    return clean_model_text(txt)
 
 
 def _is_ollama_engine(engine) -> bool:

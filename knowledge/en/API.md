@@ -97,6 +97,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 - `temperature`: 0.0-2.0 (default 0.7)
 - `top_p`: 0 < top_p ≤ 1 (null by default) — nucleus sampling; null lets each engine use its own default (≈ 0.9)
 - `max_tokens`: null = use model default, max 32000
+- `reasoning_effort` (or `reasoning: {"effort": ...}`): `"none"` or absent = the model does not reason (default); any other value = it reasons, and the reasoning comes back apart from the answer, as `reasoning` (`message.reasoning`, or `delta.reasoning` when streaming). Levels are not graded yet: any value other than `"none"` means on.
 
 **Streaming markers** (injected in SSE stream, parsed by UI):
 - `[MODEL:name]` — active model
@@ -105,7 +106,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 - `[RAG_ITEM:nexe_documentation|0.82]` — per-source detail (collection first, then score; only 2 fields)
 - `[MEM:2]` — number of facts auto-saved via MEM_SAVE
 - `[COMPACT:N]` — context compaction indicator
-- `[THINKING]` / `[/THINKING]` — thinking tokens (Ollama models like qwen3.5)
+- `<think>…</think>` — the model's reasoning, in the web UI stream only (shown in the collapsible thinking block); `/v1` sends it as `reasoning` instead
 - `[DOC_TRUNCATED:XX%]` — percentage of document discarded due to context limit (new 2026-04-02)
 
 **End of stream — why the answer stopped** (new 2026-08-31):
@@ -185,15 +186,9 @@ The field is **absent** when nothing was cut. If both happen at once, `"overflow
 }
 ```
 
-## RAG Endpoints (prefix: /v1/rag)
+## Retired RAG endpoints (/v1/rag, /v1/documents)
 
-> ⚠️ **NOT IMPLEMENTED (stub):** these endpoints return HTTP 501. Reserved for a future version.
-
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/v1/rag/search` | POST | Yes | Semantic search in RAG vector store (stub, 501) |
-| `/v1/rag/add` | POST | Yes | Add documents to RAG vector store (stub, 501) |
-| `/v1/rag/documents/{id}` | DELETE | Yes | Delete document from RAG (stub, 501) |
+`/v1/rag/search`, `/v1/rag/add`, `DELETE /v1/rag/documents/{id}` and `GET /v1/documents/` were stubs that returned 501; they were removed and now answer **404**. Retrieval happens inside the chat (`use_rag` in `/v1/chat/completions`); a direct semantic search in a collection is `POST /v1/memory/search`.
 
 ## Embeddings Endpoints (prefix: /v1/embeddings)
 
@@ -250,7 +245,7 @@ These endpoints serve the web interface and are used by the JavaScript frontend.
 | `/ui/files` | GET | Yes | default | List uploaded files |
 | `/ui/files/cleanup` | POST | Yes | 5/min | Clean up temporary files |
 
-**Upload:** Accepts .txt, .md, .pdf. Dynamic chunking based on document size (800/1000/1200/1500 chars). Magic bytes validation (SEC-004). Metadata generated without LLM (instant). Documents isolated to uploading session via session_id.
+**Upload:** Accepts PDF, .docx, .xlsx, .pptx, .epub, text, source code and data (.csv, .json, .xml, .yaml, .toml) — see RAG.md. Dynamic chunking based on document size (800/1000/1200/1500 chars). Magic bytes validation (SEC-004). Metadata generated without LLM (instant). Documents isolated to uploading session via session_id.
 
 ## Encryption CLI Commands
 
@@ -266,7 +261,7 @@ These are CLI commands (not HTTP endpoints):
 
 `/v1/chat/completions` is partially compatible with the OpenAI API format:
 
-**Supported:** messages array, model, temperature, max_tokens, stream, top_p
+**Supported:** messages array, model, temperature, max_tokens, stream, top_p, reasoning_effort (the reasoning comes back as `reasoning`)
 **Extra fields:** use_rag (boolean), engine (string)
 **Not implemented:** /v1/embeddings/encode and /v1/embeddings/models (stubs, return 501), /v1/models, /v1/completions (legacy)
 

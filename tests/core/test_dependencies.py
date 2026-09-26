@@ -45,9 +45,14 @@ class TestDependenciesContract:
         assert not offenders, f"core.dependencies imports plugins at module level: {offenders}"
 
     def test_all_exports_are_the_minimal_contract(self):
-        """__all__ no longer advertises the removed advanced limiters."""
+        """__all__ no longer advertises the removed advanced limiters, and
+        every name it does advertise exists (#971: moved here from the
+        duplicate test_dependencies_registry.py)."""
+        import core.dependencies as dep
         from core.dependencies import __all__
         assert set(__all__) == {"get_i18n", "limiter", "ADVANCED_RATE_LIMITING"}
+        for name in __all__:
+            assert hasattr(dep, name), f"Missing export: {name}"
         for removed in ("limiter_global", "limiter_by_key", "limiter_composite",
                         "limiter_by_endpoint", "rate_limit_tracker",
                         "start_rate_limit_cleanup_task"):

@@ -17,6 +17,8 @@ import logging
 import os
 import time
 
+from core.turn.text.chunks import parse_chunk
+
 from ..chat_sanitization import _sanitize_sse_token
 
 logger = logging.getLogger(__name__)
@@ -90,7 +92,7 @@ class TokenBridge:
         # longer silent: it is logged once and surfaced to the client.
         self._truncated: bool = False
 
-    def on_token(self, token: str):
+    def on_token(self, token: "str | dict"):
         """Called from the engine thread for each generated token.
 
         enforce MAX_STREAM_BYTES so a runaway generation
@@ -101,7 +103,14 @@ class TokenBridge:
         """
         if self._cap_triggered:
             return
-        token_bytes = len(token.encode("utf-8", errors="replace"))
+        # ADR-010: an engine that splits its model's reasoning hands over
+        # {thinking, content} chunks. Both count against the cap; only the
+        # answer is the response text the mirrored session keeps.
+        answer, measured = token, token
+        if isinstance(token, dict):
+            content, thinking = parse_chunk(token)
+            answer, measured = content, content + thinking
+        token_bytes = len(measured.encode("utf-8", errors="replace"))
         if self._response_bytes + token_bytes > MAX_STREAM_BYTES:
             self._cap_triggered = True
             logger.warning(
@@ -112,7 +121,7 @@ class TokenBridge:
             self.set_done(error="stream_cap_exceeded")
             return
         self._response_bytes += token_bytes
-        self._response_parts.append(token)
+        self._response_parts.append(answer)
 
         def _enqueue() -> None:
             # Runs on the event loop. The real put_nowait lives HERE, so the
@@ -174,7 +183,24 @@ async def _prepend_chunk(first: str, agen):
         yield chunk
 
 
-def format_sse_chunk(token: str, model_name: str, engine_prefix: str) -> str:
+def format_engine_token(token: "str | dict", model_name: str, engine_prefix: str) -> "str | None":
+    """One engine token as an SSE chunk; None when it carries nothing to send.
+
+    ADR-010: a structured chunk sends its answer as `content` and its
+    reasoning as `reasoning` (the field Ollama /v1, vLLM and LM Studio use).
+    Whether a client gets to SEE the reasoning is the turn's decision
+    (`SseCleaner`), not the forwarder's.
+    """
+    if isinstance(token, dict):
+        content, thinking = parse_chunk(token)
+        if not content and not thinking:
+            return None
+        return format_sse_chunk(content, model_name, engine_prefix, reasoning=thinking or None)
+    return format_sse_chunk(token, model_name, engine_prefix)
+
+
+def format_sse_chunk(token: str, model_name: str, engine_prefix: str,
+                     reasoning: "str | None" = None) -> str:
     """Format a single token as an OpenAI-compatible SSE chunk."""
     now = int(time.time())
     chunk = {
@@ -188,6 +214,8 @@ def format_sse_chunk(token: str, model_name: str, engine_prefix: str) -> str:
             "finish_reason": None,
         }],
     }
+    if reasoning:
+        chunk["choices"][0]["delta"]["reasoning"] = _sanitize_sse_token(reasoning)
     return f"data: {json.dumps(chunk)}\n\n"
 
 

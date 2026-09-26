@@ -9,8 +9,9 @@ WS6-01/WS6-02: the standalone /rag/{document,search,upload,files/stats}
 routes and the /rag/ui admin page were retired — the search was an
 ephemeral in-memory substring matcher (not vector search) and the upload
 path depended on a FileRAGSource that never existed. The chat pipeline's
-RAG (MemoryAPI/Qdrant) is a separate, working path; the public contract
-keeps the /v1/rag/* 501 stubs.
+RAG (MemoryAPI/Qdrant) is a separate, working path. ADR-008 E2 retired the
+/v1/rag/* 501 stubs too: what this module still serves is /rag/health and
+/rag/info over the chat's own sources (core/rag/).
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────

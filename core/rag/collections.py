@@ -33,7 +33,7 @@ from core.memory_access import (
     KNOWLEDGE_COLLECTION,
     MEMORY_COLLECTION,
 )
-from core.rag.source import RAGQuery
+from core.rag.source import RAGQuery, RAGSource
 
 logger = logging.getLogger(__name__)
 
@@ -124,16 +124,40 @@ MEMORY_SOURCE = CollectionSource(
 _SYSTEM_SOURCES = {s.name(): s for s in (DOCS_SOURCE, KNOWLEDGE_SOURCE, MEMORY_SOURCE)}
 
 
-def source_for(collection: str) -> CollectionSource:
-    """The source that searches `collection`.
+def is_system_collection(name: str) -> bool:
+    """True for the three collections the product ships with.
 
-    #896: a collection a plugin registered at runtime has no tuned
-    parameters, so it gets the middle ground (knowledge-grade recall, no
-    language filter) instead of being skipped entirely — the same values
-    `_UNKNOWN_COLLECTION_PARAMS` gave it before there were sources. E1b turns
-    this into a registry a plugin can add to; today it is still the
-    orchestrator that discovers the names.
+    Read by `core/rag/registry.py` to refuse a registration that would shadow
+    one of them. Lives here because this is where they are defined.
     """
+    return name in _SYSTEM_SOURCES
+
+
+def source_for(collection: str) -> "RAGSource":
+    """The source that answers for `collection`, asked in three tiers.
+
+    1. A REGISTERED source (E1b) — a plugin's own, and later E3's document
+       module. It brings its own parameters instead of being handed the
+       middle ground.
+    2. One of the three the product ships with.
+    3. #896's fallback: a collection discovered at runtime with nobody
+       registered for it still gets searched, with knowledge-grade recall and
+       no language filter — the same values `_UNKNOWN_COLLECTION_PARAMS` gave
+       it before there were sources. Dropping this would silently stop
+       searching a plugin's collection that works today.
+
+    The registry is consulted FIRST but cannot contain a system name
+    (`register_source` refuses it), so tier 1 can never shadow tier 2 — the
+    order is about letting a plugin tune its own collection, not about
+    precedence over the product's.
+    """
+    # Deferred: `registry` imports this module for `is_system_collection`, and
+    # a module-level import in both directions is a cycle.
+    from core.rag.registry import registered_source
+
+    registered = registered_source(collection)
+    if registered is not None:
+        return registered
     known = _SYSTEM_SOURCES.get(collection)
     if known is not None:
         return known

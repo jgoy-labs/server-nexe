@@ -56,9 +56,11 @@ MANIFEST: Dict[str, Any] = {
 
   "health_check": "memory.memory.health:check",
 
+  # #1068: pointed at upload_node/commit_node, which never existed. These are
+  # the two nodes the module actually ships.
   "workflow_nodes": [
-    "memory.memory.workflow.nodes.upload_node",
-    "memory.memory.workflow.nodes.commit_node"
+    "memory.memory.workflow.nodes.memory_store_node",
+    "memory.memory.workflow.nodes.memory_recall_node"
   ],
 
   "specialists": [

@@ -122,16 +122,13 @@ async def test_the_two_doors_finalise_the_prompt_the_same_way(turn_lab) -> None:
 
 
 async def test_sticky_lang_is_resolved_once_per_turn(turn_lab) -> None:
-    """#850's hysteresis advances exactly one step per turn.
+    """The language is resolved once per turn, and a switch lands on the turn
+    that asked for it.
 
-    Two consecutive detections of a new language are needed to flip; the first
-    only arms a candidate. So a turn that resolved the language twice would
-    confirm its own candidate and flip mid-turn — the prefix cache invalidation
-    the policy exists to prevent, paid on a single off-language message.
-
-    Measured through a real turn, with the real detector: the resolution is a
-    step of the turn now (`session`), and a second resolution anywhere in it
-    would show up here as a language that flipped in one turn instead of two.
+    25/09 (Jordi): #850's two-turn hysteresis is gone — detection is sure now
+    (`core.lang_detect._MIN_RELATIVE_DISTANCE`), so the first clear message in
+    a new language switches. Measured through a real turn with the real
+    detector: the English turn must already be answered in English.
     """
     pytest.importorskip("lingua", reason="cal lingua per la detecció real")
     sid = "sticky-one-per-turn"
@@ -146,12 +143,9 @@ async def test_sticky_lang_is_resolved_once_per_turn(turn_lab) -> None:
         streaming=False, session_id=sid,
         message="please explain the whole session memory system in detail",
     )
-    assert session.lang == "ca", (
-        "one English turn flipped the reply language — the hysteresis advanced "
-        "twice in the same turn"
-    )
-    assert session.lang_pending == "en", "the candidate was not armed"
-    assert ctx.lang == "ca", "the turn answered in the language it flipped away from"
+    assert session.lang == "en", "the first clear English message switches"
+    assert session.lang_pending is None
+    assert ctx.lang == "en", "the turn that switched must be answered in the new language"
 
 
 async def test_recall_is_identical_for_both_doors(turn_lab) -> None:

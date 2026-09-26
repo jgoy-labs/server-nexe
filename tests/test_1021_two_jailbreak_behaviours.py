@@ -201,7 +201,25 @@ def _ui_validate(message: str) -> str:
 
     ctx = TurnContext(turn_id="t", entry="ui", message=message)
     asyncio.run(ui_adapters(MagicMock(), streaming=False)["sanitize"](ctx))
-    return ctx.message
+    # What the model is handed this turn: since 26/09 the notice rides next to
+    # the user's text (`usage["security_notice"]`, added by `budget`), never in
+    # it — the text is what the session stores.
+    return ctx.usage.get("security_notice", "") + ctx.message
+
+
+def test_the_ui_notice_never_enters_the_users_text() -> None:
+    """26/09: glued to `ctx.message`, the notice was stored in the history and
+    repeated on every later turn."""
+    import asyncio
+    from unittest.mock import MagicMock
+
+    from core.turn.context import TurnContext
+    from plugins.web_ui_module.api.turn_adapters import ui_adapters
+
+    ctx = TurnContext(turn_id="t", entry="ui", message=FLAGGED_BY_UI_ONLY)
+    asyncio.run(ui_adapters(MagicMock(), streaming=False)["sanitize"](ctx))
+    assert ctx.message == FLAGGED_BY_UI_ONLY
+    assert ctx.usage["security_notice"].startswith(PREFIX)
 
 
 def _v1_validate(message: str) -> str:

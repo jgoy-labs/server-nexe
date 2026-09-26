@@ -91,29 +91,22 @@ class TestStickyLangPolicy:
         monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "en")
         assert ce._resolve_request_lang("s1", msg) == "ca"
 
-    def test_single_long_foreign_turn_does_not_flip(self, monkeypatch):
-        """One pasted English traceback must not invalidate the prefix."""
+    def test_a_clear_foreign_turn_flips_at_once(self, monkeypatch):
+        """25/09 (Jordi): the first clear message switches, as at the web door.
+        Accepted trade-off: a pasted English traceback now switches too."""
         monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
         ce._resolve_request_lang("s1", "hola, com estàs avui?")
         monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "en")
-        trace = "TypeError: cannot read property of undefined at Object.render at main"
-        assert ce._resolve_request_lang("s1", trace) == "ca"
+        assert ce._resolve_request_lang("s1", "can we please switch to english now?") == "en"
+        assert ce._resolve_request_lang("s1", "ok") == "en"
 
-    def test_two_consecutive_detections_flip(self, monkeypatch):
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
-        ce._resolve_request_lang("s1", "hola, com estàs avui?")
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "en")
-        assert ce._resolve_request_lang("s1", "can we please switch to english now?") == "ca"
-        assert ce._resolve_request_lang("s1", "yes, from now on let's continue in english") == "en"
-
-    def test_reaffirming_sticky_clears_the_candidate(self, monkeypatch):
-        detections = iter(["ca", "en", "ca", "en"])
+    def test_it_switches_back_just_as_fast(self, monkeypatch):
+        detections = iter(["ca", "en", "ca"])
         monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: next(detections))
         long_msg = "aquesta és una frase prou llarga per superar el llindar del gate"
-        ce._resolve_request_lang("s1", long_msg)          # ca → seeds
-        ce._resolve_request_lang("s1", long_msg)          # en → candidate
-        ce._resolve_request_lang("s1", long_msg)          # ca → candidate dropped
-        assert ce._resolve_request_lang("s1", long_msg) == "ca"  # en again → no flip
+        assert ce._resolve_request_lang("s1", long_msg) == "ca"
+        assert ce._resolve_request_lang("s1", long_msg) == "en"
+        assert ce._resolve_request_lang("s1", long_msg) == "ca"
 
     def test_sessions_are_independent(self, monkeypatch):
         monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")

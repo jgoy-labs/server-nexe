@@ -19,14 +19,16 @@ MANIFEST: Dict[str, Any] = {
   "module_id": MODULE_ID,
   "name": "rag",
   "version": __version__,
-  "description": "RAG module: health/info introspection + PersonalityRAG source for the chat pipeline (the standalone /rag surface was retired, WS6-01/02)",
+  "description": "RAG module: health/info introspection and a CLI search over the chat's retrieval sources in core/rag/ (ADR-008 E2)",
   "author": "J.Goy",
   "category": "memory.core",
 
   "dependencies": ["embeddings"],
 
+  # ADR-008 E2: "personality_rag" went with PersonalityRAG. The module owns
+  # no source any more; it lists and searches the ones in core/rag/.
   "capabilities": [
-    "personality_rag"
+    "source_introspection"
   ],
 
   "health_check": "memory.rag.health:check",

@@ -5,7 +5,7 @@ id: nexe-usage-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Como usar server-nexe 1.0.7: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) con thinking toggle, memoria automatica MEM_SAVE, MEM_DELETE (threshold 0.20) con confirmacion clear_all 2-turnos, subida de documentos PDF/TXT, comandos de encriptacion. Ejemplos de API con curl y Python. Como instalar modelos, cambiar idioma (NEXE_LANG), gestionar memoria."
+abstract: "Como usar server-nexe 1.0.7: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) con thinking toggle, memoria automatica MEM_SAVE, MEM_DELETE (threshold 0.20) con confirmacion clear_all 2-turnos, subida de documentos (PDF, Word, Excel, PowerPoint, EPUB, texto, codigo, CSV/JSON), comandos de encriptacion. Ejemplos de API con curl y Python. Como instalar modelos, cambiar idioma (NEXE_LANG), gestionar memoria."
 tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
 chunk_size: 600
 priority: P1
@@ -83,6 +83,7 @@ En macOS con la app de bandeja instalada, el servidor arranca automaticamente al
 | `./nexe chat` | Chat interactivo por CLI |
 | `./nexe chat` | La memoria RAG esta activada por defecto (no existe ningun flag `--rag`; `--no-rag` se acepta pero se ignora — el pipeline siempre gestiona el contexto) |
 | `./nexe chat --verbose` | Chat con detalles de peso RAG por fuente |
+| `./nexe chat --show-thinking` | Muestra el razonamiento del modelo entero (por defecto se pliega en una linea gris). Los hechos guardados y borrados se muestran como `💾 Desat` y `🗑 Esborrat`, y si el modelo quiere olvidar algo te pide confirmacion (s/n) |
 | `./nexe status` | Estado del servidor |
 | `./nexe modules` | Listar modulos y CLIs cargados |
 | `./nexe memory store "texto"` | Guardar texto en memoria |
@@ -124,7 +125,7 @@ Accesible en `http://127.0.0.1:9119/ui`. Requiere API key (almacenada en localSt
 
 ### Subida de documentos
 
-Subir documentos via el boton de clip en la entrada del chat. Soportados: .txt, .md, .pdf.
+Subir documentos via el boton de clip en la entrada del chat. Soportados: PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), EPUB, texto y Markdown, codigo fuente (.py, .js, .ts, .java, .go, .rs, .sql...) y datos (.csv, .json, .xml, .yaml, .toml). No se aceptan .doc ni .xls antiguos, ni imagenes escaneadas (sin OCR).
 
 - Los documentos se indexan en la coleccion `user_knowledge` con session_id
 - Solo visibles dentro de la sesion que los subio (sin contaminacion entre sesiones)
@@ -140,7 +141,7 @@ El modelo extrae y guarda automaticamente hechos de las conversaciones:
 - El usuario dice "Olvida mi nombre" -> MEM_DELETE: busqueda por similitud (**threshold 0.20** desde v0.9.9, antes 0.70), borra la coincidencia mas cercana, guard anti-re-save
 - Siguiente conversacion: "Como me llamo?" -> RAG recupera "name=Jordi" -> el modelo responde correctamente
 
-No se necesitan comandos extra. Funciona tanto en CLI como en Web UI. Indicadores: badge `[MEM:N]` muestra el recuento de hechos guardados.
+No se necesitan comandos extra. Funciona tanto en CLI como en Web UI. Indicadores: el badge de guardado lista los hechos que el servidor ha guardado de verdad, en el mismo mensaje (`💾 Desat: …` en el CLI). Si el modelo dice que lo recordara pero no se ha guardado nada, no aparece ningun badge.
 
 ### Borrado total (`CLEAR_ALL`) — confirmacion 2-turnos
 

@@ -35,6 +35,7 @@ it, the doors are already handing over the same thing.
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Optional
 
 from core.memory_access import KNOWLEDGE_COLLECTION, SYSTEM_COLLECTIONS
@@ -77,6 +78,26 @@ def collections_for_turn(
     return [c for c in base if c != KNOWLEDGE_COLLECTION]
 
 
+def _clamp_threshold(value: Optional[float]) -> Optional[float]:
+    """#991: the per-turn threshold override is a similarity score, so it only
+    means something in [0.0, 1.0]. It reaches here straight from the client
+    (the UI slider, the CLI flag); an out-of-range value is clamped to the
+    nearest bound, and said so. `None` keeps the per-collection thresholds."""
+    if value is None:
+        return None
+    raw = float(value)
+    if math.isnan(raw):
+        # NaN compares false with everything, so min/max would turn it into
+        # 0.0 — "every hit passes", the opposite of a clamp. It carries no
+        # threshold at all: fall back to the per-collection ones.
+        logger.warning("RAG: threshold override %r is not a number, ignored", value)
+        return None
+    clamped = min(1.0, max(0.0, raw))
+    if clamped != raw:
+        logger.warning("RAG: threshold override %r out of [0, 1], clamped to %s", value, clamped)
+    return clamped
+
+
 async def _build_rag_context(
     message: str,
     *,
@@ -106,7 +127,7 @@ async def _build_rag_context(
         rag_context, rag_items = await chat_rag.build_rag_context(
             message, app_state, lang,
             collections=collections,
-            threshold_override=float(threshold_override) if threshold_override is not None else None,
+            threshold_override=_clamp_threshold(threshold_override),
         )
         rag_count = len(rag_items)
         if rag_count:

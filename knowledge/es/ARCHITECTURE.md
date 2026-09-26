@@ -394,7 +394,7 @@ Los hechos que el modelo marca con `[MEM_SAVE:]` se persisten en el camino de la
 - `[MODEL_LOADING]` / `[MODEL_READY]` — estado de carga del modelo
 - `[RAG_AVG:score]` — media de relevancia RAG
 - `[RAG_ITEM:collection|score]` — detalle RAG por colección (colección primero, después score)
-- `[MEM:N]` — numero de hechos guardados en memoria
+- `[MEM:N:hecho1|hecho2]` — lo que la memoria ha guardado en este turno, confirmado por el servidor (N = hechos nuevos; la lista incluye los que ya recordaba)
 - `[COMPACT:N]` — indicador de compactacion de contexto
 - `[DOC_TRUNCATED:XX%]` — aviso de documento truncado por limite de contexto (nuevo 2026-04-02)
 
@@ -529,7 +529,7 @@ A partir de v0.9.9, server-nexe soporta **activación/desactivación de thinking
 - **Fallback 400 retry:** si el modelo NO es thinking-capable y el usuario lo activa, el servidor devuelve 400 y la UI ofrece retry automático sin thinking.
 - **Env var `NEXE_OLLAMA_THINK`:** controla el default global para modelos Ollama (`true`/`false`).
 
-Los thinking tokens se emiten en el streaming con marcadores `[THINKING]…[/THINKING]` y la UI los renderiza como bloque colapsable naranja.
+El motor devuelve el razonamiento del modelo aparte de la respuesta (ADR-010); la UI web lo recibe como `<think>…</think>` en su stream y lo renderiza como bloque colapsable naranja. `/v1` lo envia como `reasoning` solo cuando la peticion lo pide (`reasoning_effort`).
 
 ## Modelos MLX — Compatibilidad
 

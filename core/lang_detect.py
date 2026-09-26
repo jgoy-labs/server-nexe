@@ -54,13 +54,39 @@ _LANG_NAMES_EN = {
     "cy": "Welsh", "af": "Afrikaans", "sw": "Swahili",
 }
 
+# lingua must be SURE, not just pick the top of 75 near-equal guesses. With
+# every language on, a short Catalan greeting scores like noise — measured
+# 25/09: "Hola com vas?" → Latin 0.06 · Portuguese 0.05 · Spanish 0.05, and
+# that Latin seeded the session: the scaffolding went English and the reply
+# directive said "respond in LA". The langdetect this replaced (29/05) had a
+# 0.55 confidence floor; the switch to lingua dropped it. 0.1 is the measured
+# point: every short ambiguous Catalan line gives no signal (install language
+# wins), while clear sentences in es/en/de/pt/fr/it/nl/pl still detect. 0.2
+# already loses a plain Italian "Ciao, come stai oggi?".
+_MIN_RELATIVE_DISTANCE = 0.1
+
+# Catalan without accents reads like Spanish to lingua, and the first such
+# line decided a whole conversation (seen live 25/09: "Et pregunto que com
+# vas?" → es, and the session answered in Spanish). When the detection
+# differs from the INSTALL language and the install language still scores at
+# least this share of the winner's confidence, it is a close call and the
+# install language wins. A ratio, not a difference: on short text every
+# score is low. Measured on a ca install — Catalan misread as Spanish: ca at
+# 0.57-0.70 of es; real Spanish, Italian, English, German…: ca at ≤0.21 of
+# the winner (even "hola que tal estas", 0.21, stays Spanish).
+_HOME_LANG_RATIO = 0.5
+
 _DETECTOR: LanguageDetector | None = None
 try:
     from lingua import LanguageDetectorBuilder
 
-    # All languages → truly global support (the 75 lingua covers). Subset only
-    # affects RAM/latency, not disk; accuracy on our cases is already perfect.
-    _DETECTOR = LanguageDetectorBuilder.from_all_languages().build()
+    # All languages → truly global support (the 75 lingua covers), but only
+    # calls lingua is sure of (see _MIN_RELATIVE_DISTANCE).
+    _DETECTOR = (
+        LanguageDetectorBuilder.from_all_languages()
+        .with_minimum_relative_distance(_MIN_RELATIVE_DISTANCE)
+        .build()
+    )
 except ImportError:  # pragma: no cover - optional dependency
     pass
 
@@ -113,13 +139,30 @@ def detect_user_lang_or_none(message: str) -> Optional[str]:
     if len(cleaned) < _MIN_DETECT_CHARS:
         return None
 
-    # detect_language_of returns the best candidate, or None when lingua judges
-    # the text too ambiguous to call — exactly the no-signal we want.
+    # detect_language_of returns the best candidate, or None when the top two
+    # are closer than _MIN_RELATIVE_DISTANCE — exactly the no-signal we want.
     detected = _DETECTOR.detect_language_of(cleaned)
     if detected is None:
         return None
 
-    return detected.iso_code_639_1.name.lower()
+    code = detected.iso_code_639_1.name.lower()
+    home = _fallback_lang(None)
+    if code != home and _home_is_close(cleaned, detected, home):
+        return home
+    return code
+
+
+def _home_is_close(text: str, detected, home: str) -> bool:
+    """True when the install language scores at least _HOME_LANG_RATIO of the
+    detected one's confidence — too close a call to take it away from home."""
+    try:
+        from lingua import IsoCode639_1, Language
+
+        home_lang = Language.from_iso_code_639_1(IsoCode639_1.from_str(home))
+    except Exception:  # an install language lingua does not know: no preference
+        return False
+    top = _DETECTOR.compute_language_confidence(text, detected)
+    return top > 0 and _DETECTOR.compute_language_confidence(text, home_lang) >= _HOME_LANG_RATIO * top
 
 
 def detect_user_lang(message: str, fallback: Optional[str] = None) -> str:

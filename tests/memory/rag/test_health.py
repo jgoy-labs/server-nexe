@@ -91,7 +91,12 @@ class TestCheckStoragePaths:
     assert result["status"] in ["pass", "fail"]
 
 class TestCheckRagSources:
-  """Tests for rag_sources check."""
+  """Tests for rag_sources check.
+
+  ADR-008 E2: the check lists the chat's sources (system + registered)
+  through `module.list_sources()`; it no longer walks `module._sources` nor
+  calls a per-source `health()` the real sources do not have.
+  """
 
   def test_sources_not_initialized(self):
     """Verify warn when module not initialized."""
@@ -104,41 +109,73 @@ class TestCheckRagSources:
     assert result["status"] == "warn"
 
   def test_sources_no_sources(self):
-    """Verify fail when no sources registered."""
+    """Verify fail when the module lists no source at all (defensive: the
+    three system collections make this unreachable on the real module)."""
     mock_module = MagicMock()
     mock_module._initialized = True
-    mock_module._sources = {}
+    mock_module.list_sources.return_value = []
 
     result = check_rag_sources(mock_module)
 
     assert result["status"] == "fail"
 
-  def test_sources_all_healthy(self):
-    """Verify pass when all sources healthy."""
-    mock_source = MagicMock()
-    mock_source.health.return_value = {"status": "healthy"}
-
+  def test_sources_listed_pass(self):
+    """Verify pass, with the names, when the module lists sources."""
     mock_module = MagicMock()
     mock_module._initialized = True
-    mock_module._sources = {"personality": mock_source}
+    mock_module.list_sources.return_value = ["nexe_documentation", "plugin_notes"]
 
     result = check_rag_sources(mock_module)
 
     assert result["status"] == "pass"
-    assert "sources" in result
+    assert result["sources"] == ["nexe_documentation", "plugin_notes"]
+    assert "2" in result["message"]
 
-  def test_sources_some_unhealthy(self):
-    """Verify fail when some sources unhealthy."""
-    mock_source = MagicMock()
-    mock_source.health.return_value = {"status": "unhealthy"}
+  def test_real_module_with_an_empty_registry_is_not_fail(self):
+    """The readiness hazard of E2, pinned on the REAL module.
 
-    mock_module = MagicMock()
-    mock_module._initialized = True
-    mock_module._sources = {"personality": mock_source}
+    A default install registers no source. If the check were fed only
+    `registered_names()` it would report `fail`, the aggregate would turn
+    `unhealthy` and readiness would hold the server down while the chat
+    retrieves fine. The three system collections are always counted."""
+    from core.memory_access import SYSTEM_COLLECTIONS
+    from core.rag.registry import clear_registered_sources, registered_names
+    from memory.rag.module import RAGModule
 
-    result = check_rag_sources(mock_module)
+    clear_registered_sources()
+    assert registered_names() == []  # precondition: nothing registered
+    module = RAGModule.__new__(RAGModule)
+    module._initialized = True
 
-    assert result["status"] == "fail"
+    result = check_rag_sources(module)
+
+    assert result["status"] == "pass", result
+    assert sorted(result["sources"]) == sorted(SYSTEM_COLLECTIONS)
+    assert len(result["sources"]) == 3
+
+  def test_real_module_counts_a_registered_source_too(self):
+    from core.rag.registry import clear_registered_sources, register_source
+    from memory.rag.module import RAGModule
+
+    class _Src:
+      def name(self):
+        return "plugin_notes"
+
+      async def search(self, memory, query):
+        return []
+
+    clear_registered_sources()
+    register_source(_Src())
+    try:
+      module = RAGModule.__new__(RAGModule)
+      module._initialized = True
+      result = check_rag_sources(module)
+    finally:
+      clear_registered_sources()
+
+    assert result["status"] == "pass"
+    assert "plugin_notes" in result["sources"]
+    assert len(result["sources"]) == 4
 
 class TestCheckDiskSpace:
   """Tests for disk_space check."""
@@ -172,7 +209,7 @@ class TestCheckHealth:
     """Verify all checks are run."""
     mock_module = MagicMock()
     mock_module._initialized = True
-    mock_module._sources = {}
+    mock_module.list_sources.return_value = []
     mock_module.module_id = "TEST"
     mock_module.name = "rag"
     mock_module.version = "0.1"
@@ -187,12 +224,9 @@ class TestCheckHealth:
 
   def test_check_health_healthy_status(self):
     """Verify healthy when all pass."""
-    mock_source = MagicMock()
-    mock_source.health.return_value = {"status": "healthy"}
-
     mock_module = MagicMock()
     mock_module._initialized = True
-    mock_module._sources = {"personality": mock_source}
+    mock_module.list_sources.return_value = ["nexe_documentation"]
     mock_module.module_id = "TEST"
     mock_module.name = "rag"
     mock_module.version = "0.1"
@@ -206,7 +240,7 @@ class TestCheckHealth:
     """Verify unhealthy when any check fails."""
     mock_module = MagicMock()
     mock_module._initialized = False
-    mock_module._sources = {}
+    mock_module.list_sources.return_value = []
     mock_module.module_id = "TEST"
     mock_module.name = "rag"
     mock_module.version = "0.1"
@@ -220,7 +254,7 @@ class TestCheckHealth:
     """Verify metadata is included."""
     mock_module = MagicMock()
     mock_module._initialized = True
-    mock_module._sources = {}
+    mock_module.list_sources.return_value = []
     mock_module.module_id = "TEST-ID"
     mock_module.name = "rag"
     mock_module.version = "0.1"
@@ -240,12 +274,9 @@ class TestCheckHealth:
     health report lied. The real contract is exactly 5 sub-checks, none of
     which is a phantom component.
     """
-    mock_source = MagicMock()
-    mock_source.health.return_value = {"status": "healthy"}
-
     mock_module = MagicMock()
     mock_module._initialized = True
-    mock_module._sources = {"personality": mock_source}
+    mock_module.list_sources.return_value = ["nexe_documentation"]
     mock_module.module_id = "TEST"
     mock_module.name = "rag"
     mock_module.version = "0.1"
@@ -291,3 +322,30 @@ class TestHealthCheckEdgeCases:
 
       assert result["status"] == "fail"
       assert "error" in result["message"].lower()
+
+  def test_real_module_empty_registry_is_not_unhealthy_by_its_sources(self):
+    """End to end through check_health on the real module, with the store
+    answering and the disk fine: an empty registry must not make the
+    aggregate unhealthy (readiness, core/endpoints/root.py)."""
+    from core.rag.registry import clear_registered_sources
+    from memory.rag.module import RAGModule
+
+    clear_registered_sources()
+    module = RAGModule.__new__(RAGModule)
+    module.module_id = "rag"
+    module.name = "rag"
+    module.version = "0"
+    module._initialized = True
+    module._stats = {"searches_performed": 0}
+
+    with patch("core.qdrant_pool.qdrant_status", return_value=(True, "ok")), \
+         patch("memory.rag.health.check_disk_space",
+               return_value={"name": "disk_space", "status": "pass", "message": "ok"}), \
+         patch("memory.rag.health.check_storage_paths",
+               return_value={"name": "storage_paths", "status": "pass", "message": "ok"}):
+      result = check_health(module)
+
+    by_name = {c["name"]: c["status"] for c in result["checks"]}
+    assert by_name["rag_sources"] == "pass"
+    assert result["status"] == "healthy", result
+    assert len(result["metadata"]["sources"]) == 3

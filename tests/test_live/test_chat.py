@@ -237,6 +237,37 @@ class TestChatMEMSAVE:
 
     pytestmark = pytest.mark.slow  # Bug #4 (2026-05-21): Ollama-backed, schedule last
 
+    # Both tests below used to pass on ANY search hit (`len(results) >= 1 or
+    # token in raw`, over every collection) and on "≤2" even when nothing was
+    # saved — green over a broken pipeline (#1098 review, 25/09). They now ask
+    # the server what it kept, look only in personal_memory, and clean up.
+
+    @staticmethod
+    def _in_personal_memory(client, auth_headers, token: str) -> list:
+        r = client.post(
+            "/v1/memory/search",
+            headers=auth_headers,
+            json={"query": token, "limit": 20, "collections": ["personal_memory"]},
+            timeout=15.0,
+        )
+        assert r.status_code == 200, f"Memory search: {r.status_code}"
+        data = r.json()
+        results = data if isinstance(data, list) else data.get("results", data.get("memories", []))
+        return [x for x in results if token in str(x)]
+
+    @staticmethod
+    def _forget(client, auth_headers, facts) -> None:
+        """Clean-up through the door itself (C4.5). `/ui/memory/confirm-delete`
+        no longer searches by text — it confirms the session's pending entry —
+        so this arms one the way a user does: «oblida que X» is caught at the
+        `intent` step (no model involved) and «sí» confirms it by id."""
+        session_id = f"forget-{uuid.uuid4().hex[:8]}"
+        for fact in facts:
+            for message in (f"oblida que {fact}", "sí"):
+                client.post("/ui/chat", headers=auth_headers,
+                            json={"message": message, "session_id": session_id, "stream": False},
+                            timeout=30.0)
+
     def test_mem_save_via_chat_and_retrieve(
         self,
         client: httpx.Client,
@@ -244,8 +275,9 @@ class TestChatMEMSAVE:
         smallest_ollama_model: str,
     ) -> None:
         """
-        The core nexe feature: tell it to remember X → search → find X.
-        If this fails, the memory pipeline is broken regardless of unit tests.
+        The core nexe feature: tell it to remember X → the SAME reply says it
+        kept X → X is in personal_memory. If this fails, the memory pipeline is
+        broken regardless of unit tests.
         """
         token = uuid.uuid4().hex[:10]
         msg = f"Recorda que el meu codi secret de test és NEXE_{token}"
@@ -257,24 +289,18 @@ class TestChatMEMSAVE:
             timeout=90.0,
         )
         assert chat_r.status_code == 200, f"Chat MEM_SAVE: {chat_r.status_code} {chat_r.text[:400]}"
-
-        # Give the async memory pipeline a moment to persist
-        time.sleep(2)
-
-        search_r = client.post(
-            "/v1/memory/search",
-            headers=auth_headers,
-            json={"query": f"codi secret NEXE_{token}", "limit": 5},
-            timeout=15.0,
-        )
-        assert search_r.status_code == 200, f"Memory search: {search_r.status_code}"
-        data = search_r.json()
-        results = data if isinstance(data, list) else data.get("results", data.get("memories", []))
-        raw_text = search_r.text
-        assert len(results) >= 1 or token in raw_text, (
-            f"MEM_SAVE did not persist NEXE_{token}. "
-            f"Search returned {len(results)} results. Response: {raw_text[:600]}"
-        )
+        body = chat_r.json()
+        kept = body.get("memory_facts") or []
+        try:
+            assert any(token in f for f in kept), (
+                f"the reply does not say it kept NEXE_{token}: memory_saved="
+                f"{body.get('memory_saved')} memory_facts={kept}"
+            )
+            assert self._in_personal_memory(client, auth_headers, token), (
+                f"the reply said it kept NEXE_{token} but personal_memory does not have it"
+            )
+        finally:
+            self._forget(client, auth_headers, kept)
 
     def test_mem_save_dedup(
         self,
@@ -282,36 +308,67 @@ class TestChatMEMSAVE:
         auth_headers: dict[str, str],
         smallest_ollama_model: str,
     ) -> None:
-        """Same fact sent 3× should be deduplicated (threshold 0.80)."""
+        """Same fact sent 3× is kept, and deduplicated (threshold 0.80)."""
         # Use 12-char token to minimise cross-run semantic collisions
         token = uuid.uuid4().hex[:12]
-        for phrase in (
-            f"Recorda que el meu animal preferit és el gat_{token}.",
-            f"Guarda que tinc un gat que es diu gat_{token}.",
-            f"No oblidis que el meu animal és el gat_{token}.",
-        ):
-            r = client.post(
-                "/ui/chat",
-                headers=auth_headers,
-                json={"message": phrase, "backend": "ollama", "model": smallest_ollama_model, "stream": False},
-                timeout=90.0,
-            )
-            assert r.status_code == 200, f"MEM_SAVE dedup chat: {r.status_code}"
-            time.sleep(1)
+        kept_all: list = []
+        try:
+            for phrase in (
+                f"Recorda que el meu animal preferit és el gat_{token}.",
+                f"Guarda que tinc un gat que es diu gat_{token}.",
+                f"No oblidis que el meu animal és el gat_{token}.",
+            ):
+                r = client.post(
+                    "/ui/chat",
+                    headers=auth_headers,
+                    json={"message": phrase, "backend": "ollama", "model": smallest_ollama_model, "stream": False},
+                    timeout=90.0,
+                )
+                assert r.status_code == 200, f"MEM_SAVE dedup chat: {r.status_code}"
+                kept_all += r.json().get("memory_facts") or []
 
-        time.sleep(2)
-        search_r = client.post(
-            "/v1/memory/search",
-            headers=auth_headers,
-            json={"query": f"animal gat_{token}", "limit": 10},
-            timeout=15.0,
-        )
-        assert search_r.status_code == 200
-        data = search_r.json()
-        all_results = data if isinstance(data, list) else data.get("results", data.get("memories", []))
-        # Only count results that actually contain our unique token
-        token_results = [r for r in all_results if token in str(r)]
-        assert len(token_results) <= 2, (
-            f"Expected dedup to reduce 3 similar memories to ≤2, got {len(token_results)} "
-            f"(total results: {len(all_results)})"
-        )
+            stored = self._in_personal_memory(client, auth_headers, token)
+            assert stored, f"none of the three phrasings was kept (gat_{token})"
+            assert len(stored) <= 2, (
+                f"Expected dedup to reduce 3 similar memories to ≤2, got {len(stored)}"
+            )
+        finally:
+            self._forget(client, auth_headers, kept_all)
+
+    def test_a_streamed_save_is_told_on_its_own_turn_and_recalled_on_the_next(
+        self,
+        client: httpx.Client,
+        auth_headers: dict[str, str],
+        smallest_ollama_model: str,
+    ) -> None:
+        """#1098 live: the confirmation rides on the turn that saved, with the
+        fact itself — it used to arrive one turn late — and the fact is recalled
+        in the same conversation."""
+        import re
+
+        token = uuid.uuid4().hex[:8]
+        session_id = f"live-mem-{token}"
+
+        def turn(message: str) -> str:
+            with client.stream(
+                "POST", "/ui/chat", headers=auth_headers, timeout=120.0,
+                json={"message": message, "session_id": session_id, "stream": True,
+                      "backend": "ollama", "model": smallest_ollama_model},
+            ) as r:
+                assert r.status_code == 200, f"stream: {r.status_code}"
+                return "".join(r.iter_text())
+
+        kept: list = []
+        try:
+            turn("Hola, bon dia.")
+            wire = turn(f"Recorda que la meva fruita preferida és la fruita_{token}.")
+            notes = re.findall(r"\x00\[MEM:(\d*)(?::([^\x00]*))?\]\x00", wire)
+            kept = [f for _, listed in notes for f in listed.split("|") if f]
+            assert any(token in f for f in kept), (
+                f"the turn that saved did not say so on its own wire: MEM notes={notes}"
+            )
+            assert len(notes) == 1, f"one note per turn, got {notes}"
+            later = turn("Hola de nou. Quina és la meva fruita preferida?")
+            assert not re.search(r"\x00\[MEM:[1-9]", later), "a save announced a turn late"
+        finally:
+            self._forget(client, auth_headers, kept)

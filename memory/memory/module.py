@@ -189,7 +189,10 @@ class MemoryModule:
         if getattr(_sc, "is_sidecar", False):
           vectors_path = _sc.vectors_dir
         else:
-          vectors_path = project_root / "storage" / "vectors"
+          # #1053: NEXE_QDRANT_PATH counts in standalone too (the core's
+          # Qdrant already followed it; this store did not).
+          from ._paths import resolve_qdrant_path
+          vectors_path = resolve_qdrant_path(project_root / "storage" / "vectors", root=project_root)
       except Exception:
         vectors_path = project_root / "storage" / "vectors"
       db_path = vectors_path / "metadata_memory.db"

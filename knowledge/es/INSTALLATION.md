@@ -5,8 +5,8 @@ id: nexe-installation-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "Como instalar server-nexe: (1) Desktop App nexe-app (Tauri v2, recomendado) — DMG macOS (~1.3 GB), AppImage Linux ARM64 (~1.2 GB) e installer NSIS para Windows ARM64 (~1.3 GB, nuevo en 1.0.7, sin firmar — SmartScreen avisa) desde Releases, con onboarding wizard (deteccion hardware, eleccion backend, descarga modelo) y modo sidecar con bandeja. (2) CLI desde codigo fuente: git clone + ./setup.sh (macOS/Linux). (3) Legacy: DMG SwiftUI standalone (sustituido por la Desktop App). Requisitos: macOS 14+ Apple Silicon (M1+), Linux ARM64 o Windows 11 ARM64, 8GB RAM. Backends: MLX, llama.cpp, Ollama (unico backend en Windows). Catalogo en models.json. Puerto: 9119."
-tags: [installation, setup, desktop-app, tauri, appimage, dmg, cli, macos, linux, windows, nsis, requirements, models, backends, mlx, ollama, llama-cpp, tray, encryption, sidecar, wizard, how-to]
+abstract: "Como instalar server-nexe: (1) Desktop App nexe-app (recomendado) desde Releases: DMG macOS, AppImage Linux ARM64 e installer NSIS para Windows ARM64 (sin firmar, SmartScreen avisa), con wizard y modo sidecar con bandeja. (2) CLI desde codigo fuente: git clone + ./setup.sh. (3) Legacy: DMG SwiftUI. Requisitos: macOS 14+ Apple Silicon, Linux ARM64 o Windows 11 ARM64, 8GB RAM. Backends: MLX, llama.cpp, Ollama (unico en Windows). Puerto 9119."
+tags: [installation, setup, desktop-app, tauri, appimage, dmg, cli, macos, linux, windows, nsis, requirements, models, backends, mlx, ollama, llama-cpp, encryption, sidecar, wizard]
 chunk_size: 600
 priority: P1
 

@@ -343,33 +343,3 @@ class TestResolveEngine:
         with patch.dict(os.environ, env_without_engine, clear=True):
             engine, fallback = _resolve_engine(None, app_state)
         assert engine == "ollama"
-
-
-class TestRagResultToText:
-    def test_dict_with_content(self):
-        from core.endpoints.chat import _rag_result_to_text
-        result = _rag_result_to_text({"content": "Text contingut"})
-        assert result == "Text contingut"
-
-    def test_dict_with_text_fallback(self):
-        from core.endpoints.chat import _rag_result_to_text
-        result = _rag_result_to_text({"text": "Text alt"})
-        assert result == "Text alt"
-
-    def test_dict_empty_uses_str(self):
-        from core.endpoints.chat import _rag_result_to_text
-        result = _rag_result_to_text({"other": "val"})
-        assert "other" in result
-
-    def test_object_with_text_attr(self):
-        from core.endpoints.chat import _rag_result_to_text
-        obj = MagicMock()
-        obj.text = "Atribut text"
-        # The object is not a dict but has .text
-        result = _rag_result_to_text(obj)
-        assert result == "Atribut text"
-
-    def test_string_input(self):
-        from core.endpoints.chat import _rag_result_to_text
-        result = _rag_result_to_text("text directe")
-        assert result == "text directe"

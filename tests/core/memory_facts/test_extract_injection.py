@@ -166,7 +166,10 @@ class TestBug3MemSaveStripFallback:
         if not clean_response and mem_saves:
             _fallback_facts = [f.strip() for f in mem_saves if f and f.strip()]
             if _fallback_facts:
-                clean_response = "Memòria desada: " + ", ".join(_fallback_facts)
+                # C4.5 (decision 1): the stand-in names no fact — the server's
+                # [MEM:n] note is the only word on what was kept (#1098).
+                from core.turn.policy import empty_reply_text
+                clean_response = empty_reply_text("ca")
                 fallback_used = True
         return clean_response, mem_saves, fallback_used
 
@@ -185,9 +188,7 @@ class TestBug3MemSaveStripFallback:
         assert fallback_used is True, (
             "Without surrounding text, the fallback must activate"
         )
-        assert clean == "Memòria desada: l'usuari es diu Aran", (
-            f"Unexpected fallback text: {clean!r}"
-        )
+        assert clean == "D'acord.", f"Unexpected fallback text: {clean!r}"
         # Sanity: clean_response must NOT be empty (that was the bug)
         assert clean, "clean_response must not be empty when there are mem_saves"
 
@@ -199,7 +200,7 @@ class TestBug3MemSaveStripFallback:
         clean, mem_saves, fallback_used = self._apply_strip_pipeline(full_response)
         assert mem_saves == ["vegetarian", "viu a Girona"]
         assert fallback_used is True
-        assert clean == "Memòria desada: vegetarian, viu a Girona"
+        assert clean == "D'acord."
 
     def test_mem_save_with_surrounding_text(self):
         """Bug #3 — model emits text + [MEM_SAVE: ...] with surrounding content.

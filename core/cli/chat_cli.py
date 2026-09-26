@@ -159,13 +159,16 @@ async def _stream_with_spinner(gen: AsyncGenerator) -> AsyncGenerator:
 @click.option('--rag-threshold', type=float, default=None, help='RAG score threshold (0.20-0.70)')
 @click.option('--collections', '-c', default=None, help='Comma-separated collections: memory,knowledge,docs (default: all)')
 @click.option('--attach', '-a', type=click.Path(), default=None, help='Attach a file to the session before the first message (same upload /upload does interactively)')
+@click.option('--show-thinking', is_flag=True, help="Show the model's reasoning in full (folded into one line by default)")
 def chat(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool,
-         rag_threshold: Optional[float], collections: Optional[str], attach: Optional[str]):
+         rag_threshold: Optional[float], collections: Optional[str], attach: Optional[str],
+         show_thinking: bool = False):
     """
     Start an interactive chat with Nexe.
     Auto-detects the configured engine if none is specified.
     """
-    asyncio.run(_chat_async(engine, system, no_rag, model, verbose, rag_threshold, collections, attach))
+    asyncio.run(_chat_async(engine, system, no_rag, model, verbose, rag_threshold, collections, attach,
+                            show_thinking=show_thinking))
 
 def detect_model() -> str:
     """Detect which model is currently configured."""
@@ -309,6 +312,16 @@ async def _handle_slash_command(
     return True
 
 
+def _process_memory_markers(chunk: dict, state: dict) -> None:
+    """What the turn forgot, and what it wants to forget (the web badges' source)."""
+    if "DEL" in chunk:
+        # \x00[DEL:N:fact1|fact2]\x00
+        _n, _, facts = str(chunk["DEL"]).partition(":")
+        state["deleted"] = [f for f in facts.split("|") if f]
+    if "PENDING_DELETE" in chunk:
+        state["pending_delete"] = chunk["PENDING_DELETE"]
+
+
 def _process_metadata_chunk(chunk: dict, state: dict) -> None:
     """Updates the mutable state with MODEL, RAG, RAG_AVG, etc."""
     if "MODEL" in chunk:
@@ -331,7 +344,8 @@ def _process_metadata_chunk(chunk: dict, state: dict) -> None:
             except (ValueError, TypeError):
                 pass
     if "MEM" in chunk:
-        state["mem_saved"] = True
+        _note_mem(str(chunk["MEM"]), state)
+    _process_memory_markers(chunk, state)
     if "COMPACT" in chunk:
         try:
             state["compact_count"] = int(chunk["COMPACT"])
@@ -339,9 +353,68 @@ def _process_metadata_chunk(chunk: dict, state: dict) -> None:
             pass
 
 
+def _on_reasoning(text: str, state: dict, show_thinking: bool) -> None:
+    """The model's reasoning: counted, and printed dim only when asked."""
+    if show_thinking:
+        if not state["reasoning"]:
+            click.echo(click.style("💭 ", dim=True), nl=False)
+        click.echo(click.style(text, dim=True), nl=False)
+    state["reasoning"] += text
+
+
+def _open_answer(state: dict, show_thinking: bool) -> None:
+    """Before the first word of the answer: fold the reasoning into one line."""
+    if state["reasoning"]:
+        if show_thinking:
+            click.echo()
+        else:
+            tokens = max(1, len(state["reasoning"]) // 4)
+            click.echo(click.style(f"💭 raonament (~{tokens} tok) — --show-thinking per veure'l", dim=True))
+    click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+
+
+def _note_mem(value: str, state: dict) -> None:
+    """[MEM:n:fact1|fact2] — what memory kept this turn, as the server says
+    (#1098). n = stored new; [MEM:n] alone comes from the continue path;
+    [MEM:0] means nothing was kept."""
+    count, _, listed = value.partition(":")
+    kept = [f for f in listed.split("|") if f]
+    state["saved_facts"] = list(dict.fromkeys(state.get("saved_facts", []) + kept))
+    if kept or not count.isdigit() or int(count) > 0:
+        state["mem_saved"] = True
+
+
+async def _report_memory(state: dict, client: Any, session_id: str) -> None:
+    """Saved / forgotten facts, as the web UI's badges; a pending forget is asked.
+
+    `session_id` (C4.5): the confirmation deletes THE entry this session has
+    pending, by id — the same call the web dialog makes.
+    """
+    # Only what the server says memory kept ([MEM:n:facts]): a model can write
+    # a [MEM_SAVE:] the server then refuses (seen 25/09: gemma3 tagging "my
+    # name is Nexe" on its own), and saying "saved" there would be a lie. The
+    # model's own tags never feed this (#1098).
+    facts = state["saved_facts"]
+    if facts:
+        click.echo(click.style("  💾 Desat: " + "; ".join(facts), fg="green"))
+    elif state["mem_saved"]:
+        click.echo(click.style("  💾 Desat", fg="green"))
+    if state["deleted"]:
+        click.echo(click.style("  🗑 Esborrat: " + "; ".join(state["deleted"]), fg="yellow"))
+    fact = state["pending_delete"]
+    if fact and click.confirm(f'  Vols que oblidi "{fact}"?', default=False):
+        result = await client.memory_confirm_delete(fact, session_id)
+        gone = [f.get("text", f) if isinstance(f, dict) else f for f in result.get("deleted_facts", [])]
+        if result.get("deleted"):
+            click.echo(click.style("  🗑 Esborrat: " + "; ".join(map(str, gone or [fact])), fg="yellow"))
+        else:
+            click.echo(click.style("  No he trobat res a esborrar.", dim=True))
+
+
 async def _handle_user_message(
     user_input: str, client: Any,
-    session_id: str, stream_kwargs: dict, verbose: bool
+    session_id: str, stream_kwargs: dict, verbose: bool,
+    show_thinking: bool = False,
 ) -> None:
     """Streaming complet + stats + verbose RAG."""
     first = True
@@ -350,15 +423,21 @@ async def _handle_user_message(
     state: dict = {
         "model_name": None, "rag_count": 0, "rag_avg": 0.0,
         "rag_items": [], "mem_saved": False, "compact_count": 0,
+        "reasoning": "", "saved_facts": [], "deleted": [], "pending_delete": None,
     }
 
     async for chunk in _stream_with_spinner(client.chat_ui_stream(message=user_input, session_id=session_id, **stream_kwargs)):
         if isinstance(chunk, dict):
-            _process_metadata_chunk(chunk, state)
+            if chunk.get("type") == "reasoning":
+                _on_reasoning(chunk["text"], state, show_thinking)
+            elif chunk.get("type") == "memory_tags":
+                pass  # the model's own tags: a request, never "saved" (#1098)
+            else:
+                _process_metadata_chunk(chunk, state)
             continue
         if first:
             first = False
-            click.echo(click.style("Nexe: ", fg="cyan", bold=True), nl=False)
+            _open_answer(state, show_thinking)
         char_count += len(chunk)
         print(chunk, end="", flush=True)
 
@@ -371,6 +450,8 @@ async def _handle_user_message(
             bar = _format_rag_bar(score, 10)
             color = "green" if score >= 0.8 else "yellow" if score >= 0.6 else "red"
             click.echo(click.style(f"    {col:<15} {bar} {score:.0%}", fg=color))
+
+    await _report_memory(state, client, session_id)
 
 
 def _chat_emit_ignored_flags(no_rag: bool, system: Optional[str]) -> None:
@@ -415,7 +496,8 @@ def _chat_build_stream_kwargs(collections: Optional[str], rag_threshold: Optiona
     return _stream_kwargs
 
 
-async def _chat_handle_input(user_input: str, client, session_id: str, stream_kwargs: dict, verbose: bool) -> "tuple[bool, str]":
+async def _chat_handle_input(user_input: str, client, session_id: str, stream_kwargs: dict, verbose: bool,
+                             show_thinking: bool = False) -> "tuple[bool, str]":
     """Handle a single line of user input.
 
     Returns (should_break, updated_session_id).
@@ -441,13 +523,13 @@ async def _chat_handle_input(user_input: str, client, session_id: str, stream_kw
         await _handle_slash_command(cmd, cmd_arg, client, session_id, stream_kwargs)
         return False, session_id
 
-    await _handle_user_message(user_input, client, session_id, stream_kwargs, verbose)
+    await _handle_user_message(user_input, client, session_id, stream_kwargs, verbose, show_thinking)
     return False, session_id
 
 
 async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool, model: Optional[str], verbose: bool = False,
                       rag_threshold: Optional[float] = None, collections: Optional[str] = None,
-                      attach: Optional[str] = None):
+                      attach: Optional[str] = None, show_thinking: bool = False):
     from .utils.api_client import NexeAPIClient
 
     engine, model = await _resolve_chat_engine_and_model(engine, model)
@@ -489,7 +571,9 @@ async def _chat_async(engine: Optional[str], system: Optional[str], no_rag: bool
     while True:
         try:
             user_input = click.prompt(click.style("Tu", fg="green", bold=True))
-            should_break, session_id = await _chat_handle_input(user_input, client, session_id, _stream_kwargs, verbose)
+            should_break, session_id = await _chat_handle_input(
+                user_input, client, session_id, _stream_kwargs, verbose, show_thinking,
+            )
             if should_break:
                 break
         except KeyboardInterrupt:

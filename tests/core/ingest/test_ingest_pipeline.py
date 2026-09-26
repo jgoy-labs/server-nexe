@@ -312,8 +312,11 @@ class TestIngestAndSearch:
         for r in results:
             assert r.score >= 0.0
 
-    def test_rag_search_endpoint(self, ingested):
-        """The /rag/search endpoint returns relevant results."""
+    def test_rag_search_endpoint_is_retired(self, ingested):
+        """/v1/rag/search was a 501 stub and was retired (ADR-008 E2): with
+        the knowledge ingested it must answer 404, not come back. Retrieval
+        over the ingested docs is the chat's (`build_rag_context`), covered by
+        the E2E class below."""
         from fastapi.testclient import TestClient
         from core.app import app
         api_key = os.environ.get("NEXE_PRIMARY_API_KEY", "nexe-rag-test")
@@ -329,11 +332,7 @@ class TestIngestAndSearch:
                 headers={"X-API-Key": api_key, "X-CSRF-Token": csrf_token},
                 json={"query": "port per defecte NEXE", "top_k": 3}
             )
-        # 200 if implemented, 501 if not yet implemented (stub)
-        assert r.status_code in (200, 501)
-        body = r.json()
-        if r.status_code == 200:
-            assert "results" in body or "documents" in body or isinstance(body, list)
+        assert r.status_code == 404, (r.status_code, r.text[:200])
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -276,6 +276,20 @@ def jailbreak_speed_bump(message: str) -> str:
     return f"{JAILBREAK_NOTICE}{message}"
 
 
+def jailbreak_notice(message: str) -> str:
+    """The speed bump's notice for `message`, or "" — for THIS turn's prompt only.
+
+    26/09: the notice used to be glued to the user's text, and that text is
+    what the session stores. It was saved into the history and so repeated on
+    every later turn (and shown back on reload), it made the language detector
+    see a long English sentence (#1096 then switches the conversation to
+    English), and intent detection and retrieval read it as the user's words.
+    The door keeps the user's text clean and adds this where the model's
+    message for the turn is assembled.
+    """
+    return JAILBREAK_NOTICE if jailbreak_speed_bump(message) != message else ""
+
+
 async def validate_turn(ctx: TurnContext) -> None:
     """The `validate` step, at both doors: the payload the door handed over has
     to be a turn that can run.

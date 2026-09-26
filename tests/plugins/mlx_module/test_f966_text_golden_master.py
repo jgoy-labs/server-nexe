@@ -100,6 +100,7 @@ class _Gen:
         self.stream_kwargs = {}
         self.sampler_kwargs = {}
         self.deltas = []
+        self.chunks = []
 
     def _stream(self, model, tokenizer, tokens, **kwargs):
         self.stream_kwargs.update(kwargs)
@@ -117,7 +118,10 @@ class _Gen:
         return "SAMPLER"
 
     def collect(self, d):
-        self.deltas.append(d)
+        # ADR-010: the callback gets {thinking, content} chunks; `raw` is the
+        # exact generated text, which is what this golden master pins.
+        self.chunks.append(d)
+        self.deltas.append(d["raw"] if isinstance(d, dict) else d)
 
     def __enter__(self):
         self._c = [
@@ -150,6 +154,9 @@ async def test_a_text_turn_streams_and_returns_the_generated_text(tmp_path):
 
     assert result["response"] == "Hola què tal"
     assert g.deltas == ["Hola ", "què ", "tal"]
+    assert [c["message"] for c in g.chunks] == [
+        {"content": t, "thinking": ""} for t in ("Hola ", "què ", "tal")
+    ], "a reply without reasoning is all answer"
     assert result["model_used"] == str(tmp_path / "text-model")
     assert set(result["timing"]) == {"prefill_ms", "generation_ms", "overhead_ms"}
     assert result["identity_hash"]

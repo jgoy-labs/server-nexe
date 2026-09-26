@@ -56,7 +56,8 @@ from core.ingest.ingest_knowledge import (  # noqa: E402
     DEFAULT_PRIORITY,
     DEFAULT_TYPE,
     DOCUMENTATION_COLLECTION as DEFAULT_COLLECTION,
-    SUPPORTED_EXTENSIONS,
+    _discover_documents,
+    read_file,
 )
 from memory.memory.constants import DEFAULT_EMBEDDING_MODEL  # noqa: E402
 from memory.memory.precomputed_loader import (  # noqa: E402
@@ -84,15 +85,10 @@ INGEST_SOURCE = REPO_ROOT / "core" / "ingest" / "ingest_knowledge.py"
 # --------------------------------------------------------------------------- #
 
 def _read_text(path: Path) -> str:
-    """Match ingest_knowledge.py's encoding fallback chain so the chunk
-    text is byte-for-byte identical between this script and the runtime
-    path."""
-    for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
-        try:
-            return path.read_text(encoding=enc)
-        except UnicodeDecodeError:
-            continue
-    return ""
+    """The runtime ingest's reader itself (ADR-008 E3), not a copy of it: the
+    chunk text must be byte-for-byte identical between this script and the
+    runtime path, and the copy that lived here could only ever drift."""
+    return read_file(path)
 
 
 def _build_items_for_file(file_path: Path, target_collection: str, lang: str) -> List[Dict[str, Any]]:
@@ -168,22 +164,15 @@ def _collect_items_for_language(lang: str, *, verbose: bool = False) -> List[Dic
     lang_dir = KNOWLEDGE_ROOT / lang
     if not lang_dir.is_dir():
         return []
-    files: List[Path] = []
-    for ext in SUPPORTED_EXTENSIONS:
-        files.extend(lang_dir.glob(f"**/*{ext}"))
-    files.extend(lang_dir.glob("**/*.pdf"))
-    files = sorted(f for f in files if not f.name.startswith("."))
+    # Same discovery and reader as the runtime ingest (ADR-008 E3): every
+    # format it reads — PDF included, which this script used to skip while the
+    # runtime path ingested it — is embedded here identically.
+    files: List[Path] = _discover_documents(lang_dir)
     if verbose:
         logger.info("lang %s: %d files", lang, len(files))
 
     items: List[Dict[str, Any]] = []
     for f in files:
-        if f.suffix.lower() == ".pdf":
-            # Keep parity with ingest path: PDF handling needs pypdf and
-            # isn't relevant to the static KB today. If we ever add a PDF
-            # to knowledge/, extend here — for now warn and skip.
-            logger.warning("skipping PDF (not yet supported in precompute): %s", f)
-            continue
         items.extend(_build_items_for_file(f, DEFAULT_COLLECTION, lang))
     return items
 

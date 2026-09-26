@@ -5,7 +5,7 @@ id: nexe-usage-guide
 collection: nexe_documentation
 
 # === CONTINGUT RAG (OBLIGATORI) ===
-abstract: "How to use server-nexe 1.0.7: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) with thinking toggle, automatic MEM_SAVE memory, MEM_DELETE (threshold 0.20) with 2-turn clear_all confirmation, PDF/TXT document upload, encryption commands. API examples with curl and Python. How to install models, change language (NEXE_LANG), manage memory."
+abstract: "How to use server-nexe 1.0.7: CLI (nexe go, nexe chat, nexe memory, nexe knowledge, nexe status), Web UI (http://localhost:9119) with thinking toggle, automatic MEM_SAVE memory, MEM_DELETE (threshold 0.20) with 2-turn clear_all confirmation, document upload (PDF, Word, Excel, PowerPoint, EPUB, text, code, CSV/JSON), encryption commands. API examples with curl and Python. How to install models, change language (NEXE_LANG), manage memory."
 tags: [usage, cli, web-ui, chat, memory, knowledge, upload, i18n, loading-indicator, mem-save, api-examples, use-cases, encryption, how-to, commands]
 chunk_size: 600
 priority: P1
@@ -83,6 +83,7 @@ On macOS with tray app installed, the server starts automatically at login.
 | `./nexe chat` | Interactive CLI chat |
 | `./nexe chat` | RAG memory is enabled by default (there is no `--rag` flag; `--no-rag` is accepted but ignored — the pipeline always manages context) |
 | `./nexe chat --verbose` | Chat with RAG weight details per source |
+| `./nexe chat --show-thinking` | Show the model's reasoning in full (folded into one grey line by default). Saved and forgotten facts show as `💾 Desat` and `🗑 Esborrat`, and if the model wants to forget something it asks you to confirm (y/n) |
 | `./nexe status` | Server status |
 | `./nexe modules` | List loaded modules and CLIs |
 | `./nexe memory store "text"` | Save text to memory |
@@ -124,7 +125,7 @@ Access at `http://127.0.0.1:9119/ui`. Requires API key (stored in localStorage a
 
 ### Document Upload
 
-Upload documents via the paperclip button in the chat input. Supported: .txt, .md, .pdf.
+Upload documents via the paperclip button in the chat input. Supported: PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), EPUB, plain text and Markdown, source code (.py, .js, .ts, .java, .go, .rs, .sql...) and data (.csv, .json, .xml, .yaml, .toml). Legacy .doc and .xls are not accepted, nor scanned images (no OCR).
 
 - Documents indexed into `user_knowledge` collection with session_id
 - Only visible within the uploading session (no cross-session contamination)
@@ -140,7 +141,7 @@ The model automatically extracts and saves facts from conversations:
 - User says "Forget my name" → MEM_DELETE: similarity search (**threshold 0.20** since v0.9.9, previously 0.70), deletes closest match, anti-re-save guard
 - Next conversation: "What's my name?" → RAG retrieves "name=Jordi" → model answers correctly
 
-No extra commands needed. Works in both CLI and Web UI. Indicators: `[MEM:N]` badge shows count of saved facts.
+No extra commands needed. Works in both CLI and Web UI. Indicators: the saved badge lists the facts the server actually kept, on the same message (`💾 Saved: …` in the CLI). If the model says it will remember something but nothing was stored, no badge appears.
 
 ### Full wipe (`CLEAR_ALL`) — 2-turn confirmation
 

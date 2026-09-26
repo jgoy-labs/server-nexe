@@ -145,7 +145,7 @@ El menú del tray (veure `INSTALLATION.md` — App de safata (NexeTray, macOS)) 
 | Tipus de dada | On pot aparèixer al log |
 |---------------|------------------------|
 | **Converses** | Fragments de missatges que has enviat al xat (truncats a 200 caràcters per defecte, però encara llegibles) |
-| **Resultats RAG** | Trossos de documents que has pujat (`.txt`, `.md`, `.pdf`) |
+| **Resultats RAG** | Trossos de documents que has pujat (PDF, Word, Excel, text...) |
 | **Memòria personal** | Fets emmagatzemats via MEM_SAVE (noms, preferències, projectes) |
 | **Paths locals** | `/Users/tu/...` i noms de carpetes del teu equip |
 | **Session IDs** | Identificadors d'activitat (útil per correlacionar, però no personal per se) |

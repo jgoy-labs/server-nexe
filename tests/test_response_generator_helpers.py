@@ -6,15 +6,15 @@ import asyncio
 from core.memory_facts.write import JUNK_RE as _JUNK_PATTERNS_RE
 from core.memory_facts.write import NAME_CLAIM_RE as _NAME_CLAIM_RE
 from core.memory_facts.write import filter_facts as _filter_facts
+# C4.4: the model's text format moved to core/turn/text/; the door keeps the rest.
+from core.turn.text.chunks import normalize_content as _normalize_content
+from core.turn.text.chunks import parse_chunk as _parse_chunk
+from core.turn.text.clean import CTX_HEADERS_RE as _CTX_HEADERS_RE
+from core.turn.text.clean import clean_full_response as _clean_full_response
+from core.turn.text.think import process_content_think_tags as _process_content_think_tags
 from plugins.web_ui_module.api.routes_chat import (
-    _parse_chunk,
-    _normalize_content,
-    _CTX_HEADERS_RE,
-    _process_content_think_tags,
     _build_mem_stats,
     _yield_response_headers,
-    _clean_full_response,
-    _yield_reprompt,
 )
 
 
@@ -548,92 +548,3 @@ class TestCleanFullResponse:
             "[OBLIT: L'usuari vol esborrar un record]"
         )
         assert len(deletes) == 1
-
-
-# ─── _yield_reprompt ──────────────────────────────────────────────────────────
-
-class _FakeSig:
-    parameters = {"model": None, "messages": None, "stream": None}
-
-class _FakeSigNoModel:
-    parameters = {"messages": None, "stream": None}
-
-def _make_engine(*chunks):
-    """Returns a FakeEngine that yields the given chunks."""
-    async def _gen(**kwargs):
-        for c in chunks:
-            yield c
-
-    class _Engine:
-        def chat(self, model, messages, stream, thinking_enabled):
-            return _gen()
-
-    return _Engine()
-
-
-class TestYieldReprompt:
-    def test_reprompt_ok_yields_and_sets_rp_out(self):
-        engine = _make_engine("hola", " món")
-        rp_out: list = []
-        chunks = _collect(_yield_reprompt(
-            engine, "llama3", _FakeSig(), "ca",
-            "sys", [], ["l'usuari es diu Joan"], False, rp_out,
-        ))
-        assert "".join(chunks) == "hola món"
-        assert rp_out == ["hola món"]
-
-    def test_reprompt_no_model_param_skips(self):
-        rp_out: list = []
-        chunks = _collect(_yield_reprompt(
-            None, "llama3", _FakeSigNoModel(), "ca",
-            "sys", [], ["fact"], False, rp_out,
-        ))
-        assert chunks == []
-        assert rp_out == []
-
-    def test_reprompt_engine_exception_leaves_rp_out_empty(self):
-        class _BadEngine:
-            def chat(self, model, messages, stream, thinking_enabled):
-                raise RuntimeError("engine down")
-
-        rp_out: list = []
-        chunks = _collect(_yield_reprompt(
-            _BadEngine(), "llama3", _FakeSig(), "ca",
-            "sys", [], ["fact"], False, rp_out,
-        ))
-        assert chunks == []
-        assert rp_out == []
-
-    def test_reprompt_empty_mem_saves_skips(self):
-        rp_out: list = []
-        chunks = _collect(_yield_reprompt(
-            None, "llama3", _FakeSig(), "ca",
-            "sys", [], [], False, rp_out,
-        ))
-        assert chunks == []
-        assert rp_out == []
-
-    def test_reprompt_keeps_visible_after_complete_think(self):
-        """B124: one chunk with a complete <think>…</think> plus trailing visible
-        text must yield the visible text (the post-</think> reply was dropped and
-        in_think wrongly stayed True). Mutation 'search </think> in the truncated
-        pre-<think> slice' → chunks == [] → red."""
-        engine = _make_engine("<think>reasoning</think>Hola Joan")
-        rp_out: list = []
-        chunks = _collect(_yield_reprompt(
-            engine, "llama3", _FakeSig(), "ca",
-            "sys", [], ["fact"], False, rp_out,
-        ))
-        assert "".join(chunks) == "Hola Joan"
-        assert rp_out == ["Hola Joan"]
-
-    def test_reprompt_strips_mem_save_tags(self):
-        engine = _make_engine("text [MEM_SAVE: fake] fi")
-        rp_out: list = []
-        chunks = _collect(_yield_reprompt(
-            engine, "llama3", _FakeSig(), "ca",
-            "sys", [], ["fact"], False, rp_out,
-        ))
-        joined = "".join(chunks)
-        assert "[MEM_SAVE:" not in joined
-        assert "text" in joined

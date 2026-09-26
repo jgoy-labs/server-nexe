@@ -33,6 +33,7 @@ NexeUI.extend({
             .replace(/\[GEN_TRUNCATED:\d\]/g, '')       // FD-S5 marker (belt-and-braces)
             .replace(/\[MEM_DELETE:[^\]]*\]/g, '')     // [MEM_DELETE: ...]
             .replace(/\[MEMORIA:[^\]]*\]/g, '')        // [MEMORIA: ...] gpt-oss alias
+            .replace(/\[(?:OLVIDA|OBLIT|FORGET):[^\]]*\]/gi, '')  // the other forget spellings the extractor reads
             .trimStart();                               // leading whitespace after strip
 
         // Use marked.js to render Markdown

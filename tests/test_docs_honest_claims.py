@@ -14,11 +14,13 @@ REPO = Path(__file__).resolve().parents[1]
 def test_v1_endpoint_status_consistency():
     """B7: statuses declared in v1.py match empirical reality.
 
-    Endpoints that return 501 (`embeddings/encode`, `rag/search`,
-    `documents/`) CANNOT declare `status: "implemented"` in the v1 registry.
+    Endpoints that return 501 (`embeddings/encode`) CANNOT declare
+    `status: "implemented"` in the v1 registry. The `rag` and `documents`
+    stubs were retired (ADR-008 E2, they answer 404), so the registry must
+    not list them at all — advertising a route that is gone is the same lie.
     """
     text = (REPO / "core/endpoints/v1.py").read_text(encoding="utf-8")
-    for endpoint in ("embeddings", "rag", "documents"):
+    for endpoint in ("embeddings",):
         block = re.search(
             rf'"{endpoint}":\s*\{{[^}}]*"status":\s*"([^"]+)"',
             text,
@@ -27,6 +29,10 @@ def test_v1_endpoint_status_consistency():
         status = block.group(1)
         assert status != "implemented", (
             f"{endpoint} status = {status!r} but the endpoint returns 501"
+        )
+    for retired in ("rag", "documents"):
+        assert not re.search(rf'"{retired}":\s*\{{', text), (
+            f"{retired!r} is still listed in v1.py but the route was retired"
         )
 
 

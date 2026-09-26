@@ -145,7 +145,7 @@ El menu del tray (ver `INSTALLATION.md` — App de bandeja (NexeTray, macOS)) ti
 | Tipo de dato | Donde puede aparecer en el log |
 |--------------|-------------------------------|
 | **Conversaciones** | Fragmentos de mensajes que has enviado al chat (truncados a 200 caracteres por defecto, pero aun legibles) |
-| **Resultados RAG** | Trozos de documentos que has subido (`.txt`, `.md`, `.pdf`) |
+| **Resultados RAG** | Trozos de documentos que has subido (PDF, Word, Excel, texto...) |
 | **Memoria personal** | Hechos almacenados via MEM_SAVE (nombres, preferencias, proyectos) |
 | **Paths locales** | `/Users/tu/...` y nombres de carpetas de tu equipo |
 | **Session IDs** | Identificadores de actividad (util para correlacion, no personal per se) |

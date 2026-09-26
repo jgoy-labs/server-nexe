@@ -27,6 +27,17 @@ except Exception:
     _NEXE_VERSION = "unknown"
 
 
+#: Images the picker also takes: they go to the vision path, not to the loaders.
+_IMAGE_ACCEPT = ("image/jpeg", "image/png", "image/webp")
+
+
+def upload_accept() -> str:
+    """The `accept=` of the document picker: every loader extension + images."""
+    from core.files.loaders import supported_extensions  # deferred: layering gate
+
+    return ",".join(sorted(supported_extensions()) + list(_IMAGE_ACCEPT))
+
+
 def register_static_routes(router: APIRouter, *, module_ref):
     """Register endpoints: GET / (HTML), GET /static/{filename}"""
 
@@ -48,6 +59,10 @@ def register_static_routes(router: APIRouter, *, module_ref):
         html = html.replace('.css"', f'.css?v={_BOOT_TS}"')
         html = html.replace('.js"', f'.js?v={_BOOT_TS}"')
         html = html.replace('{{NEXE_VERSION}}', f'v{_NEXE_VERSION}')
+        # The file picker offers what the server can read — the loader
+        # registry's list, not a copy of it in the HTML (ADR-008 E3). After the
+        # cache-bust replaces, which would otherwise rewrite a `.js"`/`.css"`.
+        html = html.replace('{{NEXE_UPLOAD_ACCEPT}}', upload_accept())
         return HTMLResponse(content=html)
 
     # -- GET /static/{filename:path} --

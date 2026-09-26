@@ -220,17 +220,15 @@ class TestWebUiHandlerEndToEnd:
         session = h.session_mgr.get_or_create_session(sid)
         assert session.lang == "ca"
 
-        # Torn 2: anglès llarg (candidat a pending) — resposta "tallada"
+        # Torn 2: anglès llarg — des del 25/09 canvia al 1r missatge clar
         await self._run_turn(h, state, {**base, "message": "please explain the whole session memory system in detail"})
-        assert session.lang == "ca", "1 sol torn anglès no pot flipar (histèresi)"
-        assert session.lang_pending == "en"
+        assert session.lang == "en"
         session.messages.append({"role": "user", "content": "please explain the whole session memory system in detail"})
         session.messages.append({"role": "assistant", "content": "una resposta catalana tallada a mig"})
 
-        # Continue: NO pot confirmar la histèresi ni flipar
+        # Continue: no torna a resoldre l'idioma — el torn continuat el fixa
         await self._run_turn(h, state, {**base, "continue": True})
-        assert session.lang == "ca", "el continue ha flipat l'sticky (transversal reobert)"
-        assert session.lang_pending == "en", "el continue ha de deixar la histèresi INTACTA"
+        assert session.lang == "en", "el continue ha canviat l'idioma del torn que continua"
         assert compute_system_hash(engine.systems[1]) == compute_system_hash(
             engine.systems[2]
         ), "el system del continue ha de compartir prefix amb el torn que continua"

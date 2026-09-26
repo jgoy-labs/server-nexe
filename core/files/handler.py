@@ -14,20 +14,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Tuple
 
+from core.files import loaders
+from core.files.loaders import MAX_FILE_SIZE  # the doors cap their reads with _fh.MAX_FILE_SIZE (MC-078)
+from core.files.loaders.pdf import extract_pdf, looks_glued
+
 logger = logging.getLogger(__name__)
 
-# Supported formats (in sync with core/ingest/ingest_knowledge.py)
-SUPPORTED_EXTENSIONS = {".txt", ".md", ".markdown", ".text", ".pdf"}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-
-# Magic bytes for MIME validation (SEC-004)
-MAGIC_BYTES = {
-    ".pdf": [b"%PDF"],
-    ".txt": None,    # text — validated via UTF-8 decode
-    ".md": None,
-    ".markdown": None,
-    ".text": None,
-}
+# Supported formats — derived from the loader registry (ADR-008 E3, #1070), the
+# one list uploads, the knowledge ingest, the CLI and the web picker agree on.
+SUPPORTED_EXTENSIONS = loaders.supported_extensions()
 CHUNK_SIZE = 2500  # chars per chunk
 CHUNK_OVERLAP = 200  # overlap between chunks for context
 
@@ -39,7 +34,7 @@ class FileHandler:
     Features:
     - Extension validation
     - Size limits
-    - Content extraction (txt, md, pdf)
+    - Content extraction through the loader registry (core/files/loaders)
     - Temporary storage
     """
 
@@ -60,26 +55,30 @@ class FileHandler:
             (valid, error_message)
         """
         ext = Path(filename).suffix.lower()
+        loader = loaders.get_loader(filename)
 
-        if ext not in SUPPORTED_EXTENSIONS:
-            supported = ", ".join(SUPPORTED_EXTENSIONS)
+        if loader is None:
+            supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
             return False, f"Unsupported format. Valid formats: {supported}"
 
         if file_size > MAX_FILE_SIZE:
             max_mb = MAX_FILE_SIZE / (1024 * 1024)
             return False, f"File too large. Maximum: {max_mb}MB"
 
-        # Validate magic bytes (SEC-004)
-        if content_bytes and ext in MAGIC_BYTES and MAGIC_BYTES[ext] is not None:
-            valid_magic = any(content_bytes[:len(m)] == m for m in MAGIC_BYTES[ext])  # type: ignore[union-attr]  # FP: mypy does not narrow subscript post-is-not-None check (L72 already checks MAGIC_BYTES[ext] is not None)
-            if not valid_magic:
+        # Validate magic bytes (SEC-004): %PDF, the zip header of the Office
+        # formats — whatever the registered loader declares.
+        if content_bytes and loader.magic is not None:
+            if not any(content_bytes.startswith(m) for m in loader.magic):
                 logger.warning(f"Magic bytes mismatch for {filename} (ext={ext})")
                 return False, f"File content does not match {ext} format"
 
-        # Text files: verify UTF-8 decodable
-        if content_bytes and ext in {".txt", ".md", ".markdown", ".text"}:
+        # Text formats: the WHOLE content must be UTF-8. Decoding only the
+        # first 4096 bytes refused valid text whose multi-byte character
+        # straddled byte 4096, and let invalid bytes after it through to an
+        # extraction that then raised (measured, ADR-008 E3).
+        if content_bytes and loader.is_text:
             try:
-                content_bytes[:4096].decode("utf-8")
+                content_bytes.decode("utf-8")
             except UnicodeDecodeError:
                 logger.warning(f"Non-UTF-8 content in text file {filename}")
                 return False, "File content is not valid UTF-8 text"
@@ -146,88 +145,36 @@ class FileHandler:
 
     def extract_text(self, file_path: Path) -> str:
         """
-        Extract text from the file according to its format
+        Extract text from the file with the loader its extension names
 
         Args:
             file_path: Path to the file
 
         Returns:
-            Text content
+            Text content; "" for an unsupported extension or a file the
+            loader cannot read (the caller turns that into FILE_EXTRACT_FAILED)
         """
-        ext = file_path.suffix.lower()
+        try:
+            return loaders.extract_text(file_path)
+        except loaders.UnsupportedFormatError:
+            return ""
+        except Exception as e:
+            logger.error(f"Error extracting {file_path.suffix.lower()} text from {file_path.name}: {e}")
+            return ""
 
-        if ext in {".txt", ".md", ".markdown", ".text"}:
-            return file_path.read_text(encoding="utf-8")
-
-        elif ext == ".pdf":
-            try:
-                return self._extract_pdf_sync(file_path)
-            except Exception as e:
-                logger.error(f"Error extracting PDF: {e}")
-                return ""
-
-        return ""
-
-    @staticmethod
-    def _looks_glued(text: str) -> bool:
-        """B026: detect pypdf output that lost inter-word spaces.
-
-        PDFs with non-standard font encodings come out as
-        'véroInecesitatuempresahoymismo' — normal prose has ~15% spaces,
-        glued text has almost none. Short texts are not judged (tables,
-        headers and code pages legitimately have few spaces).
-        """
-        stripped = text.strip()
-        if len(stripped) < 200:
-            return False
-        space_ratio = stripped.count(" ") / len(stripped)
-        return space_ratio < 0.05
+    # B026 lives in core/files/loaders/pdf.py since ADR-008 E3 (#1070), so the
+    # knowledge ingest reads PDFs with it too. Kept here as the names the
+    # handler has always answered to.
+    _looks_glued = staticmethod(looks_glued)
 
     def _extract_pdf_sync(self, file_path: Path) -> str:
-        """Extract text from PDF (sync, CPU-bound).
-
-        B026: pypdf's default extraction loses inter-word spaces and breaks
-        ligatures on PDFs with non-standard encodings, poisoning the RAG index
-        with unreadable text. Per page: if the default output looks glued,
-        retry with extraction_mode="layout" (reconstructs spacing from glyph
-        positions). The whole text is NFKC-normalized at the end — resolves
-        ligature codepoints (ﬁ → fi) and recomposes decomposed accents (ı́ → í).
-        """
-        import re as _re
-        import unicodedata as _ud
-        from pypdf import PdfReader
-        reader = PdfReader(file_path)
-        total_pages = len(reader.pages)
-        logger.info(f"PDF '{file_path.name}': {total_pages} pages, extracting...")
-        pages = []
-        relaid_count = 0
-        for i, page in enumerate(reader.pages):
-            page_text = page.extract_text() or ""
-            if self._looks_glued(page_text):
-                try:
-                    relaid = page.extract_text(extraction_mode="layout") or ""
-                    if relaid and not self._looks_glued(relaid):
-                        # Layout mode pads columns with spaces — collapse runs.
-                        page_text = _re.sub(r"[ \t]{2,}", " ", relaid)
-                        relaid_count += 1
-                except Exception as e:
-                    logger.debug(f"  PDF layout-mode retry failed on page {i + 1}: {e}")
-            pages.append(page_text)
-            if (i + 1) % 50 == 0:
-                logger.info(f"  PDF: {i+1}/{total_pages} pages")
-        if relaid_count:
-            logger.info(f"PDF '{file_path.name}': {relaid_count} glued page(s) re-extracted in layout mode")
-        text = _ud.normalize("NFKC", "\n".join(pages) + "\n")
-        logger.info(f"PDF '{file_path.name}': {total_pages} pages -> {len(text)} chars extracted")
-        return text
+        """Extract text from PDF (sync, CPU-bound) — see loaders/pdf.py."""
+        return extract_pdf(file_path)
 
     async def extract_text_async(self, file_path: Path) -> str:
-        """Extract text asynchronously (offloads PDF to thread)."""
+        """Extract text in a worker thread — every parser here is CPU-bound."""
         import asyncio
-        ext = file_path.suffix.lower()
-        if ext == ".pdf":
-            return await asyncio.to_thread(self._extract_pdf_sync, file_path)
-        return self.extract_text(file_path)
+        return await asyncio.to_thread(self.extract_text, file_path)
 
     def chunk_text(self, text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list:
         """

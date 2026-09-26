@@ -221,7 +221,7 @@ class TestWebUiInjectContext:
 
 class TestCtxHeadersStripNonce:
     def test_model_echo_of_nonced_delimiters_is_stripped(self):
-        from plugins.web_ui_module.api.routes_chat import _CTX_HEADERS_RE
+        from core.turn.text.clean import CTX_HEADERS_RE as _CTX_HEADERS_RE
         echoed = "resposta [CONTEXT a1b2c3d4] cos [FI CONTEXT a1b2c3d4] final [FI CONTEXT]"
         cleaned = _CTX_HEADERS_RE.sub('', echoed)
         assert "CONTEXT" not in cleaned

@@ -55,12 +55,12 @@ class TestExtraction:
 class TestBothDoorsReadTheSame:
 
     def test_extraction_is_identical_for_both_doors(self):
-        """The UI reads through _clean_full_response, /v1 through its adapter;
+        """The UI reads through clean_full_response, /v1 through its adapter;
         both land on the same function, so the same text means the same thing."""
-        import plugins.web_ui_module.api.routes_chat as rc
+        from core.turn.text.clean import clean_full_response
 
         text = "Molt bé. [MEM_SAVE: L'usuari viu a Manresa] [MEM_DELETE: el gat es diu Mite]"
-        ui_clean, ui_facts, ui_deletes = rc._clean_full_response(text, user_input="visc a Manresa")
+        ui_clean, ui_facts, ui_deletes = clean_full_response(text, user_input="visc a Manresa")
         core_clean, core_facts, core_deletes = extract_memory_tags(text, user_input="visc a Manresa")
 
         assert (ui_facts, ui_deletes) == (core_facts, core_deletes)
@@ -81,15 +81,27 @@ class TestBothDoorsReadTheSame:
         assert content == "Entesos!"
         assert ctx.facts == ["L'usuari viu a Manresa"]
 
-    async def test_v1_streaming_says_it_could_not_strip_them(self):
-        """Known limit until C4 — written down, not silent."""
+    async def test_v1_json_does_not_ship_think_raw(self):
+        """C4.4-b: the JSON reply goes through the core's one cleaner too."""
+        table = api_adapters(BackgroundTasks())
+        ctx = TurnContext(turn_id="t", entry="api")
+        ctx.wire = _wire("<think>raonament</think>La resposta és 42.")
+
+        await table["postprocess"](ctx)
+
+        assert ctx.wire["choices"][0]["message"]["content"] == "La resposta és 42."
+
+    async def test_v1_streaming_says_what_it_still_does_not_do(self):
+        """C4.4-b: the stream is cleaned (SseCleaner), but the facts in it are
+        not read — this door's turn ends before the stream is generated.
+        Written down, not silent, until /v1 walks stream_turn (C4.6)."""
         table = api_adapters(BackgroundTasks())
         ctx = TurnContext(turn_id="t", entry="api")
         ctx.wire = MagicMock()  # a StreamingResponse-like object, not a dict
 
         await table["postprocess"](ctx)
 
-        assert "postprocess" in ctx.usage.get("degraded", {})
+        assert ctx.usage["degraded"]["postprocess"] == "streaming: tags stripped, facts not extracted (C4.6)"
 
     def test_the_step_map_says_both_doors(self):
         from core.turn.steps import TURN_STEPS

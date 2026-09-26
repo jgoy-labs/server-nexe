@@ -155,7 +155,7 @@ Aplicació Tauri v2 per macOS (DMG), Linux (AppImage) i Windows ARM64 (installer
 <td width="50%">
 
 ### Pujada de Documents amb Aïllament de Sessió
-Puja .txt, .md o .pdf i s'indexen automàticament per RAG. Cada document només és visible dins la sessió on s'ha pujat — sense contaminació creuada entre sessions.
+Puja PDF, Word, Excel, PowerPoint, EPUB, text, codi font o dades (CSV, JSON, XML, YAML) i s'indexen automàticament per RAG. Cada document només és visible dins la sessió on s'ha pujat — sense contaminació creuada entre sessions.
 
 </td>
 <td width="50%">
@@ -436,6 +436,7 @@ server-nexe està construït sobre les espatlles d'aquests projectes open-source
 - [Rich](https://github.com/Textualize/rich) — Formatació bonica per terminal
 - [marked.js](https://marked.js.org) — Renderització Markdown a la web UI
 - [PyPDF](https://github.com/py-pdf/pypdf) — Extracció de text de PDFs per RAG
+- [python-docx](https://github.com/python-openxml/python-docx), [openpyxl](https://openpyxl.readthedocs.io), [python-pptx](https://github.com/scanny/python-pptx) i [lxml](https://lxml.de) — Extracció de text de Word, Excel, PowerPoint, EPUB i XML
 - [rumps](https://github.com/jaredks/rumps) — Integració amb la barra de menú de macOS
 
 **Seguretat i Monitoratge**

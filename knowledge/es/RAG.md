@@ -119,9 +119,10 @@ server-nexe tiene un sistema de memoria automatica similar a ChatGPT o Claude. E
 **Como funciona:**
 1. El system prompt instruye al modelo a extraer hechos: nombres, trabajos, ubicaciones, preferencias, proyectos, deadlines
 2. El modelo genera marcadores `[MEM_SAVE: hecho]` dentro de su respuesta
-3. routes_chat.py parsea estos marcadores y los elimina del stream visible
-4. Los hechos se guardan en la coleccion `personal_memory`
-5. La UI muestra el indicador `[MEM:N]` con el recuento de hechos guardados
+3. El servidor lee estos marcadores en el nucleo (el mismo codigo para la Web UI, el CLI y `/v1`) y los quita de la respuesta
+4. En el mismo turno, cuando la respuesta ha terminado, los hechos se filtran (basura, cosas olvidadas hace poco, nombres que el usuario no ha escrito) y se guardan en la coleccion `personal_memory` — unos 15 ms por hecho
+5. Entonces el servidor dice que ha guardado: el marcador `[MEM:N:hecho1|hecho2]` (badge de la Web UI, `💾 Desat` en el CLI), `memory_facts` en la respuesta JSON de la Web UI, `nexe_memory_facts` en `/v1`. Solo eso cuenta como guardado: un `[MEM_SAVE:]` que el servidor ha rechazado nunca aparece como guardado
+6. En el primer mensaje de una conversacion solo se guardan los hechos que salen de las palabras del usuario (un modelo pequeno a veces inventa hechos o copia los ejemplos del prompt)
 
 **Deteccion de intenciones (trilingue ca/es/en):**
 - **Guardar:** "Recorda que...", "Guarda en memoria", "Remember that..."
@@ -203,7 +204,7 @@ Los documentos subidos via la Web UI se indexan en la coleccion `user_knowledge`
 - Los documentos persisten dentro de la sesion (no se borran al refrescar la pagina)
 - Los metadatos se generan sin LLM (instantaneo, no requiere modelo)
 
-**Formatos soportados:** .txt, .md, .pdf (con validacion de magic bytes SEC-004)
+**Formatos soportados:** .pdf, .docx, .xlsx, .pptx, .epub, texto (.txt, .md), codigo fuente (.py, .js, .ts, .java, .go, .rs, .sql...) y datos (.csv, .json, .xml, .yaml, .toml). La lista sale de un solo registro de cargadores (`core/files/loaders`), el mismo para las subidas y para la carpeta `knowledge/`. Validacion de contenido (SEC-004): los PDF deben empezar por `%PDF`, los formatos Office/EPUB deben ser un zip (y se rechazan si declaran descomprimirse a mas de 200 MB), y el texto debe ser UTF-8. Nunca se aceptan `.env`, `.ini`, `.conf`, `.cfg`, `.properties` ni `.pkl`. Todavia no: `.doc`/`.xls` antiguos, `.rtf`, imagenes/OCR.
 **Chunking para uploads:** Dinamico segun tamano del documento -- 800 chars (<20K), 1000 (<100K), 1200 (<300K), 1500 (>=300K). Si el documento tiene cabecera RAG valida, se usa el chunk_size especificado.
 
 ## Ingestion de documentos
@@ -299,4 +300,4 @@ storage/vectors/
 - `POST /v1/chat/completions` — Chat con RAG (use_rag: true por defecto)
 - `POST /v1/memory/store` — Guardar texto en una coleccion (usa MemoryService cuando esta inicializado, en caso contrario hace fallback a una escritura directa en Qdrant por resiliencia)
 - `POST /v1/memory/search` — Busqueda semantica directa en una coleccion
-- `DELETE /v1/rag/documents/{id}` — **[planificado, NO implementado]** devuelve 501 Not Implemented (router tagged `future`; los tres endpoints `/v1/rag/*` — search, add, documents/{id} — aun no estan operativos)
+- Los antiguos stubs `/v1/rag/*` (search, add, documents/{id}) se han retirado y responden 404: la recuperacion es la del chat, la busqueda directa es `/v1/memory/search`

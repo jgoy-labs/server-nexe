@@ -61,8 +61,11 @@ class TestValidateFile:
         assert ok is False
         assert len(msg) > 0
 
-    def test_invalid_extension_py(self, fh):
-        ok, _ = fh.validate_file("script.py", 100)
+    def test_invalid_extension_pyc(self, fh):
+        # `.py` is a supported (text) format since ADR-008 E3; its compiled
+        # bytecode is not.
+        ok, _ = fh.validate_file("script.pyc", 100)
+        assert ok is False
         assert _ != ""  # has error message
 
     def test_file_too_large(self, fh):

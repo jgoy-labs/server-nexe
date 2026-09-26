@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
 from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, mark_served_model, resolve_loaded_model_name, persist_v1_turn
-from ._streaming import TokenBridge, _prepend_chunk, format_sse_chunk, format_sse_done, SSE_DONE
+from ._streaming import TokenBridge, _prepend_chunk, format_engine_token, format_sse_done, SSE_DONE
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +144,9 @@ async def _llama_cpp_stream_generator(
         try:
             async for token in bridge:
                 got_any_token = True
-                yield format_sse_chunk(token, model_name, "llamacpp")
+                sse = format_engine_token(token, model_name, "llamacpp")  # ADR-010
+                if sse is not None:
+                    yield sse
 
             await llama_task
         except asyncio.CancelledError:

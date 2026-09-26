@@ -1,9 +1,26 @@
 """
 ────────────────────────────────────
 Server Nexe
-Author: Jordi Goy 
+Author: Jordi Goy
 Location: memory/rag/module.py
-Description: Main RAG Module - Multi-source Retrieval-Augmented Generation system.
+Description: RAG module - a thin facade over the retrieval sources in core/rag/.
+
+ADR-008 E2. This module used to own its own sources: a dict built at
+initialize() holding one `PersonalityRAG` — an in-memory keyword matcher that
+nothing ever wrote to in production, searched by nobody but this module's CLI,
+and described as structurally empty by ADR-002:68. The chat never went
+through it; it retrieves through `core/rag/` (`source_for`, the registry) from
+`core/endpoints/chat_rag.py`. Two retrieval stacks, one of them dead.
+
+So the module no longer keeps sources. It ANSWERS about the ones the turn
+uses: the three system collections (`SYSTEM_COLLECTIONS`) plus whatever is
+registered (`registered_names()`), and its `search()` asks a source exactly
+the way the turn does — `source_for(name).search(memory, RAGQuery(...))` — so
+what the CLI shows is what the chat would retrieve from that source.
+
+The imports of `core/` below are deferred on purpose, like the rest of this
+package (`health.py`): memory/ must not import core/ at import time, and the
+layering gate freezes those edges.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -11,61 +28,21 @@ www.jgoy.net · https://server-nexe.org
 
 from typing import Optional, Dict, Any, List
 import threading
-import time
+import unicodedata
 import structlog
 
 from personality.i18n import get_i18n
-from memory.rag_sources.base import AddDocumentRequest, SearchRequest, SearchHit
 
 logger = structlog.get_logger()
 
-# #1004: RAG_SEARCHES and RAG_SEARCH_DURATION were declared in
-# core/metrics/registry.py, exported in its __all__ and imported by nobody —
-# frozen at zero since the day they were written. `search()` below is the
-# canonical entry point and already carries `source`, which is exactly the
-# label both metrics take.
-#
-# Module-level and guarded, NOT the lazy `_get_metrics()` helper that
-# memory/memory/api/documents.py uses. That helper exists to retry an import
-# per call; there is nothing to retry here — prometheus-client is a hard pin
-# in requirements.txt, core/metrics/registry.py imports nothing beyond logging
-# and prometheus_client (no cycle), and the whole server refuses to start
-# without it anyway (core/server/factory_routers.py mounts /metrics
-# unconditionally). What the guard buys is the rule that instrumentation must
-# never take the RAG search path down with it — and, per #1005, it says so out
-# loud instead of passing.
-try:
-  from core.metrics.registry import RAG_SEARCHES, RAG_SEARCH_DURATION
-except ImportError as _metrics_exc:  # pragma: no cover - see test_1004
-  RAG_SEARCHES = None  # type: ignore[assignment]
-  RAG_SEARCH_DURATION = None  # type: ignore[assignment]
-  logger.warning(
-    "rag_metrics_unavailable",
-    error=str(_metrics_exc),
-    impact="RAG search counter and duration histogram will stay at zero; "
-           "search itself is unaffected",
-  )
-
-# The import succeeding is not the same as the write succeeding. See
-# _record_search_metrics: a metric that raises on `.labels()` must not become
-# the answer to a search that already ran.
-_metrics_write_failed_reported = False
 
 class RAGModule:
   """
-  RAG Module - Multi-source RAG system with Qdrant.
+  RAG Module - introspection and a CLI door onto the chat's retrieval sources.
 
-  Singleton that manages:
-  - Vector stores (Qdrant)
-  - Search i retrieval
-  - TransactionLedger (multi-store coherence)
-  - WriteCoordinator (single-writer policy)
-
-  Features:
-  - Base Singleton structure
-  - Health checks
-  - VectorStore
-  - TransactionLedger integration
+  Singleton loaded by the module manager by class name
+  (`core/modules/module_manager.py::_resolve_memory_class_name`). Owns no
+  source and no store: sources live in `core/rag/` (ADR-008 E2).
 
   Usage:
     module = RAGModule.get_instance()
@@ -92,18 +69,10 @@ class RAGModule:
     self.name = MANIFEST["name"]
     self.version = MANIFEST["version"]
 
-    self._sources: Dict[str, Any] = {}
-
-    self._stats = {
-      "documents_added": 0,
-      "searches_performed": 0,
-      "total_chunks": 0,
-      "cache_hit_rate": 0.0
-    }
-
-    self._vector_store = None
-    self._ledger = None
-    self._write_coordinator = None
+    # ADR-008 E2: only what this module really measures. `documents_added`
+    # went with add_document(); `total_chunks` was summed from a `health()`
+    # the real sources do not have; `cache_hit_rate` was never written.
+    self._stats: Dict[str, Any] = {"searches_performed": 0}
 
     logger.info(
       "rag_module_created",
@@ -128,7 +97,9 @@ class RAGModule:
     """
     Initializes the RAG module.
 
-    Loads RAG sources (PersonalityRAG) and prepares the module for operation.
+    There is nothing to load any more (ADR-008 E2: the sources live in
+    `core/rag/` and exist without this module); what is left is the lifecycle
+    contract the module manager relies on.
 
     Args:
       context: Protocol initialize context (D-C). Module overrides under
@@ -136,9 +107,6 @@ class RAGModule:
 
     Returns:
       bool: True if initialization correct
-
-    Raises:
-      RuntimeError: If already initialized
     """
     if self._initialized:
       logger.warning("rag_module_already_initialized")
@@ -156,33 +124,13 @@ class RAGModule:
         config=final_config
       )
 
-      from memory.rag_sources.personality import PersonalityRAG
-
-      logger.debug("Loading PersonalityRAG source...")
-      personality_rag = PersonalityRAG()
-
-      self._sources = {
-        "personality": personality_rag
-      }
-
-      logger.info(
-        "rag_sources_loaded",
-        sources=list(self._sources.keys())
-      )
-
-      self._stats = {
-        "documents_added": 0,
-        "searches_performed": 0,
-        "total_chunks": 0,
-        "cache_hit_rate": 0.0
-      }
-
+      self._stats = {"searches_performed": 0}
       self._initialized = True
 
       logger.info(
         "rag_module_initialized",
         version=self.version,
-        sources_count=len(self._sources),
+        sources=self.list_sources(),
         initialized=self._initialized
       )
 
@@ -200,11 +148,6 @@ class RAGModule:
     """
     Graceful module shutdown.
 
-    Cleanup:
-    - Flush pending writes
-    - Close vector store
-    - Shutdown WriteCoordinator
-
     Returns:
       bool: True if shutdown correct
     """
@@ -212,228 +155,113 @@ class RAGModule:
       logger.warning("rag_module_not_initialized_shutdown")
       return True
 
-    try:
-      logger.info("rag_module_shutting_down")
+    logger.info("rag_module_shutting_down")
+    self._initialized = False
+    logger.info("rag_module_shutdown_complete")
+    return True
 
-      self._initialized = False
-      self._vector_store = None
-      self._ledger = None
-      self._write_coordinator = None
-
-      logger.info("rag_module_shutdown_complete")
-      return True
-
-    except Exception as e:
-      logger.error(
-        "rag_module_shutdown_failed",
-        error=str(e),
-        exc_info=True
-      )
-      return False
-
-  async def add_document(
-    self,
-    request: AddDocumentRequest,
-    source: str = "personality"
-  ) -> str:
+  def list_sources(self) -> List[str]:
     """
-    Add document to a RAG source.
+    The sources the chat retrieves from: the three system collections plus
+    every registered source — the same union `chat_rag` builds.
 
-    Args:
-      request: AddDocumentRequest with text and metadata
-      source: RAG source name (default: "personality")
+    `SYSTEM_COLLECTIONS` is the one place the three names are spelled (#896);
+    `core/rag/collections.py` builds its sources from the same constants.
+
+    Does not include collections a plugin created at runtime without
+    registering a source: those are discovered live from the store by the
+    turn, and this module has no store to ask.
 
     Returns:
-      doc_id: Unique document ID
-
-    Raises:
-      RuntimeError: If module not initialized
-      ValueError: If source unknown
+      List of source names, system first, no duplicates
     """
-    if not self._initialized:
-      raise RuntimeError("RAGModule not initialized. Call initialize() first.")
+    from core.memory_access import SYSTEM_COLLECTIONS
+    from core.rag.registry import registered_names
 
-    if source not in self._sources:
-      raise ValueError(
-        f"Unknown RAG source: {source}. "
-        f"Available: {list(self._sources.keys())}"
-      )
-
-    rag_source = self._sources[source]
-
-    try:
-      doc_id = await rag_source.add_document(request)
-
-      self._stats["documents_added"] += 1
-
-      logger.info(
-        "document_added",
-        doc_id=doc_id,
-        source=source,
-        text_len=len(request.text),
-        total_docs=self._stats["documents_added"]
-      )
-
-      return doc_id
-
-    except Exception as e:
-      logger.error(
-        "add_document_failed",
-        error=str(e),
-        source=source,
-        exc_info=True
-      )
-      raise
-
-  async def search(
-    self,
-    request: SearchRequest,
-    source: str = "personality"
-  ) -> List[SearchHit]:
-    """
-    Search relevant documents.
-
-    Args:
-      request: SearchRequest with query and top_k
-      source: RAG source name (default: "personality")
-
-    Returns:
-      List[SearchHit]: Results ordered by score
-
-    Raises:
-      RuntimeError: If module not initialized
-      ValueError: If source unknown
-    """
-    if not self._initialized:
-      raise RuntimeError("RAGModule not initialized. Call initialize() first.")
-
-    if source not in self._sources:
-      raise ValueError(
-        f"Unknown RAG source: {source}. "
-        f"Available: {list(self._sources.keys())}"
-      )
-
-    rag_source = self._sources[source]
-
-    # Only the search itself is timed — everything above is argument checking
-    # that would drag the histogram down towards zero and hide the real
-    # latency of the backend.
-    _started = time.perf_counter()
-    try:
-      results = await rag_source.search(request)
-
-      self._stats["searches_performed"] += 1
-
-      logger.info(
-        "search_performed",
-        query=request.query,
-        source=source,
-        results_count=len(results),
-        total_searches=self._stats["searches_performed"]
-      )
-
-      return results
-
-    except Exception as e:
-      logger.error(
-        "search_failed",
-        error=str(e),
-        source=source,
-        query=request.query,
-        exc_info=True
-      )
-      raise
-
-    finally:
-      self._record_search_metrics(source, time.perf_counter() - _started)
-
-  @staticmethod
-  def _record_search_metrics(source: str, elapsed_seconds: float) -> None:
-    """Publish one completed search attempt to Prometheus (#1004).
-
-    Counted AND timed on both outcomes on purpose. Both metrics carry a single
-    `source` label and no `status`, so there is no way to tell the two apart in
-    the series; a counter that dropped failures would under-report load exactly
-    when the backend is breaking, and a histogram that dropped them would lose
-    the slow timeouts that are the whole reason to keep a latency histogram.
-    Keeping both on the same rule also keeps the pair consistent:
-    `core_rag_search_duration_seconds_count` always equals
-    `core_rag_searches_total`, which is what a Prometheus reader expects of a
-    counter and a histogram sharing a label set.
-
-    This deliberately does NOT match `self._stats["searches_performed"]`, which
-    counts successes only and is what the module reports in its health block.
-    Separating the two in the series would need a `status` label — a change to
-    the registry's label set, filed rather than smuggled in here.
-
-    Nothing this method does can reach the caller. It runs from the `finally`
-    of `search()`, so an exception raised here does not merely add noise — it
-    REPLACES the search's outcome: a search that completed comes back as a
-    500, and a search that failed comes back reporting the metric error while
-    the real diagnosis (the backend that went down) survives only in
-    `__context__`, which no HTTP body ever shows. The `None` guard above is not
-    enough for that: it covers "the registry could not be imported", not "the
-    registry is there and the write raises". The realistic trigger is the very
-    follow-up this finding files — adding a `status` label to the registry
-    makes every `labels(source=...)` call raise `ValueError: Incorrect label
-    names`, which would turn EVERY RAG search into a 500 from a change that
-    touched no search code at all.
-
-    Reported once per process, then silent. What is lost here is a pair of
-    counters — a uniform loss that one line describes in full, the same rule
-    `memory/memory/api/documents.py` follows — and the failure is
-    deterministic: a label-set mismatch fails identically on every search from
-    start-up, so repeating the line adds no information while a chat session
-    fires several searches a turn.
-    """
-    global _metrics_write_failed_reported
-    if RAG_SEARCHES is None or RAG_SEARCH_DURATION is None:
-      return
-    try:
-      RAG_SEARCHES.labels(source=source).inc()
-      RAG_SEARCH_DURATION.labels(source=source).observe(elapsed_seconds)
-    except Exception as exc:
-      # Deliberately bare: whatever prometheus_client (or a mis-shaped
-      # registry) throws, a search that already ran must still be the answer.
-      if not _metrics_write_failed_reported:
-        _metrics_write_failed_reported = True
-        logger.warning(
-          "rag_metrics_write_failed",
-          error=str(exc),
-          source=source,
-          impact="core_rag_searches_total and core_rag_search_duration_seconds "
-                 "will stay flat until the process restarts; search itself is "
-                 "unaffected. Not repeated for later searches.",
-        )
+    return list(dict.fromkeys([*SYSTEM_COLLECTIONS, *registered_names()]))
 
   def get_source(self, name: str) -> Any:
     """
     Gets a RAG source by name.
 
+    `source_for()` never refuses — for an unknown name it builds #896's
+    generic fallback — so the membership guard lives here: this module
+    answers for the sources it lists, and a typo must be an error, not a
+    search of a collection that does not exist.
+
     Args:
       name: Source name
 
     Returns:
-      RAG source instance
+      The `RAGSource` that answers for `name`
 
     Raises:
       ValueError: If source does not exist
     """
-    if name not in self._sources:
+    available = self.list_sources()
+    if name not in available:
       raise ValueError(
         f"Unknown RAG source: {name}. "
-        f"Available: {list(self._sources.keys())}"
+        f"Available: {available}"
       )
-    return self._sources[name]
+    from core.rag.collections import source_for
 
-  def list_sources(self) -> List[str]:
+    return source_for(name)
+
+  async def search(
+    self,
+    query: str,
+    source: str,
+    top_k: Optional[int] = None,
+    lang: str = "en",
+  ) -> List[Any]:
     """
-    Lists available RAG sources.
+    Search one source the way the chat does.
+
+    The query is NFKC-normalized (the ingest path's normalization, which the
+    turn mirrors) and asked of `source_for(source)` with the real MemoryAPI.
+    Each source applies its own tuned threshold, top_k and language filter,
+    so `top_k` can only cap what the source returns, never widen it.
+
+    Prometheus metrics are NOT recorded here: they measure the SERVER's
+    retrieval and are written in `core/endpoints/chat_rag.py`; this is a CLI
+    door, run in a process with no /metrics to scrape.
+
+    Args:
+      query: Text to search for
+      source: Source name (one of `list_sources()`)
+      top_k: Optional cap on the number of results
+      lang: Language of the query (`user_knowledge` filters by it)
 
     Returns:
-      List of source names
+      The source's results (e.g. `SearchResult`), best first
+
+    Raises:
+      RuntimeError: If module not initialized
+      ValueError: If source unknown
     """
-    return list(self._sources.keys())
+    if not self._initialized:
+      raise RuntimeError("RAGModule not initialized. Call initialize() first.")
+
+    rag_source = self.get_source(source)
+
+    from core.rag.source import RAGQuery
+    from memory.memory.api.v1 import get_memory_api
+
+    memory = await get_memory_api()
+    text = unicodedata.normalize("NFKC", query)
+    results = await rag_source.search(memory, RAGQuery(text=text, lang=lang))
+    if top_k is not None:
+      results = results[:top_k]
+
+    self._stats["searches_performed"] += 1
+    logger.info(
+      "search_performed",
+      source=source,
+      results_count=len(results),
+      total_searches=self._stats["searches_performed"]
+    )
+    return results
 
   def get_health(self) -> Dict[str, Any]:
     """
@@ -455,16 +283,6 @@ class RAGModule:
     Returns:
       Dict with manifest metadata, sources, and stats
     """
-    total_chunks = 0
-    if self._initialized:
-      for source in self._sources.values():
-        health = source.health()
-        total_chunks += health.get("num_chunks", 0)
-
-    current_stats = self._stats.copy() if self._initialized else {}
-    if self._initialized:
-      current_stats["total_chunks"] = total_chunks
-
     return {
       "module_id": self.module_id,
       "name": self.name,
@@ -472,8 +290,8 @@ class RAGModule:
       "description": self.manifest.get("description", ""),
       "capabilities": self.manifest.get("capabilities", []),
       "initialized": self._initialized,
-      "sources": list(self._sources.keys()) if self._initialized else [],
-      "stats": current_stats,
+      "sources": self.list_sources() if self._initialized else [],
+      "stats": self._stats.copy() if self._initialized else {},
       "config": self.manifest.get("default_config", {})
     }
 

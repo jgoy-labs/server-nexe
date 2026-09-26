@@ -36,7 +36,6 @@ from .chat_sanitization import (
 )
 from .chat_rag import (
     build_rag_context,
-    _rag_result_to_text,
     _RAG_CONTEXT_LABELS,
     RAG_DOCS_THRESHOLD,
     RAG_KNOWLEDGE_THRESHOLD,
@@ -132,14 +131,10 @@ def _resolve_request_lang(session_key: str, user_text: str) -> str:
         and detected != sticky
         and natural_text_len(user_text) >= _STICKY_LANG_MIN_SWITCH_CHARS
     ):
-        if state["pending"] == detected:
-            state["lang"] = detected
-            state["pending"] = None
-            return detected
-        state["pending"] = detected
-        return sticky
-    if detected == sticky and state["pending"] is not None:
-        state["pending"] = None  # the conversation reaffirms the sticky language
+        # 25/09: switch on the FIRST clear message, as the web door does.
+        state["lang"] = detected
+        state["pending"] = None
+        return detected
     return sticky
 
 
@@ -849,7 +844,6 @@ __all__ = [
     "CHARS_PER_TOKEN_ESTIMATE",
     # Re-exported from .chat_rag
     "build_rag_context",
-    "_rag_result_to_text",
     "_RAG_CONTEXT_LABELS",
     "RAG_DOCS_THRESHOLD",
     "RAG_KNOWLEDGE_THRESHOLD",

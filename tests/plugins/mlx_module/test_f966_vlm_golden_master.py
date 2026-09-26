@@ -110,7 +110,8 @@ class _Harness:
         return "PROMPT-FORMATAT"
 
     def collect(self, delta):
-        self.deltas.append(delta)
+        # ADR-010: {thinking, content} chunks; `raw` is what this pins.
+        self.deltas.append(delta["raw"] if isinstance(delta, dict) else delta)
 
     def __enter__(self):
         self._ctx = [

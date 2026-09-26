@@ -142,13 +142,15 @@ class TestDeduplicateResults:
         assert len(result) == 1
         assert result[0] is obj1
 
-    def test_dedup_uses_first_500_chars(self):
+    def test_dedup_keys_on_the_whole_text(self):
+        # #1091: this used to assert the opposite (first 500 chars identical
+        # → duplicate). Two texts that share 500 chars and differ after them
+        # are two different chunks, and both reach the context now.
         long_text = "A" * 501
         obj1 = _make_rag_obj(long_text)
         obj2 = _make_rag_obj(long_text[:-1] + "B")
         result = _deduplicate_results([obj1, obj2])
-        # The first 500 chars are identical → duplicate
-        assert len(result) == 1
+        assert result == [obj1, obj2]
 
     def test_preserves_order(self):
         items = [_make_rag_obj(f"text{i}") for i in range(5)]

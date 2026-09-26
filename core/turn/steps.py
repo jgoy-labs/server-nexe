@@ -11,9 +11,13 @@ deliberately NOT part of this module. Until then, every door keeps its own
 procedural orchestration; this table is the target shape they converge to,
 and the single place that can now say, in code, "here is the whole turn".
 
-Every `today` pointer below is a file:line citation verified against the
-codebase on 2026-09-05, by two read-only audits of the turn as it stood then:
-one mapped the sequence, the other the organs. `doors_today` is coarse on
+Every `today` pointer below was first verified against the codebase on
+2026-09-05, by two read-only audits of the turn as it stood then: one mapped
+the sequence, the other the organs. #1085 (2026-09-24): the line numbers had
+drifted (five pointed past the end of routes_chat.py), so pointers now cite
+`path (symbol)` instead, and `tests/core/turn/test_turn_steps_pointers.py`
+checks every one of them: the file exists, a cited line is inside it, a cited
+symbol appears in it. `doors_today` is coarse on
 purpose (per-door presence of an EQUIVALENT step, not a re-encoding of every
 fine-grained divergence): the exhaustive 33-row divergence table lives in
 those audits, not here.
@@ -100,10 +104,11 @@ TURN_STEPS: tuple[Step, ...] = (
         writes=frozenset({"attachments"}),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "core/turn/validate.py (validate_turn) — was routes_chat.py:595 (_validate_chat_input)",
-            "api": "core/turn/validate.py (validate_turn), after core/endpoints/chat.py:177 (_validate_chat_request: routing params + non-user content)",
+            "ui": "core/turn/validate.py (validate_turn)",
+            "api": "core/turn/validate.py (validate_turn), after core/endpoints/chat.py (_validate_chat_request: routing params + non-user content)",
         },
-        note="C4.1: one validate for both doors. The message-required 400 the "
+        note="C4.1: one validate for both doors (it replaced the UI's own "
+             "`_validate_chat_input`). The message-required 400 the "
              "UI has always answered now answers at /v1 too.",
     ),
     Step(
@@ -152,7 +157,7 @@ TURN_STEPS: tuple[Step, ...] = (
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/turn_adapters.py (get_or_create_session, id from body) + core/turn/prompt.py (_resolve_session_lang)",
-            "api": "core/endpoints/chat_engines/_common.py:196 (derive_session_id: X-Session-Id or hash of first message) + core/endpoints/chat.py (_resolve_request_lang)",
+            "api": "core/endpoints/chat_engines/_common.py (derive_session_id: X-Session-Id or hash of first message) + core/endpoints/chat.py (_resolve_request_lang)",
         },
         note="C4.2: `lang` is written HERE at both doors, which is what this "
              "table always said. The UI door used to resolve it three steps "
@@ -165,8 +170,8 @@ TURN_STEPS: tuple[Step, ...] = (
         reads=frozenset({"session_id", "message"}), writes=frozenset(),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "plugins/web_ui_module/api/routes_chat.py:2981-2986 (add_message + _save_session_to_disk)",
-            "api": "core/endpoints/chat.py:652 (mirror_v1_conversation, rewrites the mirror + save_session)",
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (persist_user_turn: add_message + _save_session_to_disk)",
+            "api": "core/endpoints/chat_engines/_common.py (mirror_v1_conversation: rewrites the mirror + save_session)",
         },
         note="The guarantee (I3 of ADR-007): nothing below this step may write "
              "memory before this one has written disk. No test asserts it yet "
@@ -253,12 +258,13 @@ TURN_STEPS: tuple[Step, ...] = (
         writes_always=frozenset({"context_window", "engine"}),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "plugins/web_ui_module/api/routes_chat.py:2646-2661 (resolve_engine_cascade, iter_live_engines, switch_engine_model)",
-            "api": "core/endpoints/chat_engines/routing.py + core/endpoints/chat.py:583-618 (resolve_engine_cascade, _dispatch_through_cascade)",
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (resolve_engine_cascade, iter_live_engines, _switch_model)",
+            "api": "core/endpoints/chat_engines/routing.py (resolve_engine_cascade) + core/endpoints/chat.py (_dispatch_through_cascade)",
         },
         note="Contract today is duck typing (hasattr(module,'chat')): no Protocol "
-             "in core/. Two competing fallback mechanisms at A (finding #1036, "
-             "reassessed 20260905) must become one here.",
+             "in core/. The two competing fallback mechanisms (finding #1036) "
+             "are one since 8d179a73 (C2.4): the forwarders no longer jump to "
+             "Ollama on their own, every error propagates to the cascade.",
     ),
     Step(
         id="budget", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
@@ -281,8 +287,8 @@ TURN_STEPS: tuple[Step, ...] = (
         writes_always=frozenset({"prompt", "recall_text"}),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "plugins/web_ui_module/api/routes_chat.py:2444-2451 (compute_context_budget, history_ratio=0.30)",
-            "api": "core/endpoints/chat.py:322-323 (_trim_rag_context, history_ratio=0.0)",
+            "ui": "core/turn/assemble.py (_assemble_engine_messages: compute_context_budget, history_ratio from resolve_history_ratio, 0.30 by default), called by plugins/web_ui_module/api/turn_adapters.py (_build_turn_context, _assemble_engine_messages)",
+            "api": "core/endpoints/chat.py (_trim_rag_context: compute_context_budget, history_ratio=0.0)",
         },
         note="Same shared function (core/context_budget.py), different parameters "
              "by design (ADR-006) — not a bug, kept as one 'budget' step here. "
@@ -297,7 +303,7 @@ TURN_STEPS: tuple[Step, ...] = (
         writes_always=frozenset({"engine", "response"}),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "plugins/web_ui_module/api/routes_chat.py:2723-2861 (engine.chat, StreamingResponse)",
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (generate_json, generate_stream, _prepare_call: engine.chat, one GPU slot per turn)",
             "api": "core/endpoints/chat_engines/{mlx,llama_cpp,ollama}.py (module.chat / HTTP)",
         },
         note="No deadline for MLX/llama.cpp at either door today (finding #1041): "
@@ -310,14 +316,19 @@ TURN_STEPS: tuple[Step, ...] = (
         writes_always=frozenset({"facts", "response"}),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "plugins/web_ui_module/api/routes_chat.py (_clean_full_response: think-tag filtering, then core.memory_facts.extract)",
-            "api": "core/turn/adapters_api.py (postprocess -> core.memory_facts.extract, JSON shape)",
+            "ui": "core/turn/text/clean.py (clean_full_response: the model's format, then core.memory_facts.extract); "
+                  "then core/memory_facts/deletes.py and core/turn/policy.py (C4.5: the pending delete and the re-prompt)",
+            "api": "core/turn/adapters_api.py (postprocess -> core.turn.text.clean, JSON shape, then the same deletes.py "
+                   "and policy.py the web door runs; a stream through core/turn/text/sse.py)",
         },
-        note="C3.2: both doors read the model's memory tags through "
-             "core/memory_facts/extract.py. At /v1 this is the JSON shape only — in "
-             "streaming the text has already been forwarded to the client; the "
-             "sentinel FSM that strips them live is unified in C4. The model-format "
-             "cleanup (<think>, harmony tags) stays the UI's until C4.",
+        note="C4.4: the model-format cleanup (<think>, harmony, <|…|>, ◁▷, echoed "
+             "context headers, memory tags) is the core's, core/turn/text/ — one "
+             "cleaner for both doors, the compactor and the /v1 history. A /v1 "
+             "STREAM is cleaned on its way out (SseCleaner) but its facts are not "
+             "read: that door's turn ends before the stream is generated "
+             "(degraded, until C4.6). ADR-010: the model's REASONING is not "
+             "cleaned away — the engines return it apart, the UI shows it in "
+             "its think block, /v1 sends it as `reasoning` when asked.",
     ),
     Step(
         id="persist_assistant_turn", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
@@ -325,25 +336,12 @@ TURN_STEPS: tuple[Step, ...] = (
         reads=frozenset({"session_id", "response"}), writes=frozenset(),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "plugins/web_ui_module/api/routes_chat.py:2253,2257 (_persist_assistant_turn + _save_session_to_disk)",
-            "api": "core/endpoints/chat_engines/_common.py:284 (persist_v1_turn)",
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (persist_simple, persist_stream: core.turn.persist.persist_assistant_turn + _save_session_to_disk)",
+            "api": "core/endpoints/chat_engines/_common.py (persist_v1_turn)",
         },
         note="This is the commit point (ADR-007 §8): everything after it is "
              "post-commit. Today an error mid-stream at the UI is committed as "
              "complete (finding #1040) — there is no outcome flag yet.",
-    ),
-    Step(
-        id="emit", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
-        idempotent=False,
-        reads=frozenset({"response", "entry", "wire", "engine", "recall_text", "engine_fallback_from", "engine_fallback_reason"}),
-        writes=frozenset({"wire"}),
-        doors_today=frozenset({"ui", "api"}),
-        today={
-            "ui": "plugins/web_ui_module/api/routes_chat.py (NUL sentinels \\x00[TAG]\\x00, two shapes: streaming and JSON)",
-            "api": "core/endpoints/chat_engines/_streaming.py:170 (format_sse_chunk, OpenAI SSE)",
-        },
-        note="The only door-specific step by design (ADR-007 §1). UI streaming "
-             "has no byte cap / token sanitizer here today (finding #1039).",
     ),
     Step(
         id="memory.write", kind=StepKind.LLM, must_have=False, replaceable=True,
@@ -354,7 +352,20 @@ TURN_STEPS: tuple[Step, ...] = (
             "ui": "plugins/web_ui_module/api/turn_adapters.py (memory_write -> core.memory_facts.write.write_facts)",
             "api": "core/turn/adapters_api.py (memory_write -> core.memory_facts.write.write_facts, no atomiser)",
         },
-        note="C3.3: both doors write through core/memory_facts/write.py — one junk filter (the union of the two that used to disagree), one first-turn rule, and a coroutine instead of two generators, because on the post-commit queue nobody is listening to a wire. What was saved is told on the NEXT turn. C3 review (08/09): a turn whose `intent` step already saved (`usage.saved_by_intent`) writes nothing here — what the model marks about that fact is its own paraphrase of it.",
+        note="C3.3: both doors write through core/memory_facts/write.py — one junk filter (the union of the two that used to disagree), one first-turn rule. 25/09 (ADR-007 §6 amended, Jordi): back INSIDE the turn, before `emit`, so the turn that saved tells what it kept (`usage.memory_kept` -> [MEM:n:facts]) — on the queue the news came one turn late and the UI badged the model's text instead (#1098). Measured: ~15 ms per fact, ~0.25 s when the atomiser runs. C3 review (08/09): a turn whose `intent` step already saved (`usage.saved_by_intent`) writes nothing here — what the model marks about that fact is its own paraphrase of it.",
+    ),
+    Step(
+        id="emit", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
+        idempotent=False,
+        reads=frozenset({"response", "entry", "wire", "engine", "recall_text", "engine_fallback_from", "engine_fallback_reason"}),
+        writes=frozenset({"wire"}),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (emit_json, emit_stream: NUL sentinels \\x00[TAG]\\x00, two shapes, streaming and JSON)",
+            "api": "core/endpoints/chat_engines/_streaming.py (format_sse_chunk: OpenAI SSE)",
+        },
+        note="The only door-specific step by design (ADR-007 §1). UI streaming "
+             "has no byte cap / token sanitizer here today (finding #1039).",
     ),
     Step(
         id="compact", kind=StepKind.LLM, must_have=False, replaceable=True,

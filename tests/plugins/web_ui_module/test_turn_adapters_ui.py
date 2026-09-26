@@ -214,19 +214,17 @@ async def test_json_saves_the_turn_before_its_facts():
     assert order[order.index("memory") + 1:] == ["disk"], order
 
 
-async def test_json_still_drops_a_first_turn_fact(caplog):
-    """The other half of the same guard, kept honest: on a first turn the JSON
-    path saves nothing (and says why), while streaming does save. Not a
-    regression of C1.3 — the divergence is documented, not introduced."""
-    import logging
-
+async def test_json_first_turn_keeps_a_fact_in_the_users_words():
+    """25/09 (Jordi): an opening "em dic Aran" is the user's own word, so the
+    model's `[MEM_SAVE: es diu Aran]` is kept — and the reply says so itself.
+    Until then every opening-turn fact was dropped (the JSON path's old guard,
+    extended to both doors by C3.3)."""
     h = _Harness(intent="chat")
     order = _ordered(h)
-    with caplog.at_level(logging.INFO):
-        await h.call({"message": "em dic Aran", "stream": False},
-                     server_state=_make_server_state(engine=_MemSaveEngine()))
-    assert "memory" not in order, order
-    assert any("first turn" in r.getMessage() for r in caplog.records)
+    result = await h.call({"message": "em dic Aran", "stream": False},
+                          server_state=_make_server_state(engine=_MemSaveEngine()))
+    assert "memory" in order, order
+    assert result["memory_facts"] == ["es diu Aran"]
 
 
 async def test_stream_saves_the_turn_before_its_facts():
@@ -243,11 +241,10 @@ async def test_stream_saves_the_turn_before_its_facts():
     body = ""
     async for chunk in result.body_iterator:
         body += chunk if isinstance(chunk, str) else chunk.decode()
-    # C3.3: the [MEM:n] note is no longer emitted by memory.write itself — it
-    # ran on the queue, where nobody was listening. It reaches the user at the
-    # START of the next turn (tests/core/memory_facts/test_write.py::TestTheNewsReachesTheNextTurn).
-    assert "\x00[MEM:" not in body
-    assert "Encantat, Aran." in body
+    # 25/09 (#1098): memory.write runs inline before `emit`, so THIS turn's
+    # wire says what memory kept — the fact itself, after the answer.
+    assert "\x00[MEM:1:es diu Aran]\x00" in body
+    assert body.index("Encantat, Aran.") < body.index("\x00[MEM:1:"), body
     # the assistant turn is on disk before the fact reaches memory; the stats
     # of that turn are then completed with the count (a second save)
     assert order.index("memory") > order.index("disk"), order
@@ -308,8 +305,10 @@ async def test_stream_d6_turn_stores_the_literal_once_not_the_paraphrase(caplog)
     # C4's job. Pinning it here would be pinning a limit as if it were a
     # guarantee (any non-browser client of /ui/chat still sees it — separate
     # fitxa).
-    # D6's own save is what the user is told about, in this turn's stream.
-    assert "\x00[MEM:1]\x00" in body
+    # D6's own save is what the user is told about, in this turn's stream —
+    # the literal it stored, once (no second [MEM] for the dropped paraphrase).
+    assert "\x00[MEM:1:el meu peix es diu Bombolla]\x00" in body
+    assert body.count("\x00[MEM:") == 1, body
     # Nothing else was written, so the assistant turn's stats stay untouched.
     assert h.session.messages[-1].get("stats", {}).get("mem_saved") in (None, 0)
     assert any("intent step already saved" in r.getMessage() for r in caplog.records)

@@ -52,7 +52,8 @@ class TestCreateParser:
     assert args.command == "search"
     assert args.query == "test query"
     assert args.top_k == 5
-    assert args.source == "personality"
+    assert args.source is None, "no default source: without --source every listed source is searched"
+    assert args.lang
 
   def test_parser_search_options(self):
     """Verify search command options."""
@@ -61,11 +62,13 @@ class TestCreateParser:
       "search", "my query",
       "--top-k", "10",
       "--source", "catalog",
+      "--lang", "ca",
       "--verbose"
     ])
     assert args.query == "my query"
     assert args.top_k == 10
     assert args.source == "catalog"
+    assert args.lang == "ca"
     assert args.verbose is True
 
   def test_parser_sources_command(self):
@@ -87,13 +90,10 @@ class TestRAGCLI:
       "version": "0.1",
       "description": "Test RAG",
       "initialized": True,
-      "sources": ["personality"],
-      "capabilities": ["keyword_search"],
+      "sources": ["nexe_documentation", "personal_memory", "user_knowledge"],
+      "capabilities": ["source_introspection"],
       "stats": {
-        "documents_added": 10,
         "searches_performed": 5,
-        "total_chunks": 50,
-        "cache_hit_rate": 0.8
       },
       "config": {"top_k": 5}
     }
@@ -101,14 +101,11 @@ class TestRAGCLI:
       "status": "healthy",
       "checks": [
         {"name": "module_initialized", "status": "pass", "message": "OK"},
-        {"name": "rag_sources", "status": "pass", "message": "1 sources healthy"}
+        {"name": "rag_sources", "status": "pass", "message": "3 sources available"}
       ],
       "metadata": {}
     }
-    mock.list_sources.return_value = ["personality"]
-    mock.get_source.return_value = MagicMock(
-      health=lambda: {"status": "healthy", "num_chunks": 50}
-    )
+    mock.list_sources.return_value = ["nexe_documentation", "personal_memory", "user_knowledge"]
     return mock
 
   @pytest.fixture
@@ -202,6 +199,19 @@ class TestRAGCLI:
     await cli_with_mock.cmd_sources(args)
     cli_with_mock.module.list_sources.assert_called_once()
 
+class TestAdvertisedCommands:
+  """`core/cli/router.py` advertises the rag CLI's commands; it listed
+  `search, index, status` — two of which never existed. Pinned to the parser
+  itself so the two cannot drift apart again (ADR-008 E2)."""
+
+  def test_router_lists_exactly_the_parser_subcommands(self):
+    import argparse
+    from core.cli.router import DEFAULT_CLIS
+
+    parser = create_parser()
+    sub = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    assert sorted(DEFAULT_CLIS["rag"].commands) == sorted(sub.choices)
+
 class TestCLIEdgeCases:
   """Tests for edge cases and error handling."""
 
@@ -253,24 +263,20 @@ class TestCLICoverage:
     mock.get_info.return_value = {
       "module_id": "TEST", "name": "rag", "version": "0.1",
       "description": "Test", "initialized": True,
-      "sources": ["personality"], "capabilities": ["search"],
-      "stats": {"documents_added": 0, "searches_performed": 0, "total_chunks": 0, "cache_hit_rate": 0.0},
+      "sources": ["nexe_documentation"], "capabilities": ["source_introspection"],
+      "stats": {"searches_performed": 0},
       "config": {"top_k": 5}
     }
     mock.get_health.return_value = {
       "status": "healthy",
       "checks": [
         {"name": "module_initialized", "status": "pass", "message": "OK"},
-        {"name": "rag_sources", "status": "pass", "message": "OK", "sources": {
-          "personality": {"status": "healthy", "num_chunks": 50, "num_documents": 5}
-        }}
+        {"name": "rag_sources", "status": "pass", "message": "OK",
+         "sources": ["nexe_documentation", "plugin_notes"]}
       ],
       "metadata": {}
     }
-    mock.list_sources.return_value = ["personality"]
-    mock.get_source.return_value = MagicMock(
-      health=lambda: {"status": "healthy", "num_chunks": 50, "num_documents": 5}
-    )
+    mock.list_sources.return_value = ["nexe_documentation", "plugin_notes"]
     mock.search = MagicMock(return_value=[])
     mock.initialize = MagicMock(return_value=True)
     mock.shutdown = MagicMock(return_value=None)
@@ -342,7 +348,7 @@ class TestCLICoverage:
       "module_id": "TEST", "name": "rag", "version": "0.1",
       "description": "Test", "initialized": True,
       "sources": [], "capabilities": [],
-      "stats": {"documents_added": 0, "searches_performed": 0, "total_chunks": 0, "cache_hit_rate": 0.0},
+      "stats": {"searches_performed": 0},
       "config": {}
     }
     args = MagicMock()
@@ -359,13 +365,16 @@ class TestCLICoverage:
     assert result == 0
 
   @pytest.mark.asyncio
-  async def test_cmd_health_with_sources_check(self, mock_module):
-    """Test health command shows sources health details."""
+  async def test_cmd_health_with_sources_check(self, mock_module, caplog):
+    """Test health command lists the sources the rag_sources check names."""
+    import logging
     cli = RAGCLI()
     cli.module = mock_module
     args = MagicMock(json=False)
-    result = await cli.cmd_health(args)
+    with caplog.at_level(logging.INFO, logger="memory.rag.cli"):
+      result = await cli.cmd_health(args)
     assert result == 0
+    assert "plugin_notes" in caplog.text
 
   @pytest.mark.asyncio
   async def test_cmd_health_error(self):
@@ -379,8 +388,7 @@ class TestCLICoverage:
 
   @pytest.mark.asyncio
   async def test_cmd_search_success(self, mock_module):
-    """Test search with results."""
-    pass  # AsyncMock already imported at top
+    """Test search with results: the module is asked with the new signature."""
     hit = MagicMock()
     hit.score = 0.9
     hit.text = "Result text"
@@ -388,34 +396,114 @@ class TestCLICoverage:
     mock_module.search = AsyncMock(return_value=[hit])
     cli = RAGCLI()
     cli.module = mock_module
-    args = MagicMock(query="test query", top_k=5, source="personality", verbose=True)
-    with patch.dict("sys.modules", {"memory.rag_sources.base": MagicMock()}):
-      result = await cli.cmd_search(args)
-      assert result == 0
+    args = MagicMock(query="test query", top_k=5, source="nexe_documentation", lang="ca", verbose=True)
+    result = await cli.cmd_search(args)
+    assert result == 0
+    mock_module.search.assert_awaited_once_with(
+      "test query", source="nexe_documentation", top_k=5, lang="ca",
+    )
 
   @pytest.mark.asyncio
   async def test_cmd_search_no_results(self, mock_module):
     """Test search with no results."""
-    pass  # AsyncMock already imported at top
     mock_module.search = AsyncMock(return_value=[])
     cli = RAGCLI()
     cli.module = mock_module
-    args = MagicMock(query="no match", top_k=5, source="personality", verbose=False)
-    with patch.dict("sys.modules", {"memory.rag_sources.base": MagicMock()}):
-      result = await cli.cmd_search(args)
-      assert result == 0
+    args = MagicMock(query="no match", top_k=5, source="nexe_documentation", lang="en", verbose=False)
+    result = await cli.cmd_search(args)
+    assert result == 0
+
+  @pytest.mark.asyncio
+  async def test_cmd_search_without_source_searches_every_listed_source(self, mock_module):
+    """No --source: every source the module lists is asked, in order."""
+    mock_module.search = AsyncMock(return_value=[])
+    cli = RAGCLI()
+    cli.module = mock_module
+    args = MagicMock(query="q", top_k=3, source=None, lang="en", verbose=False)
+    result = await cli.cmd_search(args)
+    assert result == 0
+    asked = [c.kwargs["source"] for c in mock_module.search.await_args_list]
+    assert asked == ["nexe_documentation", "plugin_notes"]
 
   @pytest.mark.asyncio
   async def test_cmd_search_error(self):
     """Test search handles errors."""
-    pass  # AsyncMock already imported at top
     cli = RAGCLI()
     cli.module = MagicMock()
     cli.module.search = AsyncMock(side_effect=Exception("Search error"))
-    args = MagicMock(query="test", top_k=5, source="personality", verbose=False)
-    with patch.dict("sys.modules", {"memory.rag_sources.base": MagicMock()}):
-      result = await cli.cmd_search(args)
-      assert result == 1
+    args = MagicMock(query="test", top_k=5, source="nexe_documentation", lang="en", verbose=False)
+    result = await cli.cmd_search(args)
+    assert result == 1
+
+  @pytest.mark.asyncio
+  async def test_cmd_search_goes_through_source_for(self, monkeypatch, caplog):
+    """ADR-008 E2, end to end with the REAL module: the CLI's search reaches
+    the source `source_for()` returns — here a registered one — the same door
+    the chat uses. The store is not searched for a registered name."""
+    import logging
+    from core.rag.registry import clear_registered_sources, register_source
+    from memory.rag.module import RAGModule
+
+    class _Hit:
+      score = 0.77
+      text = "answer from the registered source"
+      metadata = {}
+
+    class _Src:
+      def __init__(self):
+        self.queries = []
+
+      def name(self):
+        return "plugin_notes"
+
+      async def search(self, memory, query):
+        self.queries.append(query)
+        return [_Hit()]
+
+    store = MagicMock()
+    store.search = AsyncMock(return_value=[])
+    monkeypatch.setattr("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=store))
+    clear_registered_sources()
+    src = _Src()
+    register_source(src)
+    try:
+      module = RAGModule.__new__(RAGModule)
+      module._initialized = True
+      module._stats = {"searches_performed": 0}
+      cli = RAGCLI()
+      cli.module = module
+      args = MagicMock(query="what", top_k=5, source="plugin_notes", lang="ca", verbose=False)
+      with caplog.at_level(logging.INFO, logger="memory.rag.cli"):
+        result = await cli.cmd_search(args)
+    finally:
+      clear_registered_sources()
+
+    assert result == 0
+    assert [q.text for q in src.queries] == ["what"]
+    assert src.queries[0].lang == "ca"
+    assert "answer from the registered source" in caplog.text
+    store.search.assert_not_awaited()
+
+  @pytest.mark.asyncio
+  async def test_cmd_search_unknown_source_is_an_error(self, monkeypatch):
+    """A name the module does not list fails (exit 1) instead of searching a
+    phantom collection through source_for's generic fallback."""
+    from core.rag.registry import clear_registered_sources
+    from memory.rag.module import RAGModule
+
+    store = MagicMock()
+    store.search = AsyncMock(return_value=[])
+    monkeypatch.setattr("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=store))
+    clear_registered_sources()
+    module = RAGModule.__new__(RAGModule)
+    module._initialized = True
+    module._stats = {"searches_performed": 0}
+    cli = RAGCLI()
+    cli.module = module
+    args = MagicMock(query="q", top_k=5, source="personality", lang="en", verbose=False)
+
+    assert await cli.cmd_search(args) == 1
+    store.search.assert_not_awaited()
 
   @pytest.mark.asyncio
   async def test_cmd_sources_empty(self):
@@ -428,24 +516,17 @@ class TestCLICoverage:
     assert result == 0
 
   @pytest.mark.asyncio
-  async def test_cmd_sources_with_details(self, mock_module):
-    """Test sources command shows health and doc info."""
+  async def test_cmd_sources_with_details(self, mock_module, caplog):
+    """Test sources command prints every listed source."""
+    import logging
     cli = RAGCLI()
     cli.module = mock_module
     args = MagicMock()
-    result = await cli.cmd_sources(args)
+    with caplog.at_level(logging.INFO, logger="memory.rag.cli"):
+      result = await cli.cmd_sources(args)
     assert result == 0
-
-  @pytest.mark.asyncio
-  async def test_cmd_sources_source_error(self):
-    """Test sources handles source error."""
-    cli = RAGCLI()
-    cli.module = MagicMock()
-    cli.module.list_sources.return_value = ["broken"]
-    cli.module.get_source.side_effect = Exception("Source error")
-    args = MagicMock()
-    result = await cli.cmd_sources(args)
-    assert result == 0
+    assert "nexe_documentation" in caplog.text
+    assert "plugin_notes" in caplog.text
 
   @pytest.mark.asyncio
   async def test_cmd_sources_error(self):

@@ -33,7 +33,7 @@ Pregunta sobre proyectos en curso, preferencias, fechas limite. El sistema **MEM
 
 **Para quien:** profesionales que trabajan con documentos sensibles (legal, medico, consultoria) y no pueden subirlos a servicios cloud.
 
-Sube `.txt`, `.md` o `.pdf` y se indexan automaticamente en el RAG. Consultalos en lenguaje natural. Cada documento queda **aislado por sesion** — no se cruza contexto entre conversaciones sin querer.
+Sube PDF, Word, Excel, PowerPoint, EPUB, texto, codigo o datos (CSV, JSON...) y se indexan automaticamente en el RAG. Consultalos en lenguaje natural. Cada documento queda **aislado por sesion** — no se cruza contexto entre conversaciones sin querer.
 
 **Ejemplo:** sube contratos y pregunta *"¿Que clausulas de rescision mencionan penalizacion economica?"*
 

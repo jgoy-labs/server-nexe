@@ -119,9 +119,10 @@ server-nexe has an automatic memory system similar to ChatGPT or Claude. The mod
 **How it works:**
 1. The system prompt instructs the model to extract facts: names, jobs, locations, preferences, projects, deadlines
 2. The model outputs `[MEM_SAVE: fact]` markers within its response
-3. routes_chat.py parses these markers and removes them from the visible stream
-4. Facts are saved to `personal_memory` collection
-5. The UI shows `[MEM:N]` indicator with the count of saved facts
+3. The server reads these markers in the core (same code for the Web UI, the CLI and `/v1`) and removes them from the answer
+4. In the same turn, once the answer is complete, the facts are filtered (junk, recently forgotten, names the user never wrote) and saved to the `personal_memory` collection — about 15 ms per fact
+5. The server then says what memory kept: the `[MEM:N:fact1|fact2]` marker (Web UI badge, `💾 Saved` in the CLI), `memory_facts` in a Web UI JSON reply, `nexe_memory_facts` at `/v1`. Only this counts as saved: a `[MEM_SAVE:]` the server refused is never shown as saved
+6. On the first message of a conversation, only facts backed by the user's own words are kept (a small model sometimes invents facts or copies the prompt's examples)
 
 **Intent detection (trilingual ca/es/en):**
 - **Save:** "Recorda que...", "Guarda a memòria", "Remember that..."
@@ -203,7 +204,7 @@ Documents uploaded via the Web UI are indexed into `user_knowledge` collection w
 - Documents persist within the session (not cleared on page refresh)
 - Metadata is generated without LLM (instant, no model required)
 
-**Supported formats:** .txt, .md, .pdf (with magic bytes validation SEC-004)
+**Supported formats:** .pdf, .docx, .xlsx, .pptx, .epub, text (.txt, .md), source code (.py, .js, .ts, .java, .go, .rs, .sql...) and data (.csv, .json, .xml, .yaml, .toml). The list comes from a single loader registry (`core/files/loaders`), the same one for uploads and for the `knowledge/` folder. Content validation (SEC-004): PDFs must start with `%PDF`, Office/EPUB formats must be a zip (and are refused if they declare more than 200 MB uncompressed), and text must be UTF-8. `.env`, `.ini`, `.conf`, `.cfg`, `.properties` and `.pkl` are never accepted. Not yet: legacy `.doc`/`.xls`, `.rtf`, images/OCR.
 **Chunking for uploads:** Dynamic based on document size -- 800 chars (<20K), 1000 (<100K), 1200 (<300K), 1500 (>=300K). If the document has a valid RAG header, the specified chunk_size is used.
 
 ## Document Ingestion
@@ -299,4 +300,4 @@ storage/vectors/
 - `POST /v1/chat/completions` — Chat with RAG (use_rag: true by default)
 - `POST /v1/memory/store` — Save text to a collection (uses MemoryService when initialised, otherwise falls back to a direct Qdrant write for resilience)
 - `POST /v1/memory/search` — Direct semantic search in a collection
-- `DELETE /v1/rag/documents/{id}` — **[planned, NOT implemented]** returns 501 Not Implemented (router tagged `future`; all three `/v1/rag/*` endpoints — search, add, documents/{id} — are not yet operational)
+- The former `/v1/rag/*` stubs (search, add, documents/{id}) were retired and answer 404: retrieval is the chat's, direct search is `/v1/memory/search`

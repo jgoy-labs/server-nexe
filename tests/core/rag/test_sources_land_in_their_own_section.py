@@ -5,25 +5,28 @@ Author: Jordi Goy
 Location: tests/core/rag/test_sources_land_in_their_own_section.py
 Description: ADR-008 D4 — a retrieved hit is filed into one of the three
              labelled sections BY ITS `collection` attribute, and a hit
-             without one lands in the knowledge drawer WITHOUT ANY ERROR.
+             whose collection is not a system one lands in the knowledge
+             drawer.
 
-             That silence is the point of this file. `_format_results`
-             (`core/endpoints/chat_rag.py`) buckets with
-             `getattr(r, "collection", None)`, and today every hit has it
-             because they come from `MemoryAPI` (`SearchResult.collection`
-             is a required field). The day a source returns the RAG module's
-             `SearchHit` instead — which has no `collection` field at all —
-             the WHOLE context would quietly move under
-             [DOCUMENTACIO TECNICA], the system prompt would be citing
-             sections that no longer describe what is under them, and not a
-             single test would have gone red. So the mute case is pinned
-             here, with its name, next to the one that works.
+             `_format_results` (`core/endpoints/chat_rag.py`) buckets with
+             `getattr(r, "collection", None)`. Before E2 a hit WITHOUT the
+             attribute (the retired `SearchHit`, or anything a registered
+             source returns) moved there in silence, and this file pinned
+             that mute case as the alarm. E2 sealed it upstream: the
+             orchestrator stamps `collection = source.name()` on every hit
+             that lacks one (`_stamp_collection`), so by the time the
+             formatter runs every hit names its source. What stays pinned
+             here is the rule the formatter still applies — an unknown name
+             is knowledge, never a guess at docs or memory — and the stamp
+             itself.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
-from core.endpoints.chat_rag import _RAG_CONTEXT_LABELS, _format_results
+from dataclasses import dataclass, field
+
+from core.endpoints.chat_rag import _RAG_CONTEXT_LABELS, _format_results, _stamp_collection
 from core.memory_access import (
     DOCS_COLLECTION,
     KNOWLEDGE_COLLECTION,
@@ -42,7 +45,8 @@ class _Hit:
 
 
 class _HitWithoutCollection:
-    """A hit shaped like the RAG module's `SearchHit`: no `collection`."""
+    """A hit with no `collection`, like the retired `SearchHit` or a
+    registered source's own objects."""
 
     def __init__(self, text: str):
         self.text = text
@@ -86,17 +90,57 @@ def test_each_source_lands_in_its_own_labelled_section():
         )
 
 
-def test_a_hit_without_a_collection_is_filed_as_knowledge_in_silence():
-    """ADR-008 D4, the mute regression, pinned.
+def test_a_hit_from_an_unknown_source_is_filed_as_knowledge():
+    """ADR-008 D4 after E2: an unknown source name is knowledge.
 
-    This is NOT the behaviour anyone wants — it is the behaviour there is,
-    and it fails silently. If this test ever has to change because a source
-    started returning hits without a `collection`, read it as the alarm: give
-    `SearchHit` the field (D4) rather than teaching the formatter to guess.
+    The stamp gives a registered source's hit its source name
+    (`plugin_notes`), which is not a system collection. The formatter must
+    file it as knowledge — not in docs or memory, whose labels the system
+    prompt tells the model to read as the manual and as the user's memory.
     """
     labels = _RAG_CONTEXT_LABELS["ca"]
-    out = _format_results([_HitWithoutCollection("un fet sense col·leccio")], "ca")
+    out = _format_results([_Hit("plugin_notes", "un fet d'un plugin")], "ca")
 
     assert f"[{labels['knowledge']}]" in out
     assert f"[{labels['docs']}]" not in out
     assert f"[{labels['memory']}]" not in out
+
+
+def test_a_hit_without_a_collection_is_stamped_with_its_source_name():
+    """The seal itself (E2): the hit that used to reach the formatter with no
+    `collection` now reaches it with the source's name, on a COPY — the
+    source's object is left as it was."""
+    original = _HitWithoutCollection("un fet sense col·leccio")
+    [stamped] = _stamp_collection([original], "plugin_notes")
+
+    assert stamped.collection == "plugin_notes"
+    assert stamped.text == "un fet sense col·leccio"
+    assert not hasattr(original, "collection")
+
+
+def test_a_hit_that_names_its_collection_is_passed_through_untouched():
+    hit = _Hit(MEMORY_COLLECTION, "el gat es diu Mite")
+    [out] = _stamp_collection([hit], "some_other_source")
+
+    assert out is hit
+    assert out.collection == MEMORY_COLLECTION
+
+
+def test_a_frozen_hit_is_stamped_through_a_read_only_view():
+    """A frozen hit cannot take the attribute, even on a copy. It must still
+    come out named, with every other field readable, and the formatter must
+    still file it by that name."""
+
+    @dataclass(frozen=True)
+    class _FrozenHit:
+        text: str
+        score: float = 0.5
+        metadata: dict = field(default_factory=dict)
+
+    original = _FrozenHit("un fet congelat")
+    [stamped] = _stamp_collection([original], DOCS_COLLECTION)
+
+    assert stamped.collection == DOCS_COLLECTION
+    assert stamped.text == "un fet congelat" and stamped.score == 0.5
+    labels = _RAG_CONTEXT_LABELS["ca"]
+    assert f"[{labels['docs']}]" in _format_results([stamped], "ca")

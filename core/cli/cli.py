@@ -656,16 +656,12 @@ def ingest_knowledge_cmd():
         return
 
     # Check for files
-    from core.ingest.ingest_knowledge import SUPPORTED_EXTENSIONS
-    files = []
-    for ext in SUPPORTED_EXTENSIONS:
-        files.extend(knowledge_path.glob(f"**/*{ext}"))
-    files.extend(knowledge_path.glob("**/*.pdf"))
-    files = [f for f in files if not f.name.startswith('.')]
+    from core.ingest.ingest_knowledge import _discover_documents, formats_list
+    files = _discover_documents(knowledge_path)
 
     if not files:
         click.echo(click.style("ℹ️  No documents found in knowledge/", fg="yellow"))
-        click.echo("   Supported formats: .txt, .md, .pdf")
+        click.echo(f"   Supported formats: {formats_list()}")
         click.echo(f"   Add documents: cp file.pdf {knowledge_path}/")
         return
 
