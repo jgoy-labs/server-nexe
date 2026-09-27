@@ -16,7 +16,7 @@ httpx==0.28.1
 qdrant-client==1.18.0
 tomli-w==1.2.0  # TOML writes (reads: stdlib tomllib). uiri toml BANNED: truncates multiline strings with \[ silently (#834)
 structlog==26.1.0
-click==8.4.2
+click==8.5.0
 # rich/typer pinats VOLGUTS: typer 0.9.0 (API antiga usada pel codi; pujar-lo trenca el build,
 # veure L30-34) imposa rich<14. NO pujar rich a 14/15 ni typer a >=0.10 (Dependabot els ignora).
 rich==13.9.4
@@ -36,13 +36,13 @@ psutil==5.9.8
 # (va trencar el grup safe-patches en pujar el sòl a >=1.18). Dependabot ignora
 # hf>=1.14; treure sostre+ignore quan es migri typer. [refresh 2026-06-11]
 huggingface_hub>=1.13.0,<1.14
-filelock==3.32.3  # GHSA-qmgc-5h2g-mvrw GHSA-w853-jp5j-5j7f TOCTOU fixed in 3.20.3 (dep transitiva explicitada)
-idna==3.18  # PYSEC-2026-215 / GHSA-65pc-fj4g-8rjx (crafted-domain DoS) fixed in 3.15; transitive of anyio/httpx/requests/yarl, explicitly pinned for reproducibility (py3-none-any wheel -> identical pin on Windows ARM64)
-platformdirs==4.11.3  # cross-platform user data dirs (Linux/macOS); used by core.onboarding_state and installer.install_headless
+filelock==4.0.3  # GHSA-qmgc-5h2g-mvrw GHSA-w853-jp5j-5j7f TOCTOU fixed in 3.20.3 (dep transitiva explicitada)
+idna==3.20  # PYSEC-2026-215 / GHSA-65pc-fj4g-8rjx (crafted-domain DoS) fixed in 3.15; transitive of anyio/httpx/requests/yarl, explicitly pinned for reproducibility (py3-none-any wheel -> identical pin on Windows ARM64)
+platformdirs==4.11.12  # cross-platform user data dirs (Linux/macOS); used by core.onboarding_state and installer.install_headless
 
 # --- Memory & RAG ---
-fastembed==0.8.0
-pypdf==6.16.1  # PDF support for knowledge ingestion; GHSA-3crg-w4f6-42mx GHSA-4pxv-j86v-mhcw GHSA-7gw9-cf7v-778f GHSA-jj6c-8h6c-hppx GHSA-x284-j5p8-9c5p fixed in 6.10.0; GHSA-jm82-fx9c-mx94 (stream-length DoS) fixed in 6.13.3; CVE-2026-59935/59936/59937/59938 (crafted-PDF DoS) fixed in 6.14.0-6.14.2; PYSEC-2026-3655/3656 (ToUnicode token-length + CID font /W width-range DoS) fixed in 6.15.0
+fastembed==0.8.1
+pypdf==6.19.0  # PDF support for knowledge ingestion; GHSA-3crg-w4f6-42mx GHSA-4pxv-j86v-mhcw GHSA-7gw9-cf7v-778f GHSA-jj6c-8h6c-hppx GHSA-x284-j5p8-9c5p fixed in 6.10.0; GHSA-jm82-fx9c-mx94 (stream-length DoS) fixed in 6.13.3; CVE-2026-59935/59936/59937/59938 (crafted-PDF DoS) fixed in 6.14.0-6.14.2; PYSEC-2026-3655/3656 (ToUnicode token-length + CID font /W width-range DoS) fixed in 6.15.0
 # lingua-language-detector: Reply-language detection (75 langs); offline (models bundled in wheel), accurate on short text & close languages (ca/es/pt/fr/it), Apache-2.0. Chosen over langdetect (failed short ca/es) and fast-langdetect (downloads 125MB at runtime). ~95MB on disk.
 lingua-language-detector==2.1.1
 
