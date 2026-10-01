@@ -39,8 +39,27 @@ def _finish_reason_of(frame: str) -> str:
 
 
 def _final_chunk(chunks: list) -> dict:
-    """The last real chunk before [DONE] — the one that carries finish_reason."""
-    payloads = [c for c in chunks if c.startswith("data: ") and "[DONE]" not in c]
+    """The close the client will see.
+
+    C4.6-b: the generator ends with a sentinel, not this frame. `emit` turns
+    the sentinel into the SSE chunk via `format_sse_done`. Reading it through
+    that function is that step, without walking a whole turn.
+    """
+    from core.endpoints.chat_engines._streaming import NEXE_END, format_sse_done
+
+    ends = [c[NEXE_END] for c in chunks if isinstance(c, dict) and NEXE_END in c]
+    if ends:
+        end = ends[-1]
+        frame = format_sse_done(
+            "m", "mlx",
+            truncated=bool(end.get("truncated")),
+            finish_reason=end.get("finish_reason"),
+        )
+        return json.loads(frame.removeprefix("data: ").strip())
+    payloads = [
+        c for c in chunks
+        if isinstance(c, str) and c.startswith("data: ") and "[DONE]" not in c
+    ]
     return json.loads(payloads[-1].removeprefix("data: ").strip())
 
 
@@ -180,11 +199,13 @@ class TestOllamaStream:
             gen = _ollama_stream_generator("http://localhost/api/chat", {"model": "qwen"}, None, None)
             chunks = asyncio.run(_collect(gen))
 
-        assert any("[DONE]" in c for c in chunks), "the stream must still terminate with [DONE]"
+        assert not any(isinstance(c, str) and "[DONE]" in c for c in chunks)
         assert _final_chunk(chunks)["choices"][0]["finish_reason"] == expected
 
-    def test_the_final_chunk_comes_before_done(self):
-        """A client that stops reading at [DONE] must still see the reason."""
+    def test_the_reason_rides_on_the_sentinel_after_the_text(self):
+        """`[DONE]` is the turn's. The generator puts the reason on the
+        sentinel, after the text, and `emit` writes it before `[DONE]`."""
+        from core.endpoints.chat_engines._streaming import NEXE_END
         from core.endpoints.chat_engines.ollama import _ollama_stream_generator
 
         lines = [json.dumps({"message": {"content": "x"}, "done": True, "done_reason": "length"})]
@@ -192,12 +213,11 @@ class TestOllamaStream:
             gen = _ollama_stream_generator("http://localhost/api/chat", {"model": "qwen"}, None, None)
             chunks = asyncio.run(_collect(gen))
 
-        done_index = next(i for i, c in enumerate(chunks) if "[DONE]" in c)
-        reasons = [
-            i for i, c in enumerate(chunks)
-            if "finish_reason" in c and "[DONE]" not in c
-        ]
-        assert reasons and max(reasons) < done_index
+        texts = [i for i, c in enumerate(chunks) if isinstance(c, str)]
+        ends = [i for i, c in enumerate(chunks) if isinstance(c, dict) and NEXE_END in c]
+        assert texts and ends and max(texts) < ends[-1]
+        assert _final_chunk(chunks)["choices"][0]["finish_reason"] == "length"
+        assert not any(isinstance(c, str) and "[DONE]" in c for c in chunks)
 
     def test_an_older_build_without_done_reason_does_not_invent_a_cut(self):
         """Older Ollama omits done_reason — absence is not a truncation."""

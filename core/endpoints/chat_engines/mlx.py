@@ -10,17 +10,15 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
-import json
 import logging
 from typing import Dict, List, Optional
 
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 
-from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
-from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, mark_served_model, resolve_loaded_model_name, persist_v1_turn
-from ._streaming import TokenBridge, _prepend_chunk, format_engine_token, format_sse_done, SSE_DONE
+from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, mark_served_model, resolve_loaded_model_name
+from ._streaming import TokenBridge, _prepend_chunk, format_engine_token, stream_end
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +37,7 @@ async def _mlx_stream_generator(
     cancel_event=None,
     images: Optional[List[str]] = None,
     thinking_enabled: bool = False,
+    continue_final: bool = False,
 ):
     """SSE generator for MLX streaming.
 
@@ -51,7 +50,7 @@ async def _mlx_stream_generator(
     is the first thing that sets it here. Either way the module's own token
     loop is what checks it — this generator only has to pass it along.
     """
-    bridge = TokenBridge()
+    bridge = TokenBridge(cancel_event=cancel_event)
 
     async def run_mlx():
         try:
@@ -66,6 +65,7 @@ async def _mlx_stream_generator(
                 cancel_event=cancel_event,
                 images=images,
                 thinking_enabled=thinking_enabled,
+                **({"continue_final": True} if continue_final else {}),
             )
             bridge.set_done(result=result)
         except Exception as e:
@@ -89,47 +89,31 @@ async def _mlx_stream_generator(
             return
         except Exception as e:
             logger.exception("MLX streaming failed")
-            error_chunk = {"error": _sanitize_sse_token(str(e))}
-            yield f"data: {json.dumps(error_chunk)}\n\n"
+            # Before any token this is still the cascade's to retry (#1036).
+            # After a token the wire is committed: the turn saves a partial.
+            if not got_any_token:
+                raise
+            yield stream_end(failure=str(e), truncated=bridge._truncated)
             return
 
-        # If the engine task failed, surface the error to the client instead of
-        # closing with a normal "done". Previously the error was only logged
-        # (bridge.error) and the stream ended clean → the user saw nothing.
-        # This mirrors the Ollama path, which emits an error chunk on failure.
+        # If the engine task failed, surface it as the end sentinel instead of
+        # closing as a clean stop. Before any token the raise leaves this
+        # function so the forwarder's peek can retry the cascade (#1036).
         if bridge.error:
             if not got_any_token:
-                # #1036 (C2.4): nothing reached the client yet. This raise is
-                # OUTSIDE the try/except above on purpose — it must propagate
-                # as a real exception (not a yielded chunk) so the forwarder's
-                # peek-before-first-byte can catch it and let the cascade
-                # retry the next engine.
                 raise RuntimeError(bridge.error)
             logger.error("MLX streaming error surfaced to client: %s", bridge.error)
-            # #1040 (C2.4): the wire is already committed (tokens went out
-            # before this failed) — persist what reached the client as a
-            # PARTIAL turn instead of losing it from the mirrored session.
-            persist_v1_turn(app_state, session_id, bridge.get_response_text(), partial=True)
-            error_chunk = {"error": _sanitize_sse_token(str(bridge.error))}
-            yield f"data: {json.dumps(error_chunk)}\n\n"
-            yield SSE_DONE
+            yield stream_end(failure=str(bridge.error), truncated=bridge._truncated)
             return
 
-        # The engine's own reason (ceiling cut) travels in bridge.result, which
-        # this path used to drop on the floor — the close always said "stop".
-        # bridge._truncated is a DIFFERENT cut (queue overflow, B216); both
-        # both collapse into "length", so the chunk carries x_nexe_truncation
-        # to tell a missing TAIL from a missing MIDDLE (#989).
-        yield format_sse_done(
-            model_name,
-            "mlx",
+        # The engine's own reason (ceiling cut) travels in bridge.result.
+        # bridge._truncated is a DIFFERENT cut (queue overflow, B216). The
+        # turn's `emit` writes both into the client's final chunk (#989).
+        # Persistence is the turn's `persist_assistant_turn`, not this generator.
+        yield stream_end(
             truncated=bridge._truncated,
             finish_reason=(bridge.result or {}).get("finish_reason"),
         )
-        yield SSE_DONE
-
-        full_response_text = bridge.get_response_text()
-        persist_v1_turn(app_state, session_id, full_response_text)
 
         if bridge.result:
             logger.info(
@@ -184,6 +168,11 @@ async def _forward_to_mlx(
     # B075-C3: report the model that actually ran, not the client's
     # request.model (MLX runs the single loaded model, ignoring the param).
     model_name = resolve_loaded_model_name(mlx_module, "mlx-local")
+    # A resume ends inside the cut answer. Thinking would open a new
+    # reasoning block and the prefix would stop being the one that was cut.
+    resuming = getattr(request, "resume", False) is True
+    thinking = request.wants_reasoning() and not resuming
+    continued = {"continue_final": True} if resuming else {}
 
     if request.stream:
         logger.info("Forwarding to MLX module (streaming)...")
@@ -193,7 +182,8 @@ async def _forward_to_mlx(
             session_id=session_id, max_tokens=request.max_tokens,
             temperature=request.temperature, top_p=request.top_p,
             cancel_event=cancel_event, images=images,
-            thinking_enabled=request.wants_reasoning(),
+            thinking_enabled=thinking,
+            **continued,
         )
         # Peek the first chunk BEFORE committing to a StreamingResponse: an
         # error before any token reaches the client raises here as a real
@@ -210,6 +200,7 @@ async def _forward_to_mlx(
         messages=user_messages, system=system_msg, session_id=session_id,
         max_tokens=request.max_tokens, temperature=request.temperature,
         top_p=request.top_p, cancel_event=cancel_event, images=images,
-        thinking_enabled=request.wants_reasoning(),  # ADR-010: off unless asked
+        thinking_enabled=thinking,  # ADR-010: off unless asked; off on a resume
+        **continued,
     )
     return build_openai_response(result, model_name, "mlx")

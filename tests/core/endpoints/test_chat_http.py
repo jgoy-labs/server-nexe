@@ -21,6 +21,21 @@ from fastapi.responses import StreamingResponse
 API_KEY = "test-chat-key-9999"
 
 
+def _sse(chunks) -> str:
+    """The SSE text a generator yielded. The closing sentinel is a dict."""
+    return "".join(c for c in chunks if isinstance(c, str))
+
+
+def _end(chunks) -> dict:
+    """The generator's closing sentinel. `[DONE]` is the turn's, not its."""
+    from core.endpoints.chat_engines._streaming import NEXE_END
+
+    ends = [c[NEXE_END] for c in chunks if isinstance(c, dict) and NEXE_END in c]
+    assert ends, "the generator closes with a sentinel; [DONE] belongs to the turn"
+    assert not any(isinstance(c, str) and "[DONE]" in c for c in chunks)
+    return ends[-1]
+
+
 def make_app(modules=None, config=None):
     app = FastAPI()
     app.state.config = config or {}
@@ -506,6 +521,25 @@ class TestChatCompletionsEndpoint:
 
 class TestForwardToOllama:
 
+    def _streaming_client(self, mock_tags):
+        """A client whose stream yields one token. The peek (#1036) reads it
+        before `_forward_to_ollama` returns."""
+        resp = MagicMock(status_code=200)
+
+        async def _lines():
+            yield json.dumps({"message": {"content": "Hola"}, "done": True, "done_reason": "stop"})
+
+        resp.aiter_lines = MagicMock(return_value=_lines())
+        stream_cm = AsyncMock()
+        stream_cm.__aenter__ = AsyncMock(return_value=resp)
+        stream_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_tags)
+        mock_client.stream = MagicMock(return_value=stream_cm)
+        return mock_client
+
     def _make_request(self, stream=False, model=None, **kwargs):
         from core.endpoints.chat import ChatCompletionRequest, Message
         return ChatCompletionRequest(
@@ -697,10 +731,7 @@ class TestForwardToOllama:
         mock_tags.status_code = 200
         mock_tags.json.return_value = tags_data
 
-        mock_client = AsyncMock()
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client.get = AsyncMock(return_value=mock_tags)
+        mock_client = self._streaming_client(mock_tags)
 
         app_state = MagicMock()
         app_state.config = {}
@@ -781,10 +812,7 @@ class TestForwardToOllama:
         mock_tags.status_code = 200
         mock_tags.json.return_value = tags_data
 
-        mock_client = AsyncMock()
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-        mock_client.get = AsyncMock(return_value=mock_tags)
+        mock_client = self._streaming_client(mock_tags)
 
         with patch("httpx.AsyncClient", return_value=mock_client), \
              patch.dict(os.environ, {"NEXE_OLLAMA_MODEL": "llama3.2"}):
@@ -847,11 +875,12 @@ class TestOllamaStreamGenerator:
                 user_msg="Hi"
             ))
 
-        assert any("Hola" in c for c in chunks)
-        assert any("[DONE]" in c for c in chunks)
+        assert "Hola" in _sse(chunks)
+        assert _end(chunks)["failure"] is None
 
-    def test_error_status_yields_error_and_done(self):
-        """Status != 200 → yields error and [DONE]."""
+    def test_error_status_raises_before_any_token(self):
+        """Status != 200 before a token is HTTP, so the cascade can still retry."""
+        from fastapi import HTTPException
         from core.endpoints.chat import _ollama_stream_generator
 
         mock_resp = AsyncMock()
@@ -867,17 +896,17 @@ class TestOllamaStreamGenerator:
         mock_client.stream = MagicMock(return_value=mock_stream)
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            chunks = self._collect(_ollama_stream_generator(
-                "http://localhost:11434/api/chat",
-                {},
-            ))
+            with pytest.raises(HTTPException) as exc:
+                self._collect(_ollama_stream_generator(
+                    "http://localhost:11434/api/chat",
+                    {},
+                ))
+        assert exc.value.status_code == 500
 
-        assert any("error" in c for c in chunks)
-        assert any("[DONE]" in c for c in chunks)
-
-    def test_connect_error_yields_error(self):
-        """ConnectError → yields error."""
+    def test_connect_error_before_a_token_is_http(self):
+        """ConnectError before a token is HTTP 503, not an SSE error frame."""
         import httpx
+        from fastapi import HTTPException
         from core.endpoints.chat import _ollama_stream_generator
 
         mock_client = AsyncMock()
@@ -886,12 +915,12 @@ class TestOllamaStreamGenerator:
         mock_client.stream = MagicMock(side_effect=httpx.ConnectError("refused"))
 
         with patch("httpx.AsyncClient", return_value=mock_client):
-            chunks = self._collect(_ollama_stream_generator(
-                "http://localhost:11434/api/chat",
-                {},
-            ))
-
-        assert any("error" in c.lower() for c in chunks)
+            with pytest.raises(HTTPException) as exc:
+                self._collect(_ollama_stream_generator(
+                    "http://localhost:11434/api/chat",
+                    {},
+                ))
+        assert exc.value.status_code == 503
 
     def test_json_decode_error_skipped(self):
         """Lines with invalid JSON are ignored without crash."""
@@ -928,7 +957,7 @@ class TestOllamaStreamGenerator:
                 user_msg="Hi"
             ))
 
-        assert any("[DONE]" in c for c in chunks)
+        assert _end(chunks)["failure"] is None
 
     def test_empty_line_skipped(self):
         """Empty lines are ignored."""
@@ -965,7 +994,8 @@ class TestOllamaStreamGenerator:
                 user_msg="Hi"
             ))
 
-        assert any("[DONE]" in c for c in chunks)
+        assert "token" in _sse(chunks)
+        assert _end(chunks)["failure"] is None
 
 
 # ─── TestForwardToMLX ─────────────────────────────────────────────────────────
@@ -1058,13 +1088,11 @@ class TestForwardToMLX:
 
         assert isinstance(result, StreamingResponse)
 
-    def test_mlx_stream_error_after_first_token_is_partial(self):
-        """#1036/#1040 (C2.4): once a token reached the client the error is a
-        yielded chunk (irretryable — the StreamingResponse already committed),
-        and the partial reply is still persisted to the mirrored /v1 session
-        instead of being dropped on the floor."""
+    def test_mlx_stream_error_after_first_token_is_a_sentinel(self):
+        """#1036/#1040 (C2.4), C4.6-b: once a token reached the client the
+        failure rides on the sentinel. Persistence is the turn's step, not
+        this generator's."""
         from core.endpoints.chat import _forward_to_mlx
-        import core.endpoints.chat_engines.mlx as mlx_mod
 
         async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
             if stream_callback:
@@ -1077,22 +1105,18 @@ class TestForwardToMLX:
         req = self._make_fastapi_request(modules={"mlx_module": mlx_module})
 
         async def _run():
-            with patch.object(mlx_mod, "persist_v1_turn") as mock_persist:
-                result = await _forward_to_mlx(
-                    [{"role": "user", "content": "Hi"}],
-                    self._make_request(stream=True),
-                    req,
-                )
-                assert isinstance(result, StreamingResponse)
-                chunks = [c async for c in result.body_iterator]
-                return chunks, mock_persist
+            result = await _forward_to_mlx(
+                [{"role": "user", "content": "Hi"}],
+                self._make_request(stream=True),
+                req,
+            )
+            assert isinstance(result, StreamingResponse)
+            return [c async for c in result.body_iterator]
 
-        chunks, mock_persist = asyncio.run(_run())
-        text = "".join(chunks)
-        assert '"error"' in text
-        assert "[DONE]" in text
-        mock_persist.assert_called_once()
-        assert mock_persist.call_args.kwargs.get("partial") is True
+        chunks = asyncio.run(_run())
+        assert "partial" in _sse(chunks)
+        assert "GPU crashed" in (_end(chunks)["failure"] or "")
+        assert not any(isinstance(c, str) and '"error"' in c for c in chunks)
 
     def test_mlx_exception_propagates(self):
         """#1036 (C2.4): a non-streaming execution error propagates untouched
@@ -1291,12 +1315,12 @@ class TestMLXStreamGenerator:
                 user_msg="Hi",
             ))
 
-        text = "".join(chunks)
+        text = _sse(chunks)
         assert "Hola" in text or "món" in text
-        assert "[DONE]" in text
+        assert _end(chunks)["failure"] is None
 
-    def test_yields_done_at_end(self):
-        """The generator always ends with [DONE]."""
+    def test_closes_with_a_sentinel(self):
+        """The generator closes with a sentinel. `[DONE]` is the turn's."""
         from core.endpoints.chat import _mlx_stream_generator
 
         async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
@@ -1314,11 +1338,11 @@ class TestMLXStreamGenerator:
                 user_msg=None,
             ))
 
-        assert any("[DONE]" in c for c in chunks)
+        assert _end(chunks)["failure"] is None
 
     def test_exception_before_first_token_raises(self):
         """#1036 (C2.4): an error before any token reached the client raises a
-        real exception instead of ending with [DONE] — this is what lets the
+        real exception instead of ending the stream — this is what lets the
         forwarder's peek-before-first-byte give the cascade something to
         retry. (Before C2.4 this silently closed the stream with no token and
         no visible error — arguably worse than either behaviour.)"""
@@ -1338,10 +1362,10 @@ class TestMLXStreamGenerator:
                 model_name="test",
             ))
 
-    def test_exception_after_first_token_yields_chunk_and_done(self):
-        """#1036/#1040 (C2.4): once a token already reached the client, the
-        wire is committed — the error becomes a yielded chunk (irretryable),
-        exactly as before C2.4, and the stream still ends with [DONE]."""
+    def test_exception_after_first_token_is_a_sentinel(self):
+        """#1036/#1040 (C2.4), C4.6-b: once a token already reached the client,
+        the wire is committed. The failure rides on the sentinel. The turn
+        saves the partial and writes `[DONE]`; this generator does neither."""
         from core.endpoints.chat import _mlx_stream_generator
 
         async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
@@ -1359,8 +1383,9 @@ class TestMLXStreamGenerator:
             app_state=None,
         ))
 
-        assert any('"error"' in c for c in chunks)
-        assert any("[DONE]" in c for c in chunks)
+        assert "partial" in _sse(chunks)
+        assert "MLX GPU error" in (_end(chunks)["failure"] or "")
+        assert not any(isinstance(c, str) and '"error"' in c for c in chunks)
 
 
 # ─── TestLlamaCppStreamGenerator ──────────────────────────────────────────────
@@ -1406,12 +1431,12 @@ class TestLlamaCppStreamGenerator:
                 user_msg="Hi",
             ))
 
-        text = "".join(chunks)
+        text = _sse(chunks)
         assert "Hello" in text or "world" in text
-        assert "[DONE]" in text
+        assert _end(chunks)["failure"] is None
 
-    def test_yields_done_at_end(self):
-        """Always ends with [DONE]."""
+    def test_closes_with_a_sentinel(self):
+        """Closes with a sentinel. `[DONE]` is the turn's."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
         async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
@@ -1429,12 +1454,11 @@ class TestLlamaCppStreamGenerator:
                 user_msg=None,
             ))
 
-        assert any("[DONE]" in c for c in chunks)
+        assert _end(chunks)["failure"] is None
 
     def test_exception_before_first_token_raises(self):
         """#1036 (C2.4): an error before any token reached the client raises a
-        real exception instead of ending with [DONE] — see the MLX generator's
-        equivalent test for the full rationale."""
+        real exception — see the MLX generator's equivalent test."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
         async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
@@ -1451,10 +1475,9 @@ class TestLlamaCppStreamGenerator:
                 model_name="test",
             ))
 
-    def test_exception_after_first_token_yields_chunk_and_done(self):
-        """#1036/#1040 (C2.4): once a token already reached the client, the
-        error becomes a yielded chunk (irretryable) and the stream still ends
-        with [DONE]."""
+    def test_exception_after_first_token_is_a_sentinel(self):
+        """#1036/#1040 (C2.4), C4.6-b: once a token already reached the client,
+        the failure rides on the sentinel. No SSE error frame, no `[DONE]`."""
         from core.endpoints.chat import _llama_cpp_stream_generator
 
         async def fake_chat(messages, system, session_id, stream_callback=None, **kwargs):
@@ -1472,5 +1495,6 @@ class TestLlamaCppStreamGenerator:
             app_state=None,
         ))
 
-        assert any('"error"' in c for c in chunks)
-        assert any("[DONE]" in c for c in chunks)
+        assert "partial" in _sse(chunks)
+        assert "GGUF error" in (_end(chunks)["failure"] or "")
+        assert not any(isinstance(c, str) and '"error"' in c for c in chunks)

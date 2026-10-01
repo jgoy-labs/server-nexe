@@ -314,7 +314,9 @@ async def validate_turn(ctx: TurnContext) -> None:
     # system message and the image alone in the user one. Answering
     # "Message is required" blamed the text for a turn whose image had
     # already arrived and decoded fine. Both doors, one rule.
-    if not ctx.message and not attachments.get("image_b64"):
+    # C4.6: a RESUME turn carries no message of its own — it continues the
+    # session's last answer, which the door's `session` step checks exists.
+    if not ctx.message and not attachments.get("image_b64") and not ctx.resume:
         raise HTTPException(status_code=400, detail=message_required_detail(ctx.request))
 
 

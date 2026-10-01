@@ -132,21 +132,30 @@ class TestBuildOllamaPayload:
 # ─── _ollama_streaming_response ──────────────────────────────────────────────
 
 class TestOllamaStreamingResponse:
+    def _one_chunk(self):
+        async def agen():
+            yield "data: {}\n\n"
+        return agen()
+
     def test_returns_streaming_response(self):
+        import asyncio
         from core.endpoints.chat_engines.ollama import _ollama_streaming_response
         with patch("core.endpoints.chat_engines.ollama._ollama_stream_generator") as mock_gen:
-            mock_gen.return_value = MagicMock()
-            result = _ollama_streaming_response("http://localhost:11434/api/chat", {}, None, None, None, None)
+            mock_gen.return_value = self._one_chunk()
+            result = asyncio.run(_ollama_streaming_response(
+                "http://localhost:11434/api/chat", {}, None, None, None, None,
+            ))
         assert isinstance(result, StreamingResponse)
 
     def test_includes_fallback_headers_when_provided(self):
+        import asyncio
         from core.endpoints.chat_engines.ollama import _ollama_streaming_response
         with patch("core.endpoints.chat_engines.ollama._ollama_stream_generator") as mock_gen:
-            mock_gen.return_value = MagicMock()
-            result = _ollama_streaming_response(
+            mock_gen.return_value = self._one_chunk()
+            result = asyncio.run(_ollama_streaming_response(
                 "http://localhost:11434/api/chat", {}, None, None,
-                fallback_from="mlx", fallback_reason="not available"
-            )
+                fallback_from="mlx", fallback_reason="not available",
+            ))
         assert result.headers.get("x-nexe-fallback-from") == "mlx"
         assert result.headers.get("x-nexe-fallback-reason") == "not available"
 

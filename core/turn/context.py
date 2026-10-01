@@ -33,6 +33,10 @@ class TurnContext:
     principal: Optional[str] = None
     pipeline_version: int = 1
     streaming: bool = False  # set by run_turn/stream_turn, not by the door
+    # C4.6: this turn RESUMES the session's last (truncated) assistant answer
+    # instead of answering a new user message (FD-S6, the web door's
+    # Continue). A property of the turn, not of the door: the steps read it.
+    resume: bool = False
 
     # --- Given by the door, transitional (see module docstring) ---
     body: Any = None        # the request body as received (pydantic model or dict)

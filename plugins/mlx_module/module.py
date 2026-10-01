@@ -238,6 +238,13 @@ class MLXModule:
         logger.info("MLXModule: model switched to %s", new_config.model_path)
         return True
 
+    def can_continue(self, model_name: Optional[str] = None) -> bool:
+        """C4.6 (FD-S6): this engine can resume a truncated answer mid-sentence
+        (`continue_final`), on the text path and — C4.6-a-vlm — on the VLM
+        path too (`continue_final_message` through `mlx_vlm`'s template).
+        `model_name` is ignored: MLX runs the one model it has loaded."""
+        return bool(self._initialized and self._node is not None)
+
     async def chat(
         self, messages: List[Dict[str, str]], system: str = "",
         session_id: str = "default", stream_callback=None, **kwargs,

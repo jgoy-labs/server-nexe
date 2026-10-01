@@ -328,20 +328,28 @@ async def test_oneshot_path_when_there_is_no_stream_callback():
     assert result["tokens"] == 2
 
 
-async def test_continue_is_refused_on_the_vlm_path():
-    """FD-S6: mlx_vlm no té continue; el camí VLM ho ha de rebutjar explícitament."""
+async def test_the_vlm_path_resumes_from_the_prompt_the_answer_was_cut_from():
+    """C4.6-a-vlm: the VLM path continues too — the default models (Qwen3.5,
+    Gemma 4) are VLMs. The template gets the history BEFORE the answer (with
+    its generation prompt) and the answer's raw text is appended to it: the
+    prompt the answer was generated from, plus what was generated."""
     node = _make_node()
-    h = _Harness(chunks=_chunks("ok"))
+    h = _Harness(chunks=_chunks(" i continua"))
 
     with h:
-        with pytest.raises(ValueError, match="continue_final"):
-            await node.execute({
-                "system": "",
-                "messages": [{"role": "user", "content": "hola"}],
-                "images": [JPEG],
-                "stream_callback": h.collect,
-                "continue_final": True,
-            })
+        await node.execute({
+            "system": "",
+            "messages": [
+                {"role": "user", "content": "hola"},
+                {"role": "assistant", "content": "Una resposta tall"},
+            ],
+            "stream_callback": h.collect,
+            "continue_final": True,
+        })
+
+    assert h.template_kwargs["prompt"][-1] == {"role": "user", "content": "hola"}
+    assert h.template_kwargs.get("add_generation_prompt", True) is True
+    assert h.stream_kwargs["prompt"] == "PROMPT-FORMATAT" + "Una resposta tall"
 
 
 async def test_a_text_only_turn_still_goes_through_the_vlm_path():

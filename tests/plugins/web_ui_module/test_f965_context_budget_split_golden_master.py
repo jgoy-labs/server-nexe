@@ -51,7 +51,6 @@ C42_MOVED_NAMES = (
     "_finalize_system_prompt",         # core/turn/prompt.py
     "_get_system_prompt",              # core/turn/prompt.py (was core/endpoints/chat.py)
     "_build_system_prompt_with_time",  # core/turn/prompt.py
-    "_build_turn_system_prompt",       # core/turn/prompt.py
     "turn_system_prompt",              # core/turn/prompt.py (the shared step)
     "_build_rag_context",              # core/turn/recall.py
     "_build_turn_context",             # core/turn/assemble.py
@@ -262,13 +261,23 @@ class TestTheEngineReachesTheBudget:
     with every test in this suite still green."""
 
     def test_the_call_site_passes_the_engine(self) -> None:
+        # C4.6: the only call site left is the turn's `budget` adapter (the
+        # Continue path that also called it is a turn now). Read as a syntax
+        # tree: its arguments nest parentheses a regex would stop inside.
+        import ast
         import inspect
-        import re as _re
+        import textwrap
 
-        src = inspect.getsource(routes_chat.register_chat_routes)
-        call = _re.search(r"_assemble_engine_messages\((.*?)\)", src, _re.S)
-        assert call, "_handle_chat_engine must still call _assemble_engine_messages"
-        assert "engine" in call.group(1), (
+        from plugins.web_ui_module.api import turn_adapters
+
+        tree = ast.parse(textwrap.dedent(inspect.getsource(turn_adapters.ui_adapters)))
+        calls = [
+            n for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and getattr(n.func, "attr", None) == "_assemble_engine_messages"
+        ]
+        assert len(calls) == 1, "the budget step must call _assemble_engine_messages, once"
+        passed = [ast.unparse(a) for a in calls[0].args] + [ast.unparse(k.value) for k in calls[0].keywords]
+        assert "ctx.engine" in passed, (
             "#965: the live engine must reach _assemble_engine_messages, or the "
             "budget quietly reverts to the default window"
         )

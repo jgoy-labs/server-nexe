@@ -206,9 +206,33 @@ def server_state() -> MagicMock:
     return state
 
 
+def _fake_v1_stream(text: Optional[str] = None):
+    """A fresh /v1 stream, closed the way the engines now close: a sentinel,
+    not `[DONE]`. A new generator every call — a stream iterates once.
+
+    `text` is one chunk. Without it, the two `FAKE_CHUNKS` the UI door streams.
+    """
+    from fastapi.responses import StreamingResponse
+
+    from core.endpoints.chat_engines._common import mark_served_model
+    from core.endpoints.chat_engines._streaming import format_sse_chunk, stream_end
+
+    pieces = FAKE_CHUNKS if text is None else (text,)
+
+    async def agen():
+        for chunk in pieces:
+            yield format_sse_chunk(chunk, "llama3.2:3b", "ollama")
+        yield stream_end()
+
+    return mark_served_model(
+        StreamingResponse(agen(), media_type="text/event-stream"), "llama3.2:3b",
+    )
+
+
 @contextlib.contextmanager
 def door_patches(server_state: Any, memory_helper: Any, answer: str = FAKE_ANSWER,
-                 answers: Optional[list] = None):
+                 answers: Optional[list] = None, streaming: bool = False,
+                 stream_texts: Optional[list] = None):
     """The four things a turn must not really do in a unit test, patched the
     same way for every caller and every argument.
 
@@ -228,7 +252,23 @@ def door_patches(server_state: Any, memory_helper: Any, answer: str = FAKE_ANSWE
     """
     ollama_reply = {"choices": [{"message": {"role": "assistant", "content": answer}}]}
     replies = [{"choices": [{"message": {"role": "assistant", "content": a}}]} for a in (answers or [])]
-    forward = AsyncMock(side_effect=replies) if replies else AsyncMock(return_value=ollama_reply)
+    if streaming:
+        # One shape for every call: a stream. Not a branch on the request.
+        # `stream_texts` hands the next canned answer to each call (a re-prompt
+        # is the second call) and then repeats the last one.
+        queued = list(stream_texts or [])
+
+        def _next_stream(*_a, **_k):
+            if not queued:
+                return _fake_v1_stream()
+            piece = queued.pop(0) if len(queued) > 1 else queued[0]
+            return _fake_v1_stream(piece)
+
+        forward = AsyncMock(side_effect=_next_stream)
+    elif replies:
+        forward = AsyncMock(side_effect=replies)
+    else:
+        forward = AsyncMock(return_value=ollama_reply)
 
     async def _no_rag(*_args, **_kwargs):
         return "", []
@@ -258,9 +298,14 @@ class TurnLab:
         self.server_state = server_state
         #: C4.5: what the API door's engine answers, call after call (None = FAKE_ANSWER once).
         self.api_answers: Optional[list] = None
+        #: C4.6-b: the same, for a streaming turn. None = FAKE_CHUNKS.
+        self.api_stream_texts: Optional[list] = None
 
-    def _patches(self):
-        return door_patches(self.server_state, self.memory_helper, answers=self.api_answers)
+    def _patches(self, streaming: bool = False):
+        return door_patches(
+            self.server_state, self.memory_helper, answers=self.api_answers,
+            streaming=streaming, stream_texts=self.api_stream_texts,
+        )
 
     async def ui(self, *, streaming: bool, session_id: str, entry: str = "ui",
                  message: str = "hola", body_extra: Optional[dict] = None):
@@ -280,6 +325,8 @@ class TurnLab:
         ctx = TurnContext(
             turn_id=f"turn-{session_id}", entry=entry, streaming=streaming,
             principal=LAB_PRINCIPAL,
+            # C4.6: what `_chat_inner` does with the body's `continue`.
+            resume=body.get("continue") is True,
             body=body, request=make_request(self.app_state), app_state=self.app_state,
         )
         adapters = ui_adapters(self.session_manager, streaming=streaming)
@@ -300,14 +347,11 @@ class TurnLab:
         return ctx
 
     async def api(self, *, session_id: str, entry: str = "api", message: str = "hola",
-                  content=None, messages=None):
+                  content=None, messages=None, streaming: bool = False, resume: bool = False):
         """One real `/v1/chat/completions` turn through `api_adapters`.
 
-        `body.stream` is False: this door's `generate` is opaque with respect
-        to streaming (the SSE generator lives inside the engine forwarder — see
-        `adapters_api.py`'s docstring), so its streaming shape is not a
-        different walk of TURN_STEPS; it is the same walk with another object
-        in `ctx.wire`.
+        `streaming=True` (C4.6-b) walks `stream_turn` and drains it, the same
+        way `ui(streaming=True)` does. The chunks land on `lab_wire_chunks`.
 
         `content` (#1081) overrides the plain-string `message` with a
         list of OpenAI content parts (text + inline image) when a test needs
@@ -321,26 +365,41 @@ class TurnLab:
         from core.endpoints.chat_schemas import ChatCompletionRequest, Message
         from core.turn.adapters_api import api_adapters
         from core.turn.context import TurnContext
-        from core.turn.run import run_turn
+        from core.turn.run import run_turn, stream_turn
 
         if messages is not None:
             _msgs = [Message(**m) if isinstance(m, dict) else m for m in messages]
         else:
             _msgs = [Message(role="user", content=content if content is not None else message)]
         body = ChatCompletionRequest(
-            messages=_msgs, use_rag=True, stream=False, engine="ollama",
+            messages=_msgs, use_rag=True, stream=streaming, engine="ollama",
+            resume=resume,
         )
         request = make_request(self.app_state)
         request.scope["headers"] = [
             (b"x-api-key", b"test-key"), (b"x-session-id", session_id.encode()),
         ]
         ctx = TurnContext(
-            turn_id=f"turn-{session_id}", entry=entry, streaming=False,
-            principal=LAB_PRINCIPAL,
+            turn_id=f"turn-{session_id}", entry=entry, streaming=streaming,
+            principal=LAB_PRINCIPAL, resume=resume,
             body=body, request=request, app_state=self.app_state,
         )
-        with self._patches():
-            await run_turn(ctx, api_adapters(BackgroundTasks()))
+        tasks = BackgroundTasks()
+        chunks: list = []
+        with self._patches(streaming=streaming):
+            if streaming:
+                async for chunk in await stream_turn(
+                    ctx, api_adapters(tasks, streaming=True),
+                ):
+                    chunks.append(chunk)
+            else:
+                await run_turn(ctx, api_adapters(tasks))
+                # JSON queues the save. A resume's merge has to be observable
+                # once the turn returns; FastAPI would run this after the body.
+                if resume:
+                    for task in tasks.tasks:
+                        await task()
+        ctx.lab_wire_chunks = chunks
         return ctx
 
 

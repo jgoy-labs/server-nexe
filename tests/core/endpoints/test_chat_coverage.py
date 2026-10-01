@@ -11,6 +11,15 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.dependencies import limiter as _limiter
+from core.endpoints.chat_engines._streaming import NEXE_END
+
+
+def _end(chunks) -> dict:
+    """The generator's closing sentinel. `[DONE]` belongs to the turn."""
+    ends = [c[NEXE_END] for c in chunks if isinstance(c, dict) and NEXE_END in c]
+    assert ends, "the generator closes with a sentinel; [DONE] belongs to the turn"
+    assert not any(isinstance(c, str) and "[DONE]" in c for c in chunks)
+    return ends[-1]
 
 
 @pytest.fixture(autouse=True)
@@ -24,8 +33,8 @@ def _disable_rate_limiter():
 # ─── Test _ollama_stream_generator uncovered branches ──────────────────
 class TestOllamaStreamGenerator:
 
-    def test_stream_completes_with_done(self):
-        """Streaming Ollama still closes with [DONE] after a content chunk."""
+    def test_stream_completes_with_a_sentinel(self):
+        """Streaming Ollama closes with a sentinel after a content chunk."""
         from core.endpoints.chat import _ollama_stream_generator
 
         ollama_lines = [
@@ -51,7 +60,8 @@ class TestOllamaStreamGenerator:
         with patch("httpx.AsyncClient", return_value=mock_client):
             gen = _ollama_stream_generator("http://localhost/api/chat", {}, app_state, "test msg")
             chunks = asyncio.run(_collect_async_gen(gen))
-            assert any("[DONE]" in c for c in chunks)
+            assert "Hello" in "".join(c for c in chunks if isinstance(c, str))
+            assert _end(chunks)["failure"] is None
 
     def test_stream_cancelled(self):
         """Lines 590-591: CancelledError is handled."""
@@ -93,10 +103,11 @@ class TestOllamaStreamGenerator:
         with patch("httpx.AsyncClient", return_value=mock_client):
             gen = _ollama_stream_generator("http://localhost/api/chat", {}, None, None)
             chunks = asyncio.run(_collect_async_gen(gen))
-            assert any("[DONE]" in c for c in chunks)
+            assert _end(chunks)["failure"] is None
 
-    def test_stream_error_status(self):
-        """Lines 555-558: stream returns error status."""
+    def test_stream_error_status_is_http(self):
+        """A non-200 before any token raises, so the cascade can still retry."""
+        from fastapi import HTTPException
         from core.endpoints.chat import _ollama_stream_generator
 
         mock_resp = AsyncMock()
@@ -113,12 +124,14 @@ class TestOllamaStreamGenerator:
 
         with patch("httpx.AsyncClient", return_value=mock_client):
             gen = _ollama_stream_generator("http://localhost/api/chat", {}, None, None)
-            chunks = asyncio.run(_collect_async_gen(gen))
-            assert any("error" in c for c in chunks)
+            with pytest.raises(HTTPException) as exc:
+                asyncio.run(_collect_async_gen(gen))
+        assert exc.value.status_code == 500
 
-    def test_stream_connect_error(self):
-        """Lines 592-595: httpx.ConnectError in streaming."""
+    def test_stream_connect_error_is_http(self):
+        """A connection error before any token is HTTP 503, not an SSE frame."""
         import httpx
+        from fastapi import HTTPException
         from core.endpoints.chat import _ollama_stream_generator
 
         mock_client = AsyncMock()
@@ -128,9 +141,9 @@ class TestOllamaStreamGenerator:
 
         with patch("httpx.AsyncClient", return_value=mock_client):
             gen = _ollama_stream_generator("http://localhost/api/chat", {}, None, None)
-            chunks = asyncio.run(_collect_async_gen(gen))
-            assert any("error" in c for c in chunks)
-            assert any("[DONE]" in c for c in chunks)
+            with pytest.raises(HTTPException) as exc:
+                asyncio.run(_collect_async_gen(gen))
+        assert exc.value.status_code == 503
 
     def test_stream_byte_cap_terminates_runaway(self, monkeypatch):
         """B104: a model in a loop must NOT accumulate without limit; on exceeding
@@ -167,11 +180,11 @@ class TestOllamaStreamGenerator:
             gen = _ollama_stream_generator("http://localhost/api/chat", {}, None, None)
             chunks = asyncio.run(_collect_async_gen(gen))
 
-        # 1) The generator must signal the cap (error) and close with [DONE].
-        assert any("error" in c for c in chunks), "no s'emet error de cap (bug B104)"
-        assert any("[DONE]" in c for c in chunks)
+        end = _end(chunks)
+        assert end["failure"] == "stream_cap_exceeded"
+        assert end["truncated"] is True
         # 2) Comportamental: NO ha consumit els 100 chunks; para molt abans.
-        delta_chunks = [c for c in chunks if '"delta"' in c]
+        delta_chunks = [c for c in chunks if isinstance(c, str) and '"delta"' in c]
         assert len(delta_chunks) < 10, f"acumula sense límit: {len(delta_chunks)} deltes"
 
 
@@ -187,7 +200,7 @@ class TestMlxStreamGenerator:
 
         gen = _mlx_stream_generator(mock_mlx, [{"role": "user", "content": "hi"}], "system", "model")
         chunks = asyncio.run(_collect_async_gen(gen))
-        assert any("[DONE]" in c for c in chunks)
+        assert _end(chunks)["failure"] is None
 
     def test_mlx_stream_completes_with_done(self):
         """MLX streaming still closes with [DONE] after emitting tokens."""
@@ -207,7 +220,7 @@ class TestMlxStreamGenerator:
         gen = _mlx_stream_generator(mock_mlx, [{"role": "user", "content": "hi"}],
                                     "system", "model", app_state=app_state, user_msg="hi")
         chunks = asyncio.run(_collect_async_gen(gen))
-        assert any("[DONE]" in c for c in chunks)
+        assert _end(chunks)["failure"] is None
 
     def test_mlx_stream_exception(self):
         """#1036 (C2.4): an exception before any token reached the client
@@ -236,7 +249,7 @@ class TestLlamaCppStreamGenerator:
 
         gen = _llama_cpp_stream_generator(mock_llama, [{"role": "user", "content": "hi"}], "system", "model")
         chunks = asyncio.run(_collect_async_gen(gen))
-        assert any("[DONE]" in c for c in chunks)
+        assert _end(chunks)["failure"] is None
 
     def test_llama_cpp_stream_completes_with_done(self):
         """llama.cpp streaming still closes with [DONE] after emitting tokens."""
@@ -256,7 +269,7 @@ class TestLlamaCppStreamGenerator:
         gen = _llama_cpp_stream_generator(mock_llama, [{"role": "user", "content": "hi"}],
                                           "system", "model", app_state=app_state, user_msg="hi")
         chunks = asyncio.run(_collect_async_gen(gen))
-        assert any("[DONE]" in c for c in chunks)
+        assert _end(chunks)["failure"] is None
 
     def test_llama_cpp_stream_exception(self):
         """#1036 (C2.4): an exception before any token reached the client

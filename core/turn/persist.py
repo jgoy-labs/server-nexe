@@ -82,8 +82,17 @@ def persist_partial_assistant(
             # FD-S6 (MC-116): interrupted continue → merge the partial
             # tail in-place, same no-separator contract as the clean
             # path (add_message would trip the consecutive-role dedupe).
-            session.messages[-1]["content"] += _partial_clean
-            session.messages[-1].pop("gen_raw", None)
+            _last = session.messages[-1]
+            _last["content"] += _partial_clean
+            # The answer is still cut. Keep the raw prefix so the NEXT
+            # Continue stays an exact token prefix — the same rule as a
+            # truncated merge. Dropping gen_raw here made that next resume
+            # render the cleaned text and miss the cache when thinking was on.
+            if _last.get("gen_raw"):
+                _last["gen_raw"] += full_response
+            # #1106: merged in memory only, until now — the tail was lost if
+            # nothing else saved the session before a restart.
+            session_mgr._save_session_to_disk(session)
         elif _partial_clean:
             session.add_message("assistant", _partial_clean, stats={"interrupted": True})
             session_mgr._save_session_to_disk(session)

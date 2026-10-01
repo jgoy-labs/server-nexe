@@ -16,7 +16,7 @@ from collections import OrderedDict
 from uuid import uuid4
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Request, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from core.security.auth_dependencies import require_api_key
 from core.security.input_sanitizers import validate_string_input
@@ -46,6 +46,8 @@ from .chat_engines.routing import (
     _get_preferred_engine,
     _engine_available,
     _resolve_engine,
+    engine_can_continue,
+    get_engine_module,
     raise_if_terminal,
     resolve_engine_cascade,
 )
@@ -66,7 +68,9 @@ from core.turn.recall import _build_rag_context as recall_for_turn
 from core.turn.prompt import turn_system_prompt
 from core.turn.context import TurnContext
 from core.turn.post_commit import queue_for
-from core.turn.run import run_turn
+from core.turn.lease import release_turn_lease, releasing
+from core.turn.run import run_turn, stream_turn
+from .chat_engines._streaming import _prepend_chunk
 from core.lang_detect import (
     detect_user_lang_or_none as _detect_lang_or_none,
     fallback_lang as _fallback_lang,
@@ -165,8 +169,17 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
       quoted in `core/turn/validate.py`), while a system/assistant message the
       CLIENT supplies keeps the escaping default it has always had — that
       decision was about the user's message reaching the model, and about
-      nothing else.
+      nothing else. The one exception is the partial a resume continues
+      from (`_supplied_content`): escaping `<` or `&` there would change
+      the prefix the engine continues from.
     """
+    if body.resume is True:
+        last = body.messages[-1]
+        if last.role != "assistant":
+            raise HTTPException(
+                status_code=400,
+                detail="continue requires the last message to be an assistant turn",
+            )
     if body.model is not None:
         body.model = validate_string_input(body.model, max_length=200, context="param")
     if body.engine is not None:
@@ -174,8 +187,31 @@ def _validate_chat_request(body: ChatCompletionRequest) -> None:
     for _msg in body.messages:
         if _msg.role is not None:
             _msg.role = validate_string_input(_msg.role, max_length=50, context="param")
-        if _msg.content is not None and _msg.role != "user":
-            _msg.content = validate_string_input(_msg.content, max_length=MAX_CHAT_INPUT_LENGTH, context="chat")
+        _supplied_content(body, _msg)
+
+
+def _supplied_content(body: ChatCompletionRequest, msg: Message) -> None:
+    """Escape one client-supplied system or assistant message, in place.
+
+    The last assistant message of a resume is the cut answer. It is still
+    length-checked and still runs the injection detectors; it is not escaped,
+    because the engine continues from those exact characters.
+    """
+    if msg.content is None or msg.role == "user" or not isinstance(msg.content, str):
+        if msg.content is not None and msg.role != "user" and not isinstance(msg.content, str):
+            msg.content = validate_string_input(
+                msg.content, max_length=MAX_CHAT_INPUT_LENGTH, context="chat",
+            )
+        return
+    partial = (
+        body.resume is True
+        and bool(body.messages)
+        and msg is body.messages[-1]
+        and msg.role == "assistant"
+    )
+    msg.content = validate_string_input(
+        msg.content, max_length=MAX_CHAT_INPUT_LENGTH, context="chat", allow_html=partial,
+    )
 
 
 async def _fetch_rag_context(
@@ -617,7 +653,8 @@ async def _dispatch_to_engine(
 
 
 def _persist_v1_turn_from_response(
-    response: Any, background_tasks: BackgroundTasks, app_state: Any, session_id: str
+    response: Any, background_tasks: BackgroundTasks, app_state: Any, session_id: str,
+    *, resume: bool = False,
 ) -> None:
     """Queue the assistant's reply to be mirrored into its /v1 session (F-C).
 
@@ -626,19 +663,27 @@ def _persist_v1_turn_from_response(
     the full text becomes available (mirrors the pre-F-A
     ``_schedule_episodic_memory``, now targeting the session mirror instead
     of episodic memory).
+
+    `resume` (C4.6-c): the mirror has already written the client's partial,
+    so the queued save merges the tail into it instead of adding a turn.
     """
     if isinstance(response, StreamingResponse):
         return
     try:
         content = ""
+        truncated = False
         if isinstance(response, dict):
             choices = response.get("choices", [])
             if choices:
                 content = choices[0].get("message", {}).get("content", "")
+                truncated = choices[0].get("finish_reason") == "length"
             if not content:
                 content = response.get("message", {}).get("content", "")
         if content:
-            background_tasks.add_task(persist_v1_turn, app_state, session_id, content)
+            background_tasks.add_task(
+                persist_v1_turn, app_state, session_id, content,
+                resume=resume, truncated=truncated,
+            )
     except Exception as e:
         logger.error("Failed to schedule /v1 session mirror: %s", e, exc_info=True)
 
@@ -715,11 +760,30 @@ def _fit_v1_messages_to_window(
     return ([system_msg] + fitted) if system_msg else fitted
 
 
+def _engines_that_can_resume(cascade: list, body: ChatCompletionRequest, app_state: Any) -> list:
+    """The engines in `cascade` whose prompt can end inside the cut answer.
+
+    None left is a 400: a resume that reached an engine that cannot continue
+    used to start a new answer and glue it onto the one that was cut.
+    """
+    model = getattr(body, "model", None)
+    able = [
+        name for name in cascade
+        if engine_can_continue(get_engine_module(name, app_state), model)
+    ]
+    if not able:
+        raise HTTPException(
+            status_code=400,
+            detail="continue is not supported by the available engines",
+        )
+    return able
+
+
 async def _dispatch_through_cascade(
     body: ChatCompletionRequest, request: Request, messages: list[dict],
     last_user_msg: Optional[str], session_id: str, engine: str,
     preferred_fallback: Optional[str], *, cancel_event: Any = None,
-    images: Optional[list[str]] = None,
+    images: Optional[list[str]] = None, resume: bool = False,
 ) -> tuple:
     """Try the resolved engine, then the rest of the cascade. Returns
     ``(response, engine_that_answered, fallback_from, fallback_reason,
@@ -753,6 +817,10 @@ async def _dispatch_through_cascade(
     raised before a streaming response's first byte) lands here.
     """
     cascade = resolve_engine_cascade(body.engine, request.app.state) or [engine]
+    # `is True`: a MagicMock body grows a truthy `.resume` on access, and that
+    # used to reject every non-resume turn as "continue is not supported".
+    if resume or body.resume is True:
+        cascade = _engines_that_can_resume(cascade, body, request.app.state)
     last_exc: Optional[BaseException] = None
     reason = "preferred_unavailable"
     for candidate in cascade:
@@ -802,11 +870,12 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
     - Auto-routing to engines (Ollama, MLX, Llama.cpp)
 
     ADR-007 (C1.2): this door no longer decides the order of the turn. It
-    builds a `TurnContext` and lets `run_turn` walk `TURN_STEPS`; every step
-    is an adapter in `core/turn/adapters_api.py` wrapping the same functions
-    this body used to call in the same order. `ctx.wire` is what the client
-    gets — a dict, or the `StreamingResponse` the engine forwarder built.
-    Exceptions propagate untouched (a 400 from validation stays a 400).
+    builds a `TurnContext` and lets the turn engine walk `TURN_STEPS`.
+    JSON uses `run_turn`. Streaming (C4.6-b) uses `stream_turn`: the first
+    chunk is read before the `StreamingResponse` exists, so an error before
+    that byte is still HTTP and the cascade can still try the next engine.
+    The headers name the engine that actually serves. Exceptions propagate
+    untouched (a 400 from validation stays a 400).
     """
     ctx = TurnContext(
         turn_id=uuid4().hex,
@@ -817,13 +886,47 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
         # `dev-mode-bypass` label too. Nothing wrote this field before C4.1.
         principal=getattr(getattr(request, "state", None), "principal", None),
         streaming=bool(body.stream),
+        resume=body.resume is True,
         body=body,
         request=request,
         app_state=request.app.state,
     )
     # C3.3: /v1 gets the post-commit queue too — memory.write leaves the
     # critical path here as well, instead of running inline or not at all.
-    await run_turn(ctx, api_adapters(background_tasks), post_commit=queue_for(request.app.state))
+    session_mgr = getattr(request.app.state, "session_manager", None)
+    queue = queue_for(request.app.state)
+    try:
+        if body.stream:
+            body_iter = await stream_turn(
+                ctx, api_adapters(background_tasks, streaming=True), post_commit=queue,
+            )
+            try:
+                first = await body_iter.__anext__()
+            except BaseException:
+                await body_iter.aclose()
+                raise
+            response = StreamingResponse(
+                releasing(_prepend_chunk(first, body_iter), session_mgr, ctx),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                    "X-Nexe-Turn-Id": ctx.turn_id,
+                    **({"X-Session-Id": ctx.session_id} if ctx.session_id else {}),
+                },
+            )
+            return _inject_response_headers(
+                response, ctx.engine or "nexe-memory", ctx.recall_text,
+                ctx.engine_fallback_from,
+                ctx.engine_fallback_reason or "preferred_unavailable",
+            )
+        await run_turn(ctx, api_adapters(background_tasks), post_commit=queue)
+    except BaseException:
+        # #1105: a turn that fails after `session` must not keep the lease.
+        # A stream that already returned is released by `releasing` instead.
+        release_turn_lease(session_mgr, ctx)
+        raise
     return ctx.wire
 
 

@@ -68,6 +68,67 @@ def _prompt_has_open_think_prefix(formatted_prompt: str) -> bool:
     return tail.endswith("<think>")
 
 
+def _render_vlm_prompt(processor, mdl_config: dict, prompt_arg, num_images: int, thinking_enabled: bool) -> str:
+    """The chat template, with the thinking switch when the processor takes it.
+
+    `enable_thinking=False` is passed only when reasoning is off; a processor
+    whose template does not know it raises TypeError and gets the plain call.
+    With reasoning on nothing is passed — the model's native default.
+    """
+    from mlx_vlm.prompt_utils import apply_chat_template
+
+    if not thinking_enabled:
+        try:
+            return apply_chat_template(
+                processor=processor, config=mdl_config, prompt=prompt_arg,
+                num_images=num_images, enable_thinking=False,
+            )
+        except TypeError:
+            pass  # processor template does not support enable_thinking — fall through
+    return apply_chat_template(
+        processor=processor, config=mdl_config, prompt=prompt_arg, num_images=num_images,
+    )
+
+
+def _split_resumed_answer(messages: list, continue_final: bool) -> tuple:
+    """(messages before the answer being resumed, its raw text) — or the
+    messages untouched and None when this is not a resume (C4.6-a-vlm)."""
+    if continue_final and messages and messages[-1].get("role") == "assistant":
+        return messages[:-1], messages[-1].get("content") or ""
+    return messages, None
+
+
+def _without_echoed_opener(formatted_prompt: str, raw_tail: str) -> str:
+    """The raw generation, minus the `<think>\n` the stream itself added.
+
+    When the template leaves the reasoning block open, `_run_vlm_streaming`
+    emits a synthetic `<think>\n` first (see `_prompt_has_open_think_prefix`),
+    so the answer's raw text starts with an opener the prompt already has.
+    Appending it again would put `<think>` twice in the prompt of a resume.
+    """
+    opener = "<think>\n"
+    if _prompt_has_open_think_prefix(formatted_prompt) and raw_tail.startswith(opener):
+        return raw_tail[len(opener):]
+    return raw_tail
+
+
+def _eos_token_ids(processor) -> frozenset:
+    """The token ids that end a turn for this processor's tokenizer (C4.6):
+    what tells a VLM answer that stopped ON the ceiling from one cut by it."""
+    tokenizer = getattr(processor, "tokenizer", processor)
+    ids = getattr(tokenizer, "eos_token_ids", None)
+    if ids is None:
+        ids = getattr(tokenizer, "eos_token_id", None)
+    if ids is None:
+        return frozenset()
+    if isinstance(ids, int):
+        return frozenset({ids})
+    try:
+        return frozenset(int(i) for i in ids)
+    except (TypeError, ValueError):
+        return frozenset()
+
+
 def _chunked_prefill_is_broken(model_path: str) -> bool:
     """True for architectures where mlx_vlm's chunked prefill crashes.
 
@@ -181,8 +242,18 @@ class MLXVisionRunner:
         has_image: bool,
         thinking_enabled: bool = True,
         max_tokens: Optional[int] = None,
+        continue_final: bool = False,
     ) -> str:
         """Build the VLM prompt with thinking control.
+
+        `continue_final` (C4.6, FD-S6): the last message is the assistant answer
+        being resumed, and the prompt must END inside it. Built as the prompt
+        the answer was generated from (the history before it, with the
+        generation prompt) plus the raw text the model generated — the exact
+        prefix by construction, whatever the template. `continue_final_message`
+        was measured first (26/09): exact for Qwen3.5, Qwen3-VL and Gemma 4
+        e4b, NOT for Gemma 4 31B, whose generation prompt opens an empty
+        thought channel that a rendered final message does not carry.
 
         Empirically detected 2026-05-13 (Qwen3.5-27B-4bit on MLX): the VLM
         branch was ignoring the user's Raonament toggle entirely. Root cause:
@@ -205,7 +276,6 @@ class MLXVisionRunner:
         non-Qwen processors keep working.
         """
         import os
-        from mlx_vlm.prompt_utils import apply_chat_template
 
         try:
             with open(
@@ -260,6 +330,8 @@ class MLXVisionRunner:
                     max_tokens if max_tokens is not None else self.config.max_tokens,
                 )
 
+        sanitized, resumed_tail = _split_resumed_answer(sanitized, continue_final)
+
         all_messages: List[Dict[str, Any]] = []
         if system:
             all_messages.append({"role": "system", "content": system})
@@ -277,27 +349,13 @@ class MLXVisionRunner:
                 all_messages, QWEN35_THINKING_DIRECTIVE
             )
 
-        prompt_arg = all_messages if all_messages else ""
-        num_images = 1 if has_image else 0
-
-        if not thinking_enabled:
-            try:
-                return apply_chat_template(
-                    processor=processor,
-                    config=mdl_config,
-                    prompt=prompt_arg,
-                    num_images=num_images,
-                    enable_thinking=False,
-                )
-            except TypeError:
-                pass  # processor template does not support enable_thinking — fall through
-
-        return apply_chat_template(
-            processor=processor,
-            config=mdl_config,
-            prompt=prompt_arg,
-            num_images=num_images,
+        formatted = _render_vlm_prompt(
+            processor, mdl_config, all_messages if all_messages else "",
+            1 if has_image else 0, thinking_enabled,
         )
+        if resumed_tail is None:
+            return formatted
+        return formatted + _without_echoed_opener(formatted, resumed_tail)
 
     @staticmethod
     def _reset_rotated_vlm_state(prompt_cache_state) -> bool:
@@ -560,6 +618,7 @@ class MLXVisionRunner:
         cached_tokens: int = 0,
         identity_hash: str = "",
         max_tokens_used: "Optional[int]" = None,
+        eos_ids: "frozenset" = frozenset(),
     ) -> Dict[str, Any]:
         prompt_tokens = getattr(result_obj, "prompt_tokens", 0)
         gen_tokens = getattr(result_obj, "generation_tokens", len(result_text.split()))
@@ -582,12 +641,15 @@ class MLXVisionRunner:
             "identity_hash": identity_hash,
             "vlm": True,
             # FD-S5: mlx_vlm's GenerationResult has NO finish_reason —
-            # heuristic: hitting the ceiling exactly. False positive when EOS
-            # lands on the limit; acceptable because the VLM marker is
-            # informative-only (never continuable).
+            # the ceiling reached, and (C4.6) the last token not an end of
+            # turn: a VLM answer is continuable now, so an answer that ended
+            # naturally ON the limit must not read as cut.
             "finish_reason": (
                 "length"
-                if (max_tokens_used and gen_tokens >= max_tokens_used)
+                if (
+                    max_tokens_used and gen_tokens >= max_tokens_used
+                    and getattr(result_obj, "token", None) not in eos_ids
+                )
                 else None
             ),
         }
@@ -604,6 +666,7 @@ class MLXVisionRunner:
         cancel_event: Any = None,
         session_id: str = "default",
         top_p: Optional[float] = None,
+        continue_final: bool = False,
     ) -> Dict[str, Any]:
         """VLM generation with mlx_vlm (text + image). Uses mlx_vlm.generate().
 
@@ -621,7 +684,7 @@ class MLXVisionRunner:
         has_image = bool(images)
         formatted_prompt = self._prepare_vlm_prompt(
             messages, system, processor, has_image, thinking_enabled=thinking_enabled,
-            max_tokens=max_tokens,
+            max_tokens=max_tokens, continue_final=continue_final,
         )
 
         # Prefix-cache for the VLM path (mlx_vlm native PromptCacheState), keyed
@@ -700,4 +763,5 @@ class MLXVisionRunner:
             prefix_reused=had_cache, cached_tokens=cached_tokens,
             identity_hash=identity_hash,
             max_tokens_used=max_tokens or self.config.max_tokens,
+            eos_ids=_eos_token_ids(processor),
         )

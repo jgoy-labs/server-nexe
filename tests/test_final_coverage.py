@@ -238,7 +238,9 @@ class TestChatFinalCoverage:
             "sys", "model"
         )
         chunks = asyncio.run(_async_gen_collect(gen))
-        assert any("[DONE]" in c for c in chunks)
+        from core.endpoints.chat_engines._streaming import NEXE_END
+        assert any(isinstance(c, dict) and NEXE_END in c for c in chunks)
+        assert not any(isinstance(c, str) and "[DONE]" in c for c in chunks)
 
     def test_on_token_enqueue_failure_line_629_630(self):
         """Lines 629-630: MLX on_token enqueue fails."""
@@ -258,7 +260,9 @@ class TestChatFinalCoverage:
             "sys", "model"
         )
         chunks = asyncio.run(_async_gen_collect(gen))
-        assert any("[DONE]" in c for c in chunks)
+        from core.endpoints.chat_engines._streaming import NEXE_END
+        assert any(isinstance(c, dict) and NEXE_END in c for c in chunks)
+        assert not any(isinstance(c, str) and "[DONE]" in c for c in chunks)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

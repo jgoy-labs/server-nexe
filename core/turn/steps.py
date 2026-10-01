@@ -88,7 +88,7 @@ class Step:
 # it is data, and the layering gate has nothing to say about it.
 GIVEN_BY_DOOR: FrozenSet[str] = frozenset({
     "turn_id", "session_id", "entry", "principal", "pipeline_version",
-    "message", "attachments", "cancel_token", "deadline", "trace_id",
+    "message", "attachments", "cancel_token", "deadline", "trace_id", "resume",
     # transitional plumbing the C1 adapters need (see context.py docstring)
     "body", "request", "app_state", "streaming",
 })
@@ -98,7 +98,7 @@ TURN_STEPS: tuple[Step, ...] = (
     Step(
         id="validate", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=True,
-        reads=frozenset({"message", "attachments"}),
+        reads=frozenset({"message", "attachments", "resume"}),
         # C4.1: `validate` decodes the turn's image attachment, so it writes
         # back into `attachments` the door handed it.
         writes=frozenset({"attachments"}),
@@ -144,7 +144,7 @@ TURN_STEPS: tuple[Step, ...] = (
     Step(
         id="session", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=False,
-        reads=frozenset({"session_id", "entry", "message"}),
+        reads=frozenset({"session_id", "entry", "message", "resume"}),
         # `history` was listed here and NO door has ever written it in this
         # step — measured 19/09 with the engine recording real writes: the
         # only production assignment to `ctx.history` in the whole codebase is
@@ -152,7 +152,7 @@ TURN_STEPS: tuple[Step, ...] = (
         # the step that does it; `test_turn_steps.py` only ever checked this
         # table for internal consistency, so a field claimed by the wrong step
         # cost nothing and stayed for four sub-phases.
-        writes=frozenset({"session_id", "session", "lang", "attachments"}),
+        writes=frozenset({"session_id", "session", "lang", "attachments", "message"}),
         writes_always=frozenset({"lang", "session", "session_id"}),
         doors_today=frozenset({"ui", "api"}),
         today={
@@ -167,15 +167,15 @@ TURN_STEPS: tuple[Step, ...] = (
     Step(
         id="persist_user_turn", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=False,
-        reads=frozenset({"session_id", "message"}), writes=frozenset(),
+        reads=frozenset({"session_id", "message", "resume"}), writes=frozenset(),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/turn_adapters.py (persist_user_turn: add_message + _save_session_to_disk)",
             "api": "core/endpoints/chat_engines/_common.py (mirror_v1_conversation: rewrites the mirror + save_session)",
         },
         note="The guarantee (I3 of ADR-007): nothing below this step may write "
-             "memory before this one has written disk. No test asserts it yet "
-             "on the chat path (both doors) — see the plan's C1 gate.",
+             "memory before this one has written disk. Both doors assert it "
+             "by behaviour (test_turn_adapters_ui.py, test_api_turn_order.py).",
     ),
     Step(
         id="intent", kind=StepKind.COMPUTE, must_have=False, replaceable=True,
@@ -235,7 +235,7 @@ TURN_STEPS: tuple[Step, ...] = (
     Step(
         id="system_prompt", kind=StepKind.COMPUTE, must_have=True, replaceable=True,
         idempotent=True,
-        reads=frozenset({"clock_line", "intent", "lang"}), writes=frozenset({"system_prompt"}),
+        reads=frozenset({"clock_line", "intent", "lang", "resume"}), writes=frozenset({"system_prompt"}),
         writes_always=frozenset({"system_prompt"}),
         doors_today=frozenset({"ui", "api"}),
         today={
@@ -253,7 +253,7 @@ TURN_STEPS: tuple[Step, ...] = (
     Step(
         id="engine", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=False,
-        reads=frozenset({"body", "app_state"}),
+        reads=frozenset({"body", "app_state", "resume"}),
         writes=frozenset({"engine", "gpu_slot", "context_window", "engine_fallback_from", "engine_fallback_reason"}),
         writes_always=frozenset({"context_window", "engine"}),
         doors_today=frozenset({"ui", "api"}),
@@ -276,7 +276,7 @@ TURN_STEPS: tuple[Step, ...] = (
         # checks reads are satisfied could not see it while both halves of the
         # fiction were present. Removing only the write half is what turned
         # that gate red — which is the gate doing its job.
-        reads=frozenset({"system_prompt", "recall", "recall_text", "message", "lang", "engine", "context_window"}),
+        reads=frozenset({"system_prompt", "recall", "recall_text", "message", "lang", "engine", "context_window", "resume"}),
         # `history`: the UI door assembles the turn's context messages here and
         # keeps them on the context (`turn_adapters.py:400`). It is NOT in
         # `writes_always` because the API door does not write it at all — its
@@ -298,7 +298,7 @@ TURN_STEPS: tuple[Step, ...] = (
     Step(
         id="generate", kind=StepKind.LLM, must_have=True, replaceable=True,
         idempotent=False,
-        reads=frozenset({"prompt", "engine", "cancel_token", "deadline", "context_window"}),
+        reads=frozenset({"prompt", "engine", "cancel_token", "deadline", "context_window", "resume"}),
         writes=frozenset({"response", "wire", "engine", "engine_fallback_from", "engine_fallback_reason"}),
         writes_always=frozenset({"engine", "response"}),
         doors_today=frozenset({"ui", "api"}),
@@ -306,13 +306,14 @@ TURN_STEPS: tuple[Step, ...] = (
             "ui": "plugins/web_ui_module/api/turn_adapters.py (generate_json, generate_stream, _prepare_call: engine.chat, one GPU slot per turn)",
             "api": "core/endpoints/chat_engines/{mlx,llama_cpp,ollama}.py (module.chat / HTTP)",
         },
-        note="No deadline for MLX/llama.cpp at either door today (finding #1041): "
-             "'deadline' is read here but nothing enforces it yet.",
+        note="C2.5 / #1041: both doors arm ctx.deadline "
+             "(core/turn/deadline.py, NEXE_ENGINE_DEADLINE_S) on the same "
+             "cancel event a client disconnect uses. 0 disables it.",
     ),
     Step(
         id="postprocess", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=True,
-        reads=frozenset({"response"}), writes=frozenset({"response", "facts"}),
+        reads=frozenset({"response", "resume"}), writes=frozenset({"response", "facts"}),
         writes_always=frozenset({"facts", "response"}),
         doors_today=frozenset({"ui", "api"}),
         today={
@@ -324,29 +325,29 @@ TURN_STEPS: tuple[Step, ...] = (
         note="C4.4: the model-format cleanup (<think>, harmony, <|…|>, ◁▷, echoed "
              "context headers, memory tags) is the core's, core/turn/text/ — one "
              "cleaner for both doors, the compactor and the /v1 history. A /v1 "
-             "STREAM is cleaned on its way out (SseCleaner) but its facts are not "
-             "read: that door's turn ends before the stream is generated "
-             "(degraded, until C4.6). ADR-010: the model's REASONING is not "
+             "STREAM is cleaned on its way out (SseCleaner) and, since C4.6-b, its "
+             "facts are read from the raw text in the same turn. ADR-010: the model's REASONING is not "
              "cleaned away — the engines return it apart, the UI shows it in "
              "its think block, /v1 sends it as `reasoning` when asked.",
     ),
     Step(
         id="persist_assistant_turn", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=False,
-        reads=frozenset({"session_id", "response"}), writes=frozenset(),
+        reads=frozenset({"session_id", "response", "resume"}), writes=frozenset(),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/turn_adapters.py (persist_simple, persist_stream: core.turn.persist.persist_assistant_turn + _save_session_to_disk)",
             "api": "core/endpoints/chat_engines/_common.py (persist_v1_turn)",
         },
         note="This is the commit point (ADR-007 §8): everything after it is "
-             "post-commit. Today an error mid-stream at the UI is committed as "
-             "complete (finding #1040) — there is no outcome flag yet.",
+             "post-commit. #1040 (C2.4): an error after tokens are on the wire "
+             "sets ctx.partial, and this step writes that text as an interrupted "
+             "turn (persist_partial_assistant), never as a completed one.",
     ),
     Step(
         id="memory.write", kind=StepKind.LLM, must_have=False, replaceable=True,
         idempotent=False,
-        reads=frozenset({"facts", "session_id"}), writes=frozenset(),
+        reads=frozenset({"facts", "session_id", "resume"}), writes=frozenset(),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/turn_adapters.py (memory_write -> core.memory_facts.write.write_facts)",
@@ -364,8 +365,10 @@ TURN_STEPS: tuple[Step, ...] = (
             "ui": "plugins/web_ui_module/api/turn_adapters.py (emit_json, emit_stream: NUL sentinels \\x00[TAG]\\x00, two shapes, streaming and JSON)",
             "api": "core/endpoints/chat_engines/_streaming.py (format_sse_chunk: OpenAI SSE)",
         },
-        note="The only door-specific step by design (ADR-007 §1). UI streaming "
-             "has no byte cap / token sanitizer here today (finding #1039).",
+        note="The only door-specific step by design (ADR-007 §1): NUL sentinels "
+             "at the web door, OpenAI SSE at /v1. #1039: before either door "
+             "writes model text, core/turn/stream.py::StreamGuard strips "
+             "control characters and stops the turn at NEXE_MAX_STREAM_MB.",
     ),
     Step(
         id="compact", kind=StepKind.LLM, must_have=False, replaceable=True,
@@ -379,3 +382,15 @@ TURN_STEPS: tuple[Step, ...] = (
         note="C3.4: the compactor lives with the sessions it summarises, and both doors queue it post-commit. A long thread used to be compacted at one door and not at the other.",
     ),
 )
+
+
+#: The steps a RESUME turn does not run (C4.6, FD-S6 — the web door's
+#: Continue): there is no new user message to read an intent in or to recall
+#: for, and compacting would rewrite the history between the cut and the
+#: resume, breaking the exact prefix the engine continues from. The engine
+#: records them `skipped` — a decision the trace shows, not a step that ran
+#: and found nothing (which is what writing `recall=[]` would have looked like).
+#: `persist_user_turn` is NOT here: at /v1 a resume still mirrors the client's
+#: turns (the client is the source of truth); at the web door there is simply
+#: no new message, and its adapter says so.
+SKIP_ON_RESUME: FrozenSet[str] = frozenset({"intent", "recall", "compact"})

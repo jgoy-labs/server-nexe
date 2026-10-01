@@ -91,17 +91,21 @@ class TestBothDoorsReadTheSame:
 
         assert ctx.wire["choices"][0]["message"]["content"] == "La resposta és 42."
 
-    async def test_v1_streaming_says_what_it_still_does_not_do(self):
-        """C4.4-b: the stream is cleaned (SseCleaner), but the facts in it are
-        not read — this door's turn ends before the stream is generated.
-        Written down, not silent, until /v1 walks stream_turn (C4.6)."""
-        table = api_adapters(BackgroundTasks())
+    async def test_v1_stream_postprocess_reads_the_facts(self):
+        """C4.6-b: the stream table reads the tags from the raw answer."""
+        table = api_adapters(BackgroundTasks(), streaming=True)
         ctx = TurnContext(turn_id="t", entry="api")
-        ctx.wire = MagicMock()  # a StreamingResponse-like object, not a dict
+        ctx.message = "visc a Manresa"
+        ctx.response = "Entesos! [MEM_SAVE: L'usuari viu a Manresa]"
+        ctx.engine = "ollama"
+        ctx.usage["served_model"] = "qwen3.5:4b"
 
-        await table["postprocess"](ctx)
+        chunks = [c async for c in table["postprocess"](ctx)]
 
-        assert ctx.usage["degraded"]["postprocess"] == "streaming: tags stripped, facts not extracted (C4.6)"
+        assert chunks == []
+        assert "MEM_SAVE" not in ctx.response
+        assert ctx.response == "Entesos!"
+        assert ctx.facts == ["L'usuari viu a Manresa"]
 
     def test_the_step_map_says_both_doors(self):
         from core.turn.steps import TURN_STEPS

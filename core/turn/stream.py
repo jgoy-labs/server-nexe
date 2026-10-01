@@ -9,14 +9,56 @@ www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
 """
 
+import contextlib
 import inspect
 from dataclasses import dataclass, field
 from typing import Any
 
+from core.endpoints.chat_engines import _streaming as _stream_limits
 from core.endpoints.chat_engines._common import extract_engine_text
+from core.endpoints.chat_sanitization import _sanitize_sse_token
+from core.turn.errors import StreamCapExceeded
 from core.turn.text.chunks import parse_chunk
 from core.turn.text.tags import TagStreamFilter
 from core.turn.text.think import StreamThinkParser
+
+
+class StreamGuard:
+    """What the model's text must pass before a door writes it anywhere (#1039).
+
+    The two rules the /v1 forwarders always applied and the web door never
+    did: control characters out — a model that writes `\\x00[MEM:9:x]\\x00`
+    must not forge the web door's sentinels — and a byte ceiling
+    (`NEXE_MAX_STREAM_MB`), read off the module at call time so a patched value
+    is honoured. Content and reasoning both count, as in `TokenBridge.on_token`.
+    """
+
+    def __init__(self) -> None:
+        self.seen = 0
+
+    @staticmethod
+    def clean(text: str) -> str:
+        """Control characters out, nothing counted (text already measured)."""
+        return _sanitize_sse_token(text) if text else text
+
+    def take(self, content: str, thinking: str) -> "tuple[str, str]":
+        """One chunk's two halves, cleaned and counted. Raises
+        `StreamCapExceeded` once the reply has grown past the ceiling."""
+        content, thinking = self.clean(content), self.clean(thinking)
+        self.seen += len((content or "").encode("utf-8", errors="replace"))
+        self.seen += len((thinking or "").encode("utf-8", errors="replace"))
+        if self.seen > _stream_limits.MAX_STREAM_BYTES:
+            raise StreamCapExceeded()
+        return content, thinking
+
+
+async def close_quietly(chat_result: Any) -> None:
+    """Close the engine's generator now, not at GC time: leaving an `async for`
+    by an exception does not close what it was iterating (PEP 525)."""
+    aclose = getattr(chat_result, "aclose", None)
+    if aclose is not None:
+        with contextlib.suppress(Exception):
+            await aclose()
 
 
 @dataclass
@@ -62,6 +104,12 @@ def apply_trunc_sentinels(chunk: Any, flags: StreamFlags) -> bool:
         and chunk.get("done_reason") == "length"
     ):
         flags.trunc = True
+        # C4.6-a2: the engine says whether Continue is honest. A chunk
+        # without the field stays not-continuable — length alone is not
+        # enough (the answer may have no room left, or the model cannot
+        # resume).
+        if "continuable" in chunk:
+            flags.trunc_continuable = bool(chunk.get("continuable"))
     return False
 
 
@@ -107,7 +155,14 @@ async def engine_events(chat_result: Any, model_name: "str | None", flags: Strea
     `Exception` is caught with the loop it guards and becomes `Failed`.
     GeneratorExit is a BaseException, so a client disconnect still tears this
     generator down.
+
+    #1039: every piece of model text goes through `StreamGuard` first, so what
+    comes out is free of control characters and a reply past the ceiling ends
+    as `Failed(StreamCapExceeded)` — a partial turn, like any other error mid-
+    stream. Stopping the engine's worker is the door's job (`cancel_event`):
+    closing this generator does not reach a thread.
     """
+    guard = StreamGuard()
     try:
         if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
             first = True
@@ -119,7 +174,7 @@ async def engine_events(chat_result: Any, model_name: "str | None", flags: Strea
             async for chunk in chat_result:
                 if apply_trunc_sentinels(chunk, flags):
                     continue
-                content, thinking = parse_chunk(chunk)
+                content, thinking = guard.take(*parse_chunk(chunk))
                 if first:
                     first = False
                     yield Ready()
@@ -128,7 +183,7 @@ async def engine_events(chat_result: Any, model_name: "str | None", flags: Strea
                 if isinstance(chunk, dict) and isinstance(chunk.get("raw"), str):
                     # ADR-010: the engine split its text; the turn's raw text
                     # stays exactly what the model generated (Continue needs it).
-                    full = chunk["raw"]
+                    full = guard.clean(chunk["raw"])
                 yield Delta(wire, full)
                 flags.has_any_thinking = parser.has_any_thinking
             wire, full = parser.flush()
@@ -136,9 +191,10 @@ async def engine_events(chat_result: Any, model_name: "str | None", flags: Strea
         else:
             yield Ready()
             result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
-            content = extract_engine_text(result)
+            content, _ = guard.take(extract_engine_text(result) or "", "")
             if content:
                 yield Whole(content)
     except Exception as e:
+        await close_quietly(chat_result)
         flags.error = e
         yield Failed(e)

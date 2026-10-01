@@ -62,14 +62,18 @@ async def test_the_three_entries_run_the_same_sequence(turn_lab):
     stream_ctx = await turn_lab.ui(streaming=True, session_id="i1-ui-stream")
     json_ctx = await turn_lab.ui(streaming=False, session_id="i1-ui-json")
     api_ctx = await turn_lab.api(session_id="i1-api")
+    api_stream_ctx = await turn_lab.api(streaming=True, session_id="i1-api-stream")
 
-    for door, ctx in (("ui-stream", stream_ctx), ("ui-json", json_ctx), ("api", api_ctx)):
+    for door, ctx in (
+        ("ui-stream", stream_ctx), ("ui-json", json_ctx),
+        ("api", api_ctx), ("api-stream", api_stream_ctx),
+    ):
         assert _sequence(ctx) == EXPECTED_SEQUENCE, (
             f"{door} does not walk TURN_STEPS in order: {_sequence(ctx)}"
         )
     # Said between the three as well, so a future change to TURN_STEPS that
     # somehow updated all three at once still has to keep them equal.
-    assert _sequence(stream_ctx) == _sequence(json_ctx) == _sequence(api_ctx)
+    assert _sequence(stream_ctx) == _sequence(json_ctx) == _sequence(api_ctx) == _sequence(api_stream_ctx)
 
     # C4.2: and the same TURN, not just the same order of ids.
     _assert_same_turn(json_ctx, api_ctx, also_skip=CROSS_DOOR_NOT_COMPARABLE)
@@ -123,17 +127,22 @@ async def test_folded_never_grows(turn_lab):
     """
     ui_ctx = await turn_lab.ui(streaming=False, session_id="folded-ui")
     api_ctx = await turn_lab.api(session_id="folded-api")
+    api_stream_ctx = await turn_lab.api(streaming=True, session_id="folded-api-stream")
 
-    for door, ctx in (("ui", ui_ctx), ("api", api_ctx)):
+    for label, door, ctx in (
+        ("ui", "ui", ui_ctx),
+        ("api", "api", api_ctx),
+        ("api-stream", "api", api_stream_ctx),
+    ):
         folded = ctx.usage.get("folded", {})
         assert FOLDED_BASELINE[door] == 0, "core/turn/folded.py is no longer at zero"
         assert len(folded) == FOLDED_BASELINE[door], (
-            f"the {door} door folded a step again "
+            f"the {label} door folded a step again "
             f"({len(folded)} != {FOLDED_BASELINE[door]}): {sorted(folded)}"
         )
         degraded = set(ctx.usage.get("degraded", {}))
         assert degraded <= DESIGN_DEGRADATIONS, (
-            f"the {door} door degraded a step outside the declared C3 limits: "
+            f"the {label} door degraded a step outside the declared C3 limits: "
             f"{sorted(degraded - DESIGN_DEGRADATIONS)}"
         )
 

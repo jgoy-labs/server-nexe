@@ -10,17 +10,15 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import asyncio
-import json
 import logging
 from typing import Dict, List, Optional
 
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 
-from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
-from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, mark_served_model, resolve_loaded_model_name, persist_v1_turn
-from ._streaming import TokenBridge, _prepend_chunk, format_engine_token, format_sse_done, SSE_DONE
+from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, mark_served_model, resolve_loaded_model_name
+from ._streaming import TokenBridge, _prepend_chunk, format_engine_token, stream_end
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +43,10 @@ async def _forward_to_llama_cpp(
     `_start_engine_call` has always passed at the UI door — llama.cpp decides
     whether the loaded model reads it, never this forwarder.
     """
+    # #1107: a resume ends inside the cut answer. Only an explicit True counts;
+    # a MagicMock request grows a truthy `.resume` that must not resume.
+    resuming = getattr(request, "resume", False) is True
+    continued = {"continue_final": True} if resuming else {}
     last_user_msg = extract_last_user_msg(messages)
     # F-C: derived from the RAW client request (request.messages), not the
     # RAG/system-prompt-augmented `messages` param.
@@ -73,6 +75,7 @@ async def _forward_to_llama_cpp(
             session_id=session_id, max_tokens=request.max_tokens,
             temperature=request.temperature, top_p=request.top_p,
             cancel_event=cancel_event, images=images,
+            continue_final=resuming,
         )
         # Peek the first chunk BEFORE committing to a StreamingResponse: an
         # error before any token reaches the client raises here as a real
@@ -89,6 +92,7 @@ async def _forward_to_llama_cpp(
         messages=user_messages, system=system_msg, session_id=session_id,
         max_tokens=request.max_tokens, temperature=request.temperature,
         top_p=request.top_p, cancel_event=cancel_event, images=images,
+        **continued,
     )
     return build_openai_response(result, model_name, "llamacpp")
 
@@ -105,6 +109,7 @@ async def _llama_cpp_stream_generator(
     top_p: Optional[float] = None,
     cancel_event=None,
     images: Optional[List[str]] = None,
+    continue_final: bool = False,
 ):
     """SSE generator for Llama.cpp streaming.
 
@@ -117,7 +122,7 @@ async def _llama_cpp_stream_generator(
     is the first thing that sets it here. Either way the module's own token
     loop is what checks it — this generator only has to pass it along.
     """
-    bridge = TokenBridge()
+    bridge = TokenBridge(cancel_event=cancel_event)
 
     async def run_llama():
         try:
@@ -131,6 +136,7 @@ async def _llama_cpp_stream_generator(
                 top_p=top_p,
                 cancel_event=cancel_event,
                 images=images,
+                continue_final=continue_final,
             )
             bridge.set_done(result=result)
         except Exception as e:
@@ -154,47 +160,27 @@ async def _llama_cpp_stream_generator(
             return
         except Exception as e:
             logger.exception("Llama.cpp streaming failed")
-            error_chunk = {"error": _sanitize_sse_token(str(e))}
-            yield f"data: {json.dumps(error_chunk)}\n\n"
+            if not got_any_token:
+                raise
+            yield stream_end(failure=str(e), truncated=bridge._truncated)
             return
 
-        # If the engine task failed, surface the error to the client instead of
-        # closing with a normal "done". Previously the error was only logged
-        # (bridge.error) and the stream ended clean → the user saw nothing.
-        # This mirrors the Ollama path, which emits an error chunk on failure.
         if bridge.error:
             if not got_any_token:
                 # #1036 (C2.4): nothing reached the client yet. This raise is
-                # OUTSIDE the try/except above on purpose — it must propagate
-                # as a real exception (not a yielded chunk) so the forwarder's
-                # peek-before-first-byte can catch it and let the cascade
-                # retry the next engine.
+                # outside the try/except above on purpose — the forwarder's
+                # peek retries the cascade.
                 raise RuntimeError(bridge.error)
             logger.error("Llama.cpp streaming error surfaced to client: %s", bridge.error)
-            # #1040 (C2.4): the wire is already committed (tokens went out
-            # before this failed) — persist what reached the client as a
-            # PARTIAL turn instead of losing it from the mirrored session.
-            persist_v1_turn(app_state, session_id, bridge.get_response_text(), partial=True)
-            error_chunk = {"error": _sanitize_sse_token(str(bridge.error))}
-            yield f"data: {json.dumps(error_chunk)}\n\n"
-            yield SSE_DONE
+            yield stream_end(failure=str(bridge.error), truncated=bridge._truncated)
             return
 
-        # The engine's own reason (ceiling cut) travels in bridge.result, which
-        # this path used to drop on the floor — the close always said "stop".
-        # bridge._truncated is a DIFFERENT cut (queue overflow, B216); both
-        # both collapse into "length", so the chunk carries x_nexe_truncation
-        # to tell a missing TAIL from a missing MIDDLE (#989).
-        yield format_sse_done(
-            model_name,
-            "llamacpp",
+        # Ceiling cut vs queue overflow: the turn's `emit` writes both (#989).
+        # Persistence is the turn's `persist_assistant_turn`.
+        yield stream_end(
             truncated=bridge._truncated,
             finish_reason=(bridge.result or {}).get("finish_reason"),
         )
-        yield SSE_DONE
-
-        full_response_text = bridge.get_response_text()
-        persist_v1_turn(app_state, session_id, full_response_text)
 
     finally:
         if not llama_task.done():

@@ -225,6 +225,17 @@ class LlamaCppModule:
         logger.info("LlamaCppModule: model switched to %s", new_config.model_path)
         return True
 
+    def can_continue(self, model_name: Optional[str] = None) -> bool:
+        """#1107: this engine can resume a truncated text answer.
+
+        ``model_name`` is ignored: llama.cpp runs the one GGUF it has loaded.
+        A resume that also carries images is refused inside the node — the
+        installed vision handler cannot end a prompt on the cut answer
+        without dropping the picture — and that refusal is not this method's
+        job. The cascade asks only whether the engine knows how to continue.
+        """
+        return bool(self._initialized and self._node is not None)
+
     async def chat(
         self, messages: List[Dict[str, str]], system: str = "",
         session_id: str = "default", stream_callback=None, **kwargs,

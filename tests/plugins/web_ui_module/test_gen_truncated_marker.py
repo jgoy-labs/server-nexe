@@ -11,9 +11,7 @@ the last text chunk (1 = resumable by FD-S6's Continue, 0 = informative).
 """
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
-
-import pytest
+from unittest.mock import MagicMock
 
 from plugins.mlx_module.core.generate_helpers import extract_metrics
 
@@ -40,7 +38,7 @@ class TestDetectionText:
 
 
 class TestContinuableGate:
-    """chat.execute()'s continuable: text-only + KV headroom (B004 corner)."""
+    """chat.execute()'s continuable: a cut answer + KV headroom (B004 corner)."""
 
     def _node(self, max_kv=16384, max_tokens=2048):
         from plugins.mlx_module.core.chat import MLXChatNode
@@ -55,10 +53,11 @@ class TestContinuableGate:
         result = {"finish_reason": "length", "prompt_tokens": 3000, "tokens": 2048}
         assert node._compute_continuable(result, is_vlm=False) is True
 
-    def test_vlm_never_continuable(self):
+    def test_a_vlm_with_headroom_is_continuable(self):
+        """C4.6-a-vlm: the VLM path resumes too (the default models are VLMs)."""
         node = self._node()
         result = {"finish_reason": "length", "prompt_tokens": 100, "tokens": 100}
-        assert node._compute_continuable(result, is_vlm=True) is False
+        assert node._compute_continuable(result, is_vlm=True) is True
 
     def test_stop_not_continuable(self):
         node = self._node()
@@ -85,81 +84,5 @@ class TestEosAtTheLimit:
         assert m["tokens"] == 10  # count alone would have said "length"
 
 
-@pytest.mark.asyncio
-class TestStreamEmission:
-    async def _drive(self, chunks, trunc_result=None):
-        """Minimal harness over _generate_streaming_response's chunk loop
-        contract: feed an async generator, collect the yields."""
-        from plugins.web_ui_module.api import routes_chat as rc
-
-        async def _gen():
-            for c in chunks:
-                yield c
-            if trunc_result is not None:
-                yield trunc_result
-
-        ctx = MagicMock()
-        ctx.chat_result = _gen()
-        ctx.model_name = "test-model"
-        ctx.rag_count = 0
-        ctx.rag_items = []
-        ctx.compacted = False
-        ctx.doc_truncated_pct = 0
-        ctx.session.compaction_count = 0
-        ctx.session._pending_partial_delete = None
-        ctx.engine = MagicMock()
-        ctx.engine_name = "mlx_module"
-        ctx.message = "hola"
-        ctx.lang = "ca"
-        ctx.thinking_enabled = False
-        ctx.rag_collections = None
-        _mon = MagicMock()
-        _mon.done.return_value = True
-        ctx.disconnect_monitor_task = _mon
-        ctx.memory_helper = AsyncMock()
-        ctx.session_mgr = MagicMock()
-        out = []
-        async for tok in rc._generate_streaming_response(ctx):
-            out.append(tok if isinstance(tok, str) else str(tok))
-        return "".join(out), out
-
-    async def test_marker_emitted_after_text_on_length(self):
-        body, yields = await self._drive(
-            ["Hola ", "món"],
-            trunc_result={"__nexe_trunc__": True, "continuable": True},
-        )
-        assert "\x00[GEN_TRUNCATED:1]\x00" in body
-        # own yield, never mixed with text
-        marker_yields = [y for y in yields if "GEN_TRUNCATED" in y]
-        assert marker_yields == ["\x00[GEN_TRUNCATED:1]\x00"]
-        # after the last text chunk
-        assert body.index("món") < body.index("GEN_TRUNCATED")
-
-    async def test_not_continuable_marks_zero(self):
-        body, _ = await self._drive(
-            ["text"],
-            trunc_result={"__nexe_trunc__": True, "continuable": False},
-        )
-        assert "\x00[GEN_TRUNCATED:0]\x00" in body
-
-    async def test_no_marker_without_truncation(self):
-        body, _ = await self._drive(["Hola ", "món"])
-        assert "GEN_TRUNCATED" not in body
-
-    async def test_ollama_done_reason_length_marks_zero(self):
-        body, _ = await self._drive(
-            [{"message": {"content": "hola"}}, {"done": True, "done_reason": "length"}],
-        )
-        assert "\x00[GEN_TRUNCATED:0]\x00" in body
-
-    async def test_think_only_degrades_to_zero(self):
-        """A turn whose visible text cleans to EMPTY has nothing resumable —
-        the marker must degrade to :0 even when the engine said continuable.
-        (Real case: the cut landed inside the reasoning; _clean_full_response
-        strips the think block and leaves no answer text.)"""
-        body, _ = await self._drive(
-            ["<think>reasoning, then the cut</think>"],
-            trunc_result={"__nexe_trunc__": True, "continuable": True},
-        )
-        assert "\x00[GEN_TRUNCATED:0]\x00" in body
-        assert "GEN_TRUNCATED:1" not in body
+# The stream emission itself (the marker as its own yield, :1 vs :0) is driven
+# through real web turns since C4.6: tests/core/turn/test_gen_truncated_marker_stream.py

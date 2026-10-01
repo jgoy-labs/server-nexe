@@ -95,6 +95,11 @@ def _capturing_engine():
         async def is_model_loaded(self, model_name):
             return True
 
+        def can_continue(self, model_name=None):
+            # C4.6: a Continue only reaches an engine that says it can resume
+            # (the real MLX module: a text model). Without this the turn is a 400.
+            return True
+
     return _Eng()
 
 

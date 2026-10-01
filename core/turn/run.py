@@ -59,7 +59,7 @@ from typing import (
 
 from core.turn.context import TurnContext
 from core.turn.gate import Priority
-from core.turn.steps import TURN_STEPS, Step
+from core.turn.steps import SKIP_ON_RESUME, TURN_STEPS, Step
 from core.turn.trace import emit_turn_trace
 
 if TYPE_CHECKING:
@@ -139,13 +139,20 @@ def _record(ctx: TurnContext, step: Step, outcome: str, started: float, *, error
     ctx.usage.setdefault("steps", {})[step.id] = entry
 
 
-def _skipped_for_partial(ctx: TurnContext, step: Step) -> bool:
-    """#1040 (C2.4): a PARTIAL turn's `memory.write` is skipped — facts
-    atomized from a reply that broke mid-generation are not trustworthy.
-    Inline or queued alike (it was a queue-only check while memory.write lived
-    on the queue). `compact` is independent of this turn's own outcome (it
-    summarises the session's history, not this reply) and always runs."""
-    return step.id == "memory.write" and ctx.partial
+def _skipped_by_policy(ctx: TurnContext, step: Step) -> bool:
+    """The steps this turn does not run, decided by what the turn IS.
+
+    * #1040 (C2.4): a PARTIAL turn's `memory.write` — facts atomized from a
+      reply that broke mid-generation are not trustworthy. `compact` is
+      independent of this turn's own outcome and always runs.
+    * C4.6: a RESUME turn's `SKIP_ON_RESUME` (steps.py) — no new message to
+      read an intent in or recall for, and no compaction between the cut and
+      the resume.
+
+    Recorded `skipped`, never folded: the step did not run by decision."""
+    if step.id == "memory.write" and ctx.partial:
+        return True
+    return ctx.resume and step.id in SKIP_ON_RESUME
 
 
 def _finish_ok(
@@ -329,7 +336,7 @@ async def run_turn(
     ctx.streaming = False
     steps = list(steps)
     for index, step in enumerate(steps):
-        if _skipped_for_partial(ctx, step):
+        if _skipped_by_policy(ctx, step):
             _mark_skipped(ctx, [step])
             continue
         if post_commit is not None and step.id in POST_COMMIT:
@@ -378,6 +385,9 @@ async def stream_turn(
 
     tail: list[Step] = body_steps
     for index, step in enumerate(prefix):
+        if _skipped_by_policy(ctx, step):
+            _mark_skipped(ctx, [step])
+            continue
         sc = await _run_awaitable(ctx, step, adapters[step.id])
         if sc is not None:
             run, skip = _split_on_short_circuit(prefix[index + 1:] + body_steps)
@@ -447,7 +457,7 @@ async def _run_steps(
     inner: Optional[AsyncIterator[Any]] = None
     try:
         for step in steps:
-            if _skipped_for_partial(ctx, step):
+            if _skipped_by_policy(ctx, step):
                 _mark_skipped(ctx, [step])
                 done.add(step.id)
                 continue

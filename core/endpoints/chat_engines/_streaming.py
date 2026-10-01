@@ -25,6 +25,35 @@ logger = logging.getLogger(__name__)
 
 SSE_DONE = "data: [DONE]\n\n"
 
+#: The engine's last word to the turn, not to the client. `emit` writes
+#: finish_reason, the memory fields and `[DONE]`. The sentinel key is
+#: NEXE_END. The SSE coverage test treats a quoted error field as a chunk
+#: that must be sanitized, and this dict never reaches the wire.
+NEXE_END = "__nexe_end__"
+
+
+def stream_end(*, finish_reason: str | None = None, truncated: bool = False,
+               failure: str | None = None) -> dict:
+    """One stream is over. `failure` set means tokens already went out and the
+    rest of the turn is partial; a failure before the first token is a raise,
+    so the cascade can still try the next engine."""
+    return {NEXE_END: {
+        "finish_reason": finish_reason,
+        "truncated": bool(truncated),
+        "failure": failure,
+    }}
+
+
+async def _close_agen(agen) -> None:
+    """Close an async generator once. A second close is a no-op."""
+    aclose = getattr(agen, "aclose", None)
+    if aclose is None:
+        return
+    try:
+        await aclose()
+    except RuntimeError:
+        return
+
 # hard cap on streamed bytes per response.
 # Without an explicit limit a runaway generation (model loop, prompt
 # injection that keeps the engine talking, mis-configured stop tokens)
@@ -77,8 +106,12 @@ class TokenBridge:
     The async consumer reads from :attr:`queue` until :attr:`done` is set.
     """
 
-    def __init__(self, maxsize: int = 2048):
+    def __init__(self, maxsize: int = 2048, cancel_event=None):
         self.queue: asyncio.Queue = asyncio.Queue(maxsize=maxsize)
+        # #1104: the engine's own stop signal (a threading.Event its token loop
+        # checks). Set when the byte cap fires — otherwise the engine keeps
+        # generating to max_tokens after the client has been told it stopped.
+        self._cancel_event = cancel_event
         self.done = asyncio.Event()
         self.result = None
         self.error = None
@@ -119,6 +152,8 @@ class TokenBridge:
                 self._response_bytes, MAX_STREAM_BYTES,
             )
             self.set_done(error="stream_cap_exceeded")
+            if self._cancel_event is not None:
+                self._cancel_event.set()
             return
         self._response_bytes += token_bytes
         self._response_parts.append(answer)
@@ -146,9 +181,16 @@ class TokenBridge:
             logger.warning("Stream token enqueue scheduling failed (loop closed): %s", e)  # nosemgrep: python-logger-credential-disclosure
 
     def set_done(self, result=None, error=None):
-        """Signal that generation is complete."""
+        """Signal that generation is complete.
+
+        #1104: the FIRST error wins. The cap calls this with its error while the
+        engine is still running; the engine's normal finish calls it again with
+        only a result — and used to wipe the error, so a capped stream closed
+        as "stop" and was saved as complete.
+        """
         self.result = result
-        self.error = error
+        if self.error is None:
+            self.error = error
         self._loop.call_soon_threadsafe(self.done.set)
 
     def get_response_text(self) -> str:
@@ -177,10 +219,18 @@ async def _prepend_chunk(first: str, agen):
     exception the cascade can retry — instead of only surfacing once
     ``StreamingResponse`` starts draining the generator, by which point the
     cascade's own ``try`` has long since returned.
+
+    C4.6-b: closing this wrapper closes the generator underneath it. An
+    ``async for`` that is itself closed does not close what it is iterating
+    (PEP 525), so a client that leaves mid-stream used to abandon the engine
+    generator until garbage collection.
     """
-    yield first
-    async for chunk in agen:
-        yield chunk
+    try:
+        yield first
+        async for chunk in agen:
+            yield chunk
+    finally:
+        await _close_agen(agen)
 
 
 def format_engine_token(token: "str | dict", model_name: str, engine_prefix: str) -> "str | None":
@@ -219,11 +269,34 @@ def format_sse_chunk(token: str, model_name: str, engine_prefix: str,
     return f"data: {json.dumps(chunk)}\n\n"
 
 
+def format_sse_role(model_name: str, engine_prefix: str) -> str:
+    """The first chunk of a /v1 stream: the assistant role, and nothing else.
+
+    A model that reasons before it answers used to hold the HTTP headers
+    until the first content token. The role goes out as soon as the engine
+    has accepted the call, and the reasoning follows it as `delta.reasoning`.
+    """
+    now = int(time.time())
+    chunk = {
+        "id": f"{engine_prefix}-stream-{now}",
+        "object": "chat.completion.chunk",
+        "created": now,
+        "model": model_name,
+        "choices": [{
+            "index": 0,
+            "delta": {"role": "assistant"},
+            "finish_reason": None,
+        }],
+    }
+    return f"data: {json.dumps(chunk)}\n\n"
+
+
 def format_sse_done(
     model_name: str,
     engine_prefix: str,
     truncated: bool = False,
     finish_reason: str | None = None,
+    fields: dict | None = None,
 ) -> str:
     """Format the final SSE chunk.
 
@@ -273,4 +346,9 @@ def format_sse_done(
     cause = "overflow" if truncated else ("ceiling" if finish_reason == "length" else None)
     if cause:
         final_chunk["x_nexe_truncation"] = cause
+    # C4.6-b: what this turn stored, at the root, the same names as the JSON
+    # body. Empty values stay off the wire, as the headers already did.
+    for key, value in (fields or {}).items():
+        if value:
+            final_chunk[key] = value
     return f"data: {json.dumps(final_chunk)}\n\n"

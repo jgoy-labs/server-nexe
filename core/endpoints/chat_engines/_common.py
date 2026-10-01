@@ -286,25 +286,40 @@ def mirror_v1_conversation(app_state: Any, session_id: str, messages) -> None:
         logger.error("F-C: failed to mirror /v1 conversation into session %s: %s", session_id, e)
 
 
-def persist_v1_turn(app_state: Any, session_id: str, response_text: str, *, partial: bool = False) -> None:
+def persist_v1_turn(
+    app_state: Any, session_id: str, response_text: str, *,
+    partial: bool = False, resume: bool = False, truncated: bool = False,
+) -> None:
     """Append the assistant's reply to the mirrored session and save it (F-C).
 
-    Called once the full reply text is known — after the non-streaming
-    response returns, or at the end of a streaming generator. Best-effort:
-    same policy as :func:`mirror_v1_conversation`, and as the pre-F-A
-    background memory save this replaces functionally.
+    Called once the full reply text is known. The turn's
+    `persist_assistant_turn` is the caller (C4.6-b): JSON queues it, a stream
+    calls it when the generator has finished or the client has left. The
+    engine generators no longer write the session. Best-effort: same policy
+    as :func:`mirror_v1_conversation`.
 
-    `partial` (#1040, C2.4): the stream errored mid-generation and this is
-    whatever reached the client before that — the caller (the MLX/llama.cpp
-    stream generators) still calls this instead of dropping the text, so an
-    interrupted /v1 reply is not silently lost from the mirrored session.
+    `partial` (#1040, C2.4): the stream errored or the client left
+    mid-generation and this is whatever reached them, so an interrupted /v1
+    reply is not dropped from the mirrored session.
+
+    `resume` (C4.6-c): the mirror has already written the client's partial
+    as the last assistant message. The tail merges into it (the core helper,
+    no separator). The HTTP body stays the tail alone — the client stitches.
+    An empty tail leaves the partial as it was: a placeholder glued on would
+    be a second sentence inside the one being continued.
 
     C4.4-b: what is saved is the model's ANSWER, cleaned like the web door's
     (`clean_full_response`: no <think>, harmony or memory tags). A reply that
     cleans down to nothing keeps its turn with the B125 placeholder, so the
-    history never holds two user turns in a row.
+    history never holds two user turns in a row. A resume does not: an empty
+    tail is nothing to merge.
     """
     if not app_state or not session_id or not response_text or not response_text.strip():
+        return
+    if resume:
+        _merge_resumed_tail(
+            app_state, session_id, response_text, partial=partial, truncated=truncated,
+        )
         return
     # Deferred: core.turn.text.clean -> core.memory_facts -> core.endpoints
     # -> this module would close a cycle at import time.
@@ -322,6 +337,40 @@ def persist_v1_turn(app_state: Any, session_id: str, response_text: str, *, part
         session_mgr.save_session(session_id)
     except Exception as e:
         logger.error("F-C: failed to persist /v1 assistant turn to session %s: %s", session_id, e)
+
+
+def _merge_resumed_tail(
+    app_state: Any, session_id: str, response_text: str, *, partial: bool, truncated: bool,
+) -> None:
+    """Merge a resume's tail into the partial the mirror just wrote.
+
+    Best-effort, same as :func:`persist_v1_turn`. The core helper is the one
+    the web door merges with: direct concatenation, and `gen_raw` kept when
+    this tail is cut again.
+    """
+    from core.turn.persist import persist_assistant_turn, persist_partial_assistant
+    from core.turn.text.clean import clean_full_response
+
+    try:
+        session_mgr = getattr(app_state, "session_manager", None)
+        if session_mgr is None:
+            logger.warning(
+                "F-C: no session_manager on app state — /v1 resume for %s not merged", session_id,
+            )
+            return
+        session = session_mgr.get_or_create_session(session_id)
+        if partial:
+            persist_partial_assistant(session, session_mgr, response_text, "", resume=True)
+            return
+        clean, _facts, _deletes = clean_full_response(response_text)
+        if not str(clean).strip():
+            return
+        persist_assistant_turn(
+            session, clean, response_text, {}, truncated, truncated, resume=True,
+        )
+        session_mgr.save_session(session_id)
+    except Exception as e:
+        logger.error("F-C: failed to merge /v1 resume into session %s: %s", session_id, e)
 
 
 def resolve_loaded_model_name(module, fallback: str) -> str:

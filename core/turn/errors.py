@@ -12,6 +12,17 @@ www.jgoy.net · https://server-nexe.org
 """
 
 
+class StreamCapExceeded(Exception):
+    """A reply grew past `NEXE_MAX_STREAM_MB` (#1039): the turn ends partial.
+
+    Same message as the /v1 forwarders' in-band error (`stream_cap_exceeded`),
+    so a log line reads the same whichever door the runaway came through.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("stream_cap_exceeded")
+
+
 def is_oom_error(err_msg: str) -> bool:
     """True when an engine's error text describes an out-of-memory failure.
 

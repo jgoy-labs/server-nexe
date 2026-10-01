@@ -44,6 +44,62 @@ def can_think(model: str) -> bool:
     return any(family in name for family in THINKING_CAPABLE)
 
 
+# Current families only. Measured on 2026-09-30: a partial assistant message
+# ("A\nB\nC\nD\n") resumed at the next letter. qwen3 and gemma3 resumed too,
+# and stay out: they are the previous generation (Jordi, 2026-09-30).
+# Anything else stays unable until the same probe says otherwise — a model
+# that starts a new answer would be glued onto the cut one.
+CONTINUE_FAMILIES = frozenset({"qwen3.5", "gemma4"})
+
+
+def model_family(model: Optional[str]) -> str:
+    return (model or "").split("/")[-1].split(":")[0].lower()
+
+
+def model_can_continue(model: Optional[str]) -> bool:
+    """C4.6-a2: this Ollama model can resume a truncated answer mid-sentence."""
+    return model_family(model) in CONTINUE_FAMILIES
+
+
+def reply_ceiling() -> int:
+    """Tokens one web reply may spend. Default 2048, the same ceiling MLX
+    and llama.cpp already use. Read at call time: tests patch the env."""
+    raw = os.getenv("NEXE_OLLAMA_MAX_TOKENS", "2048")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 2048
+    return value if value > 0 else 2048
+
+
+def refuse_continue_unless_assistant(messages: List[Dict[str, str]], continue_final: bool) -> None:
+    """A resume continues whatever the transcript ends on. Anything else is a bug."""
+    if not continue_final:
+        return
+    last = messages[-1] if messages else None
+    if not isinstance(last, dict) or last.get("role") != "assistant":
+        raise ValueError("continue requires the last message to be an assistant turn")
+
+
+def chunk_is_continuable(model: str, chunk: Dict[str, Any], num_ctx: int, ceiling: int) -> bool:
+    """A cut answer the UI may offer Continue for.
+
+    Length, a family that was measured to resume, and room for another
+    ceiling plus the same 512-token margin the MLX gate uses. Missing
+    counts fail closed: no Continue rather than one that would evict the
+    prompt.
+    """
+    if chunk.get("done_reason") != "length" or not model_can_continue(model):
+        return False
+    prompt = chunk.get("prompt_eval_count")
+    generated = chunk.get("eval_count")
+    if not isinstance(prompt, int) or not isinstance(generated, int):
+        return False
+    if num_ctx <= 0 or ceiling <= 0:
+        return False
+    return prompt + generated + ceiling + 512 < num_ctx
+
+
 def _parent():
     """Lazy import of the parent module (tests patch httpx/ollama_breaker there).
 
@@ -66,11 +122,15 @@ class OllamaChat:
 
     def _build_payload(self, model: str, messages: List[Dict[str, str]], stream: bool,
                        images: Optional[List[str]] = None, thinking_enabled: bool = False,
-                       top_p: Optional[float] = None) -> Dict[str, Any]:
+                       top_p: Optional[float] = None, continue_final: bool = False) -> Dict[str, Any]:
         """Builds the /api/chat payload."""
-        # Env var override (global) takes precedence if explicitly set
+        # A resume must end inside the cut answer. think:true opens a new
+        # reasoning channel and the prefix stops being the one that was cut,
+        # so it wins over NEXE_OLLAMA_THINK too.
         env_think = os.getenv("NEXE_OLLAMA_THINK")
-        if env_think is not None:
+        if continue_final:
+            effective_think = False
+        elif env_think is not None:
             effective_think = env_think.lower() == "true"
         else:
             # Per-session thinking intersected with model capability (safety belt)
@@ -84,6 +144,10 @@ class OllamaChat:
             "think": effective_think,
             "options": {
                 "num_ctx": auto_num_ctx(),
+                # C4.6-a2: the same reply ceiling MLX and llama.cpp already
+                # have. Without it an Ollama answer never looked cut, so the
+                # web never offered Continue.
+                "num_predict": reply_ceiling(),
             },
         }
         # Opt-in nucleus sampling (mirror of the /v1 path): forward only when set
@@ -193,12 +257,26 @@ class OllamaChat:
             async for chunk in self._direct_request(httpx, ollama_breaker, url, payload):
                 yield chunk
 
+    def _with_continuable(self, model: str, chunk: Dict[str, Any], num_ctx: int, ceiling: int) -> Dict[str, Any]:
+        """The done chunk tells the door whether Continue is honest."""
+        if not chunk.get("done"):
+            return chunk
+        marked = dict(chunk)
+        marked["continuable"] = chunk_is_continuable(model, chunk, num_ctx, ceiling)
+        return marked
+
     async def chat(
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
         images: Optional[List[str]] = None, thinking_enabled: bool = False,
-        top_p: Optional[float] = None,
+        top_p: Optional[float] = None, continue_final: bool = False,
     ) -> AsyncIterator[Dict[str, Any]]:
-        """Chat with Ollama model (streaming or direct). images: optional base64 strings."""
+        """Chat with Ollama model (streaming or direct). images: optional base64 strings.
+
+        `continue_final` (C4.6-a2): the last message is the assistant answer
+        being resumed. It must already be that answer — Ollama continues
+        whatever the transcript ends on — and reasoning stays off.
+        """
+        refuse_continue_unless_assistant(messages, continue_final)
         p = _parent()
         httpx = p.httpx
         ollama_breaker = p.ollama_breaker
@@ -211,12 +289,15 @@ class OllamaChat:
         url = f"{self.base_url}/api/chat"
         # Build payload outside try so it's always bound in the except clause.
         payload = self._build_payload(model, messages, stream, images=images,
-                                      thinking_enabled=thinking_enabled, top_p=top_p)
+                                      thinking_enabled=thinking_enabled, top_p=top_p,
+                                      continue_final=continue_final)
+        num_ctx = int(payload["options"]["num_ctx"])
+        ceiling = int(payload["options"]["num_predict"])
         try:
             async for chunk in self._generate_with_answer_guarantee(
                 httpx, ollama_breaker, url, payload, stream, model
             ):
-                yield chunk
+                yield self._with_continuable(model, chunk, num_ctx, ceiling)
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 400 and payload.get("think"):
@@ -228,7 +309,7 @@ class OllamaChat:
                     async for chunk in self._retry_without_thinking(
                         httpx, ollama_breaker, url, payload, stream, model
                     ):
-                        yield chunk
+                        yield self._with_continuable(model, chunk, num_ctx, ceiling)
                 except Exception as retry_exc:
                     await ollama_breaker.record_failure(retry_exc)
                     logger.error("Chat retry (no-think) failed with model %s: %s", model, repr(retry_exc))

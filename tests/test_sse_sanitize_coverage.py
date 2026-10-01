@@ -61,11 +61,25 @@ BACKEND_FILES = [
 
 @pytest.mark.parametrize("backend_file", BACKEND_FILES, ids=lambda p: p.name)
 def test_backend_imports_sanitize_sse_token(backend_file):
-  """Each streaming backend must import _sanitize_sse_token."""
+  """A file that writes `content` itself must call `_sanitize_sse_token`.
+
+  C4.6-b: MLX and llama.cpp do not build the chunk. They yield through
+  `format_engine_token`, and `format_sse_chunk` (in `_streaming.py`, on this
+  same list) is the call that strips control bytes. A file with no content
+  field of its own is covered there. Ollama still writes the field and still
+  sanitizes it before the turn's cleaner sees the text.
+  """
   text = backend_file.read_text()
-  assert "_sanitize_sse_token" in text, (
-    f"{backend_file.name} does NOT import _sanitize_sse_token — "
-    f"streamed content from this backend is unsanitized."
+  if "_sanitize_sse_token" in text:
+    return
+  writes_content = re.search(r'["\']content["\']\s*:', text)
+  delegates = "format_engine_token" in text or "format_sse_chunk" in text
+  if delegates and not writes_content:
+    return
+  pytest.fail(
+    f"{backend_file.name} does NOT import _sanitize_sse_token and does not "
+    f"delegate every token to format_engine_token — streamed content from "
+    f"this backend is unsanitized."
   )
 
 

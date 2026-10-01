@@ -28,14 +28,16 @@ def test_the_env_var_raises_the_ceiling(monkeypatch):
 
 
 def test_the_generators_read_the_config_not_a_literal():
-    """The four _generate* methods must all go through the config.
+    """Every generation goes through `_sampling`, which reads the config.
 
-    They each had their own `else 2048`; a lever that only reaches some of
-    them is worse than none, because which one applies depends on whether the
-    turn streams and whether the model is a VLM.
+    The four paths (text, text stream, vision, vision stream) each had their
+    own `else 2048`. #1107 added the two resume paths. A lever that only
+    reaches some of them is worse than none. The ceiling is written once;
+    each call spreads that dict.
     """
     from pathlib import Path
 
     source = Path("plugins/llama_cpp_module/core/chat.py").read_text(encoding="utf-8")
     assert "else 2048" not in source, "a hardcoded ceiling is back in chat.py"
-    assert source.count("else self.config.max_tokens") == 4
+    assert source.count("else self.config.max_tokens") == 1
+    assert source.count("**self._sampling(") == 6

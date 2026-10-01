@@ -9,10 +9,9 @@ for the one thing C4.2 is about: **retrieval is no longer done in here**. It
 arrives as `recall`, from the `recall` step that now runs at both doors
 (`core/turn/recall.py`), instead of being folded inside this function.
 
-The `continue` path (FD-S6, decision §5 of the C1 plan) keeps calling these
-from `routes_chat._handle_chat_engine` — it does not walk the turn map, and
-it never retrieves anything, so it passes the empty recall this signature
-defaults to.
+A resume (FD-S6, the web door's Continue) walks the turn map since C4.6 and
+reaches these through the same `budget` step, with `_continue=ctx.resume`:
+its `recall` step is skipped by policy, so it hands over the empty recall.
 
 Every import is from `core/`. Two are function-local and say why: pulling
 `core.context_budget` or `core.endpoints.chat_sanitization` at module level
@@ -160,8 +159,8 @@ def _build_document_context(
 class PromptParts:
     """What a turn takes from the session before the prompt exists.
 
-    Split out of `_handle_chat_engine` on 2026-08-20 (see MC-026/MC-027): the
-    handler had grown to CCN 58 with ~130 lines of pure data assembly sitting
+    Split out of the web door's old engine handler on 2026-08-20 (see
+    MC-026/MC-027): the handler had grown to CCN 58 with ~130 lines of pure data assembly sitting
     in the middle of the engine loop. The bodies below are unchanged — only
     their indentation and the way the values travel.
 
@@ -191,25 +190,23 @@ async def _build_turn_context(
     `recall` (C4.2) is what the turn's `recall` step retrieved, as
     (text, count, items). This function used to retrieve it itself, which is
     what made `recall` a folded step at this door; `memory_helper` was its
-    only reason to be in the signature and left with it. The `continue` path
-    passes nothing and gets the empty default, exactly as before: FD-S6 never
-    retrieved on a resume.
+    only reason to be in the signature and left with it. A resume skips
+    `recall`, and the branch below drops whatever was passed: a document or
+    a retrieved block between the cut and the continuation would change the
+    prefix the engine resumes from.
 
-    `compact` (C2.2): the turn columns's `budget` adapter passes `False` — its
-    door queues `compact` as its own post-commit step (core/turn/run.py's
-    POST_COMMIT) instead, so it must not ALSO run here inline. The `continue`
-    path (which never reaches the column, §5 of the C1 plan) keeps the
-    default and compacts exactly as it always did.
+    `compact` (#1042): the only production caller is the web door's `budget`
+    step, and it passes `False`. Compaction is the post-commit step, once,
+    outside the engine retry. A resume skips that step as well. The guard
+    below is the second lock — `compact=True` still does not summarise a
+    resume. The old Continue body, which rebuilt this inside the engine
+    loop, left at C4.6-a (`b6754bd6`).
 
     `lang` (#1063) is the turn's reply language, forwarded to
     `_build_document_context` so its header agrees with `_doc_framing`
-    (`core/context_budget.py`), the sentence in the same prompt that names it.
-    The `continue` path never reaches this: `_continue=True` forces
-    `attached_doc = None` two lines below, so passing nothing here (the
-    default) is correct, not an oversight. The API door (`/v1`) does not call
-    this function at all yet — D4 (C4.3) is what would make it — so today's
-    only production caller is the `budget` adapter, which already has
-    `ctx.lang` in scope.
+    (`core/context_budget.py`). A resume forces `attached_doc = None`
+    below, so the header is not built on that path. `/v1` does not call
+    this function; the web `budget` step does, and it passes `ctx.lang`.
     """
     # --- Context Compacting ---
     # If the session has too many messages, compact with LLM summary.
@@ -366,7 +363,7 @@ def _assemble_engine_messages(
         )
     # B030/#851: the data-not-instructions rule is armed
     # UNCONDITIONALLY by _finalize_system_prompt, which runs in
-    # _build_turn_system_prompt before this — a conditional suffix
+    # the `system_prompt` step before this — a conditional suffix
     # here split the prefix-cache namespace between RAG and
     # non-RAG turns of the same session.
 

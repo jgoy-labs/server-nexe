@@ -23,9 +23,9 @@ from fastapi.responses import StreamingResponse
 from core.ollama_utils import resolve_ollama_url
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
-from ._common import mark_served_model, persist_v1_turn
+from ._common import mark_served_model
 from .ollama_helpers import auto_num_ctx
-from ._streaming import MAX_STREAM_BYTES, format_sse_done
+from ._streaming import MAX_STREAM_BYTES, NEXE_END, _close_agen, _prepend_chunk, stream_end
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +159,16 @@ async def _validate_ollama_model(host: str, model_name: str) -> tuple[str, list]
 
 def _think_for(request) -> bool:
     """ADR-010: the request decides (off unless asked); `NEXE_OLLAMA_THINK`,
-    when set, still overrides it for this whole door, as it always has."""
+    when set, still overrides it for this whole door, as it always has.
+
+    A resume wins over both: `think:true` opens a new reasoning channel and
+    the prefix stops being the cut answer. Same rule as the plugin's
+    `continue_final`.
+    """
+    # `is True`: a MagicMock request grows a truthy `.resume` and would force
+    # think off on every ordinary payload this door builds.
+    if getattr(request, "resume", False) is True:
+        return False
     env = os.getenv("NEXE_OLLAMA_THINK")
     if env is not None and env.strip():
         return env.strip().lower() == "true"
@@ -223,19 +232,34 @@ def _build_ollama_payload(
     return payload
 
 
-def _ollama_streaming_response(
+async def _ollama_streaming_response(
     url: str, payload: dict, app_state, user_msg,
     fallback_from: Optional[str], fallback_reason: Optional[str],
     session_id: Optional[str] = None,
 ) -> StreamingResponse:
-    """Builds and returns the StreamingResponse with fallback headers if applicable."""
+    """Peek the first chunk, then build the StreamingResponse.
+
+    Same as MLX and llama.cpp (#1036): a failure before any token raises out
+    of this call, so the cascade can still answer with HTTP instead of an SSE
+    error the client only sees after a 200.
+    """
     headers = {"X-Nexe-Engine": "ollama"}
     if fallback_from:
         headers["X-Nexe-Fallback-From"] = fallback_from
         headers["X-Nexe-Fallback-Reason"] = fallback_reason or "fallback"
+    agen = _ollama_stream_generator(url, payload, app_state, user_msg, session_id=session_id)
+    try:
+        first = await agen.__anext__()
+    except StopAsyncIteration:
+        await _close_agen(agen)
+        raise RuntimeError("Ollama produced no stream")
+    end = first.get(NEXE_END) if isinstance(first, dict) else None
+    if isinstance(end, dict) and end.get("failure"):
+        await _close_agen(agen)
+        raise RuntimeError(end["failure"])
     # #1054: the name is already in the payload this stream was built from.
     return mark_served_model(StreamingResponse(
-        _ollama_stream_generator(url, payload, app_state, user_msg, session_id=session_id),
+        _prepend_chunk(first, agen),
         media_type="text/event-stream",
         headers=headers,
     ), payload.get("model") or "")
@@ -335,92 +359,113 @@ async def _forward_to_ollama(
     model_name, _ = await _validate_ollama_model(_ollama_host, model_name)  # raises status_code=404 if not found, 503 if unavailable
     payload = _build_ollama_payload(request, messages, model_name, images=images)
     if request.stream:
-        return _ollama_streaming_response(
+        return await _ollama_streaming_response(
             url, payload, app_state, user_msg, fallback_from, fallback_reason, session_id=session_id
         )
     return await _ollama_blocking_response(url, payload, fallback_from, fallback_reason)
+
+def _ollama_stream_gate(resp, payload: dict) -> Optional[dict]:
+    """A 400 that was the think flag is a payload to send again.
+
+    Any other non-200 raises before a token, so the peek can still answer
+    with HTTP. `None` means this response is the stream to read.
+    """
+    retry = _without_think(payload) if resp.status_code == 400 else None
+    if retry is not None:
+        return retry
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=f"Ollama returned HTTP {resp.status_code}",
+        )
+    return None
+
+
+def _ollama_line_events(data: dict, response_bytes: int) -> tuple[int, list, str]:
+    """One Ollama JSON line, as SSE strings plus at most one sentinel.
+
+    The status is `open` (keep reading), `capped` (byte cap, stop) or
+    `done` (Ollama closed the generation). The byte total includes reasoning.
+    """
+    events: list = []
+    reasoning_sse, reasoning_bytes = _reasoning_sse(data)
+    response_bytes += reasoning_bytes
+    if reasoning_sse:
+        events.append(reasoning_sse)
+
+    content = _sanitize_sse_token(data.get("message", {}).get("content", ""))
+    if content:
+        # B104: hard byte cap, symmetric with TokenBridge.
+        response_bytes += len(content.encode("utf-8", errors="replace"))
+        if response_bytes > MAX_STREAM_BYTES:
+            logger.warning(
+                "Ollama stream cap reached (%d bytes > %d). Terminating early.",
+                response_bytes, MAX_STREAM_BYTES,
+            )
+            events.append(stream_end(failure="stream_cap_exceeded", truncated=True))
+            return response_bytes, events, "capped"
+        chunk = {"choices": [{"delta": {"content": content}}]}
+        events.append(f"data: {json.dumps(chunk)}\n\n")
+
+    if data.get("done", False):
+        # `done_reason` is the ceiling cut. Absence is a clean stop, and
+        # the turn's emit writes it.
+        reason = data.get("done_reason")
+        events.append(stream_end(finish_reason="length" if reason == "length" else None))
+        return response_bytes, events, "done"
+    return response_bytes, events, "open"
+
 
 async def _ollama_stream_generator(
     url: str, payload: dict, app_state=None, user_msg: Optional[str] = None,
     session_id: Optional[str] = None,
 ):
-    """OpenAI-compatible streaming generator from Ollama."""
-    response_parts = []
+    """Tokens from Ollama, then one `stream_end` sentinel.
+
+    `[DONE]`, the final chunk and persistence belong to the turn (C4.6-b).
+    A non-200 or a connection error before the first token raises, so the
+    caller — which peeks — can still answer with HTTP. `user_msg` stays in
+    the signature: `test_user_msg_signatures_regression.py` pins it.
+    """
     _response_bytes = 0
+    got_any = False
 
     try:
         async with httpx.AsyncClient(timeout=_OLLAMA_STREAM_TIMEOUT) as client:
             async with client.stream("POST", url, json=payload) as resp:
-                retry = _without_think(payload) if resp.status_code == 400 else None
+                retry = _ollama_stream_gate(resp, payload)
                 if retry is not None:
                     async for chunk in _ollama_stream_generator(url, retry, app_state, user_msg, session_id=session_id):
                         yield chunk
                     return
-                if resp.status_code != 200:
-                    err_str = _sanitize_sse_token(f"Ollama stream failed with status {resp.status_code}")
-                    yield f"data: {json.dumps({'error': err_str})}\n\n"
-                    yield "data: [DONE]\n\n"
-                    return
 
+                ended = False
                 async for line in resp.aiter_lines():
                     if not line:
                         continue
                     try:
-                        # Ollama returns JSON lines
                         data = json.loads(line)
-                        content = _sanitize_sse_token(data.get("message", {}).get("content", ""))
-                        done = data.get("done", False)
-                        reasoning_sse, reasoning_bytes = _reasoning_sse(data)
-                        _response_bytes += reasoning_bytes
-                        if reasoning_sse:
-                            yield reasoning_sse
-
-                        if content:
-                            # B104: hard byte cap, symmetric with TokenBridge._cap_triggered
-                            # (MLX/llama_cpp path). A runaway generation (model stuck in a loop) must
-                            # not accumulate GB into response_parts. We signal a cap error and stop.
-                            _response_bytes += len(content.encode("utf-8", errors="replace"))
-                            if _response_bytes > MAX_STREAM_BYTES:
-                                logger.warning(
-                                    "Ollama stream cap reached (%d bytes > %d). Terminating early.",
-                                    _response_bytes, MAX_STREAM_BYTES,
-                                )
-                                err_str = _sanitize_sse_token("stream_cap_exceeded")
-                                yield f"data: {json.dumps({'error': err_str})}\n\n"
-                                yield "data: [DONE]\n\n"
-                                return
-                            response_parts.append(content)
-                            # Wrap in OpenAI-like SSe format for our client convenience
-                            chunk = {
-                                "choices": [{"delta": {"content": content}}]
-                            }
-                            yield f"data: {json.dumps(chunk)}\n\n"
-
-                        if done:
-                            # Ollama puts the reason in done_reason on the final
-                            # line; the stream used to close with [DONE] alone, so
-                            # a ceiling cut was indistinguishable from a clean stop
-                            # (the blocking path already reads the same field).
-                            yield format_sse_done(
-                                payload.get("model", ""),
-                                "ollama",
-                                finish_reason=data.get("done_reason"),
-                            )
-                            yield "data: [DONE]\n\n"
-
-                            full_response_text = "".join(response_parts)
-                            persist_v1_turn(app_state, session_id, full_response_text)
-
-                            break
-
                     except json.JSONDecodeError as jde:
                         logger.debug("Ollama stream: JSON decode error on line: %s", jde)
+                        continue
+                    _response_bytes, events, status = _ollama_line_events(data, _response_bytes)
+                    for event in events:
+                        got_any = True
+                        yield event
+                    if status != "open":
+                        ended = True
+                        return
+                if not ended:
+                    yield stream_end()
     except asyncio.CancelledError:
-        # Client disconnected during streaming — clean exit, no error.
         logger.debug("Ollama stream cancelled (client disconnected)")
         return
     except httpx.ConnectError:
-        _lang = os.getenv("NEXE_LANG", "en").split("-")[0].lower()
-        error_msg = {"error": _sanitize_sse_token(_OLLAMA_ERRORS.get(_lang, _OLLAMA_ERRORS["en"])["stream_unavailable"])}
-        yield f"data: {json.dumps(error_msg)}\n\n"
-        yield "data: [DONE]\n\n"
+        if got_any:
+            yield stream_end(failure="ollama_unavailable")
+            return
+        from core.messages import get_message as _core_msg
+        raise HTTPException(
+            status_code=503,
+            detail=_core_msg(None, "core.ollama.not_responding"),
+        )

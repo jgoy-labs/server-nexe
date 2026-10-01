@@ -130,26 +130,8 @@ class TestCachePostGenerationMerge:
         assert merged[-1]["content"] == "placeholder\n\ntext"
 
 
-class TestVlmGate:
-    async def test_vlm_continue_raises(self, tmp_path):
-        """D-C: phase 1 is text-only — the VLM path must refuse loudly."""
-        from plugins.mlx_module.core.chat import MLXChatNode
-
-        model_dir = tmp_path / "vlm"
-        model_dir.mkdir()
-        (model_dir / "config.json").write_text(json.dumps({
-            "model_type": "qwen3_vl",
-            "architectures": ["Qwen3VLForConditionalGeneration"],
-        }))
-        config = MagicMock()
-        config.model_path = str(model_dir)
-        node = MLXChatNode.__new__(MLXChatNode)
-        node.config = config
-        with pytest.raises(ValueError, match="VLM"):
-            await node.execute({
-                "system": "s", "messages": [{"role": "user", "content": "q"}],
-                "continue_final": True,
-            })
+# The VLM path used to refuse a Continue (D-C, phase 1). It resumes since C4.6-a-vlm:
+# tests/plugins/mlx_module/test_f966_vlm_golden_master.py and test_vlm_continue.py.
 
 
 class TestContinueHandler:
@@ -175,9 +157,17 @@ class TestContinueHandler:
         session_mgr.is_valid_session_id.return_value = True
         if session is not None:
             session_mgr.get_or_create_session.return_value = session
+        from fastapi import Request
+
+        def _auth(request: Request):
+            # C4.6: a Continue walks the turn now, and the turn's `authorize`
+            # step refuses a turn without the principal `require_ui_auth`
+            # records — so the stub leaves the same trace the real one does.
+            request.state.principal = "harness-key"
+
         router = APIRouter()
         rc.register_chat_routes(
-            router, session_mgr=session_mgr, require_ui_auth=lambda: None
+            router, session_mgr=session_mgr, require_ui_auth=_auth
         )
         app = FastAPI()
         app.include_router(router)

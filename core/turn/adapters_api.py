@@ -17,15 +17,12 @@ Two facts about today's code shape the adapters, and both are deliberate:
   helpers (`derive_session_id`, `mirror_v1_conversation`) are imported from
   their own module: nobody patches them through `chat`, and `chat.py` no longer
   needs them itself.
-* `_dispatch_through_cascade` returns the finished response object — a dict for
-  JSON, a `StreamingResponse` whose SSE generator (inside the engine forwarder)
-  generates, formats and persists on its own. So at this door `generate` is
-  opaque with respect to streaming and the route uses `run_turn` for BOTH
-  `body.stream` values: `ctx.wire` carries the object the route returns, and
-  `emit` decorates it exactly as before. Splitting the forwarders' SSE
-  generators into `stream_turn` steps is a refactor of `mlx.py`/`llama_cpp.py`/
-  `ollama.py` — the same files #1036 (the double fallback) lives in — and
-  belongs to C2, not to a wiring commit.
+* `run_turn` is the JSON shape. `stream_turn` (C4.6-b) is the streaming one:
+  `api_adapters(..., streaming=True)` swaps `generate`, `postprocess`,
+  `persist_assistant_turn` and `emit` for async generators. The engines yield
+  tokens and one sentinel; this table cleans, reads the facts, persists and
+  writes `[DONE]`. The default stays the coroutine table every JSON caller
+  walks. A stream is no longer opaque at this door.
 
 Folded steps: **none, since C4.2**. `intent`, `postprocess`, `memory.write`
 and `compact` became real at C3.1-C3.4; `authorize` and `sanitize` at C4.1;
@@ -39,9 +36,10 @@ step, and the other three run for themselves through
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
@@ -50,7 +48,15 @@ from core.endpoints.chat_engines._common import (
     build_openai_response,
     derive_session_id,
     mirror_v1_conversation,
+    persist_v1_turn,
     served_model_of,
+)
+from core.endpoints.chat_engines._streaming import (
+    NEXE_END,
+    SSE_DONE,
+    format_sse_chunk,
+    format_sse_done,
+    format_sse_role,
 )
 from core.memory_facts import intents
 from core.memory_facts.deletes import arm_pending_deletes
@@ -98,6 +104,37 @@ def _content_of(response: Any) -> str:
     return (response.get("message") or {}).get("content") or ""
 
 
+async def _text_of_reprompt_stream(body):
+    """Answer text from a second call that came back as SSE.
+
+    Production asks with `stream=False` and gets a dict. The turn lab's
+    engine fake always speaks SSE, so the same drain has to read both.
+    Sentinels carry no answer.
+    """
+    async for chunk in body:
+        if _end_of(chunk) is not None:
+            continue
+        text = _raw_of(chunk)
+        if text:
+            yield text
+
+
+def _reasoning_apart(response: Any) -> str:
+    """Reasoning a JSON engine already split out of the answer (ADR-010)."""
+    if not isinstance(response, dict):
+        return ""
+    first = (response.get("choices") or [{}])[0] or {}
+    return (first.get("message") or {}).get("reasoning") or ""
+
+
+def _note_reprompt_reasoning(ctx: TurnContext, reasoning: str) -> None:
+    """Keep the second call's reasoning on the JSON wire, only if asked."""
+    if not reasoning or not _wants_reasoning(ctx) or not isinstance(ctx.wire, dict):
+        return
+    message = ctx.wire["choices"][0]["message"]
+    message["reasoning"] = (message.get("reasoning") or "") + reasoning
+
+
 def _v1_reprompt_call(ctx: TurnContext):
     """This door's way of asking its engine once more — `policy.reprompt_chunks`'s
     `call` (C4.5). The same cascade `generate` walked, non-streaming, with the
@@ -116,16 +153,14 @@ def _v1_reprompt_call(ctx: TurnContext):
             response, _served_by, _fallback_from, _reason, _model = await chat._dispatch_through_cascade(
                 ctx.body, ctx.request, prompt, ctx.message or None,
                 ctx.session_id, ctx.engine, ctx.engine_fallback_from,
+                resume=False,
             )
+            if isinstance(response, StreamingResponse):
+                async for text in _text_of_reprompt_stream(response.body_iterator):
+                    yield text
+                return
             inline_reasoning, answer = split_text(_content_of(response))
-            apart = ""
-            if isinstance(response, dict):
-                first = (response.get("choices") or [{}])[0] or {}
-                apart = (first.get("message") or {}).get("reasoning") or ""
-            reasoning = apart + inline_reasoning
-            if reasoning and _wants_reasoning(ctx) and isinstance(ctx.wire, dict):
-                message = ctx.wire["choices"][0]["message"]
-                message["reasoning"] = (message.get("reasoning") or "") + reasoning
+            _note_reprompt_reasoning(ctx, _reasoning_apart(response) + inline_reasoning)
             if answer:
                 yield answer
 
@@ -247,9 +282,196 @@ def _peel_content_parts(ctx: TurnContext) -> None:
     ctx.message = (last_user.content if last_user else None) or ""
 
 
-def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
+def _engine_prefix(engine: Optional[str]) -> str:
+    """The SSE id prefix the three forwarders already use."""
+    name = (engine or "").lower().replace(".", "").replace("_", "")
+    if "llamacpp" in name:
+        return "llamacpp"
+    if name == "mlx":
+        return "mlx"
+    return "ollama"
+
+
+def _served_model(ctx: TurnContext) -> str:
+    return ctx.usage.get("served_model") or ctx.engine or "nexe"
+
+
+def _end_of(chunk: Any) -> Optional[dict]:
+    """The engine's closing sentinel, if this chunk is one."""
+    if isinstance(chunk, dict):
+        end = chunk.get(NEXE_END)
+        if isinstance(end, dict):
+            return end
+    return None
+
+
+def _raw_of(chunk: Any) -> str:
+    """The answer text inside one SSE chunk, before `SseCleaner` touches it.
+
+    Facts live in that text. Accumulating the cleaned chunk would drop them
+    before `postprocess` can read them, which is the hole C4.6-b closes.
+    """
+    text = chunk.decode("utf-8") if isinstance(chunk, (bytes, bytearray)) else chunk
+    if not isinstance(text, str):
+        return ""
+    parts: list[str] = []
+    for event in text.split("\n\n"):
+        event = event.strip()
+        if not event.startswith("data:"):
+            continue
+        payload = event[len("data:"):].strip()
+        if payload == "[DONE]":
+            continue
+        try:
+            obj = json.loads(payload)
+            delta = (obj.get("choices") or [{}])[0].get("delta") or {}
+        except (ValueError, IndexError, AttributeError, TypeError):
+            continue
+        content = delta.get("content")
+        if isinstance(content, str):
+            parts.append(content)
+    return "".join(parts)
+
+
+def _note_end(ctx: TurnContext, end: dict) -> None:
+    """Remember why the engine stopped. A failure after tokens is a partial."""
+    ctx.usage["stream_end"] = end
+    failure = end.get("failure")
+    if not failure:
+        return
+    ctx.partial = True
+    ctx.error = {"step": "generate", "class": "engine", "message": str(failure)}
+
+
+def _memory_fields(ctx: TurnContext) -> dict:
+    """The three names the JSON body already uses, for the last SSE chunk."""
+    fields: dict = {}
+    saved = ctx.usage.get("memory_saved") or 0
+    if saved:
+        fields["nexe_memory_saved"] = saved
+    kept = ctx.usage.get("memory_kept") or []
+    if kept:
+        fields["nexe_memory_facts"] = list(kept)
+    pending = ctx.usage.get("pending_delete") or ""
+    if pending:
+        fields["nexe_pending_delete"] = pending
+    return fields
+
+
+def _release(ctx: TurnContext) -> None:
+    session_mgr = getattr(ctx.app_state, "session_manager", None)
+    if session_mgr is not None and ctx.session_id:
+        session_mgr.release_lease(ctx.session_id, ctx.turn_id)
+
+
+async def _open_stream_call(ctx: TurnContext):
+    """Gate, deadline, cascade. The slot stays held: the caller releases it
+    when the generator ends, including when the client leaves."""
+    chat = _chat()
+    gate = gate_for(ctx.app_state)
+    cancel_event, monitor = start_disconnect_monitor(ctx.request)
+    ctx.cancel_token = (cancel_event, monitor)
+    deadline_handle = None
+    if ctx.deadline:
+        deadline_handle = asyncio.get_running_loop().call_later(ctx.deadline, cancel_event.set)
+
+    def stop() -> None:
+        if deadline_handle is not None:
+            deadline_handle.cancel()
+        if not monitor.done():
+            monitor.cancel()
+
+    try:
+        slot = await gate.acquire(
+            Priority.USER_TURN, holder=ctx.turn_id, cancel_event=cancel_event, timeout=_gate_wait_s(),
+        )
+    except GateBusy:
+        stop()
+        raise HTTPException(status_code=429, detail="Server busy, try again in a moment")
+    ctx.gpu_slot = slot
+    started = time.monotonic()
+    try:
+        image = ctx.attachments.get("image_b64")
+        response, served_by, fallback_from, reason, served_model = await chat._dispatch_through_cascade(
+            ctx.body, ctx.request, ctx.prompt, ctx.message or None,
+            ctx.session_id, ctx.engine, ctx.engine_fallback_from,
+            cancel_event=cancel_event,
+            images=[image] if image else None,
+            resume=ctx.resume,
+        )
+    except BaseException:
+        await gate.release(slot)
+        stop()
+        raise
+    ctx.usage["served_model"] = served_model or ""
+    if served_by != ctx.engine:
+        ctx.context_window = chat.get_effective_context_window(served_by, ctx.app_state)
+    ctx.engine = served_by
+    ctx.engine_fallback_from = fallback_from
+    ctx.engine_fallback_reason = reason
+    return response, served_by, served_model, slot, gate, stop, started
+
+
+async def _drain_engine(ctx: TurnContext, response: Any, cleaner: SseCleaner):
+    """Forward the engine's chunks, keeping the raw answer on `ctx.response`."""
+    if not isinstance(response, StreamingResponse):
+        ctx.response = _content_of(response)
+        return
+    async for chunk in response.body_iterator:
+        end = _end_of(chunk)
+        if end is not None:
+            _note_end(ctx, end)
+            continue
+        ctx.response += _raw_of(chunk)
+        for out in cleaner.rewrite(chunk):
+            yield out
+    for out in cleaner.close():
+        yield out
+
+
+def _text_appended(before: str, after: str) -> str:
+    """What `after` added past `before`. Empty when the text was replaced."""
+    if not after.startswith(before):
+        return ""
+    return after[len(before):].strip("\n")
+
+
+async def _stream_facts_only_reprompt(ctx: TurnContext, facts: list, finished: list):
+    """The second ask, as SSE chunks. The finished answer lands in `finished`.
+
+    The cascade sees `stream=False`. The lab's fake still speaks SSE, and
+    `_v1_reprompt_call` drains whichever shape comes back. An empty second
+    ask yields the neutral stand-in so the client is not left with nothing.
+    """
+    saved_body = ctx.body
+    ctx.body = saved_body.model_copy(update={"stream": False})
+    parts: list[str] = []
+    try:
+        async for chunk in policy.reprompt_chunks(
+            ctx, facts, call=_v1_reprompt_call(ctx),
+            engine_name=ctx.engine or "", model=_served_model(ctx),
+        ):
+            parts.append(chunk)
+            if chunk:
+                yield format_sse_chunk(chunk, _served_model(ctx), _engine_prefix(ctx.engine))
+    finally:
+        ctx.body = saved_body
+    clean = policy.second_answer_text(parts) or policy.empty_reply_text(ctx.lang)
+    finished.append(clean)
+    if not parts and clean:
+        yield format_sse_chunk(clean, _served_model(ctx), _engine_prefix(ctx.engine))
+
+
+def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> Adapters:
     """The adapter table for one request. Built per request because
-    `persist_assistant_turn` needs this request's `BackgroundTasks`."""
+    `persist_assistant_turn` needs this request's `BackgroundTasks`.
+
+    `streaming=True` swaps the four steps whose wire shape differs
+    (`generate`, `postprocess`, `persist_assistant_turn`, `emit`) for async
+    generators, the same split the web door has had since C1. The default
+    stays the coroutine table: `run_turn` rejects a generator, and every
+    existing caller of this function is a JSON turn.
+    """
 
     async def validate(ctx: TurnContext) -> None:
         chat = _chat()
@@ -266,6 +488,12 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         # on any role, and the OpenAI SDKs really do send a `system` that
         # way — so the door that accepts the shape has to normalise it first.
         _peel_content_parts(ctx)
+        if getattr(ctx.body, "resume", False) is True and ctx.attachments.get("image_b64"):
+            # The web door's rule: a Continue does not take a new attachment.
+            # The image, if the history carried one, is already on the session
+            # at that door. Here the request IS the history, so an image part
+            # is the attachment and it is refused the same way.
+            raise HTTPException(status_code=400, detail="continue does not take an attachment")
         chat._validate_chat_request(ctx.body)
         # C4.1: the shared `validate` (core/turn/validate.py) — including the
         # image check, now that this door can carry one: `attachments` above
@@ -294,7 +522,14 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
     async def session(ctx: TurnContext) -> None:
         chat = _chat()
         ctx.session_id = derive_session_id(ctx.request, ctx.body.messages)
-        ctx.lang = chat._resolve_request_lang(ctx.session_id, ctx.message)
+        if ctx.resume:
+            # The language stays the one the cut answer was written in. Detecting
+            # it again from the partial would flip the prefix the engine resumes.
+            from core.lang_detect import fallback_lang
+            remembered = chat._SESSION_LANG.get(ctx.session_id) or {}
+            ctx.lang = remembered.get("lang") or fallback_lang()
+        else:
+            ctx.lang = chat._resolve_request_lang(ctx.session_id, ctx.message)
         # C2.3 (ADR-007 §9/I9): same lease the UI door takes — one live
         # writer per session, whichever door it is (tanka #997: this is
         # exactly "the /v1 mirror wipes a UI thread's images/stats when a
@@ -316,7 +551,14 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
             # not the web door's — `TURN_STEPS` has always said this step
             # writes `session`, and until now only one door did.
             ctx.session = session_mgr.get_or_create_session(ctx.session_id)
-            ctx.attachments["document"] = ctx.session.get_attached_document()
+            # A resume does not inject the session's document between the cut
+            # and the continuation: that text was not part of the prefix.
+            if ctx.resume:
+                ctx.attachments["document"] = None
+                if getattr(ctx.session, "lang", None):
+                    ctx.lang = ctx.session.lang
+            else:
+                ctx.attachments["document"] = ctx.session.get_attached_document()
             result = session_mgr.acquire_lease(
                 ctx.session_id, holder=ctx.entry, turn_id=ctx.turn_id, where="API",
                 force=bool(getattr(ctx.body, "force_lease", False)),
@@ -407,9 +649,12 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         #   * the document used to ride this door's RAG budget with
         #     `document_chars=0`, so a long client history dropped it whole
         #     (#1079, measured: gone at ~30k chars with only a WARNING).
-        context_text = ctx.recall_text
+        # A Continue keeps the prefix the answer was cut from: no document
+        # and no retrieved text between the cut and the resume. `recall` is
+        # already skipped; this is the belt, and the document is not.
+        context_text = "" if ctx.resume else ctx.recall_text
         document_chars = 0
-        attached_doc = ctx.attachments.get("document")
+        attached_doc = None if ctx.resume else ctx.attachments.get("document")
         if attached_doc:
             from core.turn.assemble import _build_document_context
             document_context, _shown, _total = _build_document_context(
@@ -472,6 +717,7 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
                 cancel_event=cancel_event,
                 # #1081: same shape as the UI door's `_images_arg`.
                 images=[_image_b64] if _image_b64 else None,
+                resume=ctx.resume,
             )
             # I8 (C2.5): the cascade may have tried more than one engine, but
             # `served_by` is the one that actually generated — a retry that
@@ -522,10 +768,11 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
                 _stop_cancellation()
 
     async def persist_assistant_turn(ctx: TurnContext) -> None:
-        # JSON: queued as a background task. Stream: a no-op here — the SSE
-        # generator inside the forwarder persists when the text is complete.
+        # JSON only. A stream writes the answer in `persist_stream`, once the
+        # text is known — the forwarders no longer persist (C4.6-b).
         _chat()._persist_v1_turn_from_response(
-            ctx.wire, background_tasks, ctx.app_state, ctx.session_id
+            ctx.wire, background_tasks, ctx.app_state, ctx.session_id,
+            resume=ctx.resume,
         )
 
     async def intent(ctx: TurnContext) -> None:
@@ -582,16 +829,16 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         """C3.2: the model's memory tags are read at this door too.
 
         C4.4: the JSON reply is cleaned with the core's one cleaner first
-        (<think>, harmony, <|…|>) — the web door's. In streaming, the tags
-        never reach the client (`SseCleaner`, in `generate`), but this door's
-        turn has ended before the stream is generated, so the FACTS in a
-        streamed reply are not read: a written limit, closed when /v1 walks
-        `stream_turn` like the web door (C4.6).
+        (<think>, harmony, <|…|>) — the web door's. A stream is the other
+        table (`postprocess_stream`, C4.6-b): its facts are read from the raw
+        text in the same turn. This coroutine only sees dicts.
         """
         if not isinstance(ctx.wire, dict):
-            ctx.usage.setdefault("degraded", {})["postprocess"] = (
-                "streaming: tags stripped, facts not extracted (C4.6)"
-            )
+            # A stream is the other table (`streaming=True`). This one only
+            # sees dicts; writing the old C4.6 degradation here would keep a
+            # limit the stream walk has closed.
+            ctx.response = ctx.response or ""
+            ctx.facts = []
             return
         try:
             message = ctx.wire["choices"][0]["message"]
@@ -609,7 +856,7 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         clean, facts, deletes = clean_full_response(content, user_input=ctx.message)
         if deletes:
             clean = await _arm_pending_delete(ctx, deletes, clean)
-        if not clean and facts:
+        if not clean and facts and not ctx.resume:
             clean = await _second_reply(ctx, facts)
         message["content"] = clean
         ctx.response = clean
@@ -686,6 +933,87 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
                 "compacted": session.compaction_count - before,
             }
 
+    async def generate_stream(ctx: TurnContext):
+        """The engine call, as a generator. The first yield is the assistant
+        role, once the cascade has accepted an engine — a reasoning-first
+        model does not hold the headers until the answer starts. I8's time is
+        the whole generation, not the wait for that first token."""
+        ctx.response = ""
+        response, served_by, served_model, slot, gate, stop, started = await _open_stream_call(ctx)
+        try:
+            yield format_sse_role(served_model or served_by, _engine_prefix(served_by))
+            cleaner = SseCleaner(served_model, keep_reasoning=_wants_reasoning(ctx))
+            async for out in _drain_engine(ctx, response, cleaner):
+                yield out
+            record_llm_call(
+                ctx, step="generate", engine=served_by, model=served_model or "",
+                ms=(time.monotonic() - started) * 1000.0,
+            )
+        finally:
+            await gate.release(slot)
+            stop()
+
+    async def postprocess_stream(ctx: TurnContext):
+        """Clean the raw answer, arm a delete, and ask again when the reply
+        was only memory tags. A partial turn is cleaned and not asked again."""
+        clean, facts, deletes = clean_full_response(ctx.response or "", user_input=ctx.message)
+        if not ctx.partial and deletes:
+            before = clean
+            clean = await _arm_pending_delete(ctx, deletes, clean)
+            extra = _text_appended(before, clean)
+            if extra:
+                yield format_sse_chunk(extra, _served_model(ctx), _engine_prefix(ctx.engine))
+        if not ctx.resume and not ctx.partial and not clean and facts:
+            finished: list[str] = []
+            async for sse in _stream_facts_only_reprompt(ctx, facts, finished):
+                yield sse
+            if finished:
+                clean = finished[0]
+        ctx.response = clean
+        ctx.facts = facts
+
+    async def persist_stream(ctx: TurnContext) -> None:
+        """The answer is known here, so it is written now. A disconnect
+        (`generate` cancelled) is a partial and lets the lease go, because
+        `emit` will not run. An engine error keeps the lease until `[DONE]`."""
+        text = ctx.response or ""
+        cancelled = ctx.outcomes.get("generate") == "cancelled"
+        if str(text).strip():
+            end = ctx.usage.get("stream_end") or {}
+            persist_v1_turn(
+                ctx.app_state, ctx.session_id, text,
+                partial=bool(ctx.partial) or cancelled,
+                resume=ctx.resume,
+                truncated=end.get("finish_reason") == "length",
+            )
+        if cancelled:
+            _release(ctx)
+
+    async def emit_stream(ctx: TurnContext):
+        """The final chunk, then `[DONE]`, then the lease. A memory command
+        never ran `generate`, so its text leaves from here, as SSE."""
+        # `skipped`: a memory command answered before `generate`, so this is
+        # the first thing on the wire. `ok` and `degraded` already yielded
+        # the role from `generate`.
+        if ctx.outcomes.get("generate") == "skipped":
+            model = getattr(ctx.body, "model", None) or "nexe-memory"
+            prefix = "nexe"
+            yield format_sse_role(model, prefix)
+            if ctx.response:
+                yield format_sse_chunk(ctx.response, model, prefix)
+        else:
+            model = _served_model(ctx)
+            prefix = _engine_prefix(ctx.engine)
+        end = ctx.usage.get("stream_end") or {}
+        yield format_sse_done(
+            model, prefix,
+            truncated=bool(end.get("truncated")),
+            finish_reason=end.get("finish_reason"),
+            fields=_memory_fields(ctx),
+        )
+        yield SSE_DONE
+        _release(ctx)
+
     async def emit(ctx: TurnContext) -> None:
         ctx.wire = _chat()._inject_response_headers(
             ctx.wire, ctx.engine, ctx.recall_text, ctx.engine_fallback_from, ctx.engine_fallback_reason
@@ -696,12 +1024,8 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         elif isinstance(ctx.wire, dict):
             ctx.wire.setdefault("turn_id", ctx.turn_id)
         _write_memory_news(ctx)
-        # C2.3: release the lease taken in `session`. Known gap for the
-        # streaming shape (docstring above: this door's `generate` is opaque
-        # to streaming — the forwarder still sends tokens after this adapter
-        # returns), so this releases a moment before the stream truly ends,
-        # same trade-off #1036/C2.4's forwarder split will also have to
-        # revisit. The JSON shape is exact: nothing sends after this.
+        # JSON: the lease ends here, with the body. A stream releases in
+        # `emit_stream`, after `[DONE]` (C4.6-b).
         session_mgr = getattr(ctx.app_state, "session_manager", None)
         if session_mgr is not None:
             session_mgr.release_lease(ctx.session_id, ctx.turn_id)
@@ -718,10 +1042,10 @@ def api_adapters(background_tasks: BackgroundTasks) -> Adapters:
         "system_prompt": system_prompt,
         "engine": engine,
         "budget": budget,
-        "generate": generate,
-        "postprocess": postprocess,
-        "persist_assistant_turn": persist_assistant_turn,
-        "emit": emit,
+        "generate": generate_stream if streaming else generate,
+        "postprocess": postprocess_stream if streaming else postprocess,
+        "persist_assistant_turn": persist_stream if streaming else persist_assistant_turn,
+        "emit": emit_stream if streaming else emit,
         "memory.write": memory_write,
         "compact": compact,
     }

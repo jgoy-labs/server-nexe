@@ -95,6 +95,30 @@ class _OllamaCapture:
         resp.json.return_value = {"message": {"content": self.reply}, "done": True}
         return resp
 
+    def stream(self, *a, **kw):
+        """C4.6-b peeks the first token through `client.stream`, not `post`."""
+        reply = self.reply
+
+        class _Stream:
+            async def __aenter__(self):
+                resp = MagicMock()
+                resp.status_code = 200
+
+                async def _lines():
+                    yield json.dumps({
+                        "message": {"role": "assistant", "content": reply},
+                        "done": True,
+                        "done_reason": "stop",
+                    })
+
+                resp.aiter_lines = _lines
+                return resp
+
+            async def __aexit__(self, *exc):
+                return False
+
+        return _Stream()
+
 
 @pytest.fixture(autouse=True)
 def _disable_rate_limiter():
@@ -577,15 +601,15 @@ class TestEmptyContentTurns:
         )
 
 
-# ─── End to end: streaming generators persist their own turn ──────────────
+# ─── C4.6-b: the generators no longer persist. The turn does. ─────────────
 
-class TestStreamingEnginesMirrorToSession:
+class TestStreamingEnginesDoNotPersist:
     def _collect(self, gen):
         async def _run():
             return [chunk async for chunk in gen]
         return asyncio.run(_run())
 
-    def test_mlx_stream_persists_assistant_turn(self, session_manager):
+    def test_mlx_stream_leaves_the_session_to_the_turn(self, session_manager):
         from core.endpoints.chat_engines.mlx import _mlx_stream_generator
         from core.endpoints.chat_engines._common import mirror_v1_conversation
 
@@ -607,10 +631,9 @@ class TestStreamingEnginesMirrorToSession:
         ))
 
         session = session_manager.get_session("sess_mlx")
-        assert session.messages[-1]["role"] == "assistant"
-        assert session.messages[-1]["content"] == "Hola des de MLX"
+        assert [m["role"] for m in session.messages] == ["user"]
 
-    def test_llama_cpp_stream_persists_assistant_turn(self, session_manager):
+    def test_llama_cpp_stream_leaves_the_session_to_the_turn(self, session_manager):
         from core.endpoints.chat_engines.llama_cpp import _llama_cpp_stream_generator
         from core.endpoints.chat_engines._common import mirror_v1_conversation
 
@@ -632,10 +655,9 @@ class TestStreamingEnginesMirrorToSession:
         ))
 
         session = session_manager.get_session("sess_llama")
-        assert session.messages[-1]["role"] == "assistant"
-        assert session.messages[-1]["content"] == "Hola des de llama.cpp"
+        assert [m["role"] for m in session.messages] == ["user"]
 
-    def test_ollama_stream_persists_assistant_turn(self, session_manager):
+    def test_ollama_stream_leaves_the_session_to_the_turn(self, session_manager):
         from core.endpoints.chat_engines.ollama import _ollama_stream_generator
         from core.endpoints.chat_engines._common import mirror_v1_conversation
 
@@ -671,5 +693,4 @@ class TestStreamingEnginesMirrorToSession:
             ))
 
         session = session_manager.get_session("sess_ollama")
-        assert session.messages[-1]["role"] == "assistant"
-        assert session.messages[-1]["content"] == "Hola des de Ollama"
+        assert [m["role"] for m in session.messages] == ["user"]

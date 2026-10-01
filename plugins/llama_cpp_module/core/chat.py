@@ -37,6 +37,112 @@ _LLAMA_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="llama-wo
 atexit.register(_LLAMA_EXECUTOR.shutdown, wait=False, cancel_futures=True)
 
 
+def split_resumed_answer(messages: List[Dict], continue_final: bool) -> tuple:
+    """(messages before the cut answer, its raw text).
+
+    A resume that is not sitting on an assistant message refuses: generating
+    from scratch here would glue a new answer onto the cut one. No resume
+    returns the messages unchanged and ``None``.
+    """
+    if not continue_final:
+        return messages, None
+    if not messages or messages[-1].get("role") != "assistant":
+        raise RuntimeError("continue on llama.cpp needs the cut assistant message")
+    return messages[:-1], messages[-1].get("content") or ""
+
+
+def _resume_formatters() -> Dict[str, Any]:
+    """The library formatters the config's names actually render with.
+
+    ``Llama.create_chat_completion`` has no continue flag: every stock
+    formatter closes the last message and then opens a fresh assistant turn.
+    A resume renders the messages *without* the cut answer (that already
+    opens the turn) and appends the raw text. Names are the config's, which
+    are not always the library's (``mistral`` is ``mistral-instruct``).
+    ``phi-3`` is absent on purpose: the installed library has no formatter
+    under that name, and guessing chatml would resume against a different
+    template than the one that cut the answer.
+    """
+    from llama_cpp.llama_chat_format import (
+        format_alpaca,
+        format_chatml,
+        format_gemma,
+        format_llama2,
+        format_llama3,
+        format_mistral_instruct,
+    )
+
+    return {
+        "chatml": format_chatml,
+        "llama-2": format_llama2,
+        "llama-3": format_llama3,
+        "gemma": format_gemma,
+        "alpaca": format_alpaca,
+        "mistral": format_mistral_instruct,
+    }
+
+
+def render_resume_prompt(chat_format: str, messages: List[Dict], partial: str) -> str:
+    """Prompt that ends on ``partial``, with the assistant turn still open."""
+    formatter = _resume_formatters().get(chat_format)
+    if formatter is None:
+        raise RuntimeError(
+            f"continue is not supported for llama.cpp chat_format {chat_format!r}"
+        )
+    return formatter(messages=messages).prompt + partial
+
+
+def _chat_chunk_text(choice: Dict) -> str:
+    delta = choice.get("delta") or {}
+    return delta.get("content") or ""
+
+
+def _completion_chunk_text(choice: Dict) -> str:
+    return choice.get("text") or ""
+
+
+def _chunk_choice(chunk: Dict) -> Dict:
+    choices = chunk.get("choices") or [{}]
+    return choices[0] or {}
+
+
+def _note_usage(chunk: Dict, prompt_tokens: int, completion_tokens: int) -> tuple:
+    usage = chunk.get("usage") or {}
+    if not usage:
+        return prompt_tokens, completion_tokens
+    return (
+        usage.get("prompt_tokens", prompt_tokens),
+        usage.get("completion_tokens", completion_tokens),
+    )
+
+
+def _split_timing(start: float, first: Optional[float], end: float) -> tuple:
+    if not first:
+        return 0, int((end - start) * 1000)
+    return int((first - start) * 1000), int((end - first) * 1000)
+
+
+def continuable_answer(
+    finish_reason: Optional[str],
+    prompt_tokens: int,
+    completion_tokens: int,
+    *,
+    n_ctx: int,
+    reply_ceiling: int,
+) -> bool:
+    """Length, and room for another reply before the context window fills.
+
+    Same headroom MLX uses against its KV window (``max_tokens + 512``): a
+    Continue chain must not cross the window. ``reply_ceiling`` is the
+    config's ceiling, the size of the *next* continue, not the call that
+    just hit the limit.
+    """
+    if finish_reason != "length":
+        return False
+    used = prompt_tokens + completion_tokens
+    return used + reply_ceiling + 512 < n_ctx
+
+
 class LlamaCppChatNode:
     """
     Inference engine for Llama.cpp adapted for server-nexe.
@@ -111,6 +217,18 @@ class LlamaCppChatNode:
         # of running to max_tokens (orphan worker blocking the instance). None
         # disables cancellation (back-compat).
         cancel_event = inputs.get("cancel_event")
+        # Only an explicit True. A MagicMock grows a truthy `.resume` / flag
+        # and must not be treated as a continue.
+        continue_final = inputs.get("continue_final", False) is True
+
+        # #1107: the vision handler renders inside create_chat_completion and
+        # always closes the assistant turn. A string completion would keep
+        # the cut text and lose the picture. Refuse, and do it as a plain
+        # runtime error so the cascade can offer the turn to an engine that
+        # can continue an image (MLX). A ValueError would end the turn for
+        # every engine.
+        if continue_final and images:
+            raise RuntimeError("continue with images is not supported by llama.cpp")
 
         # Graceful fallback: if there is an image but no mmproj, warn and ignore the image
         if images and not self.config.mmproj_path:
@@ -151,48 +269,11 @@ class LlamaCppChatNode:
             # Pin to the dedicated single-worker executor so generations on the
             # shared instance serialise (B190) instead of racing on the default
             # multi-worker pool.
-            if images and self.config.mmproj_path:
-                # VLM path: images + clip model configured
-                if stream_callback:
-                    result = await loop.run_in_executor(
-                        _LLAMA_EXECUTOR,
-                        functools.partial(
-                            self._generate_vlm_streaming,
-                            model, system, messages, images, threadsafe_callback,
-                            max_tokens_override, temperature_override, cancel_event,
-                            top_p=top_p_override,
-                        ),
-                    )
-                else:
-                    result = await loop.run_in_executor(
-                        _LLAMA_EXECUTOR,
-                        functools.partial(
-                            self._generate_vlm,
-                            model, system, messages, images,
-                            max_tokens_override, temperature_override,
-                            top_p=top_p_override,
-                        ),
-                    )
-            elif stream_callback:
-                result = await loop.run_in_executor(
-                    _LLAMA_EXECUTOR,
-                    functools.partial(
-                        self._generate_streaming,
-                        model, system, messages, threadsafe_callback,
-                        max_tokens_override, temperature_override, cancel_event,
-                        top_p=top_p_override,
-                    ),
-                )
-            else:
-                result = await loop.run_in_executor(
-                    _LLAMA_EXECUTOR,
-                    functools.partial(
-                        self._generate,
-                        model, system, messages,
-                        max_tokens_override, temperature_override,
-                        top_p=top_p_override,
-                    ),
-                )
+            result = await self._run_generation(
+                loop, model, system, messages, images, stream_callback,
+                threadsafe_callback, max_tokens_override, temperature_override,
+                top_p_override, cancel_event, continue_final,
+            )
 
             reasoning_text, response_text = finish_split(structured_cb, split, result["text"])
 
@@ -204,6 +285,7 @@ class LlamaCppChatNode:
 
             context_used = result["prompt_tokens"] + result["tokens"]
             system_tokens = len(system) // 4  # Estimate
+            finish_reason, can_resume = self._answer_flags(result, images)
 
             # Get timing from the result
             timing = result.get("timing", {})
@@ -235,12 +317,78 @@ class LlamaCppChatNode:
                 "thinking": reasoning_text,  # ADR-010: apart from the answer
                 "cache_hit": cache_hit,  # Restored for compatibility
                 "timing": timing,
+                "finish_reason": finish_reason,
+                "continuable": can_resume,
             }
 
         except Exception as e:
             elapsed_ms = int((time.time() - start_time) * 1000)
             logger.error("LlamaCppChatNode error after %dms: %s", elapsed_ms, str(e))
             raise
+
+    async def _run_generation(
+        self, loop, model, system, messages, images, stream_callback,
+        threadsafe_callback, max_tokens, temperature, top_p, cancel_event,
+        continue_final,
+    ):
+        """One generation on the single worker thread. Vision when the clip
+        model is loaded; a resume only on the text path."""
+        if images and self.config.mmproj_path:
+            if stream_callback:
+                work = functools.partial(
+                    self._generate_vlm_streaming,
+                    model, system, messages, images, threadsafe_callback,
+                    max_tokens, temperature, cancel_event, top_p=top_p,
+                )
+            else:
+                work = functools.partial(
+                    self._generate_vlm,
+                    model, system, messages, images,
+                    max_tokens, temperature, top_p=top_p,
+                )
+        elif stream_callback:
+            work = functools.partial(
+                self._generate_streaming,
+                model, system, messages, threadsafe_callback,
+                max_tokens, temperature, cancel_event,
+                top_p=top_p, continue_final=continue_final,
+            )
+        else:
+            work = functools.partial(
+                self._generate,
+                model, system, messages,
+                max_tokens, temperature, top_p=top_p, continue_final=continue_final,
+            )
+        return await loop.run_in_executor(_LLAMA_EXECUTOR, work)
+
+    def _answer_flags(self, result: Dict[str, Any], images) -> tuple:
+        """(finish_reason, continuable) for the web button and the /v1 client.
+
+        A disconnect is not a ceiling cut. A vision answer reports the cut
+        and leaves the button off: resuming it would drop the picture.
+        """
+        finish_reason = result.get("finish_reason")
+        if result.get("cancelled"):
+            finish_reason = None
+        if images and self.config.mmproj_path:
+            return finish_reason, False
+        prompt_tokens = result.get("prompt_tokens") or 0
+        completion_tokens = result.get("tokens") or 0
+        return finish_reason, continuable_answer(
+            finish_reason,
+            prompt_tokens,
+            completion_tokens,
+            n_ctx=self.config.n_ctx,
+            reply_ceiling=self.config.max_tokens,
+        )
+
+    def _sampling(self, max_tokens, temperature, top_p) -> Dict[str, Any]:
+        return {
+            "max_tokens": max_tokens if max_tokens is not None else self.config.max_tokens,
+            "temperature": temperature if temperature is not None else 0.7,
+            "top_p": top_p if top_p is not None else 0.9,
+            "stop": self._STOP_SEQUENCES,
+        }
 
     def _generate(
         self,
@@ -250,32 +398,76 @@ class LlamaCppChatNode:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
+        continue_final: bool = False,
     ) -> Dict[str, Any]:
         """Generate a response without streaming."""
+        prefix, partial = split_resumed_answer(messages, continue_final)
+        if partial is not None:
+            return self._generate_resume(
+                model, system, prefix, partial, max_tokens, temperature, top_p,
+            )
         all_messages = [{"role": "system", "content": system}] + messages
 
         start_time = time.time()
         response = model.create_chat_completion(
             messages=all_messages,
-            max_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
-            temperature=temperature if temperature is not None else 0.7,
-            top_p=top_p if top_p is not None else 0.9,
-            stop=self._STOP_SEQUENCES,
+            **self._sampling(max_tokens, temperature, top_p),
         )
         end_time = time.time()
 
         # Without streaming we cannot distinguish prefill from generation
         total_ms = int((end_time - start_time) * 1000)
+        choice = response["choices"][0]
 
         return {
-            "text": response["choices"][0]["message"]["content"],
+            "text": choice["message"]["content"],
             "tokens": response["usage"]["completion_tokens"],
             "prompt_tokens": response["usage"]["prompt_tokens"],
+            "finish_reason": choice.get("finish_reason"),
+            "cancelled": False,
             "timing": {
                 "prefill_ms": 0,  # Not measurable without streaming
                 "generation_ms": total_ms,
                 "overhead_ms": 0,
                 "prefill_available": False,  # TTFT not measurable without streaming
+            },
+        }
+
+    def _generate_resume(
+        self,
+        model: Any,
+        system: str,
+        messages: List[Dict],
+        partial: str,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Continue ``partial``. The prompt ends on that text; only the tail comes back."""
+        prompt = render_resume_prompt(
+            self.config.chat_format,
+            [{"role": "system", "content": system}] + messages,
+            partial,
+        )
+        start_time = time.time()
+        response = model.create_completion(
+            prompt=prompt,
+            echo=False,
+            **self._sampling(max_tokens, temperature, top_p),
+        )
+        total_ms = int((time.time() - start_time) * 1000)
+        choice = response["choices"][0]
+        return {
+            "text": choice.get("text") or "",
+            "tokens": response["usage"]["completion_tokens"],
+            "prompt_tokens": response["usage"]["prompt_tokens"],
+            "finish_reason": choice.get("finish_reason"),
+            "cancelled": False,
+            "timing": {
+                "prefill_ms": 0,
+                "generation_ms": total_ms,
+                "overhead_ms": 0,
+                "prefill_available": False,
             },
         }
 
@@ -289,70 +481,113 @@ class LlamaCppChatNode:
         temperature: Optional[float] = None,
         cancel_event: Any = None,
         top_p: Optional[float] = None,
+        continue_final: bool = False,
     ) -> Dict[str, Any]:
         """Generate a response with streaming."""
+        prefix, partial = split_resumed_answer(messages, continue_final)
+        if partial is not None:
+            return self._generate_resume_streaming(
+                model, system, prefix, partial, stream_callback,
+                max_tokens, temperature, cancel_event, top_p,
+            )
         all_messages = [{"role": "system", "content": system}] + messages
+        return self._consume_stream(
+            model.create_chat_completion(
+                messages=all_messages,
+                stream=True,
+                **self._sampling(max_tokens, temperature, top_p),
+            ),
+            stream_callback,
+            cancel_event,
+            text_of=_chat_chunk_text,
+        )
 
+    def _generate_resume_streaming(
+        self,
+        model: Any,
+        system: str,
+        messages: List[Dict],
+        partial: str,
+        stream_callback: Any,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        cancel_event: Any = None,
+        top_p: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Stream the tail. ``echo`` stays off, so the cut text is not re-sent."""
+        prompt = render_resume_prompt(
+            self.config.chat_format,
+            [{"role": "system", "content": system}] + messages,
+            partial,
+        )
+        return self._consume_stream(
+            model.create_completion(
+                prompt=prompt,
+                echo=False,
+                stream=True,
+                **self._sampling(max_tokens, temperature, top_p),
+            ),
+            stream_callback,
+            cancel_event,
+            text_of=_completion_chunk_text,
+        )
+
+    def _consume_stream(
+        self,
+        chunks: Any,
+        stream_callback: Any,
+        cancel_event: Any,
+        text_of: Any,
+    ) -> Dict[str, Any]:
+        """Drain a llama.cpp stream into the result dict both doors read."""
         full_response = []
         prompt_tokens = 0
         completion_tokens = 0
-
-        # Timing breakdown
+        finish_reason = None
+        cancelled = False
         start_time = time.time()
         first_token_time = None
 
-        for chunk in model.create_chat_completion(
-            messages=all_messages,
-            max_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
-            temperature=temperature if temperature is not None else 0.7,
-            top_p=top_p if top_p is not None else 0.9,
-            stream=True,
-            stop=self._STOP_SEQUENCES,
-        ):
+        for chunk in chunks:
             # MC-011: the route handler sets cancel_event when the HTTP client
             # disconnects; exit early instead of generating to max_tokens.
             if cancel_event is not None and cancel_event.is_set():
                 logger.info("LlamaCppChatNode: cancel_event set — breaking stream loop")
+                cancelled = True
                 break
 
-            delta = chunk.get("choices", [{}])[0].get("delta", {})
-            content = delta.get("content", "")
+            choice = _chunk_choice(chunk)
+            reason = choice.get("finish_reason")
+            if reason:
+                finish_reason = reason
+            content = text_of(choice)
 
             if content:
-                # Mark TTFT (Time To First Token)
                 if first_token_time is None:
                     first_token_time = time.time()
-
                 full_response.append(content)
                 if callable(stream_callback):
                     stream_callback(content)
 
-            usage = chunk.get("usage", {})
-            if usage:
-                prompt_tokens = usage.get("prompt_tokens", prompt_tokens)
-                completion_tokens = usage.get("completion_tokens", completion_tokens)
+            prompt_tokens, completion_tokens = _note_usage(
+                chunk, prompt_tokens, completion_tokens,
+            )
 
         end_time = time.time()
         text = "".join(full_response)
         if completion_tokens == 0:
             completion_tokens = len(text) // 4
-
-        # Calculate timing breakdown
-        if first_token_time:
-            prefill_ms = int((first_token_time - start_time) * 1000)
-            generation_ms = int((end_time - first_token_time) * 1000)
-        else:
-            prefill_ms = 0
-            generation_ms = int((end_time - start_time) * 1000)
-
+        prefill_ms, generation_ms = _split_timing(start_time, first_token_time, end_time)
         return {
             "text": text,
             "tokens": completion_tokens,
             "prompt_tokens": prompt_tokens,
+            "finish_reason": None if cancelled else finish_reason,
+            "cancelled": cancelled,
             "timing": {
-                "prefill_ms": prefill_ms,      # TTFT - Time To First Token
-                "prefill_available": True,     # TTFT available via streaming
-                "generation_ms": generation_ms, # Generation time
+                "prefill_ms": prefill_ms,
+                "prefill_available": True,
+                "generation_ms": generation_ms,
                 "overhead_ms": 0,
             },
         }
@@ -419,18 +654,18 @@ class LlamaCppChatNode:
         start_time = time.time()
         response = model.create_chat_completion(
             messages=all_messages,
-            max_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
-            temperature=temperature if temperature is not None else 0.7,
-            top_p=top_p if top_p is not None else 0.9,
-            stop=self._STOP_SEQUENCES,
+            **self._sampling(max_tokens, temperature, top_p),
         )
         end_time = time.time()
         total_ms = int((end_time - start_time) * 1000)
+        choice = response["choices"][0]
 
         return {
-            "text": response["choices"][0]["message"]["content"],
+            "text": choice["message"]["content"],
             "tokens": response["usage"]["completion_tokens"],
             "prompt_tokens": response["usage"]["prompt_tokens"],
+            "finish_reason": choice.get("finish_reason"),
+            "cancelled": False,
             "timing": {
                 "prefill_ms": 0,
                 "generation_ms": total_ms,
@@ -453,65 +688,16 @@ class LlamaCppChatNode:
     ) -> Dict[str, Any]:
         """Generate a VLM response with streaming (images + clip model)."""
         all_messages = self._build_vlm_messages(system, messages, images)
-
-        full_response = []
-        prompt_tokens = 0
-        completion_tokens = 0
-
-        start_time = time.time()
-        first_token_time = None
-
-        for chunk in model.create_chat_completion(
-            messages=all_messages,
-            max_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
-            temperature=temperature if temperature is not None else 0.7,
-            top_p=top_p if top_p is not None else 0.9,
-            stream=True,
-            stop=self._STOP_SEQUENCES,
-        ):
-            # MC-011: break early when the route handler cancels (HTTP disconnect).
-            if cancel_event is not None and cancel_event.is_set():
-                logger.info("LlamaCppChatNode: cancel_event set — breaking VLM stream loop")
-                break
-
-            delta = chunk.get("choices", [{}])[0].get("delta", {})
-            content = delta.get("content", "")
-
-            if content:
-                if first_token_time is None:
-                    first_token_time = time.time()
-                full_response.append(content)
-                if callable(stream_callback):
-                    stream_callback(content)
-
-            usage = chunk.get("usage", {})
-            if usage:
-                prompt_tokens = usage.get("prompt_tokens", prompt_tokens)
-                completion_tokens = usage.get("completion_tokens", completion_tokens)
-
-        end_time = time.time()
-        text = "".join(full_response)
-        if completion_tokens == 0:
-            completion_tokens = len(text) // 4
-
-        if first_token_time:
-            prefill_ms = int((first_token_time - start_time) * 1000)
-            generation_ms = int((end_time - first_token_time) * 1000)
-        else:
-            prefill_ms = 0
-            generation_ms = int((end_time - start_time) * 1000)
-
-        return {
-            "text": text,
-            "tokens": completion_tokens,
-            "prompt_tokens": prompt_tokens,
-            "timing": {
-                "prefill_ms": prefill_ms,
-                "prefill_available": True,
-                "generation_ms": generation_ms,
-                "overhead_ms": 0,
-            },
-        }
+        return self._consume_stream(
+            model.create_chat_completion(
+                messages=all_messages,
+                stream=True,
+                **self._sampling(max_tokens, temperature, top_p),
+            ),
+            stream_callback,
+            cancel_event,
+            text_of=_chat_chunk_text,
+        )
 
     @classmethod
     def reset_model(cls) -> None:

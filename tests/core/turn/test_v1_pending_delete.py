@@ -71,6 +71,28 @@ async def test_no_match_arms_nothing_and_the_door_stays_quiet():
     assert _memory_news(ctx)["Pending-Delete"] == ""
 
 
+async def test_a_stream_names_the_pending_delete_on_the_last_chunk():
+    """C4.6-b: the question goes out as a content delta, and the entry rides
+    on the last chunk before `[DONE]`, the same name as the JSON body."""
+    import json
+
+    ctx, helper = _ctx("D'acord. [MEM_DELETE: el gos]", candidates=[ENTRY])
+    ctx.response = "D'acord. [MEM_DELETE: el gos]"
+    ctx.engine = "ollama"
+    ctx.usage["served_model"] = "qwen3.5:4b"
+    table = api_adapters(BackgroundTasks(), streaming=True)
+
+    mid = [c async for c in table["postprocess"](ctx)]
+    tail = [c async for c in table["emit"](ctx)]
+
+    helper.preview_delete_from_memory.assert_awaited_once()
+    assert mid and ENTRY["text"] in mid[0] and "MEM_DELETE" not in mid[0]
+    assert tail[-1].strip() == "data: [DONE]"
+    final = json.loads(tail[-2][len("data:"):].strip())
+    assert final["nexe_pending_delete"] == ENTRY["text"]
+    assert final["choices"][0]["finish_reason"] == "stop"
+
+
 async def test_a_pending_confirmation_is_not_overwritten_at_this_door_either():
     ctx, helper = _ctx("[MEM_DELETE: el gat]", candidates=[ENTRY])
     ctx.session._pending_partial_delete = {"content": "first", "entries": [{**ENTRY, "id": "id-0", "text": "first"}]}

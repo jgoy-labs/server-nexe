@@ -35,6 +35,7 @@ from typing import Any, AsyncIterator, Callable, Optional
 from core.turn.budget import record_llm_call
 from core.turn.context import TurnContext
 from core.turn.gate import GateBusy, Priority, _gate_wait_s, gate_for
+from core.turn.stream import StreamGuard
 from core.turn.text import think as text_think
 
 logger = logging.getLogger(__name__)
@@ -132,6 +133,10 @@ async def reprompt_chunks(
     facts = _facts_to_confirm(facts)
     if not facts or not reprompt_enabled():
         return
+    if ctx.resume:
+        # C4.6: the answer being resumed is mid-sentence; a second generation
+        # would open a new assistant turn inside it. Nothing to confirm with.
+        return
     if call is None:
         logger.info("Re-prompt skipped: %s has no way to call its engine again from this door", engine_name)
         return
@@ -197,12 +202,18 @@ async def _take_slot(gate, turn_id: str):
 async def _visible_text(stream) -> AsyncIterator[str]:
     """The engine's raw chunks as text the user may see: thinking-only chunks
     dropped, <think> blocks filtered across chunk boundaries (B124), a tag the
-    model repeats removed. Whatever shape the door's engine speaks."""
+    model repeats removed. Whatever shape the door's engine speaks.
+
+    #1039: the second answer never passes through `engine_events`, so it gets
+    the same guard here — no control characters, and a runaway reply ends at
+    the ceiling (the caller logs it and falls back like any failed re-prompt)."""
     in_think = False
+    guard = StreamGuard()
     async for raw in stream:
         content, skip = text_think.extract_reprompt_chunk_content(raw)
         if skip:
             continue
+        content, _ = guard.take(content, "")
         content, in_think = text_think.filter_reprompt_think_tags(content, in_think)
         if in_think:
             continue

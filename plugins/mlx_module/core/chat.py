@@ -252,13 +252,9 @@ class MLXChatNode:
             # the primary source — it is always fresh and does not depend on the _is_vlm
             # singleton which can go stale when switching from VLM → text within the same session.
             is_vlm = model_loader._detect_vlm_capability(self.config.model_path)
-            if continue_final and is_vlm:
-                # FD-S6 scope: mlx_vlm does the prefix matching internally on
-                # the real input_ids and has no continue support — phase 1 is
-                # text-only by design (D-C).
-                raise ValueError(
-                    "continue_final is not supported on the VLM path"
-                )
+            # C4.6: the VLM path resumes too — the default models (Qwen3.5,
+            # Gemma 4) are VLMs. `_prepare_vlm_prompt` ends the prompt inside
+            # the answer being resumed (continue_final_message).
             # ADR-010: this engine's model writes its reasoning INTO the text;
             # the plugin that knows how is the one that splits it, and hands
             # the caller {thinking, content} chunks.
@@ -280,6 +276,7 @@ class MLXChatNode:
                         cancel_event,
                         session_id,
                         top_p=top_p_override,
+                        continue_final=continue_final,
                     ),
                 )
             else:
@@ -445,8 +442,8 @@ class MLXChatNode:
     def _normalize_image_input(self, raw) -> bytes:
         return self._vlm._normalize_image_input(raw)
 
-    def _prepare_vlm_prompt(self, messages: List[Dict], system: str, processor, has_image: bool, thinking_enabled: bool=True, max_tokens: Optional[int]=None) -> str:
-        return self._vlm._prepare_vlm_prompt(messages, system, processor, has_image, thinking_enabled, max_tokens)
+    def _prepare_vlm_prompt(self, messages: List[Dict], system: str, processor, has_image: bool, thinking_enabled: bool=True, max_tokens: Optional[int]=None, continue_final: bool=False) -> str:
+        return self._vlm._prepare_vlm_prompt(messages, system, processor, has_image, thinking_enabled, max_tokens, continue_final)
 
     def _log_vlm_kv_request(self, model, prompt_cache_state=None) -> None:
         return self._vlm._log_vlm_kv_request(model, prompt_cache_state)
@@ -457,11 +454,11 @@ class MLXChatNode:
     def _run_vlm_oneshot(self, model, processor, formatted_prompt: str, tmp_path: Optional[str], max_tokens: Optional[int], temperature: Optional[float]=None, top_p: Optional[float]=None):
         return self._vlm._run_vlm_oneshot(model, processor, formatted_prompt, tmp_path, max_tokens, temperature, top_p)
 
-    def _extract_vlm_metrics(self, result_obj, result_text: str, elapsed_ms: int, prefix_reused: bool=False, cached_tokens: int=0, identity_hash: str='', max_tokens_used: 'Optional[int]'=None) -> Dict[str, Any]:
-        return self._vlm._extract_vlm_metrics(result_obj, result_text, elapsed_ms, prefix_reused, cached_tokens, identity_hash, max_tokens_used)
+    def _extract_vlm_metrics(self, result_obj, result_text: str, elapsed_ms: int, prefix_reused: bool=False, cached_tokens: int=0, identity_hash: str='', max_tokens_used: 'Optional[int]'=None, eos_ids: frozenset=frozenset()) -> Dict[str, Any]:
+        return self._vlm._extract_vlm_metrics(result_obj, result_text, elapsed_ms, prefix_reused, cached_tokens, identity_hash, max_tokens_used, eos_ids)
 
-    def _generate_vlm(self, system: str, messages: List[Dict], images: List[bytes], stream_callback: Optional[Callable[[str], None]]=None, max_tokens: Optional[int]=None, temperature: Optional[float]=None, thinking_enabled: bool=True, cancel_event: Any=None, session_id: str='default', top_p: Optional[float]=None) -> Dict[str, Any]:
-        return self._vlm._generate_vlm(system, messages, images, stream_callback, max_tokens, temperature, thinking_enabled, cancel_event, session_id, top_p)
+    def _generate_vlm(self, system: str, messages: List[Dict], images: List[bytes], stream_callback: Optional[Callable[[str], None]]=None, max_tokens: Optional[int]=None, temperature: Optional[float]=None, thinking_enabled: bool=True, cancel_event: Any=None, session_id: str='default', top_p: Optional[float]=None, continue_final: bool=False) -> Dict[str, Any]:
+        return self._vlm._generate_vlm(system, messages, images, stream_callback, max_tokens, temperature, thinking_enabled, cancel_event, session_id, top_p, continue_final)
 
     _reset_rotated_vlm_state = staticmethod(MLXVisionRunner._reset_rotated_vlm_state)
     _reset_untrimmable_vlm_state = staticmethod(MLXVisionRunner._reset_untrimmable_vlm_state)
@@ -626,14 +623,15 @@ class MLXChatNode:
     def _compute_continuable(self, result: Dict[str, Any], is_vlm: bool) -> bool:
         """Whether a truncated answer can be resumed with a Continue (FD-S6).
 
-        Only the MLX text path qualifies (VLM has no reliable finish_reason
-        and no continue support; its KV is bounded since #826 except for
-        models with a model-owned make_cache — #845, FD-S7). The KV gate
-        keeps a Continue chain from crossing the rotating window (which would
-        evict the system prompt and degenerate mid-chain, B004) and from
+        Both paths since C4.6: the VLM path resumes with
+        `continue_final_message`, and its "length" now excludes an answer
+        whose last token was an end of turn (`_extract_vlm_metrics`). `is_vlm`
+        no longer decides; it stays in the signature for the callers. The KV
+        gate keeps a Continue chain from crossing the rotating window (which
+        would evict the system prompt and degenerate mid-chain, B004) and from
         hitting the untrimmable-when-full corner of RotatingKVCache.
         """
-        if result.get("finish_reason") != "length" or is_vlm:
+        if result.get("finish_reason") != "length":
             return False
         used = result.get("prompt_tokens", 0) + result.get("tokens", 0)
         headroom_needed = used + self.config.max_tokens + 512

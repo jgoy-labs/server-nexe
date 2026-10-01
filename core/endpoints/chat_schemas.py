@@ -122,6 +122,9 @@ class ChatCompletionRequest(BaseModel):
     model: Optional[str] = Field(default=None, max_length=200)
     engine: Optional[str] = Field(default="auto", max_length=50)
     stream: bool = False
+    # C4.6-c: the client's "continue". The messages already end on the cut
+    # assistant answer; the turn resumes it instead of starting a new one.
+    resume: bool = False
     use_rag: bool = True  # RAG enabled by default - searches nexe_documentation + personal_memory
     # F-D block 3: same toggle the UI has always had — None searches every
     # collection (unchanged default); a list restricts the search to those.

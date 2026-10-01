@@ -40,7 +40,23 @@ def _chunk(frame: str) -> dict:
 
 
 def _final_chunk(chunks: list) -> dict:
-    payloads = [c for c in chunks if c.startswith("data: ") and "[DONE]" not in c]
+    """The close the client will see. The generator ends with a sentinel
+    (C4.6-b); `format_sse_done` is what `emit` turns it into."""
+    from core.endpoints.chat_engines._streaming import NEXE_END, format_sse_done
+
+    ends = [c[NEXE_END] for c in chunks if isinstance(c, dict) and NEXE_END in c]
+    if ends:
+        end = ends[-1]
+        frame = format_sse_done(
+            "m", "mlx",
+            truncated=bool(end.get("truncated")),
+            finish_reason=end.get("finish_reason"),
+        )
+        return json.loads(frame.removeprefix("data: ").strip())
+    payloads = [
+        c for c in chunks
+        if isinstance(c, str) and c.startswith("data: ") and "[DONE]" not in c
+    ]
     return json.loads(payloads[-1].removeprefix("data: ").strip())
 
 
@@ -129,8 +145,8 @@ class TestMlxStreamNamesTheCause:
         from core.endpoints.chat_engines import mlx as mlx_mod
 
         class TinyBridge(TokenBridge):
-            def __init__(self, maxsize=1):
-                super().__init__(maxsize=1)
+            def __init__(self, maxsize=1, **kwargs):
+                super().__init__(maxsize=1, **kwargs)
 
         monkeypatch.setattr(mlx_mod, "TokenBridge", TinyBridge)
         monkeypatch.setattr(_streaming, "MAX_STREAM_BYTES", 1024 * 1024 * 1024)

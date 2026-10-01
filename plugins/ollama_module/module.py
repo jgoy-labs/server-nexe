@@ -31,7 +31,7 @@ from .core.client import (
     OllamaClient,
     resolve_base_url,
 )
-from .core.chat import OllamaChat
+from .core.chat import OllamaChat, model_can_continue
 from .core.errors import (
     ModelNotFoundError,  # noqa: F401 — re-export used by tests
     OllamaSemanticError,  # noqa: F401 — re-export used by tests
@@ -261,11 +261,27 @@ class OllamaModule:
         """Delete a model from the local Ollama instance."""
         return await self.models_mgr.delete_model(model_name)
 
+    def can_continue(self, model_name: Optional[str] = None) -> bool:
+        """C4.6-a2: resume only a family measured to continue a cut answer.
+
+        The current families only (qwen3.5, gemma4). A previous-generation
+        name (qwen3, gemma3), or a longer token that merely starts like one
+        (`gemma40`), stays unable: a model that starts a new answer would be
+        glued onto the one that was cut.
+        """
+        return model_can_continue(model_name)
+
     def chat(
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
         images: Optional[List[str]] = None, thinking_enabled: bool = False,
-        top_p: Optional[float] = None,
+        top_p: Optional[float] = None, continue_final: bool = False,
     ) -> AsyncIterator[Dict[str, Any]]:
-        """Send a chat request to Ollama, yielding streamed response chunks."""
+        """Send a chat request to Ollama, yielding streamed response chunks.
+
+        `continue_final` (C4.6-a2): the transcript already ends on the cut
+        assistant answer. Explicit, not `**kwargs`, so the door can see it
+        on the signature and a caller that does not pass it keeps today.
+        """
         return self.chat_mgr.chat(model, messages, stream=stream, images=images,
-                                  thinking_enabled=thinking_enabled, top_p=top_p)
+                                  thinking_enabled=thinking_enabled, top_p=top_p,
+                                  continue_final=continue_final)

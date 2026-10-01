@@ -243,7 +243,9 @@ class TestGateActuallyBites:
         return path
 
     def test_a_function_that_grows_fails_the_gate(self, tmp_path: Path) -> None:
-        key = "plugins/web_ui_module/api/routes_chat.py::_generate_streaming_response"
+        # C4.6: the canary was `routes_chat.py::_generate_streaming_response`,
+        # deleted with the Continue path's legacy body.
+        key = "core/endpoints/installer_gguf.py::_stream_gguf"
         assert key in json.loads(BASELINE.read_text(encoding="utf-8")), (
             "the canary function must be in the baseline"
         )

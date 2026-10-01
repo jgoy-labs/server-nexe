@@ -203,9 +203,8 @@ def _build_system_prompt_with_time(
 
     ``app_state`` (C4.2) is the state the door already has on its request; the
     turn's steps pass ``ctx.app_state``. ``None`` falls back to the process
-    singleton, which is what every caller did before this parameter existed and
-    what the `continue` path — which has no request state to hand over — still
-    does. The two are the same object's config in production: `lifespan.py`
+    singleton, which is what every caller did before this parameter existed.
+    The two are the same object's config in production: `lifespan.py`
     assigns ``app.state.config = server_state.config``.
 
     ``lang_hint`` (#850) is always sent by the call site (the sticky
@@ -225,43 +224,6 @@ def _build_system_prompt_with_time(
     except Exception:
         base_system_prompt = EMERGENCY_SYSTEM_PROMPT
     system_prompt = build_system_prompt_with_time(base_system_prompt, _lang, _now=_now)
-    return system_prompt, _lang
-
-
-def _build_turn_system_prompt(
-    body: dict, session, message: str, _continue: bool, *, app_state: Any = None
-) -> tuple[str, str]:
-    """Sticky reply language (#850) + system prompt + collection toggles (#851).
-
-    Returns (system_prompt, lang).
-    """
-    # 4. Construct Final System Prompt (reply language: sticky per
-    # session, #850 — an off-language short ack must not flip the
-    # CRITICAL directive and invalidate the whole prefix cache)
-    # Review transversal: en mode continue NO s'avança la màquina
-    # d'estats (el continue re-alimenta _last_user: re-detectar-lo
-    # confirmaria la histèresi i fliparia a MIG continue, fora del
-    # prefix que ha de reutilitzar) — resolució només-lectura,
-    # mirall del tractament de rag_collections de sota.
-    if _continue:
-        _lang_sticky = getattr(session, "lang", None) or _fallback_lang()
-    else:
-        _lang_sticky = _resolve_session_lang(session, message)
-    system_prompt, _lang = _build_system_prompt_with_time(
-        message, lang_hint=_lang_sticky, app_state=app_state,
-    )
-    # Collection toggles + unconditional RAG security rule (#851).
-    # Review #851: el body de continue NO porta rag_collections —
-    # reutilitzem els toggles de l'últim torn (persistits a la
-    # sessió) perquè el continue quedi DINS el prefix que acaba
-    # de construir (i conservi les notes de col·leccions OFF).
-    if _continue:
-        _rag_cols = getattr(session, "rag_collections", None)
-    else:
-        _rag_cols = body.get("rag_collections")
-        session.rag_collections = _rag_cols
-    system_prompt = _finalize_system_prompt(system_prompt, _lang, _rag_cols)
-
     return system_prompt, _lang
 
 

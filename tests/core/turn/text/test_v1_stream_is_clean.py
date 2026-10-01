@@ -76,8 +76,9 @@ def test_think_and_mem_tags_never_reach_the_sse_client():
     assert "raonament" not in text and "<think" not in text and "think>" not in text
     assert "MEM_SAVE" not in text and "Vic" not in text
     assert text.startswith("Hola ") and "món." in text and text.endswith("Adéu.")
-    last = [ln for ln in lines if ln.startswith("data: ")][-1]
-    assert json.loads(last[len("data: "):])["choices"][0]["finish_reason"] == "stop"
+    data = [ln for ln in lines if ln.startswith("data: ") and ln.strip() != "data: [DONE]"]
+    assert any(ln.strip() == "data: [DONE]" for ln in lines)
+    assert json.loads(data[-1][len("data: "):])["choices"][0]["finish_reason"] == "stop"
 
 
 def test_a_harmony_stream_keeps_only_the_final_channel():

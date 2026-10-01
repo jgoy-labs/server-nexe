@@ -10,7 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import HTTPException
 
@@ -170,6 +170,25 @@ def iter_live_engines(cascade: list, app_state):
             logger.warning("Engine %s module has no chat(), skipping", engine_name)
             continue
         yield engine_name, module
+
+
+def engine_can_continue(module: Any, model_name: Optional[str] = None) -> bool:
+    """C4.6 (FD-S6): can this engine RESUME a truncated answer mid-sentence?
+
+    Asked of the module itself (`can_continue(model_name)`), because only the
+    engine knows whether its prompt can end inside the last assistant message
+    — and for some engines it depends on the model (MLX: text models only).
+    A module that does not declare it cannot: guessing here is what used to
+    send a Continue to an engine that silently started a new answer.
+    """
+    check = getattr(module, "can_continue", None)
+    if not callable(check):
+        return False
+    try:
+        return bool(check(model_name))
+    except Exception:
+        logger.debug("can_continue failed; treating the engine as unable to resume", exc_info=True)
+        return False
 
 
 def engine_error_to_http(exc: BaseException, engine_name: str) -> Optional[tuple]:

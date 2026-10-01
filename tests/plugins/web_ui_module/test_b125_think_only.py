@@ -72,8 +72,9 @@ def test_placeholder_is_wired_into_response_generator():
     silently stops calling it (test-theatre). We assert the exact call site.
     """
     # C4.4: the helper is the core's now; the streaming turn persists through
-    # turn_adapters (and the `continue` path still through routes_chat).
-    for module in (routes_chat, turn_adapters):
+    # turn_adapters. C4.6: the `continue` path that also called it from
+    # routes_chat is a turn of its own now, so turn_adapters is the one site.
+    for module in (turn_adapters,):
         src = inspect.getsource(module)
         assert "think_only_placeholder(clean_response, full_response)" in src, (
             f"{module.__name__} must call think_only_placeholder before persisting "
