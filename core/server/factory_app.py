@@ -36,8 +36,9 @@ def create_fastapi_instance(i18n: Any, config: dict) -> FastAPI:
   # Bug 22 (security): /docs, /redoc, /openapi.json reveal full API map.
   # Disable them outside development mode (NEXE_ENV=development) so production
   # installations don't leak internal endpoint structure.
-  # el guard try/except viu ara a resolve_core_env (sidecar_config).
-  # Keep raw env per distingir "development" vs "test" (ambdós permeten docs).
+  # the try/except guard now lives in resolve_core_env (sidecar_config).
+  # Keep the raw env so "development" stays distinct from "test"
+  # (both allow the docs).
   from core.sidecar_config import resolve_core_env
   _nexe_env = resolve_core_env("production", "create_fastapi_instance", logger)
   _docs_enabled = _nexe_env in ("development", "test")

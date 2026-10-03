@@ -32,9 +32,10 @@ from core.turn.steps import TURN_STEPS
 pytestmark = pytest.mark.asyncio
 
 ALL_IDS = tuple(step.id for step in TURN_STEPS)
-# 25/09 (ADR-007 §6 amended, #1098): only `compact` is post-commit now —
-# `memory.write` runs inline, before `emit`.
-INLINE_IDS = tuple(sid for sid in ALL_IDS if sid != "compact")
+# 25/09 (ADR-007 §6 amended, #1098): `memory.write` runs inline, before
+# `emit`; post-commit are `compact` and (#1144) `describe_image`.
+QUEUED_IDS = ("describe_image", "compact")
+INLINE_IDS = tuple(sid for sid in ALL_IDS if sid not in QUEUED_IDS)
 
 
 def _ctx(**kwargs) -> TurnContext:
@@ -75,9 +76,10 @@ async def test_post_commit_steps_are_queued_not_run_inline():
     q = PostCommitQueue(EngineGate(slots=1))
     ctx = await run_turn(_ctx(), _fake_adapters(calls), post_commit=q)
 
-    assert list(calls) == list(INLINE_IDS), "compact must not run before drain()"
+    assert list(calls) == list(INLINE_IDS), "compact and describe_image must not run before drain()"
     assert ctx.outcomes["memory.write"] == "ok", "memory.write is inline since 25/09"
     assert ctx.outcomes["compact"] == "queued"
+    assert ctx.outcomes["describe_image"] == "queued"
 
     q.start()
     await q.drain()
@@ -142,13 +144,14 @@ async def test_partial_turn_queues_no_memory_write_but_still_queues_compact():
     ctx = await run_turn(_ctx(), _fake_adapters(calls, generate=_mark_partial("generate")), post_commit=q)
     assert ctx.outcomes["generate"] == "degraded", "a step that signals ctx.error on itself is degraded, not ok"
     assert ctx.outcomes["memory.write"] == "skipped"
+    assert ctx.outcomes["describe_image"] == "skipped", "#1144: nothing to describe from a broken turn"
     assert ctx.outcomes["compact"] == "queued"
     assert q.pending(ctx.session_id) == {"compact"}
 
     q.start()
     await q.drain()
     await q.stop()
-    assert "memory.write" not in calls
+    assert "memory.write" not in calls and "describe_image" not in calls
     assert "compact" in calls
 
 
@@ -201,6 +204,29 @@ async def test_preempted_job_is_requeued_until_it_succeeds():
     await q.stop()
     assert len(attempts) == 2
     assert q.take_last_results("s1")["memory.write"]["outcome"] == "ok"
+
+
+async def test_a_preempted_job_runs_again_with_its_cancel_event_cleared():
+    """Review 04/10: the event the user turn set stayed set, so the re-run gave
+    up at once — #1144's image description was lost, with a wasted prefill on
+    MLX. The queue clears it when the job gets the slot again."""
+    q = PostCommitQueue(EngineGate(slots=1))
+    seen: list[bool] = []
+
+    async def preempted_once(cancel):
+        seen.append(cancel.is_set())
+        if len(seen) == 1:
+            cancel.set()  # what a user turn's preempt does to a running job
+            return {"outcome": "preempted"}
+        return {"outcome": "ok"}
+
+    q.enqueue(Priority.COMPACT, turn_id="t1", session_id="s1", step_id="describe_image",
+              run=preempted_once, cancel=threading.Event())
+    q.start()
+    await q.drain()
+    await q.stop()
+    assert seen == [False, False]
+    assert q.take_last_results("s1")["describe_image"]["outcome"] == "ok"
 
 
 async def test_a_job_that_keeps_failing_stops_after_max_attempts():

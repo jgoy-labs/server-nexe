@@ -203,7 +203,7 @@ def test_a_model_that_cannot_physically_fit_is_refused_even_in_warn_mode(tmp_pat
 
     assert not loads.text and not loads.vlm, "no s'ha d'arribar a carregar res"
     assert "MLX" in str(err.value), (
-        "contracte amb routes_chat._oom_notice: el consell de canviar de motor "
+        "contracte amb wire._oom_notice: el consell de canviar de motor "
         "només es manté si el text conté 'MLX'"
     )
 

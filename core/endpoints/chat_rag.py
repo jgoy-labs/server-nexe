@@ -326,14 +326,14 @@ async def build_rag_context(
                     len(context_text), len(unique),
                 )
         except Exception as mem_err:
-            # #899: aquí hi queia `_rag_module_fallback` (el RAG legacy,
-            # PersonalityRAG), que ADR-002:68 ja descriu com estructuralment
-            # buit: sempre tornava "" i el seu únic senyal era el WARNING que
-            # B114 li va posar perquè el camí mort fos audible. Retirat el camí,
-            # el senyal es queda — el que importa no era el fallback sinó que
-            # el torn es respon SENSE CONTEXT i això no pot passar en silenci.
-            # Ara surt sempre que MemoryAPI cau, no només quan hi havia un
-            # mòdul `rag` registrat.
+            # #899: this is where `_rag_module_fallback` used to run (the legacy RAG,
+            # PersonalityRAG), which ADR-002:68 already describes as structurally
+            # empty: it always returned "" and its only signal was the WARNING
+            # B114 added so the dead path was audible. The path is gone,
+            # the signal stays — what mattered was not the fallback but that
+            # the turn is answered WITH NO CONTEXT and that cannot pass in silence.
+            # It now fires whenever MemoryAPI fails, not only when a
+            # `rag` module was registered.
             logger.warning(
                 "RAG: no context this turn — MemoryAPI unavailable: %s", mem_err,
             )

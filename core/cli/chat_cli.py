@@ -82,9 +82,12 @@ def _format_rag_bar(score: float, width: int = 8) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
+_ENGINE_NAMES = {"mlx": "MLX", "ollama": "Ollama", "llama_cpp": "llama.cpp"}
+
+
 def _format_stats_line(elapsed: float, char_count: int, model_name: Optional[str] = None,
                        rag_count: int = 0, rag_avg: float = 0.0, mem_saved: bool = False,
-                       compact_count: int = 0) -> str:
+                       compact_count: int = 0, engine_name: Optional[str] = None) -> str:
     """Build the stats line displayed after each response."""
     tokens_est = char_count // 4
     tok_per_sec = tokens_est / elapsed if elapsed > 0.5 else 0
@@ -98,7 +101,9 @@ def _format_stats_line(elapsed: float, char_count: int, model_name: Optional[str
         short = model_name.split("/")[-1] if "/" in model_name else model_name
         if len(short) > 25:
             short = short[:22] + "..."
-        parts.append(short)
+        # #1146: the engine that answered, as the web footer shows it.
+        engine = _ENGINE_NAMES.get(engine_name, engine_name) if engine_name else ""
+        parts.append(f"{short} · {engine}" if engine else short)
     if rag_count > 0:
         bar = _format_rag_bar(rag_avg) if rag_avg > 0 else ""
         pct = f" {rag_avg:.0%}" if rag_avg > 0 else ""
@@ -326,6 +331,8 @@ def _process_metadata_chunk(chunk: dict, state: dict) -> None:
     """Updates the mutable state with MODEL, RAG, RAG_AVG, etc."""
     if "MODEL" in chunk:
         state["model_name"] = chunk["MODEL"]
+    if "ENGINE" in chunk:
+        state["engine_name"] = chunk["ENGINE"]  # #1146: the engine that answered
     if "RAG" in chunk:
         try:
             state["rag_count"] = int(chunk["RAG"])
@@ -388,7 +395,8 @@ async def _report_memory(state: dict, client: Any, session_id: str) -> None:
     """Saved / forgotten facts, as the web UI's badges; a pending forget is asked.
 
     `session_id` (C4.5): the confirmation deletes THE entry this session has
-    pending, by id — the same call the web dialog makes.
+    pending, by id — the same call the web dialog makes; a "no" disarms it on
+    the server, as the dialog's «Cancel·la» does (#1136).
     """
     # Only what the server says memory kept ([MEM:n:facts]): a model can write
     # a [MEM_SAVE:] the server then refuses (seen 25/09: gemma3 tagging "my
@@ -402,13 +410,18 @@ async def _report_memory(state: dict, client: Any, session_id: str) -> None:
     if state["deleted"]:
         click.echo(click.style("  🗑 Esborrat: " + "; ".join(state["deleted"]), fg="yellow"))
     fact = state["pending_delete"]
-    if fact and click.confirm(f'  Vols que oblidi "{fact}"?', default=False):
-        result = await client.memory_confirm_delete(fact, session_id)
-        gone = [f.get("text", f) if isinstance(f, dict) else f for f in result.get("deleted_facts", [])]
-        if result.get("deleted"):
-            click.echo(click.style("  🗑 Esborrat: " + "; ".join(map(str, gone or [fact])), fg="yellow"))
-        else:
-            click.echo(click.style("  No he trobat res a esborrar.", dim=True))
+    if not fact:
+        return
+    if not click.confirm(f'  Vols que oblidi "{fact}"?', default=False):
+        # #1136: a "no" the server never hears leaves the delete armed.
+        await client.memory_cancel_delete(session_id)
+        return
+    result = await client.memory_confirm_delete(fact, session_id)
+    gone = [f.get("text", f) if isinstance(f, dict) else f for f in result.get("deleted_facts", [])]
+    if result.get("deleted"):
+        click.echo(click.style("  🗑 Esborrat: " + "; ".join(map(str, gone or [fact])), fg="yellow"))
+    else:
+        click.echo(click.style("  No he trobat res a esborrar.", dim=True))
 
 
 async def _handle_user_message(
@@ -421,7 +434,7 @@ async def _handle_user_message(
     t_start = time.monotonic()
     char_count = 0
     state: dict = {
-        "model_name": None, "rag_count": 0, "rag_avg": 0.0,
+        "model_name": None, "engine_name": None, "rag_count": 0, "rag_avg": 0.0,
         "rag_items": [], "mem_saved": False, "compact_count": 0,
         "reasoning": "", "saved_facts": [], "deleted": [], "pending_delete": None,
     }
@@ -442,7 +455,8 @@ async def _handle_user_message(
         print(chunk, end="", flush=True)
 
     elapsed = time.monotonic() - t_start
-    stats = _format_stats_line(elapsed, char_count, state["model_name"], state["rag_count"], state["rag_avg"], state["mem_saved"], state["compact_count"])
+    stats = _format_stats_line(elapsed, char_count, state["model_name"], state["rag_count"], state["rag_avg"],
+                               state["mem_saved"], state["compact_count"], engine_name=state.get("engine_name"))
     print(click.style(f"  [{stats}]", dim=True))
 
     if verbose and state["rag_items"]:

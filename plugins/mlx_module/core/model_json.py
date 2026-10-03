@@ -1,8 +1,8 @@
-"""Lectura tolerant del JSON d'un model, compartida pel camí de text i pel VLM.
+"""Tolerant read of a model's JSON, shared by the text path and the VLM.
 
-Extret de `chat.py` a #966 (Tros A) sense cap canvi de cos: era l'únic símbol que
-necessitaven les dues bandes, i deixar-lo a `chat.py` hauria obligat el mòdul VLM a
-importar-lo d'allà, tancant un cicle d'imports.
+Extracted from `chat.py` in #966 (slice A) with no body change: it was the only
+symbol both sides needed, and leaving it in `chat.py` would have forced the VLM
+module to import it from there, closing an import cycle.
 """
 import json
 from pathlib import Path

@@ -27,8 +27,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional
 
 from .config import MLXConfig
-# Re-exportats: el cami VLM que els usava viu ara a vlm_runner, pero la suite
-# els importa des d'aqui (test_multimodal, test_vlm_thinking_propagation).
+# Re-exported: the VLM path that used them now lives in vlm_runner, but the suite
+# imports them from here (test_multimodal, test_vlm_thinking_propagation).
 from .qwen35_directive import (  # noqa: F401
     QWEN35_THINKING_DIRECTIVE,
     _inject_thinking_directive_into_messages,
@@ -36,8 +36,8 @@ from .qwen35_directive import (  # noqa: F401
 )
 from . import model_loader
 from .text_runner import MLXTextRunner
-# Re-exportats: viuen a model_loader des de #966, pero la suite i el codi
-# existent els importen des d'aqui. `noqa: F401` = re-export deliberat.
+# Re-exported: they live in model_loader since #966, but the suite and existing
+# code import them from here. `noqa: F401` = deliberate re-export.
 from .model_loader import (  # noqa: F401
     _detect_vlm_capability,
     _estimate_required_ram,
@@ -46,8 +46,8 @@ from .model_loader import (  # noqa: F401
     _require_torch,
     _sanitize_safetensors_index,
 )
-# Re-exportats: viuen al mòdul VLM des de #966, però la suite i el codi
-# existent els importen des d'aquí. `noqa: F401` = re-export deliberat.
+# Re-exported: they live in the VLM module since #966, but the suite and existing
+# code import them from here. `noqa: F401` = deliberate re-export.
 from .vlm_runner import (  # noqa: F401
     MLXVisionRunner,
     _chunked_prefill_is_broken,
@@ -132,6 +132,21 @@ atexit.register(_MLX_EXECUTOR.shutdown, wait=False, cancel_futures=True)
 
 
 
+def _free_prompt_caches() -> None:
+    """Drop the text and VLM prompt-cache states: KV bound to a model that is
+    going away (reset_model, and a hot swap since #1137)."""
+    try:
+        from .prompt_cache_manager import get_prompt_cache_manager
+        get_prompt_cache_manager().clear()
+    except Exception as e:
+        logger.warning("MLXChatNode: error clearing cache manager: %s", e)
+    try:
+        from .vlm_cache_manager import get_vlm_cache_manager
+        get_vlm_cache_manager().clear()
+    except Exception as e:
+        logger.warning("MLXChatNode: error clearing VLM cache manager: %s", e)
+
+
 class MLXChatNode:
     """
     Inference engine for MLX adapted for server-nexe.
@@ -182,18 +197,32 @@ class MLXChatNode:
         point so web_ui calls MLXModule.switch_model() instead of reaching into
         these class-level privates directly (B073).
         """
+        old_path = getattr(MLXChatNode._config, "model_path", None)
         self.config = new_config
         MLXChatNode._config = new_config
         MLXChatNode._model = None
         MLXChatNode._is_vlm = False
         MLXChatNode._template_think_prefix = None
+        if old_path != new_config.model_path:
+            # #1137: the old model's prompt caches used to stay until LRU pushed
+            # them out — never, if the new model is text-only and the VLM path
+            # does not run again. With up to 4 VLM conversations kept, that is
+            # up to 4 KV windows held for a model that is gone.
+            #
+            # On the MLX worker, like every MLX op (see _MLX_EXECUTOR): the clear
+            # imports vlm_cache_manager, which imports mlx_vlm.generate, whose
+            # module-level generation_stream belongs to the thread that imports
+            # it first. Run from this request thread it left the worker with
+            # "There is no Stream(gpu, 0) in current thread" on every turn
+            # (live 03/10). Queued behind a generation in flight, ahead of the next.
+            _MLX_EXECUTOR.submit(_free_prompt_caches)
 
     def _get_model(self) -> tuple:
-        """Model i tokenizer/processor (singleton mandrós).
+        """Model and tokenizer/processor (lazy singleton).
 
-        El COM es carrega viu a `model_loader`; aquí queda el singleton, que és
-        estat d'aquesta classe. Accés pel mòdul a posta (veure el docstring de
-        `model_loader`): un sol lloc de resolució per a `_detect_vlm_capability`.
+        HOW it loads lives in `model_loader`; the singleton stays here, and it is
+        this class's state. Access goes through the module on purpose (see the
+        `model_loader` docstring): one resolution site for `_detect_vlm_capability`.
         """
         if MLXChatNode._model is None:
             model_loader.load_model_into(MLXChatNode, self.config)
@@ -419,13 +448,13 @@ class MLXChatNode:
 
     @property
     def _vlm(self) -> "MLXVisionRunner":
-        """El runner VLM, construït al primer ús.
+        """The VLM runner, built on first use.
 
-        MANDRÓS a posta, no construït a `__init__`: la suite crea nodes amb
-        `MLXChatNode.__new__(MLXChatNode)` per saltar-se la càrrega de config, i
-        amb construcció ansiosa aquests nodes es quedaven sense `_vlm`. Un node
-        ha de seguir funcionant exactament igual s'hagi construït com s'hagi
-        construït — que és el que feia abans de #966.
+        LAZY on purpose, not built in `__init__`: the suite creates nodes with
+        `MLXChatNode.__new__(MLXChatNode)` to skip config loading, and
+        with eager construction those nodes were left without `_vlm`. A node
+        has to keep working exactly the same however it was
+        built — which is what it did before #966.
         """
         runner = self.__dict__.get("_vlm_runner")
         if runner is None:
@@ -433,11 +462,11 @@ class MLXChatNode:
             self.__dict__["_vlm_runner"] = runner
         return runner
 
-    # ── Camí VLM (#966 Tros A) ───────────────────────────────────────────────
-    # Els cossos viuen a `vlm_runner.MLXVisionRunner`. Aquests delegadors
-    # conserven els noms perquè les crides existents (i la suite) no canviïn.
-    # Els dos `staticmethod` ho segueixen sent: la suite els crida sobre la
-    # CLASSE (`MLXChatNode._reset_rotated_vlm_state(state)`).
+    # ── VLM path (#966 slice A) ──────────────────────────────────────────────
+    # The bodies live in `vlm_runner.MLXVisionRunner`. These delegators
+    # keep the names so existing calls (and the suite) do not change.
+    # The two `staticmethod`s stay that way: the suite calls them on the
+    # CLASS (`MLXChatNode._reset_rotated_vlm_state(state)`).
 
     def _normalize_image_input(self, raw) -> bytes:
         return self._vlm._normalize_image_input(raw)
@@ -641,16 +670,16 @@ class MLXChatNode:
 
     @property
     def _text(self) -> "MLXTextRunner":
-        """Mandrós, com `_vlm`: la suite crea nodes amb `__new__`."""
+        """Lazy, like `_vlm`: the suite creates nodes with `__new__`."""
         runner = self.__dict__.get("_text_runner")
         if runner is None:
             runner = MLXTextRunner(self)
             self.__dict__["_text_runner"] = runner
         return runner
 
-    # ── Camí de text (#966 Tros C) ───────────────────────────────────────────
-    # Els cossos viuen a `text_runner.MLXTextRunner`; aquests delegadors
-    # conserven noms i signatures perquè les crides existents no canviïn.
+    # ── Text path (#966 slice C) ─────────────────────────────────────────────
+    # The bodies live in `text_runner.MLXTextRunner`; these delegators
+    # keep the names and signatures so existing calls do not change.
 
     def _generate_blocking(self, system: str, messages: List[Dict], messages_for_cache: List[Dict], stream_callback: Optional[Callable[[str], None]], session_id: str='default', max_tokens: Optional[int]=None, temperature: Optional[float]=None, thinking_enabled: bool=True, cancel_event: Any=None, top_p: Optional[float]=None, continue_final: bool=False) -> Dict[str, Any]:
         return self._text._generate_blocking(system, messages, messages_for_cache, stream_callback, session_id, max_tokens, temperature, thinking_enabled, cancel_event, top_p, continue_final)
@@ -663,21 +692,7 @@ class MLXChatNode:
     def reset_model(cls) -> None:
         """Destroy model, tokenizer and all caches."""
         with cls._lock:
-            # Clear cache manager (prefix matching)
-            try:
-                from .prompt_cache_manager import get_prompt_cache_manager
-                cache_manager = get_prompt_cache_manager()
-                cache_manager.clear()
-            except Exception as e:
-                logger.warning("MLXChatNode: error clearing cache manager: %s", e)
-
-            # Clear VLM prompt-cache states too (KV caches bound to the old
-            # model — free them on reload, mirror of the text path above).
-            try:
-                from .vlm_cache_manager import get_vlm_cache_manager
-                get_vlm_cache_manager().clear()
-            except Exception as e:
-                logger.warning("MLXChatNode: error clearing VLM cache manager: %s", e)
+            _free_prompt_caches()
 
             # Destroy model
             if cls._model is not None:

@@ -24,8 +24,9 @@ holds one such state per ``model_key`` and hands it to the runner.
 Memory note
 -----------
 VLM KV caches are large. On low-RAM machines (the 8 GB case that surfaced this
-bug) we keep a very small number of sessions (default 1) and evict LRU, so we
-never hold a stale cache while a fresh conversation runs.
+bug) we keep a very small number of sessions (1 there) and evict LRU, so we
+never hold a stale cache while a fresh conversation runs. How many is sized
+from the RAM since #1137 (config.auto_vlm_session_caches: 4 on 128 GB).
 """
 import logging
 import threading

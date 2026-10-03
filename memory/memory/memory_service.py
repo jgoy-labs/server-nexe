@@ -47,7 +47,7 @@ class MemoryService:
         require_encryption: bool = False,
     ):
         """Initialize pipeline components and storage backends."""
-        # resol path via SidecarConfig en sidecar mode
+        # resolve the path via SidecarConfig in sidecar mode
         from memory.memory._paths import resolve_qdrant_path
         self._config = config or get_config()
         _default_vectors = resolve_qdrant_path()

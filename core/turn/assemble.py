@@ -54,6 +54,13 @@ logger = logging.getLogger(__name__)
 #: has `ctx.lang` in scope at its only production call site (`budget` in
 #: `turn_adapters.py`) and the turn's reply language is what the surrounding
 #: prompt is already written in.
+#: #1123: the key on the first message of what THIS turn adds — the user's
+#: message, and the context and image turns placed before it. None of it is
+#: rendered again next turn (the session keeps the bare message), so an engine
+#: that keeps a prompt cache across turns keeps it up to here. Engines that do
+#: not look for it ignore an unknown key.
+TURN_START_KEY = "nexe_turn_start"
+
 _DOC_HEADER = {
     "ca": "DOCUMENT ADJUNTAT ({filename}):",
     "es": "DOCUMENTO ADJUNTO ({filename}):",
@@ -85,6 +92,22 @@ _DOC_COMPLETE_NOTE = {
     "en": "[Complete document: ~{total_pages} pages]\n\n",
 }
 
+
+
+def _stamp_user_message(message: dict, lang: str, time_line) -> str:
+    """What goes in front of an earlier user message in the history: its time
+    (#1125) and, if it brought an image, the image's note (#1144) — the engine
+    gets `role` + `content` only, so without the note a later turn has no way
+    to know there was an image at all (live 03/10)."""
+    from core.turn import image_memory
+
+    lines = [time_line(message.get("timestamp"), lang)]
+    image_b64 = message.get("image_b64")
+    if image_b64:
+        description = message.get("image_description") or image_memory.DESCRIPTIONS.get(
+            image_memory.image_key(image_b64))
+        lines.append(image_memory.note(description, lang))
+    return "\n".join(line for line in lines if line)
 
 def _doc_lang_key(lang) -> str:
     """Two-letter code restricted to ca/es/en, `en` as the fallback.
@@ -218,7 +241,13 @@ async def _build_turn_context(
 
     # --- Build Context ---
     # 1. Get recent conversation history with summary context
-    context_messages_full = session.get_context_messages()
+    # #1125: every earlier user message carries the time it was sent, from
+    # the session; this turn's gets the same line from the `clock` step.
+    from core.chat_prompt import message_time_line
+
+    context_messages_full = session.get_context_messages(
+        stamp=lambda m: _stamp_user_message(m, lang, message_time_line)
+    )
     # Exclude the very last message (just added) to avoid duplication.
     # FD-S6: on continue there is NO just-added user message —
     # the last message is the truncated assistant turn we are
@@ -356,11 +385,14 @@ def _assemble_engine_messages(
         if _raw and engine_messages and engine_messages[-1]["role"] == "assistant":
             engine_messages[-1]["content"] = _raw
     else:
+        _turn_start = len(engine_messages)
         engine_messages, _doc_truncated_pct, _ctx_injected = _inject_context_into_messages(
             engine_messages, message, document_context, rag_context,
             _budget, available_chars, history_chars, lang, app_state,
             has_image=has_image,
         )
+        if _turn_start < len(engine_messages):
+            engine_messages[_turn_start][TURN_START_KEY] = True
     # B030/#851: the data-not-instructions rule is armed
     # UNCONDITIONALLY by _finalize_system_prompt, which runs in
     # the `system_prompt` step before this — a conditional suffix

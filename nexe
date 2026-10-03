@@ -27,4 +27,11 @@ if [ ! -x "$PY" ]; then
     exit 1
 fi
 
+# #1138: huggingface_hub llegeix HF_HUB_DISABLE_XET en importar-se, i amb hf_xet
+# actiu les baixades grans de models es queden penjades (huggingface_hub#3266).
+# La nexe-app ja la posa al seu llançador (lib.rs); ./nexe no, i cada arrencada
+# avisava «hf_xet active at startup». Si ve de fora, mana la de fora (també
+# buida: `-` i no `:-`, com el tray, que fa os.environ.get(..., "1")).
+export HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET-1}"
+
 exec "$PY" -m core.cli "$@"

@@ -26,7 +26,7 @@ EXPECTED_ORDER = (
     "validate", "authorize", "sanitize", "session", "persist_user_turn",
     "intent", "recall", "clock", "system_prompt", "engine", "budget",
     "generate", "postprocess", "persist_assistant_turn", "memory.write",
-    "emit", "compact",
+    "emit", "describe_image", "compact",
 )
 
 # The four steps ADR-007 names explicitly as must-have and non-replaceable
@@ -85,4 +85,4 @@ def test_reads_are_satisfied_by_the_door_or_a_prior_step():
 
 def test_only_generate_and_the_post_commit_steps_are_llm():
     llm_ids = {step.id for step in TURN_STEPS if step.kind is StepKind.LLM}
-    assert llm_ids == {"generate", "memory.write", "compact"}
+    assert llm_ids == {"generate", "memory.write", "describe_image", "compact"}

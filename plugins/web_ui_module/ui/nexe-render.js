@@ -27,6 +27,7 @@ NexeUI.extend({
         const cleaned = text
             .replace(/\x00/g, '') // eslint-disable-line no-control-regex
             .replace(/\[MODEL:[^\]]+\]/g, '')          // [MODEL:nexe-system]
+            .replace(/\[ENGINE:[^\]]+\]/g, '')         // [ENGINE:mlx] (#1146)
             .replace(/\[MEM(?::\d+)?\]/g, '')          // [MEM] and [MEM:N]
             .replace(/\[DEL:\d+(?::[^\]]*)?\]/g, '')   // [DEL:N:facts]
             .replace(/\[MEM_SAVE:[^\]]*\]/g, '')       // [MEM_SAVE: ...]

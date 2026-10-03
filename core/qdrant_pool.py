@@ -74,10 +74,10 @@ def _create_client(path: Optional[str], url: Optional[str]) -> QdrantClient:
         return QdrantClient(url=url, prefer_grpc=False)
     qdrant_path = _anchor_path(path)
     qdrant_path.mkdir(parents=True, exist_ok=True)
-    # NEXE-SRV-WS3-06: el dir de vectors guarda embeddings (PII) — força
-    # 0o700 owner-only replicant el patró de sqlite_store, perquè mkdir
-    # hereta l'umask (0o755 amb umask 022) i exposaria els vectors a
-    # altres comptes en un Mac compartit.
+    # NEXE-SRV-WS3-06: the vectors dir holds embeddings (PII) — force
+    # 0o700 owner-only, copying the sqlite_store pattern, because mkdir
+    # inherits the umask (0o755 with umask 022) and would expose the vectors to
+    # other accounts on a shared Mac.
     os.chmod(qdrant_path, 0o700)
     return QdrantClient(path=str(qdrant_path))
 

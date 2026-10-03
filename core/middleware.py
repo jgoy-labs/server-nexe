@@ -52,9 +52,9 @@ _CSRF_EXEMPT_PATTERNS = [
     # always fell back to SIGKILL.
     re.compile(r"^/admin/"),
     # /installer/* is called by the onboarding wizard
-    # ABANS que l'usuari tingui API key. Loopback-only (127.0.0.1) + Tauri
-    # WebView. POST /installer/finalize sense exempció = 403 → wizard mai
-    # acaba. Descobert empíricament al cicle local 2026-05-20.
+    # BEFORE the user has an API key. Loopback-only (127.0.0.1) + Tauri
+    # WebView. POST /installer/finalize without the exemption = 403 → the wizard never
+    # finishes. Found empirically in the local cycle of 2026-05-20.
     re.compile(r"^/installer/"),
 ]
 
@@ -238,7 +238,7 @@ def setup_cors(app: FastAPI, config: Dict[str, Any], i18n = None) -> None:
         "(includes Tauri origins)"
       )
   except Exception as e:  # pragma: no cover
-    # Defensive: si get_sidecar_config() falla per qualsevol motiu,
+    # Defensive: if get_sidecar_config() fails for any reason,
     # fall back to cors_origins from server.toml (pre-sidecar behaviour).
     logger.warning("CORS: SidecarConfig unavailable, falling back to server.toml: %s", e)
 
@@ -377,12 +377,12 @@ def setup_csrf_protection(app: FastAPI, config: Dict[str, Any]) -> None:
   Setup CSRF protection middleware.
 
   In sidecar mode use SidecarConfig.csrf_secret + is_production
-  (override de NEXE_CSRF_SECRET + NEXE_ENV directes per consistència amb la resta
-  de consumers).
+  (override of the direct NEXE_CSRF_SECRET + NEXE_ENV, for consistency with the other
+  consumers).
 
   If neither env nor SidecarConfig carry a secret, the helper
-  _load_or_create_persistent_csrf_secret() persisteix un secret estable a
-  disc (0600) en comptes de regenerar-lo a cada boot.
+  _load_or_create_persistent_csrf_secret() persists a stable secret on
+  disk (0600) instead of regenerating it on every boot.
 
   Args:
     app: FastAPI application instance
@@ -489,7 +489,7 @@ def setup_trusted_hosts(app: FastAPI, config: Dict[str, Any]) -> None:
     allowed.add(host)
 
   # in sidecar mode, SidecarConfig.trusted_hosts can add aliases
-  # custom (NEXE_TRUSTED_HOSTS). Union amb el set actual per no perdre defaults.
+  # custom (NEXE_TRUSTED_HOSTS). Union with the current set so the defaults are kept.
   try:
     from core.sidecar_config import get_sidecar_config
     sidecar_cfg = get_sidecar_config()

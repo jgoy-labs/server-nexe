@@ -48,9 +48,9 @@ def register_file_routes(router: APIRouter, *, session_mgr, file_handler, requir
         # SessionManager blocks them anyway, but via ValueError → 500.
         if session_id is not None and not session_mgr.is_valid_session_id(session_id):
             raise HTTPException(status_code=400, detail="Invalid session_id")
-        # MC-078: límit pre-read — no carregar tot el cos a memòria abans de
-        # validar la mida. read(MAX+1) atura la lectura; si excedeix → 413.
-        # (Mitiga el DoS de memòria; el límit de recepció total seria a uvicorn.)
+        # MC-078: pre-read limit — do not load the whole body into memory before
+        # validating the size. read(MAX+1) stops the read; over the cap → 413.
+        # (Mitigates the memory DoS; a total receive limit would live in uvicorn.)
         content = await file.read(_fh.MAX_FILE_SIZE + 1)
         if len(content) > _fh.MAX_FILE_SIZE:
             raise HTTPException(status_code=413, detail="File too large")

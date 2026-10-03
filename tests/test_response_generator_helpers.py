@@ -12,7 +12,7 @@ from core.turn.text.chunks import parse_chunk as _parse_chunk
 from core.turn.text.clean import CTX_HEADERS_RE as _CTX_HEADERS_RE
 from core.turn.text.clean import clean_full_response as _clean_full_response
 from core.turn.text.think import process_content_think_tags as _process_content_think_tags
-from plugins.web_ui_module.api.routes_chat import (
+from plugins.web_ui_module.api.wire import (
     _build_mem_stats,
     _yield_response_headers,
 )

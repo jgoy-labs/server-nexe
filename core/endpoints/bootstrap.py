@@ -96,9 +96,9 @@ def check_rate_limit(client_ip: str, request: Request) -> None:
 
 def _validate_bootstrap_env() -> None:
   """Raise 503 if NEXE_ENV is not 'development'."""
-  # el guard try/except viu ara a resolve_core_env (sidecar_config).
-  # Mantenim raw env per distingir "development" de valors no-produccio com
-  # "staging"/"test" que han de bloquejar bootstrap.
+  # the try/except guard now lives in resolve_core_env (sidecar_config).
+  # Keep the raw env so "development" stays distinct from non-production
+  # values such as "staging"/"test", which must block bootstrap.
   from core.sidecar_config import resolve_core_env
   core_env = resolve_core_env('production', '_validate_bootstrap_env', logger)
   if core_env != 'development':
@@ -296,9 +296,9 @@ async def bootstrap_info(request: Request) -> BootstrapInfoResponse:
   from core.bootstrap_tokens import get_bootstrap_token
   from datetime import datetime
 
-  # el guard try/except viu ara a resolve_core_env (sidecar_config).
-  # Mantenim raw env per distingir "development" de valors no-produccio com
-  # "staging"/"test".
+  # the try/except guard now lives in resolve_core_env (sidecar_config).
+  # Keep the raw env so "development" stays distinct from non-production
+  # values such as "staging"/"test".
   from core.sidecar_config import resolve_core_env
   core_env = resolve_core_env('production', 'bootstrap info endpoint', logger)
   bootstrap_enabled = (core_env == 'development')

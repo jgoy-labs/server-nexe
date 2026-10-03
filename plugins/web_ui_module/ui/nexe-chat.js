@@ -143,6 +143,24 @@ NexeUI.extend({
 
     // Clean special model tags (GPT-OSS, etc.). Promoted out of sendMessage
     // (#127): pure, and a closure cannot be reached by tests/frontend/.
+    /**
+     * Split off a sentinel the read cut in half, to be finished by the next one.
+     *
+     * #1139 (live 03/10): «[MODEL_READY]» painted at the start of replies, and
+     * the turn timer at 0.0s — the sentinel was never recognised. The old carry
+     * kept only an unclosed `\x00[`: a read ending in the lone opening `\x00`
+     * slipped through, and the next began with `[MODEL_READY]\x00`. The server
+     * strips control characters out of model text (core/turn/stream.py,
+     * StreamGuard), so every `\x00` belongs to a sentinel and they come in
+     * pairs: an odd count means the last one opens a sentinel still arriving.
+     */
+    _takeSentinelCarry(text) {
+        const nuls = (text.match(/\x00/g) || []).length; // eslint-disable-line no-control-regex
+        if (nuls % 2 === 0) return { chunk: text, carry: '' };
+        const at = text.lastIndexOf('\x00');
+        return { chunk: text.slice(0, at), carry: text.slice(at) };
+    },
+
     _cleanModelTags(buf) {
         buf = buf.replace(/<\|[^|]+\|>/g, '');
         buf = buf.replace(/[◁◀][^▷▶]*[▷▶]/g, '');
@@ -213,6 +231,7 @@ NexeUI.extend({
     _stripLeakedTags(text) {
         text = text.replace(/\[ACTION\]:\s*[^\n]*/g, '');
         text = text.replace(/\[MODEL:[^\]]+\]/g, '');
+        text = text.replace(/\[ENGINE:[^\]]+\]/g, '');  // #1146
         text = text.replace(/\[MEM:\d+(?::[^\]]*)?\]/g, '');
         text = text.replace(/\[MEM\]/g, '');
         // Strip [DEL:N:...] tokens from final render
@@ -528,6 +547,7 @@ NexeUI.extend({
                 let ragAvg = 0;
                 let ragItems = [];  // [{col, score}]
                 let usedModel = '';
+                let usedEngine = '';
                 let compactMatch = null;
 
                 const reader = response.body.getReader();
@@ -624,26 +644,31 @@ NexeUI.extend({
 
 
                 // A sentinel cut between two reads would leak as text and never
-                // match: hold an unclosed \x00[ tail until the next read.
+                // match: hold everything after an odd \x00 until the next read
+                // (#1139, `_takeSentinelCarry`).
                 let sentinelCarry = '';
                 try {
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) break;
 
-                        let chunk = sentinelCarry + decoder.decode(value, { stream: true });
-                        sentinelCarry = '';
-                        const openAt = chunk.lastIndexOf('\x00[');
-                        if (openAt !== -1 && chunk.indexOf(']\x00', openAt) === -1) {
-                            sentinelCarry = chunk.slice(openAt);
-                            chunk = chunk.slice(0, openAt);
-                        }
+                        let chunk;
+                        ({ chunk, carry: sentinelCarry } = this._takeSentinelCarry(sentinelCarry + decoder.decode(value, { stream: true })));
 
-                        // Detect MODEL token (model actually used)
-                        const modelMatch = chunk.match(/\x00\[MODEL:([^\]]+)\]\x00/); // eslint-disable-line no-control-regex
-                        if (modelMatch) {
-                            usedModel = modelMatch[1];
-                            chunk = chunk.replace(/\x00\[MODEL:[^\]]+\]\x00/, ''); // eslint-disable-line no-control-regex
+                        // Detect MODEL token (model actually used). A turn answered
+                        // by a fallback sends a second one (#1035): the last wins,
+                        // and two can arrive in the same network chunk.
+                        const modelMatches = [...chunk.matchAll(/\x00\[MODEL:([^\]]+)\]\x00/g)]; // eslint-disable-line no-control-regex
+                        if (modelMatches.length) {
+                            usedModel = modelMatches[modelMatches.length - 1][1];
+                            chunk = chunk.replace(/\x00\[MODEL:[^\]]+\]\x00/g, ''); // eslint-disable-line no-control-regex
+                        }
+                        // #1146: the engine that answers, sent when it claims the
+                        // turn — the last wins, as with MODEL.
+                        const engineMatches = [...chunk.matchAll(/\x00\[ENGINE:([^\]]+)\]\x00/g)]; // eslint-disable-line no-control-regex
+                        if (engineMatches.length) {
+                            usedEngine = engineMatches[engineMatches.length - 1][1];
+                            chunk = chunk.replace(/\x00\[ENGINE:[^\]]+\]\x00/g, ''); // eslint-disable-line no-control-regex
                         }
 
                         // Detect RAG token (retrieved memories)
@@ -931,7 +956,7 @@ NexeUI.extend({
                     if (statsEl && finalTok > 0) {
                         const timeStr = elapsed > 0 ? `${elapsed.toFixed(1)}s` : '';
                         const spdStr = finalSpd ? ` · ${finalSpd} tok/s` : '';
-                        const modelShort = usedModel ? usedModel.split('/').pop() : '';
+                        const modelShort = this._modelFooterLabel(usedModel, usedEngine);
                         let memBadge = '';
                         if (memorySaved && memFacts.length > 0) {
                             const factsHtml = memFacts.map(f => {

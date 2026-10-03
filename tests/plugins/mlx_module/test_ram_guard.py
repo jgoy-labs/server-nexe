@@ -223,13 +223,13 @@ class TestHardRefusal:
         exc = _invoke_guard(tmp_path, avail_gb=0.5, total_gb=2)
         assert _HARD_FRAGMENT not in str(exc)
 
-    def test_message_contract_with_routes_chat(self, tmp_path, monkeypatch):
-        """The hard message MUST be detectable by routes_chat's streaming
-        handler or the UI shows a generic error instead of the Ollama advice.
+    def test_message_contract_with_the_web_notice(self, tmp_path, monkeypatch):
+        """The hard message MUST be detectable by the web door's streaming
+        notice or the UI shows a generic error instead of the Ollama advice.
 
-        Cross-reference (keep in sync): routes_chat.py `_is_oom` substrings
+        Cross-reference (keep in sync): core/turn/errors.py `is_oom_error` substrings
         ("Memòria insuficient", "Memoria insuficiente", "Not enough memory",
-        "Insufficient Memory", "OutOfMemory") and `_oom_notice`, which keeps
+        "Insufficient Memory", "OutOfMemory") and wire.py `_oom_notice`, which keeps
         the switch-engine advice only when "MLX" appears in the text.
         """
         _is_oom_keys = (

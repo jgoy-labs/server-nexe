@@ -230,9 +230,9 @@ def _stop_find_via_pgrep() -> list:
   """Fallback: find Nexe processes via pgrep. Returns list of found (name, pattern, pids) or empty."""
   import subprocess
   try:
-    # B109: el servidor es llança com 'python -m core.app' (cli.py) i
-    # setproctitle='server-nexe' (core/server/runner.py); mai 'uvicorn'.
-    # El patró ha de cobrir TOTS DOS cmdlines (setproctitle pot no estar instal·lat).
+    # B109: the server is launched as 'python -m core.app' (cli.py) and
+    # setproctitle='server-nexe' (core/server/runner.py); never 'uvicorn'.
+    # The pattern has to cover BOTH cmdlines (setproctitle may not be installed).
     _pattern = r"server-nexe|core\.app"
     result = subprocess.run(  # nosec B603 B607: pgrep on hardcoded literal pattern; system tool resolved via PATH (mono-user local)
       ["pgrep", "-f", _pattern],
@@ -290,7 +290,7 @@ def stop(ctx: click.Context, force: bool):
       click.echo(t("cli.stop.cancelled"))
       return
 
-  # B111: no reportar èxit si cap SIGTERM ha funcionat (p.ex. PermissionError).
+  # B111: do not report success if no SIGTERM worked (e.g. PermissionError).
   stopped = _stop_send_sigterm(found)
   if stopped > 0:
     click.echo(t("cli.stop.services_stopped"))
@@ -475,11 +475,11 @@ def list_models():
     click.echo()
 
 def _cli_ensure_ollama_ready() -> bool:
-    """#833: arrenca Ollama si cal i confirma que l'API respon abans del pull.
+    """#833: start Ollama if needed and confirm the API answers before the pull.
 
-    Usa les primitives canòniques de l'app (async httpx, /api/tags == 200) —
-    el CLI viu dins l'app completa, a diferència de l'installer standalone
-    (que duu la seva versió stdlib a installer/ollama_ready.py).
+    Uses the app's canonical primitives (async httpx, /api/tags == 200) —
+    the CLI lives inside the full app, unlike the standalone installer
+    (which carries its own stdlib version in installer/ollama_ready.py).
     """
     import asyncio
 
@@ -494,10 +494,10 @@ def _cli_ensure_ollama_ready() -> bool:
         await ensure_ollama_running(base, wait=True)
         return await is_ollama_running(base)
 
-    # Review #833: cap try/except ampli — les primitives ja capturen les
-    # fallades de connectivitat internament (retornen False); una excepció
-    # aquí és un error REAL (import/config) que main() reporta amb traceback,
-    # no un "Ollama no respon" amb remei equivocat.
+    # Review #833: no broad try/except — the primitives already catch
+    # connectivity failures internally (they return False); an exception
+    # here is a REAL error (import/config) that main() reports with a traceback,
+    # not an "Ollama is not responding" with the wrong remedy.
     return asyncio.run(_go())
 
 
@@ -520,9 +520,9 @@ def install_model(name: str, engine: Optional[str]):
             return tomllib.load(f)
 
     def _maybe_set_primary(download_ok: bool, primary_value: str) -> None:
-        # Set-as-primary FORA del try de descàrrega (#834 review): un error
-        # d'escriptura de config ha de sortir amb exit != 0, mai empassat
-        # com si fos un error de descàrrega amb exit 0.
+        # Set-as-primary OUTSIDE the download try (#834 review): a config
+        # write error must exit != 0, never swallowed
+        # as if it were a download error with exit 0.
         if not (download_ok and click.confirm("Set as primary model?")):
             return
         config_path = get_repo_root() / BASE_CONFIG_RELATIVE  # B110: write target must match config.py's read (NEXE_HOME / ~/.nexe), not CWD
@@ -586,8 +586,8 @@ def install_model(name: str, engine: Optional[str]):
         if not tag:
             click.echo(click.style("⚠️ MLX-only model, not available via Ollama.", fg="yellow"))
             return
-        # #833: mai `ollama pull` sense l'API responent — el pull contra un
-        # daemon a mig arrencar falla amb errors críptics de connexió.
+        # #833: never `ollama pull` unless the API is answering — a pull against a
+        # daemon still starting fails with cryptic connection errors.
         if not _cli_ensure_ollama_ready():
             click.echo(click.style(
                 "❌ Ollama API not responding (/api/tags) — start Ollama and retry.",
@@ -597,9 +597,9 @@ def install_model(name: str, engine: Optional[str]):
         click.echo(f"   Running: ollama pull {tag}")
         _pull_ok = False
         try:
-            # Review #833: el gate valida resolve_base_url() (NEXE_OLLAMA_HOST >
-            # OLLAMA_HOST) però el CLI d'ollama només honora OLLAMA_HOST —
-            # alineem l'env perquè gate i pull parlin amb el MATEIX daemon.
+            # Review #833: the gate checks resolve_base_url() (NEXE_OLLAMA_HOST >
+            # OLLAMA_HOST) but the ollama CLI only honors OLLAMA_HOST —
+            # align the env so the gate and the pull talk to the SAME daemon.
             from plugins.ollama_module.core.client import resolve_base_url as _rbu
             _pull_env = {**os.environ, "OLLAMA_HOST": _rbu()}
             subprocess.run(["ollama", "pull", tag], check=True, env=_pull_env)  # nosec B603 B607: tag from registry catalog (entry.ollama_tag); ollama via PATH (mono-user local)
@@ -619,19 +619,19 @@ def knowledge():
     pass
 
 def _resolve_knowledge_path(project_root: Path) -> Path:
-    """Carpeta a ingerir: knowledge/<NEXE_LANG>, amb el `.env` comptant.
+    """Folder to ingest: knowledge/<NEXE_LANG>, counting the `.env`.
 
-    #902: el servidor carrega el `.env` a l'arrencada (core/server/runner.py:30)
-    i serveix, per exemple, `ca`; el CLI llegia NEXE_LANG només de l'entorn del
-    procés i queia a `en`, de manera que `./nexe knowledge ingest` indexava
-    knowledge/en mentre el producte servia knowledge/ca. Ara el CLI llegeix el
-    mateix `.env` amb el patró que ja fa servir core/cli/chat_cli.py:169-178 —
-    `load_dotenv` NO sobreescriu el que ja hi ha a l'entorn, així que qui
-    exporta NEXE_LANG (el llançador del bundle, el pare Tauri) continua manant i
-    no s'afegeix cap segona font de veritat.
+    #902: the server loads the `.env` at startup (core/server/runner.py:30)
+    and serves, for example, `ca`; the CLI read NEXE_LANG only from the process
+    environment and fell back to `en`, so `./nexe knowledge ingest` indexed
+    knowledge/en while the product served knowledge/ca. The CLI now reads the
+    same `.env` with the pattern core/cli/chat_cli.py:169-178 already uses —
+    `load_dotenv` does NOT overwrite what is already in the environment, so whoever
+    exports NEXE_LANG (the bundle launcher, the Tauri parent) still wins and
+    no second source of truth is added.
 
-    Sense subdirectori de llengua es torna knowledge/ tal qual: instal·lacions
-    antigues amb l'arbre pla han de continuar ingerint.
+    With no language subdirectory it returns knowledge/ as-is: old
+    installs with a flat tree must keep ingesting.
     """
     from dotenv import load_dotenv
 
@@ -683,8 +683,8 @@ def knowledge_status():
     async def check_status():
         try:
             from memory.memory.api import MemoryAPI
-            # B108: l'ingest escriu a DOCUMENTATION_COLLECTION ('nexe_documentation')
-            # per defecte; el status mirava 'user_knowledge' → sempre 'does not exist'.
+            # B108: ingest writes DOCUMENTATION_COLLECTION ('nexe_documentation')
+            # by default; status was looking at 'user_knowledge' → always 'does not exist'.
             from core.ingest.ingest_knowledge import DOCUMENTATION_COLLECTION
             memory = MemoryAPI()
             await memory.initialize()

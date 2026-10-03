@@ -19,6 +19,8 @@ import uuid
 import httpx
 import pytest
 
+from tests.test_live.conftest import read_stream_with_retry
+
 pytestmark = pytest.mark.test_live
 
 _MAX_AUTO_MODEL_GB = 32
@@ -350,13 +352,15 @@ class TestChatMEMSAVE:
         session_id = f"live-mem-{token}"
 
         def turn(message: str) -> str:
-            with client.stream(
-                "POST", "/ui/chat", headers=auth_headers, timeout=120.0,
+            # #1111: this test runs after the Ollama model sweep, which spends
+            # the 20/minute chat budget. A 429 is that window, not a failed save.
+            status, raw = read_stream_with_retry(
+                client, "/ui/chat", headers=auth_headers, timeout=120.0,
                 json={"message": message, "session_id": session_id, "stream": True,
                       "backend": "ollama", "model": smallest_ollama_model},
-            ) as r:
-                assert r.status_code == 200, f"stream: {r.status_code}"
-                return "".join(r.iter_text())
+            )
+            assert status == 200, f"stream: {status}"
+            return raw
 
         kept: list = []
         try:

@@ -14,6 +14,7 @@ www.jgoy.net · https://server-nexe.org
 
 from __future__ import annotations
 
+import logging
 import os
 import pathlib
 import secrets
@@ -27,18 +28,20 @@ from typing import Any
 
 import pytest
 
+logger = logging.getLogger(__name__)
+
 
 def _install_nexe_flow_mock():
-    """Font ÚNICA de veritat del mock de `nexe_flow` (paquet no instal·lat → sempre mockejat).
+    """SINGLE source of truth for the `nexe_flow` mock (package not installed → always mocked).
 
-    Viu al conftest ARREL perquè s'instal·li a sys.modules abans de qualsevol col·lecció en
-    QUALSEVOL invocació de pytest (sota tests/, sobre l'arbre font, o la comanda de CI
-    `pytest core memory personality plugins`). Abans (E-002) el mock vivia DIVERGENT en 14
-    llocs (7 fitxers inline + 4 conftests sota tests/ + 3 conftests morts a l'arbre font), amb
-    estratègies barrejades (guard/setdefault/force-replace) i un Node sense validate_inputs al
-    sanitizer → hazard d'ordre de col·lecció (OllamaNode.execute crida validate_inputs).
+    It lives in the ROOT conftest so it is installed in sys.modules before any collection in
+    ANY pytest invocation (under tests/, on the source tree, or the CI command
+    `pytest core memory personality plugins`). Before (E-002) the mock lived DIVERGENT in 14
+    places (7 inline files + 4 conftests under tests/ + 3 dead conftests in the source tree), with
+    mixed strategies (guard/setdefault/force-replace) and a Node without validate_inputs in the
+    sanitizer → a collection-order hazard (OllamaNode.execute calls validate_inputs).
 
-    El contracte és un SUPERCONJUNT que satisfà tots els consumidors del codi font:
+    The contract is a SUPERSET that satisfies every consumer in the source tree:
       - Node.validate_inputs        → l'invoca OllamaNode.execute (ollama_node.py)
       - NodeMetadata.config_schema   → l'usa RAGSearchNode (rag_search_node.py)
       - NodeInput.json_schema/default
@@ -219,9 +222,35 @@ def mock_ollama(monkeypatch):
     return mock_client
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# OLLAMA AUTO-START FIXTURE
-# ═══════════════════════════════════════════════════════════════════════════
+def _clear_auth_and_chat_windows() -> None:
+    """Drop the process-wide auth window and the /ui/chat limiter window.
+
+    A clear that raises is logged and the suite goes on (#1115). The reset
+    stays: without it the suite burns the 20-failure window and the next
+    test's 429 looks like a product limit.
+    """
+    try:
+        from core.security.auth_rate_limit import auth_failures
+        auth_failures.clear()
+    except Exception:
+        logger.warning("auth failure window was not cleared", exc_info=True)
+    # Same class of state: the slowapi limiter on /ui/chat (B030,
+    # 20/minute) is a process-wide singleton too — the suite's many
+    # direct endpoint calls burn its window and unrelated tests 429.
+    try:
+        from core.dependencies import limiter
+        limiter.reset()
+        # Each register_chat_routes() re-decorates the same function and
+        # slowapi APPENDS its "20/minute" to the same _route_limits key.
+        # Tests that build the router repeatedly amplify one request into
+        # N hits — the first call after ~20 registrations 429s with an
+        # EMPTY window. Production registers once; keep one limit per key.
+        for _k, _v in list(limiter._route_limits.items()):
+            if len(_v) > 1:
+                limiter._route_limits[_k] = _v[:1]
+    except Exception:
+        logger.warning("chat rate-limit window was not cleared", exc_info=True)
+
 
 @pytest.fixture(autouse=True)
 def _reset_auth_failure_window():
@@ -232,33 +261,14 @@ def _reset_auth_failure_window():
     of deliberately-unauthenticated requests the suite makes burn the
     20-failures/60s window and unrelated tests start seeing 429s.
     """
-    def _clear_windows():
-        try:
-            from core.security.auth_rate_limit import auth_failures
-            auth_failures.clear()
-        except Exception:
-            pass
-        # Same class of state: the slowapi limiter on /ui/chat (B030,
-        # 20/minute) is a process-wide singleton too — the suite's many
-        # direct endpoint calls burn its window and unrelated tests 429.
-        try:
-            from core.dependencies import limiter
-            limiter.reset()
-            # Each register_chat_routes() re-decorates the same function and
-            # slowapi APPENDS its "20/minute" to the same _route_limits key.
-            # Tests that build the router repeatedly amplify one request into
-            # N hits — the first call after ~20 registrations 429s with an
-            # EMPTY window. Production registers once; keep one limit per key.
-            for _k, _v in list(limiter._route_limits.items()):
-                if len(_v) > 1:
-                    limiter._route_limits[_k] = _v[:1]
-        except Exception:
-            pass
-
-    _clear_windows()
+    _clear_auth_and_chat_windows()
     yield
-    _clear_windows()
+    _clear_auth_and_chat_windows()
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OLLAMA AUTO-START FIXTURE
+# ═══════════════════════════════════════════════════════════════════════════
 
 _ollama_process = None
 
@@ -363,24 +373,23 @@ def _f56_reset_rate_limiter():
 
 @pytest.fixture(autouse=True)
 def _uploads_never_pile_up_in_the_product():
-    """Cap test deixa fitxers al directori d'uploads del PRODUCTE.
+    """No test leaves files in the PRODUCT upload directory.
 
-    `plugins/web_ui_module/ui/uploads/` és on aterren els documents de
-    l'usuari i viu DINS l'arbre del producte. Mesurat el 24/08: la suite hi
-    deixava un fitxer per execució (`test.txt`, `test_1.txt`, `test_2.txt`…)
-    perquè `test_upload_txt_file` mocka la memòria però la pujada és REAL. El
-    build copia del directori de treball, o sigui que d'allà se'ls enduia al
+    `plugins/web_ui_module/ui/uploads/` is where the user's documents land
+    and it lives INSIDE the product tree. Measured on 24/08: the suite left
+    one file per run there (`test.txt`, `test_1.txt`, `test_2.txt`…)
+    because `test_upload_txt_file` mocks memory but the upload is REAL. The
+    build copies from the working directory, so from there they were carried into the
     bundle (#930).
 
-    Es neteja per DIFERÈNCIA (què hi havia abans vs què hi ha després), no per
-    llista de noms coneguts: la llista és justament el que ha deixat passar
-    aquests quatre.
+    Cleanup is by DIFFERENCE (what was there before vs what is there after), not by
+    a list of known names: the list is exactly what let these four through.
 
-    I NO es redirigeix el directori, que era el primer intent: el guard
-    WS5-01 (`/ui/static/uploads/**` mai servit sense auth) es mesura contra el
-    path real del mòdul, i moure'l deixava passar un document per static amb
-    200. Un fixture que desactiva un control de seguretat és pitjor que la
-    brossa que volia evitar.
+    And the directory is NOT redirected, which was the first attempt: the
+    WS5-01 guard (`/ui/static/uploads/**` never served without auth) is measured against the
+    module's real path, and moving it let a document through static with
+    200. A fixture that disables a security control is worse than the
+    junk it meant to avoid.
     """
     uploads = pathlib.Path(__file__).parent / "plugins" / "web_ui_module" / "ui" / "uploads"
     before = set(uploads.iterdir()) if uploads.is_dir() else set()
@@ -395,7 +404,7 @@ def _uploads_never_pile_up_in_the_product():
                 shutil.rmtree(path, ignore_errors=True)
             else:
                 path.unlink()
-        except OSError:  # nosec B110: no és feina d'aquest fixture tombar un test per no poder esborrar
+        except OSError:  # nosec B110: this fixture's job is not to fail a test because it could not delete
             pass
 
 

@@ -131,9 +131,9 @@ async def _stream_ollama(model_id: str, request: Request) -> AsyncIterator[dict]
     yield {"type": "progress", "stage": "Iniciant Ollama...", "percent": 0}
     _base = resolve_base_url()
     await ensure_ollama_running(_base, wait=True)
-    # #833 (review): ensure_ollama_running retorna el Popen encara que el
-    # wait esgoti el pressupost — sense aquest gate, el pull corria igualment
-    # contra un daemon mort i moria amb l'error críptic "ollama pull failed".
+    # #833 (review): ensure_ollama_running returns the Popen even when the
+    # wait burns its budget — without this gate, the pull ran anyway
+    # against a dead daemon and died with the cryptic "ollama pull failed".
     if not await is_ollama_running(_base):
         raise RuntimeError(
             "Ollama API not ready (/api/tags) — cannot pull the model; "

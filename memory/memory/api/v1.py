@@ -88,7 +88,7 @@ class MemorySearchResponse(BaseModel):
 
 # Global memory API instance (initialized on first use)
 _memory_api = None
-_memory_api_lock = asyncio.Lock()  # MC-121: serialitza el cold-start
+_memory_api_lock = asyncio.Lock()  # MC-121: serialize the cold start
 
 async def get_memory_api():
     """Get or create MemoryAPI instance."""
@@ -128,18 +128,47 @@ async def get_memory_api():
                 _memory_api = _new_api  # only assigned after successful initialization
     return _memory_api
 
+async def _store_in_requested_collection(body: MemoryStoreRequest) -> str:
+    """Write an accepted store into the Qdrant collection ``/search`` reads.
+
+    ``MemoryService.remember()`` keeps the fact in SQLite. The dreaming cycle
+    later copies it into the ``memory_index`` collection, which ``/search``
+    does not scan. Without this write, a store that just returned 200 is
+    invisible to the search of the same second.
+    """
+    memory = await get_memory_api()
+
+    if not await memory.collection_exists(body.collection):
+        await memory.create_collection(body.collection, vector_size=DEFAULT_VECTOR_SIZE)
+        logger.info("Created collection on demand: %s", body.collection)
+
+    metadata = dict(body.metadata or {})
+    metadata["source"] = metadata.get("source", "chat-cli")
+
+    doc_id = await memory.store(
+        text=body.content,
+        collection=body.collection,
+        metadata=metadata,
+    )
+    logger.info("Stored document %s in collection %s", doc_id, body.collection)
+    return doc_id
+
+
 @router.post("/store", response_model=MemoryStoreResponse, dependencies=[Depends(require_api_key)], summary="Store content in semantic memory (API key required)", operation_id="memory_store")
 @limiter.limit("30/minute")
 async def memory_store(request: Request, body: MemoryStoreRequest):
     """
     Store content in semantic memory (RAG).
 
-    Uses MemoryService.remember() if available, falls back to direct Qdrant.
+    When MemoryService is up, the fact also goes through ``remember()``.
+    Either way, an accepted store is written to ``body.collection`` before
+    the response, because that is the collection ``/search`` reads.
     """
     try:
         validate_collection_name(body.collection)
 
-        # Try MemoryService first (v1 pipeline)
+        # Try MemoryService first (v1 pipeline). A rejection stops here:
+        # nothing is written to the collection search will scan.
         try:
             from ..module import get_memory_service
             svc = get_memory_service()
@@ -156,36 +185,18 @@ async def memory_store(request: Request, body: MemoryStoreRequest):
                 is_mem_save=True,   # /store IS an explicit MEM_SAVE: bypass model_generated gate
                 force=body.force,
             )
-            return MemoryStoreResponse(
-                success=entry_id is not None,
-                document_id=entry_id,
-                message="Content stored successfully"
-                if entry_id
-                else "Content rejected: too short, empty, or repetitive",
-            )
+            if entry_id is None:
+                return MemoryStoreResponse(
+                    success=False,
+                    document_id=None,
+                    message="Content rejected: too short, empty, or repetitive",
+                )
 
-        # Fallback to direct Qdrant
-        memory = await get_memory_api()
-
-        if not await memory.collection_exists(body.collection):
-            await memory.create_collection(body.collection, vector_size=DEFAULT_VECTOR_SIZE)
-            logger.info("Created collection on demand: %s", body.collection)
-
-        metadata = body.metadata or {}
-        metadata["source"] = metadata.get("source", "chat-cli")
-
-        doc_id = await memory.store(
-            text=body.content,
-            collection=body.collection,
-            metadata=metadata
-        )
-
-        logger.info("Stored document %s in collection %s", doc_id, body.collection)
-
+        doc_id = await _store_in_requested_collection(body)
         return MemoryStoreResponse(
             success=True,
             document_id=doc_id,
-            message="Content stored successfully"
+            message="Content stored successfully",
         )
 
     except InvalidCollectionNameError:

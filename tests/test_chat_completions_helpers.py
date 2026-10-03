@@ -198,20 +198,24 @@ class TestTheV1PromptAssembly:
         app_state = MagicMock()
         app_state.config = {}
         messages, _ = await _v1_prompt(body, app_state, lang="ca")
-        assert "Hora actual del sistema" in messages[-1]["content"], (
-            "F-D: /v1 must answer clock questions on demand, like the UI — "
+        # #1125: every message carries the time it was sent, at both doors.
+        assert messages[-1]["content"].startswith("[Hora del missatge: "), (
+            "F-D: /v1 must give the model the time, like the UI — "
             f"got: {messages[-1]['content']!r}"
         )
-        assert "Hora actual del sistema" not in messages[0]["content"], (
+        assert "Hora del missatge" not in messages[0]["content"], (
             "the clock must never poison the system prompt / prefix cache"
         )
 
-    async def test_normal_message_gets_no_clock_injected(self):
+    async def test_a_message_that_does_not_ask_still_gets_its_time(self):
+        """#1125: a phrase decided before, and "hora es" without its accent
+        found no clock. The time comes in front of the user's words, untouched."""
         body = _make_body(use_rag=False, messages=[Message(role="user", content="hola, com va?")])
         app_state = MagicMock()
         app_state.config = {}
         messages, _ = await _v1_prompt(body, app_state, lang="ca")
-        assert messages[-1]["content"] == "hola, com va?"
+        assert messages[-1]["content"].startswith("[Hora del missatge: ")
+        assert messages[-1]["content"].endswith("]\n\nhola, com va?")
 
 
 # ─── _dispatch_to_engine ─────────────────────────────────────────────────────

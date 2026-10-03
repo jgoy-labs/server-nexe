@@ -69,8 +69,8 @@ async def module_manager_health():
     })
 
   except Exception:
-    # MC-132: la traça completa va NOMÉS al log intern; el cos de la resposta
-    # mai retorna str(e) (evita info-disclosure d'estructura interna sense auth).
+    # MC-132: the full traceback goes ONLY to the internal log; the response body
+    # never returns str(e) (avoids disclosing internal structure without auth).
     logger.exception("Health check failed")
     return JSONResponse(
       content={
@@ -138,7 +138,7 @@ async def list_registered_modules():
         "name": reg.name,
         "status": getattr(reg, 'status', 'unknown'),
         "version": getattr(reg, 'version', 'unknown'),
-        # MC-132: només el nom del directori, no la ruta absoluta del filesystem.
+        # MC-132: only the directory name, not the absolute filesystem path.
         "path": Path(str(getattr(reg, 'path', ''))).name,
       })
 

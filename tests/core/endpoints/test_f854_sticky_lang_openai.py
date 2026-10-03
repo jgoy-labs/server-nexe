@@ -24,6 +24,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import core.lang_detect as _lang_detect  # #1143: the one place the reply language is decided
 import core.endpoints.chat as ce
 # C4.2: the web UI door's half of the policy lives in `core/turn/prompt.py`
 # now — one function, still two stores (this door's LRU, the session object
@@ -31,6 +32,12 @@ import core.endpoints.chat as ce
 import core.turn.prompt as rc
 
 API_KEY = "test-f854-key"
+
+#: A Catalan opener long enough to seed a session on ANY install (#1143: a short
+#: line only seeds the install language). The 21-character "hola, com estàs
+#: avui?" these tests used passed only where NEXE_LANG=ca — never in CI.
+CA_SEED = "hola, com estàs avui? jo molt bé"
+assert len(CA_SEED) >= 25
 
 
 @pytest.fixture(autouse=True)
@@ -56,64 +63,65 @@ def _clean_state(monkeypatch):
 class TestStickyLangPolicy:
 
     def test_first_real_detection_seeds_the_session(self, monkeypatch):
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "ca")
         assert ce._resolve_request_lang("s1", "una frase prou llarga en català") == "ca"
         # second turn, no detection at all → the seeded language holds
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: None)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: None)
         assert ce._resolve_request_lang("s1", "ok") == "ca"
 
     def test_fallback_is_returned_but_never_seeded(self, monkeypatch):
         """A guess must not lock the session before the first real detection."""
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: None)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: None)
         monkeypatch.setenv("NEXE_LANG", "en")
         assert ce._resolve_request_lang("s1", "ok") == "en"
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "ca")
         assert ce._resolve_request_lang("s1", "una frase llarga en català") == "ca"
 
     def test_degenerate_nexe_lang_still_returns_en(self, monkeypatch):
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: None)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: None)
         monkeypatch.setenv("NEXE_LANG", "-es")
         assert ce._resolve_request_lang("s1", "ok") == "en"
 
     def test_short_ack_never_flips(self, monkeypatch):
         """The #854 case: NEXE_LANG=en, Catalan session, a 'gràcies!' ack."""
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
-        assert ce._resolve_request_lang("s1", "hola, com estàs avui?") == "ca"
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "en")
+        monkeypatch.setenv("NEXE_LANG", "en")  # the case as it was reported, pinned
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "ca")
+        assert ce._resolve_request_lang("s1", CA_SEED) == "ca"
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "en")
         assert ce._resolve_request_lang("s1", "thanks a lot") == "ca"
 
     def test_url_padded_ack_never_flips(self, monkeypatch):
         """The gate measures natural text: a long link is not language."""
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
-        ce._resolve_request_lang("s1", "hola, com estàs avui?")
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "ca")
+        ce._resolve_request_lang("s1", CA_SEED)
         msg = "thanks mate https://github.com/jgoy-labs/server-nexe/issues/1"
         assert len(msg) >= ce._STICKY_LANG_MIN_SWITCH_CHARS  # the RAW length lies
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "en")
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "en")
         assert ce._resolve_request_lang("s1", msg) == "ca"
 
     def test_a_clear_foreign_turn_flips_at_once(self, monkeypatch):
         """25/09 (Jordi): the first clear message switches, as at the web door.
         Accepted trade-off: a pasted English traceback now switches too."""
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
-        ce._resolve_request_lang("s1", "hola, com estàs avui?")
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "en")
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "ca")
+        ce._resolve_request_lang("s1", CA_SEED)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "en")
         assert ce._resolve_request_lang("s1", "can we please switch to english now?") == "en"
         assert ce._resolve_request_lang("s1", "ok") == "en"
 
     def test_it_switches_back_just_as_fast(self, monkeypatch):
         detections = iter(["ca", "en", "ca"])
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: next(detections))
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: next(detections))
         long_msg = "aquesta és una frase prou llarga per superar el llindar del gate"
         assert ce._resolve_request_lang("s1", long_msg) == "ca"
         assert ce._resolve_request_lang("s1", long_msg) == "en"
         assert ce._resolve_request_lang("s1", long_msg) == "ca"
 
     def test_sessions_are_independent(self, monkeypatch):
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
-        assert ce._resolve_request_lang("s1", "hola, com estàs avui?") == "ca"
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "de")
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "ca")
+        assert ce._resolve_request_lang("s1", CA_SEED) == "ca"
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "de")
         assert ce._resolve_request_lang("s2", "hallo, wie geht es dir heute?") == "de"
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: None)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: None)
         assert ce._resolve_request_lang("s1", "ok") == "ca"
         assert ce._resolve_request_lang("s2", "ok") == "de"
 
@@ -122,20 +130,20 @@ class TestStickyLangMemoryBound:
     """A per-session map on a long-running server must not grow forever."""
 
     def test_lru_evicts_the_oldest_session(self, monkeypatch):
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "ca")
         for i in range(ce._SESSION_LANG_MAX + 10):
-            ce._resolve_request_lang(f"s{i}", "hola, com estàs avui?")
+            ce._resolve_request_lang(f"s{i}", CA_SEED)
         assert len(ce._SESSION_LANG) == ce._SESSION_LANG_MAX
         assert "s0" not in ce._SESSION_LANG
         assert f"s{ce._SESSION_LANG_MAX + 9}" in ce._SESSION_LANG
 
     def test_touching_a_session_keeps_it_alive(self, monkeypatch):
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: "ca")
-        ce._resolve_request_lang("keep-me", "hola, com estàs avui?")
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "ca")
+        ce._resolve_request_lang("keep-me", CA_SEED)
         for i in range(ce._SESSION_LANG_MAX - 1):
-            ce._resolve_request_lang(f"s{i}", "hola, com estàs avui?")
-            ce._resolve_request_lang("keep-me", "hola, com estàs avui?")
-        ce._resolve_request_lang("overflow", "hola, com estàs avui?")
+            ce._resolve_request_lang(f"s{i}", CA_SEED)
+            ce._resolve_request_lang("keep-me", CA_SEED)
+        ce._resolve_request_lang("overflow", CA_SEED)
         assert "keep-me" in ce._SESSION_LANG
 
 
@@ -164,11 +172,11 @@ class TestPolicyParityWithWebUIRoute:
             ("and one more question in english, please", "en"),
         ]
         detections = iter([d for _, d in turns])
-        monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: next(detections))
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: next(detections))
         mine = [ce._resolve_request_lang("s1", text) for text, _ in turns]
 
         detections2 = iter([d for _, d in turns])
-        monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: next(detections2))
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: next(detections2))
         session = SimpleNamespace(lang=None, lang_pending=None)
         theirs = [rc._resolve_session_lang(session, text) for text, _ in turns]
 
@@ -361,7 +369,7 @@ class TestSystemPromptStableAcrossTurns:
 def test_env_default_still_applies_to_a_brand_new_session(monkeypatch):
     """No regression: a first turn with no detectable language still follows
     NEXE_LANG (the documented behaviour of the route)."""
-    monkeypatch.setattr(ce, "_detect_lang_or_none", lambda m: None)
+    monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: None)
     monkeypatch.setenv("NEXE_LANG", "es")
     ce._reset_session_lang_state()
     assert ce._resolve_request_lang("brand-new", "ok") == "es"

@@ -257,8 +257,8 @@ def validate(json_path: str) -> list[str]:
     js = _flatten_json(json_path)
     errors: list[str] = []
 
-    # B158: claus duplicades dins un mateix catàleg col·lapsen al flatten i
-    # amaguen divergències de metadades (gemma4_31b: ram_gb 10 vs 22). Caça-ho.
+    # B158: duplicate keys inside one catalog collapse in the flatten and
+    # hide metadata divergence (gemma4_31b: ram_gb 10 vs 22). Catch it.
     errors.extend(_duplicate_key_errors("installer_catalog_data.py", MODEL_CATALOG))
     errors.extend(
         _duplicate_key_errors(

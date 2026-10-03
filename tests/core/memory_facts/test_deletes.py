@@ -17,6 +17,11 @@ from unittest.mock import AsyncMock, MagicMock
 from core.memory_facts import deletes, intents
 
 
+#: These tests are about what arms and how; #1135 (whether the user asked)
+#: has its own file, test_1135_mention_vs_use.py.
+_ASKED = "oblida-ho"
+
+
 def _session(pending=None):
     s = MagicMock()
     s.id = "sess-1"
@@ -46,7 +51,7 @@ class TestArmPendingDeletes:
     async def test_arms_the_pending_and_answers_with_data_without_deleting(self):
         port = _port([_candidate()])
         session = _session()
-        outcome = await deletes.arm_pending_deletes(session, ["fact one", "fact two"], port)
+        outcome = await deletes.arm_pending_deletes(session, ["fact one", "fact two"], port, user_message=_ASKED)
         port.delete_from_memory.assert_not_called()
         port.delete_memory_entries.assert_not_called()
         assert session._pending_partial_delete == {"content": "fact one", "entries": [_candidate()]}
@@ -59,35 +64,35 @@ class TestArmPendingDeletes:
     async def test_the_thing_to_confirm_is_the_entrys_text_not_the_models_phrase(self):
         """The dialog shows it and sends it back as the confirmed reference (B093)."""
         port = _port([_candidate(text="El gos de l'usuari es diu Tro")])
-        outcome = await deletes.arm_pending_deletes(_session(), ["el gos"], port)
+        outcome = await deletes.arm_pending_deletes(_session(), ["el gos"], port, user_message=_ASKED)
         assert outcome.pending_delete_fact == "El gos de l'usuari es diu Tro"
 
     async def test_no_match_arms_nothing_and_answers_nothing(self):
         port = _port([])
         session = _session()
-        assert await deletes.arm_pending_deletes(session, ["unknown topic"], port) is None
+        assert await deletes.arm_pending_deletes(session, ["unknown topic"], port, user_message=_ASKED) is None
         assert not session._pending_partial_delete
 
     async def test_a_failed_preview_arms_nothing(self):
         """TUR-PHANTOM-DEL: no dead confirm button, no armed flag."""
         port = _port([_candidate()], success=False)
         session = _session()
-        assert await deletes.arm_pending_deletes(session, ["fact one"], port) is None
+        assert await deletes.arm_pending_deletes(session, ["fact one"], port, user_message=_ASKED) is None
         assert not session._pending_partial_delete
 
     async def test_skips_short_facts(self):
         port = _port([_candidate()])
-        assert await deletes.arm_pending_deletes(_session(), ["ab", "x", ""], port) is None
+        assert await deletes.arm_pending_deletes(_session(), ["ab", "x", ""], port, user_message=_ASKED) is None
         port.preview_delete_from_memory.assert_not_called()
 
     async def test_a_raising_preview_is_survived(self):
         port = _port()
         port.preview_delete_from_memory = AsyncMock(side_effect=RuntimeError("crash"))
-        assert await deletes.arm_pending_deletes(_session(), ["some fact"], port) is None
+        assert await deletes.arm_pending_deletes(_session(), ["some fact"], port, user_message=_ASKED) is None
 
     async def test_nothing_to_arm_asks_nothing(self):
         port = _port([_candidate()])
-        assert await deletes.arm_pending_deletes(_session(), [], port) is None
+        assert await deletes.arm_pending_deletes(_session(), [], port, user_message=_ASKED) is None
         port.preview_delete_from_memory.assert_not_called()
 
     async def test_a_pending_confirmation_is_not_overwritten(self):
@@ -96,7 +101,7 @@ class TestArmPendingDeletes:
         pending = {"content": "first", "entries": [_candidate(text="first", cid="id-0")]}
         session = _session(pending=dict(pending))
         port = _port([_candidate()])
-        assert await deletes.arm_pending_deletes(session, ["fact one"], port) is None
+        assert await deletes.arm_pending_deletes(session, ["fact one"], port, user_message=_ASKED) is None
         port.preview_delete_from_memory.assert_not_called()
         assert session._pending_partial_delete == pending
 
@@ -104,7 +109,7 @@ class TestArmPendingDeletes:
         """The rule the streaming copy broke: a tag never reaches a collection
         the user switched off — same as a typed "oblida" (`intents._delete`)."""
         port = _port([_candidate()])
-        await deletes.arm_pending_deletes(_session(), ["fact one"], port, ["personal_memory"])
+        await deletes.arm_pending_deletes(_session(), ["fact one"], port, ["personal_memory"], user_message=_ASKED)
         port.preview_delete_from_memory.assert_awaited_once_with("fact one", collections=["personal_memory"])
 
     async def test_the_first_tag_that_matches_wins(self):
@@ -114,7 +119,7 @@ class TestArmPendingDeletes:
             {"success": True, "candidates": [_candidate(text="fact two", cid="id-2")]},
         ])
         session = _session()
-        outcome = await deletes.arm_pending_deletes(session, ["nothing here", "fact two"], port)
+        outcome = await deletes.arm_pending_deletes(session, ["nothing here", "fact two"], port, user_message=_ASKED)
         assert session._pending_partial_delete["content"] == "fact two"
         assert outcome.pending_delete_fact == "fact two"
 
@@ -122,7 +127,7 @@ class TestArmPendingDeletes:
         """B028/RT-04: what the user confirms is exactly what dies."""
         port = _port([_candidate(cid="id-1"), _candidate(text="fact one bis", cid="id-2")])
         session = _session()
-        await deletes.arm_pending_deletes(session, ["fact one"], port)
+        await deletes.arm_pending_deletes(session, ["fact one"], port, user_message=_ASKED)
         assert session._pending_partial_delete["entries"] == [_candidate(cid="id-1")]
 
 

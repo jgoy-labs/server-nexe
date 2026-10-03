@@ -171,7 +171,8 @@ async def test_the_two_steps_c42_unfolded_do_their_work():
     assert ctx.recall_text == "un fet recuperat"
     assert ctx.recall == [("personal_memory", 0.9)]
     assert ctx.usage["ui"]["rag_count"] == 1
-    assert "Hora actual del sistema" in ctx.clock_line
+    # #1125: the time the message was sent, every turn — not only when asked.
+    assert ctx.clock_line.startswith("[Hora del missatge: ")
 
 
 async def test_user_turn_is_on_disk_before_memory_is_asked_json():

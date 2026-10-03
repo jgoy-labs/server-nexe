@@ -1955,6 +1955,30 @@ html[data-ai-state="streaming"] .message.assistant:last-of-type .message-avatar 
     font-style: italic;
 }
 
+/* #1126: an uploaded document, inside the conversation */
+.doc-card {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    max-width: 560px;
+    margin: 0.5rem 0 1rem 3rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.doc-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.doc-card .uploaded-file-notice {
+    padding: 0;
+}
+
 /* Drag and drop zone */
 .chat-main.drag-over {
     position: relative;

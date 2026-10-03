@@ -34,6 +34,8 @@ diverge.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 
 pytestmark = pytest.mark.asyncio
@@ -59,8 +61,17 @@ def _turns(ctx) -> list[dict]:
 
 
 def _last_user(ctx) -> str:
+    """The user's own words, as the engine gets them. #1125 puts the time the
+    message was sent in front of it at both doors — a line of its own, not a
+    framing sentence — so it is taken off before comparing."""
+    from core.chat_prompt import message_time_line
+
     users = [m for m in _turns(ctx) if m.get("role") == "user"]
-    return (users[-1].get("content") or "") if users else ""
+    text = (users[-1].get("content") or "") if users else ""
+    head = message_time_line(datetime.now(timezone.utc), ctx.lang or "ca").split(":", 1)[0]
+    if text.startswith(head) and "]\n\n" in text:
+        text = text.split("]\n\n", 1)[1]
+    return text
 
 
 def _context_turn(messages: list[dict]) -> str:

@@ -12,7 +12,9 @@ www.jgoy.net · https://server-nexe.org
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-import tomllib  # uiri toml trunca multiline amb \[ en silenci (#834) — validar amb el parser bo
+# uiri toml silently truncates a multiline that ends in \[ (#834).
+# Validate with the stdlib parser.
+import tomllib
 import re
 
 @dataclass

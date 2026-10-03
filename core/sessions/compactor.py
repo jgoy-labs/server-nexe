@@ -82,6 +82,18 @@ async def _call_engine(engine, messages, system_msg):
     return _extract_mlx_content(summary_result)
 
 
+def _image_note(message: dict, session) -> str:
+    """#1144 (review 03/10): a message that brought an image keeps its note in
+    what is summarised — compacted away, the image would leave no trace."""
+    if not message.get("image_b64"):
+        return ""
+    from core.turn import image_memory  # deferred: core.turn imports core.sessions
+
+    description = message.get("image_description") or image_memory.DESCRIPTIONS.get(
+        image_memory.image_key(message["image_b64"]))
+    return image_memory.note(description, getattr(session, "lang", None)) + " "
+
+
 async def compact_session(session, engine, session_manager, *, cancel_event=None):
     """
     Compacts a session with too many messages using an LLM summary.
@@ -111,7 +123,7 @@ async def compact_session(session, engine, session_manager, *, cancel_event=None
 
     try:
         compact_text = "\n".join(
-            f"{m['role']}: {_clean_for_compact(m['content'][:1500])}"
+            f"{m['role']}: {_image_note(m, session)}{_clean_for_compact(m['content'][:1500])}"
             for m in to_compact
         )
         prev_summary = f"Resum anterior: {session.context_summary}\n\n" if session.context_summary else ""
@@ -137,7 +149,7 @@ async def compact_session(session, engine, session_manager, *, cancel_event=None
             # apply time — a user turn queued between the LLM call above and
             # this line must not lose its own message (C2.2).
             session.apply_compaction(summary, compacted_count=len(to_compact))
-            session_manager._save_session_to_disk(session)
+            session_manager.save_session_if_live(session)
             logger.info("Session %s: compaction done (%d chars summary)", session.id[:8], len(summary))
         else:
             logger.warning("Session %s: compaction returned empty summary", session.id[:8])

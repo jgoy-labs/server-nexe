@@ -86,11 +86,24 @@ NexeUI.extend({
         if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsDiv] });
     },
 
+    /**
+     * The footer's model, and the engine that answered it (#1146 — Jordi,
+     * 03/10: «posa'm el motor al peu»). One label for the live footer and the
+     * one a reload paints, so the two cannot drift: «Qwen3.5-9B-MLX-4bit · MLX».
+     */
+    _modelFooterLabel(model, engine) {
+        const name = model ? String(model).split('/').pop() : '';
+        const ENGINE_NAMES = { mlx: 'MLX', ollama: 'Ollama', llama_cpp: 'llama.cpp' };
+        const label = engine ? (ENGINE_NAMES[engine] || String(engine)) : '';
+        if (!name) return '';
+        return label ? `${name} · ${label}` : name;
+    },
+
     _renderSavedStats(statsDiv, stats, textDiv) {
         const tok = stats.tokens || 0;
         const elapsed = stats.elapsed || 0;
         const speed = elapsed > 0.5 ? (tok / elapsed).toFixed(1) : null;
-        const model = stats.model ? stats.model.split('/').pop() : '';
+        const model = this._modelFooterLabel(stats.model, stats.engine);
         const ragCount = stats.rag_count || 0;
         const ragAvg = stats.rag_avg || 0;
         const memSaved = stats.mem_saved || 0;

@@ -113,9 +113,9 @@ async def store_document(
 
   loop = asyncio.get_running_loop()
 
-  # #907: el text viu al payload de Qdrant. L'alternativa (text a SQLite via
-  # TextStore, Qdrant només amb vectors) mai es va arribar a activar — cap
-  # cridador passava el path del magatzem — i s'ha retirat.
+  # #907: the text lives in the Qdrant payload. The alternative (text in SQLite via
+  # TextStore, Qdrant holding only vectors) was never switched on — no
+  # caller passed the store path — and it has been removed.
   qdrant_payload = {
     "original_id": doc_id,
     "text": text,

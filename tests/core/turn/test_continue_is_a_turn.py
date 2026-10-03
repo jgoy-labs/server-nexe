@@ -95,15 +95,17 @@ async def _resume(turn_lab, sid, *, streaming=True):
 
 
 @pytest.mark.parametrize("streaming", [True, False])
-async def test_a_resume_walks_the_turn_with_three_steps_skipped_and_none_folded(
+async def test_a_resume_walks_the_turn_with_four_steps_skipped_and_none_folded(
         turn_lab, session_manager, mlx, streaming):
+    # #1144: `describe_image` joined `SKIP_ON_RESUME` — a resume carries the
+    # answered image again (C4.6-a-vlm), and describing it twice is a wasted call.
+    skipped = ("intent", "recall", "describe_image", "compact")
     sid = f"c46-walk-{int(streaming)}"
     _cut_session(session_manager, sid)
     ctx = await _resume(turn_lab, sid, streaming=streaming)
 
-    assert {s: ctx.outcomes[s] for s in ("intent", "recall", "compact")} == dict.fromkeys(
-        ("intent", "recall", "compact"), "skipped")
-    others = {s: o for s, o in ctx.outcomes.items() if s not in ("intent", "recall", "compact", "memory.write")}
+    assert {s: ctx.outcomes[s] for s in skipped} == dict.fromkeys(skipped, "skipped")
+    others = {s: o for s, o in ctx.outcomes.items() if s not in skipped + ("memory.write",)}
     assert set(others.values()) == {"ok"}, others
     assert not ctx.usage.get("folded"), ctx.usage.get("folded")
 
@@ -292,6 +294,13 @@ def _visible(ctx) -> str:
     return "".join(c for c in ctx.lab_wire_chunks if isinstance(c, str) and not c.startswith("\x00"))
 
 
+def _generic_notice(ctx) -> str:
+    """The engine-error notice in this turn's language. A literal in one
+    language passes or fails with NEXE_LANG, not with the code (#1117)."""
+    from plugins.web_ui_module.api.wire import _stream_error_notice
+    return _stream_error_notice(RuntimeError("x"), ctx.lang).strip()
+
+
 async def test_an_image_continue_on_llama_is_offered_to_mlx_before_any_byte(
         turn_lab, session_manager, app_state, mlx):
     """The refusal used to land inside an already-open stream, so the client
@@ -308,7 +317,7 @@ async def test_an_image_continue_on_llama_is_offered_to_mlx_before_any_byte(
     assert mlx.calls and mlx.calls[0].get("continue_final") is True
     visible = _visible(ctx)
     assert "ada" in visible
-    assert "error en generar" not in visible
+    assert _generic_notice(ctx) not in visible
     assert ctx.usage["llm"]["calls"][-1]["engine"] == "mlx"
 
 
@@ -350,7 +359,7 @@ async def test_a_generator_that_fails_before_a_byte_is_offered_to_the_next_engin
     assert dead.calls == 1
     assert mlx.calls
     assert "ada" in _visible(ctx)
-    assert "error en generar" not in _visible(ctx)
+    assert _generic_notice(ctx) not in _visible(ctx)
     assert ctx.usage["llm"]["calls"][-1]["engine"] == "mlx"
 
 
@@ -367,7 +376,7 @@ async def test_a_generator_that_fails_after_a_token_keeps_the_stream(
     assert mlx.calls == []
     visible = _visible(ctx)
     assert "mig" in visible
-    assert "error en generar" in visible
+    assert _generic_notice(ctx) in visible
 
 
 async def test_a_resumed_answer_about_an_image_is_resumed_with_that_image(turn_lab, session_manager, mlx):

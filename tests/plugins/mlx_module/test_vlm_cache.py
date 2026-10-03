@@ -589,11 +589,16 @@ class TestVLMMaxSessionsIsConfigurable:
 
 class TestVLMMaxSessionsConfig:
 
-    def test_config_default_is_one(self, monkeypatch):
-        from plugins.mlx_module.core.config import MLXConfig
+    @pytest.mark.parametrize("ram_gb, expected", [(8.0, 1), (128.0, 4)])
+    def test_config_default_follows_the_ram(self, monkeypatch, ram_gb, expected):
+        """#1137: 1 was #843's 8 GB machine; on 128 GB every new conversation
+        evicted the last (live 03/10). The 8 GB case must stay at 1."""
+        from plugins.mlx_module.core import config as cfg_mod
         monkeypatch.delenv("NEXE_MLX_VLM_MAX_SESSION_CACHES", raising=False)
+        monkeypatch.delenv("NEXE_MLX_MAX_KV_SIZE", raising=False)
         monkeypatch.setenv("NEXE_MLX_MODEL", "/tmp/fake-model")
-        assert MLXConfig.from_env().max_vlm_session_caches == 1
+        monkeypatch.setattr(cfg_mod, "_total_ram_gb", lambda: ram_gb)
+        assert cfg_mod.MLXConfig.from_env().max_vlm_session_caches == expected
 
     def test_config_reads_its_own_env(self, monkeypatch):
         """A separate knob from the text path: the VLM cache is far heavier,
@@ -611,10 +616,64 @@ class TestVLMMaxSessionsConfig:
         assert cfg.max_vlm_session_caches == 2
 
     def test_invalid_env_falls_back_to_one(self, monkeypatch):
-        from plugins.mlx_module.core.config import MLXConfig
+        """Even on 128 GB: a typo keeps the conservative count, as before #1137."""
+        from plugins.mlx_module.core import config as cfg_mod
         monkeypatch.setenv("NEXE_MLX_MODEL", "/tmp/fake-model")
         monkeypatch.setenv("NEXE_MLX_VLM_MAX_SESSION_CACHES", "moltes")
-        assert MLXConfig.from_env().max_vlm_session_caches == 1
+        monkeypatch.setattr(cfg_mod, "_total_ram_gb", lambda: 128.0)
+        assert cfg_mod.MLXConfig.from_env().max_vlm_session_caches == 1
+
+    def test_the_env_var_short_circuits_the_auto_count(self, monkeypatch):
+        from plugins.mlx_module.core import config as cfg_mod
+        monkeypatch.setenv("NEXE_MLX_MODEL", "/tmp/fake-model")
+        monkeypatch.setenv("NEXE_MLX_VLM_MAX_SESSION_CACHES", "2")
+
+        def _must_not_run(*_a, **_k):
+            raise AssertionError("auto-sized although the env var is set")
+        monkeypatch.setattr(cfg_mod, "auto_vlm_session_caches", _must_not_run)
+        assert cfg_mod.MLXConfig.from_env().max_vlm_session_caches == 2
+
+    def test_the_8gb_case_is_8gb_everywhere(self, monkeypatch):
+        """Review 03/10: patching only _total_ram_gb left auto_max_kv_size on the
+        real RAM (65536 on this Mac). One reader now: both see 8 GB."""
+        from plugins.mlx_module.core import config as cfg_mod
+        monkeypatch.delenv("NEXE_MLX_VLM_MAX_SESSION_CACHES", raising=False)
+        monkeypatch.delenv("NEXE_MLX_MAX_KV_SIZE", raising=False)
+        monkeypatch.setenv("NEXE_MLX_MODEL", "/tmp/fake-model")
+        monkeypatch.setattr(cfg_mod, "_total_ram_gb", lambda: 8.0)
+        cfg = cfg_mod.MLXConfig.from_env()
+        assert cfg.max_kv_size == 8192  # the 8 GB box's window (floor), not 128 GB's 65536
+        assert cfg.max_vlm_session_caches == 1
+
+
+class TestAutoVLMSessionCaches:
+    """#1137 — the count from the RAM budget, with the live model's numbers
+    (Qwen3.5-9B-MLX-4bit: 5.54 GB of weights, 128 KB of KV per token)."""
+
+    @pytest.fixture(autouse=True)
+    def _live_model(self, monkeypatch):
+        from plugins.mlx_module.core import config as cfg_mod
+        monkeypatch.setattr(cfg_mod, "model_weights_gb", lambda _p: 5.54)
+        monkeypatch.setattr(cfg_mod, "model_kv_bytes_per_token", lambda _p, **_k: 128 * 1024)
+
+    @pytest.mark.parametrize("ram_gb, max_kv, expected", [
+        (8.0, 16384, 1),    # #843's machine: below budget, still one
+        (16.0, 32768, 1),   # 7.8 GB left, one 4 GB window
+        (32.0, 65536, 2),   # 23.8 GB left, 8 GB windows
+        (128.0, 65536, 4),  # 14 would fit: capped at the text path's 4
+    ])
+    def test_the_count_is_the_budget_over_one_window(self, ram_gb, max_kv, expected):
+        from plugins.mlx_module.core.config import auto_vlm_session_caches
+        assert auto_vlm_session_caches("m", max_kv, total_gb=ram_gb) == expected
+
+    def test_unknown_ram_keeps_one(self, monkeypatch):
+        from plugins.mlx_module.core import config as cfg_mod
+        monkeypatch.setattr(cfg_mod, "_total_ram_gb", lambda: None)
+        assert cfg_mod.auto_vlm_session_caches("m", 65536) == 1
+
+    def test_no_window_keeps_one(self):
+        from plugins.mlx_module.core.config import auto_vlm_session_caches
+        assert auto_vlm_session_caches("m", 0, total_gb=128.0) == 1
 
 
 def test_vlm_path_passes_the_configured_limit():
@@ -632,3 +691,57 @@ def test_vlm_path_passes_the_configured_limit():
     src = " ".join(inspect.getsource(chat_mod).split())
     assert "get_vlm_cache_manager( self.config.max_vlm_session_caches )" in src \
         or "get_vlm_cache_manager(self.config.max_vlm_session_caches)" in src
+
+
+class TestHotSwapFreesTheOldModelsCaches:
+    """#1137, review 03/10: a model switch (`apply_config`) never cleared the
+    VLM cache — the old model's states left only by LRU, and never if the new
+    model is text-only. With up to 4 conversations kept, that is up to 4 KV
+    windows held for a model that is gone."""
+
+    @pytest.fixture
+    def node(self, monkeypatch, _fresh_singleton):
+        from types import SimpleNamespace
+        from plugins.mlx_module.core.chat import MLXChatNode
+        for attr in ("_config", "_model", "_is_vlm", "_template_think_prefix"):
+            monkeypatch.setattr(MLXChatNode, attr, getattr(MLXChatNode, attr, None))
+        monkeypatch.setattr(MLXChatNode, "_config", SimpleNamespace(model_path="/models/A"))
+        node = MLXChatNode.__new__(MLXChatNode)
+        manager = _fresh_singleton.get_vlm_cache_manager(4)
+        for s in ("s1", "s2", "s3", "s4"):  # the states themselves: no mlx_vlm needed
+            manager._states[f"/models/A:hash:{s}"] = object()
+        return node, manager
+
+    @staticmethod
+    def _drain_the_mlx_worker():
+        from plugins.mlx_module.core.chat import _MLX_EXECUTOR
+        _MLX_EXECUTOR.submit(lambda: None).result(timeout=10)
+
+    def test_switching_model_frees_them(self, node):
+        from types import SimpleNamespace
+        n, manager = node
+        n.apply_config(SimpleNamespace(model_path="/models/B"))
+        self._drain_the_mlx_worker()
+        assert manager.get_stats()["total"] == 0
+
+    def test_the_same_model_keeps_them(self, node):
+        from types import SimpleNamespace
+        n, manager = node
+        n.apply_config(SimpleNamespace(model_path="/models/A"))
+        self._drain_the_mlx_worker()
+        assert manager.get_stats()["total"] == 4
+
+    def test_the_clear_runs_on_the_mlx_worker_not_the_callers_thread(self, node, monkeypatch):
+        """Live 03/10: run from the request thread, the clear imported
+        mlx_vlm.generate there, and its generation_stream — bound to the
+        importing thread — failed every turn on the worker with "There is no
+        Stream(gpu, 0) in current thread"."""
+        import threading
+        from types import SimpleNamespace
+        from plugins.mlx_module.core import chat
+        ran_on = []
+        monkeypatch.setattr(chat, "_free_prompt_caches", lambda: ran_on.append(threading.current_thread().name))
+        n, _ = node
+        n.apply_config(SimpleNamespace(model_path="/models/B"))
+        self._drain_the_mlx_worker()
+        assert len(ran_on) == 1 and ran_on[0].startswith("mlx-worker"), ran_on

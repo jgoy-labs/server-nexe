@@ -25,13 +25,26 @@ CTX_HEADERS_RE = _re.compile(
     # so this branch does not strip it in ANY language — only a model that
     # echoes the bracketed shape back verbatim is caught. Not closed here.
     r'\[(?:(?:FI\s+)?CONTEXT(?:\s+[0-9a-f]{6,16})?|MEMORIA DE L\'USUARI|MEMORIA DEL USUARIO|'
-    r'USER MEMORY|DOCUMENTACI[ÓO] DEL SISTEMA|SYSTEM DOCUMENTATION|'
-    r'DOCUMENTACI[ÓO] T[EÈ]CNICA|TECHNICAL DOCUMENTATION|'
+    # #1124: the Spanish labels end in N (chat_rag.py sends DOCUMENTACION
+    # TECNICA); they were never stripped.
+    r'USER MEMORY|DOCUMENTACI(?:ÓN?|ON?) DEL SISTEMA|SYSTEM DOCUMENTATION|'
+    r'DOCUMENTACI(?:ÓN?|ON?) T[EÈÉ]CNICA|TECHNICAL DOCUMENTATION|'
     r'DOCUMENT ADJUNTAT|ATTACHED DOCUMENT|DOCUMENTO ADJUNTO|'
-    r'FI DOCUMENT|END DOCUMENT|FIN DOCUMENTO)\]',
+    # #1144: the note an earlier image leaves in the history (core/turn/image_memory.py).
+    r'IMATGE ADJUNTA|IMAGEN ADJUNTA|ATTACHED IMAGE|'
+    r'FI DOCUMENT|END DOCUMENT|FIN DOCUMENTO|'
+    # #1102: the header of each recalled item, `[Font: personal_memory]`
+    # (core/endpoints/chat_rag.py), copied into the answer. Its source is an
+    # identifier — a collection, a file, a channel: personal_memory,
+    # manual.pdf, chat-cli — so a citation the model writes in words,
+    # "[Font: Wikipedia]", is not one.
+    # Bounded like the stream's hold (core/turn/text/tags.py), so the two agree.
+    r'(?-i:Font): (?=[\w.\-]{1,100}\])[\w.\-]*[_.\-][\w.\-]*|'
+    # #1125: the time line in front of every user message (core/chat_prompt.py),
+    # and the on-demand clock /v1 still uses, echoed back.
+    r'(?:HORA DEL MISSATGE|HORA DEL MENSAJE|MESSAGE TIME|HORA ACTUAL DEL SISTEMA|CURRENT SYSTEM TIME): [^\]\n]{1,80})\]',
     _re.IGNORECASE
 )
-
 
 def is_harmony(text: str) -> bool:
     """True for gpt-oss (harmony) output: channel tags, or the bare shape they
@@ -107,6 +120,12 @@ def clean_model_text(text: str) -> str:
     text = PIPE_TAG_RE.sub('', text)
     text = ANGLE_TAG_RE.sub('', text)
     text = final_section(text) if harmony else text.strip()
+    # #1124: a source caption that only held labels goes with them — through
+    # the stream's own filter, so the stored reply is what the screen showed.
+    # Deferred: captions.py imports this module.
+    from core.turn.text.captions import drop_source_captions
+
+    text = drop_source_captions(text)
     return CTX_HEADERS_RE.sub('', text).strip()
 
 

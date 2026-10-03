@@ -174,6 +174,12 @@ class PostCommitQueue:
                 # defensive, not an expected path.
                 self._record(job, {"outcome": "gate_busy"}, started)
                 return
+            if job.attempts and job.cancel is not None:
+                # A preempted job runs again with the event the user turn set
+                # still set: it gave the slot back and would give it back again
+                # at once — or, on MLX, read its whole prompt (#1127) and then
+                # throw the result away (review 04/10). This run is a new one.
+                job.cancel.clear()
             try:
                 result = await job.run(job.cancel)
             except Exception as exc:

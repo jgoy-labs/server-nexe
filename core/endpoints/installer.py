@@ -374,10 +374,10 @@ _OLLAMA_INSTALL_KEEPALIVE_S = 10.0
 async def install_ollama_endpoint(request: Request) -> StreamingResponse:
     """Install Ollama if not present, streaming status as SSE.
 
-    Replaces the placeholder "already_installed: False"
-    per una crida real a ensure_ollama_installed(headless=True). Mateixes
-    correccions C1-C5 de l'auditoria agèntica que installer_ollama._stream_ollama (cancel detection,
-    lock concurrent, error UX-friendly per platform, logger.exception).
+    Replaces the placeholder "already_installed: False" with a real call to
+    ensure_ollama_installed(headless=True). Same C1-C5 fixes from the agent
+    audit as installer_ollama._stream_ollama (cancel detection, concurrent
+    lock, platform-friendly error UX, logger.exception).
     """
 
     async def generate() -> AsyncIterator[str]:
@@ -553,11 +553,11 @@ async def finalize_get(request: Request) -> JSONResponse:
 async def check_metal() -> JSONResponse:
     """Check if Apple Metal/MLX is available on this system.
 
-    El wizard usa aquest endpoint per saber si pot oferir MLX com a backend.
-    A Macs Intel (sense Metal) o Linux/Windows, mlx no s'ha d'oferir.
-    Validat amb agentic audit 2026-05-20 (thread executor suficient,
-    no cal subprocess). Memory pressure ~200-500 MB del MLX framework
-    s'acceptarà perquè el sidecar ja el carregara per chat.
+    The wizard uses this endpoint to know whether it can offer MLX as a backend.
+    On Intel Macs (no Metal) or Linux/Windows, mlx must not be offered.
+    Validated by the agentic audit of 2026-05-20 (a thread executor is enough,
+    no subprocess needed). Memory pressure of ~200-500 MB from the MLX framework
+    is accepted because the sidecar would load it for chat anyway.
     """
     def _check() -> bool:
         try:
@@ -577,10 +577,10 @@ async def check_metal() -> JSONResponse:
 async def installer_state() -> JSONResponse:
     """Return the current onboarding state.
 
-    El frontend Tauri usa aquest endpoint per saber si l'onboarding s'ha
-    completat sense necessitat de llegir el fitxer JSON del disc. Util quan
-    el sidecar es reinicia i el frontend vol decidir si mostrar wizard o UI.
-    NO retorna api_key (sensible). Validat amb agentic audit 2026-05-20.
+    The Tauri frontend uses this endpoint to know whether onboarding has
+    finished without reading the JSON file from disk. Useful when
+    the sidecar restarts and the frontend wants to decide between wizard and UI.
+    It does NOT return the api_key (sensitive). Validated by the agentic audit of 2026-05-20.
     """
     state = OnboardingState.load()
     if state is None:

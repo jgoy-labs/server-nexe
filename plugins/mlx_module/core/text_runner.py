@@ -1,13 +1,12 @@
-"""El camí de TEXT de l'MLX, extret de `chat.py` a #966 — Tros C.
+"""The MLX TEXT path, extracted from `chat.py` in #966 — slice C.
 
-Simètric a `vlm_runner`: amb la visió i la càrrega ja fora, `MLXChatNode` es quedava amb
-el camí de text a dins per pura inèrcia. Els dos mètodes venen amb el cos original; les
-úniques modificacions són substitucions mecàniques i uniformes.
+Symmetric with `vlm_runner`: with vision and loading already out, `MLXChatNode` still held
+the text path inside out of pure inertia. The two methods come with the original body; the
+only modifications are mechanical, uniform substitutions.
 
-**Els helpers de la canonada es criden PEL MÒDUL** (`generate_helpers.prepare_tokens(...)`),
-no important-ne els noms. És la lliçó del Tros B: amb un sol lloc de resolució, patxejar
-el lloc de definició val per a qualsevol consumidor i no pot passar que un `patch`
-n'intercepti una crida i una altra no.
+**The pipeline helpers are called THROUGH THE MODULE** (`generate_helpers.prepare_tokens(...)`),
+not by importing their names. That is the lesson of slice B: with a single resolution site, patching
+the definition site covers every consumer and one `patch` cannot intercept one call and miss another.
 """
 import json
 import logging
@@ -22,19 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 class MLXTextRunner:
-    """El camí de text de `MLXChatNode`. Els cossos són els originals."""
+    """The text path of `MLXChatNode`. The bodies are the originals."""
 
     def __init__(self, node):
         self._node = node
 
     @property
     def config(self):
-        """En viu des del node: `apply_config` reemplaça l'objecte de config."""
+        """Live from the node: `apply_config` replaces the config object."""
         return self._node.config
 
     def _get_model(self) -> tuple:
-        """Es resol a la crida, no al `__init__`: la suite patxeja
-        `MLXChatNode._get_model` després de construir el node."""
+        """Resolved at call time, not in `__init__`: the suite patches
+        `MLXChatNode._get_model` after the node is built."""
         return self._node._get_model()
 
     def _generate_blocking(

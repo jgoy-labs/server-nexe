@@ -52,7 +52,8 @@ lingua-language-detector==2.1.1
 lxml==6.1.3  # XML/EPUB parsing (resolve_entities=False, no_network, no DTD); also required by python-docx/python-pptx
 python-docx==1.2.0
 openpyxl==3.1.5
-python-pptx==1.0.2  # also pulls Pillow, already present transitively via fastembed
+python-pptx==1.0.2  # also pulls Pillow (pinned below)
+Pillow==12.3.0  # #1122: core/turn/validate.py shrinks attached images with it; was only transitive (fastembed, python-pptx, mlx-vlm). 12.2.0 had PYSEC-2026-3493/3494/3495/3496, fixed in 12.3.0 (pip-audit 2026-10-02: 0). MIT-CMU. fastembed 0.8.0 asks <13; win_arm64 cp312 wheel exists (verified 2026-10-02)
 et-xmlfile==2.0.0  # transitive of openpyxl, pinned for reproducibility
 XlsxWriter==3.2.9  # transitive of python-pptx, pinned for reproducibility
 

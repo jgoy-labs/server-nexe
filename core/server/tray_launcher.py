@@ -33,7 +33,7 @@ def _is_tray_already_running() -> bool:
 def _is_tray_supported() -> bool:
     """Return True if all conditions for tray launch are met."""
     # Tauri already manages the tray when running in sidecar mode
-    # (ADR-tray-doble-conflicte) — evitem doble icona Python + Tauri.
+    # (ADR-tray-doble-conflicte) — avoid a second icon, Python plus Tauri.
     if os.environ.get("NEXE_SIDECAR"):
         return False
     if sys.platform != "darwin":

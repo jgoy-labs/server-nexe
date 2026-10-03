@@ -272,8 +272,8 @@ async def attach_to_session(
     # Security: validate filename (path traversal, injection).
     #
     # `allow_html=True` for the same reason `validate` uses it at both chat
-    # doors (#1043, kickoff 31/08 §2.3): "escapar és una protecció de
-    # renderitzat, i viu on toca" — the UI escapes when painting, both in the
+    # doors (#1043, kickoff 31/08 §2.3): escaping is a rendering protection,
+    # and it lives where it belongs — the UI escapes when painting, both in the
     # file preview (`nexe-files.js:243`, `escapeHtml`) and in the chat bubble
     # (`nexe-render.js`, whose renderer escapes raw HTML and refuses every
     # scheme but http/https/mailto). Every injection detector stays ON and

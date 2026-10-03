@@ -335,6 +335,32 @@ def post_with_retry(
     return response
 
 
+def read_stream_with_retry(
+    client: httpx.Client, path: str, *, retries: int = 2, **kwargs
+) -> tuple[int, str]:
+    """Streaming POST that waits out a 429, then returns ``(status, body)``.
+
+    ``/ui/chat`` is 20/minute. The live suite's Ollama model sweep spends that
+    budget, and the next streamed turn used to die on 429 before its assertion
+    (#1111). A 429 here is the same traffic control ``post_with_retry`` already
+    waits out: the body of the first response that is not a 429 is the one the
+    caller asserts on. The last attempt is returned as-is, 429 included.
+    """
+    for attempt in range(retries + 1):
+        with client.stream("POST", path, **kwargs) as response:
+            if response.status_code == 429 and attempt < retries:
+                delay = _retry_after_delay(response)
+                response.read()
+            else:
+                return response.status_code, "".join(response.iter_text())
+        print(
+            f"\nrate-limited on {path} — waiting {delay:.0f}s "
+            f"(retry {attempt + 1}/{retries})"
+        )
+        time.sleep(delay)
+    return 429, ""
+
+
 # ─── Test ordering — slow tests last ──────────────────────────────────────────
 
 def pytest_collection_modifyitems(

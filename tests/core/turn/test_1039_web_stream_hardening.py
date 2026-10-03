@@ -108,20 +108,20 @@ async def test_reasoning_counts_against_the_ceiling(monkeypatch):
 
 
 async def test_the_json_accumulation_is_cleaned():
-    from plugins.web_ui_module.api import routes_chat as rc
+    from plugins.web_ui_module.api import engine_call
 
     async def gen():
         yield f"Hola {FORGED}"
         yield {"message": {"content": " món"}}
 
     chunks: list = []
-    capped = await rc._accumulate_nonstreaming_response(gen(), chunks)
+    capped = await engine_call._accumulate_nonstreaming_response(gen(), chunks)
     assert capped is False
     assert "\x00" not in "".join(chunks)
 
 
 async def test_the_json_accumulation_stops_at_the_ceiling(monkeypatch):
-    from plugins.web_ui_module.api import routes_chat as rc
+    from plugins.web_ui_module.api import engine_call
 
     monkeypatch.setattr(_streaming, "MAX_STREAM_BYTES", 10)
     closed = []
@@ -135,7 +135,7 @@ async def test_the_json_accumulation_stops_at_the_ceiling(monkeypatch):
             closed.append(True)
 
     chunks: list = []
-    capped = await rc._accumulate_nonstreaming_response(gen(), chunks)
+    capped = await engine_call._accumulate_nonstreaming_response(gen(), chunks)
     assert capped is True
     assert chunks == ["12345"]
     assert closed == [True]

@@ -191,6 +191,25 @@ def engine_can_continue(module: Any, model_name: Optional[str] = None) -> bool:
         return False
 
 
+def engine_can_see_images(module: Any) -> Optional[bool]:
+    """#1035: can the model this engine runs read an image?
+
+    Asked of an engine that answers with a model it chose itself (a fallback
+    runs the one it has loaded), so a text model is never handed a turn with
+    a picture to answer as if it saw it. `None` when the module does not say:
+    an engine that takes its model per request (Ollama) is given the one
+    requested, and is left to it, as before. A check that raises says no.
+    """
+    check = getattr(module, "can_see_images", None)
+    if not callable(check):
+        return None
+    try:
+        return bool(check())
+    except Exception:
+        logger.debug("can_see_images failed; treating the engine as unable to see", exc_info=True)
+        return False
+
+
 def engine_error_to_http(exc: BaseException, engine_name: str) -> Optional[tuple]:
     """``(status, detail)`` for an error that ends the turn, or None to try the next engine.
 

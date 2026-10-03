@@ -227,11 +227,11 @@ class WebUIModule:
     # --- Sidecar-aware initialization ---
 
     def _is_disabled_in_sidecar(self) -> bool:
-        """Return True only if manifest `disabled_in_sidecar=true` AND sidecar mode actiu.
+        """Return True only if manifest `disabled_in_sidecar=true` AND sidecar mode is on.
 
-        Light-touch defensive (lliçó `feedback_revert_mental_obligatori`): qualsevol
-        excepció es loga a debug i tornem False — preservem el comportament històric
-        (carregar el mòdul) si quelcom falla.
+        Light-touch defensive (lesson `feedback_revert_mental_obligatori`): any
+        exception is logged at debug and we return False — keep the historical
+        behaviour (load the module) if something fails.
         """
         try:
             try:

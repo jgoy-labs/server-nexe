@@ -387,8 +387,8 @@ def main():
   env_host = os.environ.get("NEXE_HOST")
   host = env_host if env_host else server_config.get('host', DEFAULT_HOST)
   _enforce_loopback_bind(str(host))
-  # NOTA: import de get_default_host/get_default_port reservat per a M0-bis
-  # (F2) — substituiran els DEFAULT_* constants en el refactor real.
+  # NOTE: the get_default_host/get_default_port import is reserved for M0-bis
+  # (F2) — they will replace the DEFAULT_* constants in the real refactor.
   _ = (get_default_host, get_default_port)  # noqa: F841 — reserved for F2
   workers = server_config.get('workers', 1)
   if workers > 1:

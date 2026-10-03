@@ -47,6 +47,7 @@ from .chat_engines.routing import (
     _engine_available,
     _resolve_engine,
     engine_can_continue,
+    engine_can_see_images,
     get_engine_module,
     raise_if_terminal,
     resolve_engine_cascade,
@@ -72,9 +73,8 @@ from core.turn.lease import release_turn_lease, releasing
 from core.turn.run import run_turn, stream_turn
 from .chat_engines._streaming import _prepend_chunk
 from core.lang_detect import (
-    detect_user_lang_or_none as _detect_lang_or_none,
-    fallback_lang as _fallback_lang,
-    natural_text_len,
+    STICKY_SWITCH_MIN_CHARS,
+    decide_reply_lang,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,17 +87,17 @@ router = APIRouter(tags=["chat"])
 # recomputing it per request rewrote the prompt from token 0 mid-conversation:
 # a new trie node on MLX, _destroy + GGUF reload on llama.cpp — for the same
 # session_id the engines key their prefix cache by. Policy (commit 8f67d6a6,
-# #850): the fallback is returned but NEVER seeded, the switch gate measures
-# the NATURAL text (code/URLs out), and a switch needs two consecutive
-# detections of the same new language.
+# #850): the fallback is returned but NEVER seeded, and the switch gate
+# measures the NATURAL text (code/URLs out). Since #1143 the decision itself
+# is one function for both doors, core.lang_detect.decide_reply_lang (a short
+# line seeds only the install language; a language asked for by name wins).
 #
 # This route has no ChatSession to hang the state on, so it keeps an LRU keyed
 # by the very session_id the engines use (derive_session_id) — stickiness and
-# prefix cache then share one scope by construction. The policy is duplicated
-# rather than imported because core must not depend on a plugin; the parity
-# test in tests/core/endpoints/test_f854_sticky_lang_openai.py fails if either
-# copy drifts (the shared home would be core.lang_detect — see the finding).
-_STICKY_LANG_MIN_SWITCH_CHARS = 25
+# prefix cache then share one scope by construction. The parity test in
+# tests/core/endpoints/test_f854_sticky_lang_openai.py keeps the two stores
+# answering alike.
+_STICKY_LANG_MIN_SWITCH_CHARS = STICKY_SWITCH_MIN_CHARS  # one constant, core.lang_detect
 _SESSION_LANG_MAX = 256
 _SESSION_LANG: "OrderedDict[str, dict]" = OrderedDict()
 
@@ -115,31 +115,23 @@ def _reset_session_lang_state() -> None:
 def _resolve_request_lang(session_key: str, user_text: str) -> str:
     """Reply language for this turn: sticky per session_key (#854).
 
-    Mirrors plugins/web_ui_module/api/routes_chat._resolve_session_lang.
+    Mirrors core.turn.prompt._resolve_session_lang, the web door's.
     """
-    detected = _detect_lang_or_none(user_text)
+    # #1143: the decision is core.lang_detect.decide_reply_lang, shared with
+    # the web door; this one keeps it in the LRU keyed by session.
     state = _SESSION_LANG.get(session_key)
-    if state is None:
-        # A guess never locks the session — the first REAL detection decides.
-        if detected is None:
-            return _fallback_lang(None)
-        _SESSION_LANG[session_key] = {"lang": detected, "pending": None}
-        while len(_SESSION_LANG) > _SESSION_LANG_MAX:
-            _SESSION_LANG.popitem(last=False)
-        return detected
-
-    _SESSION_LANG.move_to_end(session_key)
-    sticky = state["lang"]
-    if (
-        detected
-        and detected != sticky
-        and natural_text_len(user_text) >= _STICKY_LANG_MIN_SWITCH_CHARS
-    ):
-        # 25/09: switch on the FIRST clear message, as the web door does.
-        state["lang"] = detected
-        state["pending"] = None
-        return detected
-    return sticky
+    if state is not None:
+        _SESSION_LANG.move_to_end(session_key)
+    lang, new_sticky = decide_reply_lang(state["lang"] if state else None, user_text)
+    if new_sticky:
+        if state is None:
+            _SESSION_LANG[session_key] = {"lang": new_sticky, "pending": None}
+            while len(_SESSION_LANG) > _SESSION_LANG_MAX:
+                _SESSION_LANG.popitem(last=False)
+        else:
+            state["lang"] = new_sticky
+            state["pending"] = None
+    return lang
 
 
 # --- System Prompt ---
@@ -561,9 +553,9 @@ def _inject_rag_context_into_messages(
         logger.warning(
             "Image note dropped: no user message in the request to insert it before",
         )
-    # #851: la regla de seguretat s'arma INCONDICIONALMENT al caller
-    # (_build_rag_and_system_prompt) — aquí només corria amb context i
-    # partia el namespace de la caché de prefix entre torns amb/sense RAG.
+    # #851: the security rule is armed UNCONDITIONALLY at the caller
+    # (_build_rag_and_system_prompt) — here it only ran when there was context and
+    # it split the prefix-cache namespace between turns with and without RAG.
     return _injected
 
 
@@ -790,8 +782,10 @@ async def _dispatch_through_cascade(
     model_that_answered)``.
 
     ``images`` (#1081): threaded unchanged to every candidate in the
-    cascade — an image that one engine cannot read is not a reason to skip
-    it, the same "the engine decides" rule the UI door has always followed.
+    cascade. The engine that was resolved decides what to do with one; a
+    FALLBACK whose model says it cannot see (`engine_can_see_images`) is
+    skipped, because it answers with the model it has loaded and would answer
+    as if it saw the picture — the rule the UI door follows too (#1035).
 
     The last element is #1054: the engine's NAME is not the model's, and the
     turn's LLM counter had no way to reach the second one — every streamed /v1
@@ -823,7 +817,12 @@ async def _dispatch_through_cascade(
         cascade = _engines_that_can_resume(cascade, body, request.app.state)
     last_exc: Optional[BaseException] = None
     reason = "preferred_unavailable"
-    for candidate in cascade:
+    for index, candidate in enumerate(cascade):
+        if index > 0 and images and engine_can_see_images(
+            get_engine_module(candidate, request.app.state)
+        ) is False:
+            logger.warning("Engine %s cannot see the image; trying the next in the cascade", candidate)
+            continue
         start_time = time.time()
         try:
             # #976, per engine: the prompt was fitted to the window of the engine

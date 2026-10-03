@@ -60,6 +60,17 @@ async def test_a_model_delete_tag_arms_the_confirmation_and_the_door_says_so():
     assert "mem_deletes" not in ctx.usage, "the field nobody read is gone"
 
 
+async def test_a_delete_tag_the_user_never_asked_for_arms_nothing():
+    """#1135 (live 03/10): a model explaining its memory wrote a delete tag
+    with the user's real name. /v1 hands the user's message to the rule too."""
+    ctx, helper = _ctx("Així funciono. [MEM_DELETE: el gos]", candidates=[ENTRY])
+    ctx.message = "com funciona la teva memòria?"
+    await api_adapters(BackgroundTasks())["postprocess"](ctx)
+    helper.preview_delete_from_memory.assert_not_called()
+    assert not getattr(ctx.session, "_pending_partial_delete", None)
+    assert "pending_delete" not in ctx.usage
+
+
 async def test_no_match_arms_nothing_and_the_door_stays_quiet():
     ctx, helper = _ctx("D'acord. [MEM_DELETE: el gos]", candidates=[])
 

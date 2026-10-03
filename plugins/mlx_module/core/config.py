@@ -158,6 +158,15 @@ def model_weights_gb(model_path: str):
         return None
 
 
+def _total_ram_gb():
+    """Total RAM in GB, or None — the one reader both auto-sizers use (#1137)."""
+    try:
+        import psutil
+        return psutil.virtual_memory().total / (1024 ** 3)
+    except Exception:
+        return None
+
+
 def auto_max_kv_size(model_path: str, total_gb=None) -> int:
     """KV window budgeted from the REAL model and the machine's RAM.
 
@@ -175,11 +184,7 @@ def auto_max_kv_size(model_path: str, total_gb=None) -> int:
     of this in from_env().
     """
     if total_gb is None:
-        try:
-            import psutil
-            total_gb = psutil.virtual_memory().total / (1024 ** 3)
-        except Exception:
-            total_gb = None  # fall through: the model cap below must still apply
+        total_gb = _total_ram_gb()  # None falls through: the model cap below must still apply
     if total_gb is None:
         result = 16384  # safe fallback (the old 65536 was NOT conservative)
     else:
@@ -228,6 +233,32 @@ def auto_max_kv_size(model_path: str, total_gb=None) -> int:
     return result
 
 
+#: The text path's default (max_session_caches / ModelPool.max_sessions): the
+#: VLM count never goes above it, however much RAM there is.
+_VLM_SESSION_CACHES_CAP = 4
+
+
+def auto_vlm_session_caches(model_path: str, max_kv_size: int, total_gb=None) -> int:
+    """How many conversations keep their VLM prompt cache, from the RAM (#1137).
+
+    The fixed 1 was sized for #843's 8 GB machine; on 128 GB it meant going
+    back to an earlier conversation re-read it whole (live 03/10: every new
+    conversation evicted the last). Same budget as auto_max_kv_size (total −
+    OS reserve − runtime − weights), divided by one full KV window per
+    conversation — the most a cached conversation can hold — and kept between
+    1 and the text path's 4. RAM unknown → 1. NEXE_MLX_VLM_MAX_SESSION_CACHES
+    overrides it in from_env().
+    """
+    if total_gb is None:
+        total_gb = _total_ram_gb()
+    if total_gb is None or not max_kv_size or max_kv_size <= 0:
+        return 1
+    weights = model_weights_gb(model_path)
+    budget_gb = total_gb - _OS_RESERVE_GB - _RUNTIME_GB - (weights if weights is not None else 3.5)
+    window_gb = max_kv_size * model_kv_bytes_per_token(model_path) / (1024 ** 3)
+    return max(1, min(_VLM_SESSION_CACHES_CAP, int(max(0.0, budget_gb) // window_gb)))
+
+
 def detect_hardware_tier() -> str:
     """Returns 'low' (<16 GB), 'mid' (16-32 GB), 'high' (32-64 GB), 'ultra' (64+ GB)."""
     try:
@@ -265,9 +296,9 @@ class MLXConfig:
     top_p: float = 0.9
     max_session_caches: int = 4  # Same as ModelPool.max_sessions
     # VLM KV caches are far heavier than the text ones, and #843 is an 8 GB
-    # machine: this gets its own knob and its own default of 1, so raising
-    # NEXE_MLX_MAX_SESSION_CACHES for the text path cannot quietly multiply
-    # the VLM memory too.
+    # machine: this gets its own knob, so raising NEXE_MLX_MAX_SESSION_CACHES
+    # for the text path cannot quietly multiply the VLM memory too. 1 here;
+    # from_env() sizes it from the RAM (auto_vlm_session_caches, #1137).
     max_vlm_session_caches: int = 1  # NEXE_MLX_VLM_MAX_SESSION_CACHES
 
     def __post_init__(self):
@@ -351,7 +382,6 @@ class MLXConfig:
             temperature=float(os.getenv("NEXE_MLX_TEMPERATURE", "0.7")),
             top_p=float(os.getenv("NEXE_MLX_TOP_P", "0.9")),
             max_session_caches=int(os.getenv("NEXE_MLX_MAX_SESSION_CACHES", "4")),
-            max_vlm_session_caches=_positive_int_env("NEXE_MLX_VLM_MAX_SESSION_CACHES", 1),
         )
         # B004: max_kv_size AFTER construction (__post_init__ has normalised
         # ~/relative paths) and derived from the model actually being loaded.
@@ -376,16 +406,25 @@ class MLXConfig:
         config.max_kv_size = (
             _kv_override if _kv_override is not None else auto_max_kv_size(config.model_path)
         )
+        # #1137: after max_kv_size — one conversation's cache is one KV window.
+        # Like NEXE_MLX_MAX_KV_SIZE above, the env var short-circuits the auto
+        # value (only computed when it is absent); an unusable one keeps 1.
+        config.max_vlm_session_caches = (
+            auto_vlm_session_caches(config.model_path, config.max_kv_size)
+            if os.getenv("NEXE_MLX_VLM_MAX_SESSION_CACHES") is None
+            else _positive_int_env("NEXE_MLX_VLM_MAX_SESSION_CACHES", 1)
+        )
 
         logger.info(
             "MLXConfig loaded: model=%s, max_tokens=%d, max_kv_size=%d, "
-            "temp=%.1f, top_p=%.1f, max_caches=%d",
+            "temp=%.1f, top_p=%.1f, max_caches=%d, vlm_caches=%d",
             config.model_path if config.model_path else "(empty)",
             config.max_tokens,
             config.max_kv_size,
             config.temperature,
             config.top_p,
             config.max_session_caches,
+            config.max_vlm_session_caches,
         )
 
         return config

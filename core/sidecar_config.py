@@ -18,36 +18,36 @@ paths/helpers.py, factory_security.py — the meta-bug "mode sidecar fictici"
 documented at the project's meta-mode sidecar ADR.
 
 ═══════════════════════════════════════════════════════════════════════════
-SidecarConfig vs NexeSettings — quan usar cadascú
+SidecarConfig vs NexeSettings — when to use which
 ═══════════════════════════════════════════════════════════════════════════
 
-`core/sidecar_config.SidecarConfig` (aquest mòdul):
-  ▸ ÚS: codi runtime que necessita decisions immediates (CORS, paths, allowlist)
-  ▸ FOCUS: subset de ~18 camps computats + derivats per a mode sidecar
-  ▸ API: dataclass FROZEN (immutable, type-safe, no `Optional[str]` sense parse)
-  ▸ FAIL-FAST: SidecarConfigError si manca env crítica
+`core/sidecar_config.SidecarConfig` (this module):
+  ▸ USE: runtime code that needs an immediate decision (CORS, paths, allowlist)
+  ▸ FOCUS: subset of ~18 computed + derived fields for sidecar mode
+  ▸ API: FROZEN dataclass (immutable, type-safe, no unparsed `Optional[str]`)
+  ▸ FAIL-FAST: SidecarConfigError if a critical env var is missing
   ▸ CONSUMERS: middleware, factory_security, lifespan_*, paths/helpers
   ▸ Usage: `config = get_sidecar_config(); if config.is_sidecar: ...`
 
-`core.config.NexeSettings` (BaseSettings Pydantic):
-  ▸ ÚS: future admin panel — exposar tots els NEXE_* a UI dinàmica
-  ▸ FOCUS: registry de ~40+ camps amb metadata (description, type, alias)
-  ▸ API: classe Pydantic mutable amb `model_fields` introspectable
-  ▸ NO FAIL-FAST: tots els camps tenen default (Optional o valor)
-  ▸ CONSUMERS: panel admin (futur), no codi runtime
+`core.config.NexeSettings` (Pydantic BaseSettings):
+  ▸ USE: future admin panel — expose every NEXE_* to a dynamic UI
+  ▸ FOCUS: registry of ~40+ fields with metadata (description, type, alias)
+  ▸ API: mutable Pydantic class with introspectable `model_fields`
+  ▸ NO FAIL-FAST: every field has a default (Optional or a value)
+  ▸ CONSUMERS: admin panel (future), not runtime code
   ▸ Usage: `settings = NexeSettings(); admin_panel.render(settings.list_settings())`
 
-Regla pràctica:
-- Pots derivar un valor amb seguretat al startup → SidecarConfig (parsing fail-fast).
-- Vols mostrar un valor a l'usuari amb metadata → NexeSettings (.list_settings()).
-- Vols overrides dinàmics post-startup → cap dels dos (SidecarConfig és FROZEN; NexeSettings encara no té setter).
+Practical rule:
+- You can derive a value safely at startup → SidecarConfig (fail-fast parsing).
+- You want to show a value to the user with metadata → NexeSettings (.list_settings()).
+- You want dynamic overrides after startup → neither (SidecarConfig is FROZEN; NexeSettings still has no setter).
 
 Fields that exist in both (manually synced up to Session 2):
 - host (NEXE_SERVER_HOST) / port (NEXE_SERVER_PORT) / lang / default_model
 - model_engine / prompt_tier / logs_dir / approved_modules
-Camps només a SidecarConfig (parse derivat): is_sidecar, is_production,
+Fields only on SidecarConfig (derived parse): is_sidecar, is_production,
 cors_origins, trusted_hosts, vectors_dir, cache_dir, parent_pid.
-Camps només a NexeSettings (raw env exposure): ollama_*, qdrant_url,
+Fields only on NexeSettings (raw env exposure): ollama_*, qdrant_url,
 csrf_secret, encryption_enabled, bootstrap_*, autostart_ollama, vpn_*.
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -59,7 +59,7 @@ Usage runtime:
         # tauri://localhost is in config.cors_origins, etc.
         ...
 
-Status: Initial implementation (2026-05-16). Impl bàsica
+Status: Initial implementation (2026-05-16). Basic impl
 direct os.environ — integration with NexeSettings deferred to Session 2.
 
 www.jgoy.net · https://server-nexe.org
@@ -77,22 +77,22 @@ from core.env_utils import parse_truthy as _parse_truthy
 
 
 # Required env vars when running as sidecar (NEXE_SIDECAR=1).
-# Tauri's spawn_sidecar_process injecta més (NEXE_HOME, NEXE_DATA_DIR, etc.)
-# però NOMÉS en release (sidecar_data_dir != None). En dev (`pnpm tauri dev`)
-# només injecta el subset crític sotabaix. Per tant fem fail-fast SOLS d'aquestes
-# (sense fallback raonable); les altres tenen defaults a _resolve_paths().
+# Tauri's spawn_sidecar_process injects more (NEXE_HOME, NEXE_DATA_DIR, etc.)
+# but ONLY in release (sidecar_data_dir != None). In dev (`pnpm tauri dev`)
+# it injects only the critical subset below. So we fail-fast ONLY on these
+# (no reasonable fallback); the others have defaults in _resolve_paths().
 #
 # Anomaly discovered empirically: requiring NEXE_HOME/DATA_DIR/etc.
-# trencava `pnpm tauri dev` perquè dev mode no les injecta — SidecarConfigError
-# es propagava al try/except defensiu de setup_cors, que feia fallback a server.toml
-# CORS sense Tauri origins → webview rebutjat.
+# broke `pnpm tauri dev` because dev mode does not inject them — SidecarConfigError
+# propagated into setup_cors's defensive try/except, which fell back to server.toml
+# CORS without Tauri origins → webview rejected.
 SIDECAR_REQUIRED_ENV_VARS: tuple[str, ...] = (
-    "NEXE_PRIMARY_API_KEY",  # Auth: sense això no hi ha seguretat
-    "NEXE_PORT",             # Port efímer del Tauri spawn — sense això collisió port 9119
+    "NEXE_PRIMARY_API_KEY",  # Auth: without this there is no security
+    "NEXE_PORT",             # Ephemeral port from the Tauri spawn — without it, port 9119 collides
 )
 
-# Env vars que Tauri spawn injecta en release (informatius, NO fail-fast).
-# Quan falten (dev mode), _resolve_paths() usa fallbacks raonables (~/.nexe/, cwd).
+# Env vars the Tauri spawn injects in release (informational, NOT fail-fast).
+# When they are missing (dev mode), _resolve_paths() uses reasonable fallbacks (~/.nexe/, cwd).
 SIDECAR_RELEASE_ENV_VARS: tuple[str, ...] = (
     "NEXE_HOME",
     "NEXE_DATA_DIR",
@@ -334,7 +334,7 @@ class SidecarConfig:
 
     # === Services (expanded fields for sidecar consumers) ===
     ollama_host: str          # NEXE_OLLAMA_HOST — default "http://localhost:11434"
-    qdrant_url: Optional[str] # NEXE_QDRANT_URL — Optional Qdrant extern; embedded if None
+    qdrant_url: Optional[str] # NEXE_QDRANT_URL — optional external Qdrant; embedded if None
     csrf_secret: Optional[str]    # NEXE_CSRF_SECRET — None disables persistent CSRF
     encryption_enabled: str   # NEXE_ENCRYPTION_ENABLED — "auto"/"true"/"false"
     auto_ingest_knowledge: bool   # NEXE_AUTO_INGEST_KNOWLEDGE
@@ -419,18 +419,18 @@ def reset_sidecar_config() -> None:
 # Import-guard helpers
 # ─────────────────────────────────────────────────────────────────────
 #
-# Aquests helpers encapsulen el patró try/except que estava duplicat a
-# bootstrap.py, system.py, factory_app.py i factory_security.py: importar
-# get_sidecar_config() de forma defensiva i degradar amb gràcia si la
-# config no està disponible. Repliquen EXACTAMENT la lògica/logs previs.
+# These helpers wrap the try/except pattern that was duplicated in
+# bootstrap.py, system.py, factory_app.py and factory_security.py: import
+# get_sidecar_config() defensively and degrade gracefully if the
+# config is unavailable. They replicate the previous logic/logs EXACTLY.
 
 def resolve_core_env(raw_default: str, context: str, logger: "logging.Logger") -> str:
     """
     Resolve the canonical environment string, deferring to SidecarConfig.
 
-    SidecarConfig.is_production is the canonical source for produccio vs
-    no-produccio. Es manté el raw NEXE_ENV per distingir "development" de
-    valors no-produccio com "staging"/"test".
+    SidecarConfig.is_production is the canonical source for production vs
+    non-production. The raw NEXE_ENV is kept to tell "development" apart from
+    other non-production values such as "staging"/"test".
 
     Args:
       raw_default: Default value for NEXE_ENV when the env var is unset
@@ -459,8 +459,8 @@ def is_sidecar_mode(context: str, logger: "logging.Logger") -> bool:
     """
     Return whether the process runs as a sidecar, degrading to False on error.
 
-    Encapsula el guard defensiu: si get_sidecar_config() falla per qualsevol
-    motiu, assumim que NO som sidecar (comportament previ de system.py).
+    Wraps the defensive guard: if get_sidecar_config() fails for any
+    reason, we assume we are NOT a sidecar (system.py's previous behavior).
 
     Args:
       context: Caller label used in the fallback debug log line.

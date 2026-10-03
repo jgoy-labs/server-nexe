@@ -352,29 +352,27 @@ class TestTheThirdCopyOfTheOrder:
 
 
 class TestASelectedModelMeetsTheCascade:
-    """Characterisation, not endorsement: what the product does today when the
-    UI has a model selected AND the engine serving it fails mid-turn.
-
-    A model name belongs to one engine — an MLX directory is not a .gguf — so
-    the next engine in the cascade is asked to load something it cannot, its
-    validation raises ValueError("not found"), and that is terminal. The user
-    gets a 404 about a model instead of the fallback answer the cascade exists
-    to give. Unchanged by F-D block 5 (the old loop switched per engine inside
-    the same try), so this pins it rather than fixing it under cover of a
-    refactor.
+    """#1035: the UI always sends the model selected in its dropdown, and a
+    model name belongs to one engine — an MLX directory is not a .gguf. The
+    next engine in the cascade used to be asked to load that name; its
+    validation raised ValueError("not found"), final for the cascade, so the
+    user got a 404 about a model instead of the fallback answer the cascade
+    exists to give. Now a fallback answers with the model it has loaded, as
+    `/v1` already did. (This class pinned the 404 as a characterisation from
+    F-D block 5 until the fix.)
     """
 
-    def test_a_model_from_the_failed_engine_ends_the_turn(self):
+    def test_the_fallback_answers_with_its_own_model(self):
         mlx = _Engine(raises=RuntimeError("corrupt model"))
         llama = _Engine(reply="from llama")
         llama.switch_model_by_path = MagicMock(
             side_effect=ValueError("Model 'Qwen3-8B-MLX' not found: not a GGUF file")
         )
         state = _state(mlx=mlx, llama_cpp=llama, ollama=_Engine())
-        with pytest.raises(HTTPException) as raised:
-            asyncio.run(_ui_turn(state, {"backend": "mlx", "model": "Qwen3-8B-MLX"}))
-        assert raised.value.status_code == 404
-        assert llama.calls == 0, "the fallback engine never got to answer"
+        asyncio.run(_ui_turn(state, {"backend": "mlx", "model": "Qwen3-8B-MLX"}))
+        assert mlx.calls == 1
+        assert llama.calls == 1, "the fallback engine never got to answer"
+        llama.switch_model_by_path.assert_not_called()
 
 
 class TestWhichErrorsAreWorthAnotherEngine:

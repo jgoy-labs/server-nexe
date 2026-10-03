@@ -652,6 +652,53 @@ class TestChatLLM:
         assert len(assistant_msgs) >= 1
         assert assistant_msgs[-1]["content"] == "Resposta de prova"
 
+    @pytest.mark.parametrize("stream", [True, False])
+    async def test_a_model_delete_tag_the_user_never_asked_for_arms_nothing(self, stream):
+        """#1135 (live 03/10 17:18): asked how its memory works, the model wrote
+        [MEM_DELETE: L'usuari es diu Jordi] as an example and the dialog offered
+        to delete the user's name. Both web paths must hand the user's message
+        to the arming rule: here nobody asked to forget, so nothing arms."""
+        class _ExplainingEngine:
+            def chat(self, model, messages, stream=False, images=None, thinking_enabled=False):
+                if stream:
+                    return self._astream()
+                return {"message": {"content": "Així funciono. [MEM_DELETE: L'usuari es diu Jordi]"}, "done": True}
+
+            async def _astream(self):
+                yield {"message": {"content": "Així funciono. "}}
+                yield {"message": {"content": "[MEM_DELETE: L'usuari es diu Jordi]"}}
+
+            async def is_model_loaded(self, model_name):
+                return True
+
+        h = _Harness(intent="chat")
+        h.session._pending_partial_delete = None
+        state = _make_server_state(engine=_ExplainingEngine())
+        result = await h.call({"message": "com funciona la teva memòria?", "stream": stream}, server_state=state)
+        if isinstance(result, StreamingResponse):
+            async for _ in result.body_iterator:
+                pass
+        assert h.session._pending_partial_delete is None
+
+    async def test_json_model_mem_delete_arms_when_the_user_asked(self):
+        """#1135, the JSON half of the rule (review 04/10): the web JSON path
+        hands the user's message to the arming rule too. Only the negative case
+        covered it, so dropping `user_message=ctx.message` there stayed green;
+        here the user asked to forget, and the model's tag arms."""
+        class _ForgettingEngine:
+            def chat(self, model, messages, stream=False, images=None, thinking_enabled=False):
+                return {"message": {"content": "D'acord, ho oblido. [MEM_DELETE: el meu nom es Joan]"}, "done": True}
+
+            async def is_model_loaded(self, model_name):
+                return True
+
+        h = _Harness(intent="chat")
+        h.session._pending_partial_delete = None
+        state = _make_server_state(engine=_ForgettingEngine())
+        await h.call({"message": "oblida el meu nom", "stream": False}, server_state=state)
+        pending = h.session._pending_partial_delete
+        assert pending is not None and pending["content"] == "el meu nom es Joan"
+
     async def test_streaming_model_mem_delete_arms_text_confirmation(self):
         """MC-117: when the MODEL emits a [MEM_DELETE: ...] tag INSIDE the streamed
         response, the streaming generator must arm session._pending_partial_delete

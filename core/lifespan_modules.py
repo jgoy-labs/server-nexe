@@ -343,7 +343,7 @@ async def _startup_module_discovery(app, server_state, _translate) -> None:
         try:
             cycle_warnings = server_state.module_manager.get_cycle_warnings()
         except Exception:
-            # AP-G01: log diagnòstic sense canviar el fallback (cap warning de cicle)
+            # AP-G01: diagnostic log without changing the fallback (no cycle warning)
             logger.debug("Could not read module cycle warnings", exc_info=True)
             cycle_warnings = []
         for cycle_chain in cycle_warnings:
@@ -420,7 +420,7 @@ async def start_memory_service_v1(app, server_state) -> None:
                         from memory.memory._paths import resolve_qdrant_path
                         vectors_dir = resolve_qdrant_path(Path(project_root) / "storage" / "vectors", root=Path(project_root))
                 except Exception:
-                    # AP-G01: log diagnòstic sense canviar el fallback al path per defecte
+                    # AP-G01: diagnostic log without changing the fallback to the default path
                     logger.debug("SidecarConfig unavailable resolving vectors_dir", exc_info=True)
                     vectors_dir = Path(project_root) / "storage" / "vectors"
                 vectors_dir.mkdir(parents=True, exist_ok=True)

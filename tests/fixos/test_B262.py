@@ -21,6 +21,7 @@ import pytest
 # C4.2: the sticky-language policy and the system-prompt assembly moved out of
 # the plugin into `core/turn/prompt.py`, whole. `rc` keeps its name here so the
 # assertions below stay a move, not a rewrite.
+import core.lang_detect as _lang_detect  # #1143: the one place the reply language is decided
 import core.turn.prompt as rc
 from core.utils import compute_system_hash
 from core.sessions import ChatSession
@@ -40,7 +41,7 @@ class TestResolveSessionLangPolicy:
     """
 
     def test_first_real_detection_seeds_sticky(self, monkeypatch):
-        monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: "en", raising=False)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "en")
         s = _session()
         assert rc._resolve_session_lang(s, "hello there, how are you today?") == "en"
         assert s.lang == "en"
@@ -48,7 +49,7 @@ class TestResolveSessionLangPolicy:
     def test_no_detection_returns_fallback_without_seeding(self, monkeypatch):
         """Review #850: un guess (NEXE_LANG) mai es fixa — la primera detecció
         REAL és qui sembra; mentrestant el fallback és estable per env."""
-        monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: None, raising=False)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: None)
         monkeypatch.setenv("NEXE_LANG", "ca")
         s = _session()
         assert rc._resolve_session_lang(s, "ok") == "ca"
@@ -56,14 +57,14 @@ class TestResolveSessionLangPolicy:
 
     def test_degenerate_nexe_lang_still_returns_en(self, monkeypatch):
         """Review #850: NEXE_LANG degenerat no pot produir idioma buit."""
-        monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: None, raising=False)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: None)
         monkeypatch.setenv("NEXE_LANG", "-es")
         assert rc._resolve_session_lang(_session(), "ok") == "en"
 
     def test_short_ack_never_flips(self, monkeypatch):
         """El cor del #850: "thanks a lot" (12 chars, detecció EN real) NO pot
         flipar una sessió catalana."""
-        monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: "en", raising=False)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "en")
         s = _session(lang="ca")
         assert rc._resolve_session_lang(s, "thanks a lot") == "ca"
         assert s.lang == "ca"
@@ -71,7 +72,7 @@ class TestResolveSessionLangPolicy:
     def test_url_padded_ack_never_flips(self, monkeypatch):
         """Review #850: el llindar es mesura sobre el TEXT NATURAL — un link
         llarg no converteix "thanks mate" en canvi d'idioma."""
-        monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: "en", raising=False)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "en")
         s = _session(lang="ca")
         msg = "thanks mate https://github.com/jgoy-labs/server-nexe/issues/1"
         assert len(msg) >= rc._STICKY_LANG_MIN_SWITCH_CHARS  # el RAW enganya
@@ -84,7 +85,7 @@ class TestResolveSessionLangPolicy:
         des que ho és (`_MIN_RELATIVE_DISTANCE`), un canvi genuí no ha de pagar
         un torn de retard. Contrapartida acceptada: una traça en anglès de ≥25
         caràcters enganxada en una conversa catalana també canvia l'idioma."""
-        monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: "en", raising=False)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "en")
         s = _session(lang="ca")
         assert rc._resolve_session_lang(s, "can we please switch to english now?") == "en"
         assert s.lang == "en" and s.lang_pending is None
@@ -92,7 +93,7 @@ class TestResolveSessionLangPolicy:
     def test_it_switches_back_just_as_fast(self, monkeypatch):
         detections = iter(["en", "ca"])
         monkeypatch.setattr(
-            rc, "_detect_lang_or_none", lambda m: next(detections), raising=False
+            _lang_detect, "detect_user_lang_or_none", lambda m: next(detections)
         )
         s = _session(lang="ca")
         long = "aquesta és una frase prou llarga per superar el llindar del gate"
@@ -101,7 +102,7 @@ class TestResolveSessionLangPolicy:
         assert s.lang == "ca"
 
     def test_same_lang_long_message_keeps_sticky(self, monkeypatch):
-        monkeypatch.setattr(rc, "_detect_lang_or_none", lambda m: "ca", raising=False)
+        monkeypatch.setattr(_lang_detect, "detect_user_lang_or_none", lambda m: "ca")
         s = _session(lang="ca")
         assert rc._resolve_session_lang(s, "una pregunta llarga i ben catalana sobre el temps") == "ca"
 

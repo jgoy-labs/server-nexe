@@ -1,12 +1,17 @@
 """The web UI door (`POST /ui/chat`) on the turn engine (ADR-007, C1.3).
 
 One adapter per step of `core.turn.steps.TURN_STEPS`, each a thin wrapper over a
-function that ALREADY exists in `routes_chat.py`. The adapters live in the
-plugin, not in `core/turn/`: the UI's behaviour is plugin code, and the layering
-gate keeps `core → plugins` at zero. Every call into `routes_chat` goes through
-the module object, looked up at call time — the UI's tests patch attributes on
-`plugins.web_ui_module.api.routes_chat` (`helper_for` from the core,
-the core's `compact_session`) and on `core.lifespan` (`get_server_state`).
+function that ALREADY exists in the core or in the door's other modules:
+`wire.py` (the sentinels built outside the stream, the curated notices, the
+saved stats) and `engine_call.py` (starting an engine and reading it), both
+split out of `routes_chat.py` on 2026-10-04. The adapters live in the plugin,
+not in `core/turn/`: the UI's behaviour is plugin code, and the layering gate
+keeps `core → plugins` at zero. Calls into `wire`, `engine_call` and
+`routes_chat` (`_rc()`, three names) are looked up on the module at call time;
+the names this file imports from the core are bound here at import, and that
+is where the UI's tests patch them (`turn_adapters.compact_session`,
+`turn_adapters._build_rag_context`), with `core.lifespan` (`get_server_state`).
+No test patches `routes_chat`, `wire` or `engine_call` (checked 2026-10-04).
 
 Two tables, because four steps really differ between the UI's two wire formats
 (measured 2026-09-05: different functions, different junk regexes, different
@@ -33,10 +38,12 @@ Since C4.6 nothing bypasses these adapters: FD-S6's Continue is a turn with
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import logging
 import os
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import HTTPException
@@ -55,7 +62,7 @@ from core.sessions.compactor import compact_session
 from core.turn.post_commit import queue_for
 from core.turn.errors import StreamCapExceeded, classify_engine_error
 from core.turn.persist import persist_assistant_turn, persist_partial_assistant
-from core.turn.stream import StreamFlags
+from core.turn.stream import Failed, StreamFlags, close_quietly
 from core.turn.text import clean as text_clean
 from core.turn.prompt import _fallback_lang, _resolve_session_lang, turn_system_prompt
 from core.turn.recall import _build_rag_context, collections_for_turn
@@ -66,6 +73,10 @@ from core.turn.validate import (
     sanitize_user_text,
     validate_turn,
 )
+
+# The web door's alphabet and its engine call, split out of routes_chat.py
+# (2026-10-04): looked up on the module at call time, like `_rc()` below.
+from plugins.web_ui_module.api import engine_call, wire
 
 logger = logging.getLogger(__name__)
 
@@ -92,11 +103,111 @@ def _internal_error(ctx: TurnContext, exc: BaseException) -> TurnShortCircuit:
     return TurnShortCircuit(INTERNAL_ERROR_TEXT, reason="internal_error")
 
 
+@dataclass
+class _Claim:
+    """One engine attempt of a streaming turn, its first event already read
+    (#1117): the engine that claimed the stream, or the first one that failed
+    before a byte when none did."""
+    engine_name: str
+    engine_obj: Any
+    prepared: tuple
+    primed: tuple
+    flags: StreamFlags
+    started: float
+
+
+#: `_prepare_or_decide`'s answer when an engine fails to start in a way every
+#: engine would repeat, and an earlier failure's notice is already in hand.
+_KEEP_THE_NOTICE = object()
+
+
 async def _switch_model(engine, engine_name: str, model_name: str) -> None:
     # Deferred: a plugin must not pull core at import time (layering gate, #471).
     from core.endpoints.chat_engines.model_switch import model_switch_lock, switch_engine_model
     async with model_switch_lock():
         await switch_engine_model(engine, engine_name, model_name)
+
+
+def _model_on_fallback(engine, requested: str) -> str:
+    """#1035: the model a fallback engine answers with — the one it has loaded.
+
+    A model name belongs to one engine: an MLX directory is not a .gguf, and
+    neither is an Ollama tag. The web doors used to ask the next engine in the
+    cascade to load the name picked for another one; its validation raised
+    ValueError("not found"), final for the cascade policy, so with a model
+    selected in the UI (always) no fallback ever answered. `/v1` already runs
+    a fallback with its loaded model; the web doors do the same now. An engine
+    with no single loaded model (Ollama picks one per request) gets the
+    requested name, as before.
+    """
+    # Deferred, as above.
+    from core.endpoints.chat_engines._common import resolve_loaded_model_name
+    return resolve_loaded_model_name(engine, requested)
+
+
+class _CannotSeeTheImage(RuntimeError):
+    """#1035: a fallback whose own model cannot read the turn's image. A
+    RuntimeError, so the cascade moves on to the next engine; a ValueError
+    would end the turn for every engine."""
+
+
+def _reattach_mentioned_image(ctx: TurnContext) -> None:
+    """#1144 (Jordi: «sí, posa la capa 2»): a message that talks about an image
+    and brings none gets the conversation's latest one again, so the model
+    looks at it instead of answering from memory — and so does any turn while
+    that image has no description yet (the note cannot carry it). After
+    `persist_user_turn` (stored once, not again with this turn) and before
+    `budget` (the prompt is built knowing there is an image). Only for an
+    engine that can see."""
+    from core.endpoints.chat_engines.routing import engine_can_see_images  # deferred, as below
+    from core.turn import image_memory
+
+    if ctx.resume or ctx.attachments.get("image_b64"):
+        return
+    earlier = _latest_image(ctx.session.messages[:-1])  # the last one is this turn's own message
+    if earlier is None:
+        return
+    key = image_memory.image_key(earlier["image_b64"])
+    described = earlier.get("image_description") or image_memory.DESCRIPTIONS.get(key)
+    # Live 03/10: asked right after the image, before its description existed,
+    # the model had neither and guessed («el botó és verd»; it is blue). Until
+    # the note can carry the image, the image itself goes again — unless no
+    # description is coming (review 04/10: then every later turn re-sent it).
+    if (described or image_memory.gave_up(key)) and not image_memory.mentions_image(ctx.message):
+        return
+    if engine_can_see_images(ctx.engine) is False:
+        logger.info("Image not re-attached: the engine cannot see (#1144)")
+        return
+    ctx.attachments["image_b64"] = earlier["image_b64"]
+    ctx.attachments["image_type"] = earlier.get("image_type")
+    ctx.attachments["image_reattached"] = True
+    logger.info("Image re-attached from an earlier message of the conversation (#1144)")
+
+
+def _latest_image(messages: list) -> "dict | None":
+    """The last user message in `messages` that brought an image."""
+    return next((m for m in reversed(messages) if m.get("role") == "user" and m.get("image_b64")), None)
+
+
+def _latest_undescribed_image(messages: list) -> "dict | None":
+    """The last user message whose image still needs its description — not
+    simply the last image (review 04/10: two images in a row, the second
+    turn's job replaced the first's, and the first was never described)."""
+    from core.turn import image_memory
+
+    return next((m for m in reversed(messages)
+                 if m.get("role") == "user" and m.get("image_b64") and not m.get("image_description")
+                 and not image_memory.gave_up(image_memory.image_key(m["image_b64"]))), None)
+
+
+def _require_sight(engine, engine_name: str, model_name: str) -> None:
+    """A fallback answers with its own model (#1035), and a text model given a
+    turn with an image would answer as if it saw it. An engine that says it
+    cannot see is skipped; one that does not say (it takes the requested
+    model, Ollama) is left as before."""
+    from core.endpoints.chat_engines.routing import engine_can_see_images  # deferred, as above
+    if engine_can_see_images(engine) is False:
+        raise _CannotSeeTheImage(f"{engine_name} runs {model_name}, which cannot see the image")
 
 
 def _serve_with(ctx: TurnContext, engine_obj, ui: dict) -> None:
@@ -282,6 +393,18 @@ def _resume_from(ctx: TurnContext) -> None:
     if answered.get("image_b64"):
         ctx.attachments["image_b64"] = answered["image_b64"]
         ctx.attachments["image_type"] = answered.get("image_type")
+    else:
+        # #1144: a turn that got the conversation's image re-attached was
+        # answered WITH it, though the message does not store it again.
+        from core.turn import image_memory
+
+        if image_memory.mentions_image(ctx.message):
+            asked_at = max(i for i, m in enumerate(messages) if m is answered) if answered else len(messages)
+            earlier = _latest_image(messages[:asked_at])
+            if earlier is not None:
+                ctx.attachments["image_b64"] = earlier.get("image_b64")
+                ctx.attachments["image_type"] = earlier.get("image_type")
+                ctx.attachments["image_reattached"] = True
 
 
 def _memory_port(ctx: TurnContext):
@@ -448,7 +571,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         if outcome.continue_turn:
             # D6: the fact is already saved; the model answers the user normally.
             return
-        raise TurnShortCircuit(rc.render_intent_for_ui(outcome), reason=f"memory_intent:{outcome.kind}")
+        raise TurnShortCircuit(wire.render_intent_for_ui(outcome), reason=f"memory_intent:{outcome.kind}")
 
     async def recall(ctx: TurnContext) -> None:
         """C4.2: retrieval is a step of the turn, not a line inside
@@ -476,16 +599,20 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         _ui(ctx)["rag_count"] = _count
 
     async def clock(ctx: TurnContext) -> None:
-        """C4.2: B007's on-demand clock, resolved once and written down.
+        """C4.2: the clock, resolved once and written down. `budget` prefixes it
+        to this turn's user message and never to the system prompt, which
+        would poison the prefix cache for the whole conversation.
 
-        It used to be computed inside `_assemble_engine_messages`, which
-        `budget` calls — the last thing this door had folded. `budget` still
-        prefixes it to this turn's user message and never to the system
-        prompt, which would poison the prefix cache for the whole conversation.
+        #1125: every turn, not only when a phrase asked for the time — the
+        model said it had no clock to "quin dia i hora es avui?" (02/10). It
+        is the same line every earlier message carries from its stored
+        `timestamp` (`core/turn/assemble.py`), so the history renders the same
+        next turn. /v1 runs the same function; its history is the client's,
+        and carries what the client sends.
         """
-        from core.chat_prompt import time_context_line
+        from core.chat_prompt import turn_time_line
 
-        ctx.clock_line = time_context_line(ctx.message, ctx.lang)
+        ctx.clock_line = turn_time_line(ctx.lang)
 
     async def system_prompt(ctx: TurnContext) -> None:
         """C4.2: the same `turn_system_prompt` /v1 runs.
@@ -534,6 +661,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 await _switch_model(ctx.engine, ui["engine_name"], model_name)
             ctx.context_window = ask_engine_window(ctx.engine)
             ctx.deadline = resolve_deadline_s() or None
+            _reattach_mentioned_image(ctx)
         except HTTPException:
             raise
         except Exception as exc:
@@ -581,23 +709,35 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             raise _internal_error(ctx, exc) from exc
 
     async def _prepare_call(ctx: TurnContext, index: int, engine_name: str, engine_obj, cancel_event, *, stream: bool):
-        """One engine attempt's setup: model switch (fallbacks only — the first
-        candidate was switched in `engine`), signature, prompt refit, start."""
+        """One engine attempt's setup: its model, signature, prompt refit, start.
+
+        The first candidate was switched to the requested model in `engine`; a
+        fallback answers with the model it has loaded (#1035), and only if
+        that model can see the turn's image when there is one. The model comes
+        back last: this attempt's text is parsed, recorded and stored as its."""
         ui = _ui(ctx)
-        if index > 0 and ctx.body.get("model"):
-            await _switch_model(engine_obj, engine_name, ui["model_name"])
+        model_name = ui["model_name"] if index == 0 else _model_on_fallback(engine_obj, ui["model_name"])
+        image_b64 = ctx.attachments.get("image_b64")
+        if image_b64 and ctx.attachments.get("image_reattached"):
+            # #1144: a re-attached image is a help, never a reason to pass an
+            # engine over — one that cannot see answers from the image's note.
+            from core.endpoints.chat_engines.routing import engine_can_see_images  # deferred, as in _require_sight
+            if engine_can_see_images(engine_obj) is False:
+                image_b64 = None
+        elif index > 0 and image_b64:
+            _require_sight(engine_obj, engine_name, model_name)
         thinking_enabled = getattr(ctx.session, "thinking_enabled", False)
         sig = inspect.signature(engine_obj.chat)
         messages = ctx.prompt if index == 0 else _refit_for(engine_obj, ctx.system_prompt, ctx.prompt)
         top_p = parse_top_p(ctx.body)
         sampling_kwargs = {"top_p": top_p} if top_p is not None else {}
-        chat_result = rc._start_engine_call(
-            engine_obj, engine_name, sig, ui["model_name"], ctx.system_prompt, messages,
-            stream=stream, image_b64=ctx.attachments.get("image_b64"),
+        chat_result = engine_call._start_engine_call(
+            engine_obj, engine_name, sig, model_name, ctx.system_prompt, messages,
+            stream=stream, image_b64=image_b64,
             thinking_enabled=thinking_enabled, cancel_event=cancel_event,
             sampling_kwargs=sampling_kwargs, session_id=ctx.session.id, _continue=ctx.resume,
         )
-        return chat_result, sig, messages, thinking_enabled
+        return chat_result, sig, messages, thinking_enabled, model_name
 
     # ---------------------------------------------------------- JSON mode
 
@@ -623,27 +763,28 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 logger.info("Trying engine: %s", engine_name)
                 _call_started = time.monotonic()
                 try:
-                    chat_result, sig, messages, thinking_enabled = await _prepare_call(
+                    chat_result, sig, messages, thinking_enabled, model_name = await _prepare_call(
                         ctx, index, engine_name, engine_obj, cancel_event, stream=False,
                     )
                     # C4.5: how this door asks the engine once more, if the
                     # turn cleans down to nothing but tags (`postprocess`).
-                    ui["reprompt_call"] = rc.reprompt_call_for(
-                        engine_obj, sig, ui["model_name"], messages, thinking_enabled,
+                    ui["reprompt_call"] = engine_call.reprompt_call_for(
+                        engine_obj, sig, model_name, messages, thinking_enabled,
                     )
                     chunks: list[str] = []
-                    if await rc._accumulate_nonstreaming_response(chat_result, chunks):
+                    if await engine_call._accumulate_nonstreaming_response(chat_result, chunks):
                         _end_partial(ctx, StreamCapExceeded())
                     text = "".join(chunks)
                     if text:
                         logger.info("%s succeeded!", engine_name)
                         record_llm_call(
-                            ctx, step="generate", engine=engine_name, model=ui["model_name"],
+                            ctx, step="generate", engine=engine_name, model=model_name,
                             ms=(time.monotonic() - _call_started) * 1000.0,
                         )
                         ctx.response = text
                         _serve_with(ctx, engine_obj, ui)
                         ui["engine_name"] = engine_name
+                        ui["model_name"] = model_name  # #1035: the one that answered
                         return
                 except Exception as exc:
                     # F-D block 5: which errors end the turn and which are worth
@@ -679,10 +820,10 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         if facts and not ui["memory_action"]:
             ui["memory_action"] = "mem_save_inline"
         armed = await memory_deletes.arm_pending_deletes(
-            ctx.session, deletes, ui["memory_helper"], _rag_collections(ctx),
+            ctx.session, deletes, ui["memory_helper"], _rag_collections(ctx), user_message=ctx.message,
         )
         if armed is not None:
-            question = rc.render_intent_for_ui(armed)
+            question = wire.render_intent_for_ui(armed)
             clean = f"{clean}\n\n{question}" if clean else question
             ui["memory_action"] = armed.memory_action
         if not clean and facts and not ctx.resume:
@@ -714,6 +855,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 "tokens": max(1, len(ctx.response) // 4),
                 "elapsed": round(time.time() - ui.get("start_t", time.time()), 1),
                 "model": str(model_name)[:100] if model_name else None,
+                "engine": ui.get("engine_name") or None,
                 "mem_deleted": ui.get("mem_deleted") or None,
             })
         session_mgr._save_session_to_disk(ctx.session)
@@ -756,6 +898,99 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             # The error is already on the wire (as text, via _stream_error_notice).
             _end_partial(ctx, flags.error)
 
+    async def _prepare_or_decide(ctx: TurnContext, index: int, engine_name: str, engine_obj, cancel_event,
+                                 *, have_notice: bool):
+        """`_prepare_call` for the streaming claim, and what a failure there
+        means: `None` tries the next engine; an error the cascade policy treats
+        as final (`should_try_next_engine`) is raised as its HTTP answer —
+        unless a notice is already in hand (`have_notice`, #1117), and then
+        `_KEEP_THE_NOTICE` writes it instead of cutting a stream whose 200 is
+        already out. Either way the error is logged here: the notice the user
+        sees is the earlier engine's, and this one would otherwise leave no trace."""
+        from core.endpoints.chat_engines.routing import raise_if_terminal, should_try_next_engine
+        try:
+            return await _prepare_call(ctx, index, engine_name, engine_obj, cancel_event, stream=True)
+        except Exception as exc:
+            logger.warning("%s failed: %s", engine_name, exc)
+            logger.debug("Engine error details:", exc_info=True)
+            if have_notice and not should_try_next_engine(exc):
+                return _KEEP_THE_NOTICE
+            raise_if_terminal(exc, engine_name)
+            return None
+
+    async def _claim_stream_engine(ctx: TurnContext, ui: dict, cancel_event, holder: list):
+        """The engine that owns this stream, chosen before any of its bytes.
+
+        Each candidate is started (`_prepare_call`, which also says the model
+        it runs: a fallback's is the one it has loaded, #1035), the loading
+        banner goes out if that model is not in memory, and its first event is
+        read (`engine_call.claim_engine_start`). A
+        real event claims the stream. A failure tries the next engine, unless
+        the cascade policy treats it as final (`should_try_next_engine`).
+
+        #1117: the response is committed by now, so when no engine claims the
+        stream the FIRST one that failed on its first event keeps the turn,
+        that event already read, and the normal path writes its notice (the
+        out-of-memory one included) — usually the engine the user picked, and
+        the wire 32f9cbd0 sent. A raise cuts the connection, so it is left for
+        the two cases 32f9cbd0 already raised in: no engine got as far as its
+        first event, or one failed to start with a final error before any
+        notice was in hand.
+
+        The loading banner names the first engine that needed a load. When it
+        fails and another one loads, nexe-chat.js keeps that first label (a
+        second banner would spin for ever there).
+
+        Only wire strings come out. The claim goes into `holder`: Starlette
+        encodes every chunk, so nothing else may reach the wire.
+        """
+        from core.endpoints.chat_engines.routing import should_try_next_engine
+        announced = False
+        first_failure = None
+        pending = None
+        try:
+            for index, (engine_name, engine_obj) in enumerate(ui["candidates"]):
+                if index > 0 and cancel_event.is_set():
+                    break  # the turn is cancelled (client gone, deadline): no other engine is asked
+                logger.info("Trying engine: %s", engine_name)
+                prepared = await _prepare_or_decide(
+                    ctx, index, engine_name, engine_obj, cancel_event, have_notice=first_failure is not None,
+                )
+                if prepared is _KEEP_THE_NOTICE:
+                    break
+                if prepared is None:
+                    continue
+                pending = prepared[0]
+                if not announced:
+                    # After `_prepare_call`: it says which model this attempt
+                    # runs (a fallback's own, #1035), and that is the one the
+                    # banner asks about and names.
+                    # Once per turn: nexe-chat.js keeps a second banner spinning.
+                    async for token in wire._yield_model_loading_check(engine_obj, prepared[-1], engine_name):
+                        announced = True
+                        yield token
+                flags = StreamFlags()
+                started = time.time()  # the load and the first token are this call's time
+                events, first = await engine_call.claim_engine_start(prepared[0], prepared[-1], flags)
+                pending = None
+                attempt = _Claim(engine_name, engine_obj, prepared, (events, first), flags, started)
+                if not isinstance(first, Failed):
+                    holder.append(attempt)
+                    return
+                logger.warning("%s failed before its first byte: %s", engine_name, first.exc)
+                logger.debug("Engine error details:", exc_info=first.exc)
+                if first_failure is None:
+                    # Replayed, its `started` also covers the engines tried after it.
+                    first_failure = attempt
+                if not should_try_next_engine(first.exc):
+                    break  # final for the cascade policy: no other engine is asked
+            if first_failure is None:
+                raise HTTPException(status_code=503, detail="No AI engine available")
+            holder.append(first_failure)
+        finally:
+            if pending is not None:
+                await close_quietly(pending)
+
     async def generate_stream(ctx: TurnContext):
         ui = _ui(ctx)
         cancel_event, monitor = rc._start_disconnect_monitor(ctx.request)
@@ -779,28 +1014,19 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         # `_chat_inner` returned the `StreamingResponse` OBJECT, before a single
         # token was generated — this is the fix.
         try:
+            # #1117: the headers first — none of them depends on the engine
+            # that will answer. The loading banner goes out inside the claim,
+            # with the engine that is about to load.
+            async for header in wire._yield_response_headers(
+                ui["model_name"], ui["rag_count"], ctx.recall, ui["compacted"],
+                ctx.session.compaction_count, ui["doc_truncated_pct"],
+            ):
+                yield header
+            holder: list = []
             try:
-                from core.endpoints.chat_engines.routing import raise_if_terminal
-                started = None
-                for index, (engine_name, engine_obj) in enumerate(ui["candidates"]):
-                    logger.info("Trying engine: %s", engine_name)
-                    try:
-                        prepared = await _prepare_call(
-                            ctx, index, engine_name, engine_obj, cancel_event, stream=True,
-                        )
-                        # A raise before the first byte is this engine failing.
-                        # Headers stay unsent, so the next engine can still answer.
-                        flags = StreamFlags()
-                        primed = await rc.claim_engine_start(prepared[0], ui["model_name"], flags)
-                        started = (prepared, primed, flags)
-                        break
-                    except Exception as exc:
-                        raise_if_terminal(exc, engine_name)
-                        logger.warning("%s failed: %s", engine_name, exc)
-                        logger.debug("Engine error details:", exc_info=True)
-                        continue
-                if started is None:
-                    raise HTTPException(status_code=503, detail="No AI engine available")
+                async with contextlib.aclosing(_claim_stream_engine(ctx, ui, cancel_event, holder)) as claiming:
+                    async for token in claiming:
+                        yield token
             except HTTPException:
                 _cancel_monitor(ctx)
                 raise
@@ -808,14 +1034,25 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 _cancel_monitor(ctx)
                 raise _internal_error(ctx, exc) from exc
 
-            (chat_result, sig, messages, thinking_enabled), primed, flags = started
+            claim = holder[0]
+            engine_name, engine_obj, flags = claim.engine_name, claim.engine_obj, claim.flags
+            chat_result, sig, messages, thinking_enabled, model_name = claim.prepared
             _serve_with(ctx, engine_obj, ui)
             ui["engine_name"] = engine_name
-            ui["reprompt_call"] = rc.reprompt_call_for(
-                engine_obj, sig, ui["model_name"], messages, thinking_enabled,
+            # #1035: from here on the turn's model is the one that answers. The
+            # `[MODEL:]` header above went out with the requested one; the
+            # client keeps the last it reads, so a fallback's goes out now —
+            # when it answers, not when its failure is the notice replayed.
+            if not isinstance(claim.primed[1], Failed):
+                if model_name != ui["model_name"]:
+                    yield wire.model_token(model_name)
+                yield wire.engine_token(engine_name)  # #1146: the footer names the engine
+            ui["model_name"] = model_name
+            ui["reprompt_call"] = engine_call.reprompt_call_for(
+                engine_obj, sig, model_name, messages, thinking_enabled,
             )
-            stream_ctx = rc.StreamingChatContext(
-                model_name=ui["model_name"], rag_count=ui["rag_count"], rag_items=ctx.recall,
+            stream_ctx = engine_call.StreamingChatContext(
+                model_name=model_name, rag_count=ui["rag_count"], rag_items=ctx.recall,
                 compacted=ui["compacted"], doc_truncated_pct=ui["doc_truncated_pct"],
                 session=ctx.session, session_mgr=session_mgr, memory_helper=ui["memory_helper"],
                 engine=engine_obj, engine_name=engine_name, chat_result=chat_result, sig=sig,
@@ -824,19 +1061,12 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 rag_collections=_rag_collections(ctx),
             )
             ui["stream_ctx"] = stream_ctx
-            async for header in rc._yield_response_headers(
-                stream_ctx.model_name, stream_ctx.rag_count, stream_ctx.rag_items, stream_ctx.compacted,
-                stream_ctx.session.compaction_count, stream_ctx.doc_truncated_pct,
-            ):
-                yield header
-            async for token in rc._yield_model_loading_check(engine_obj, stream_ctx.model_name, engine_name):
-                yield token
-            ui["stream_start_t"] = time.time()
+            ui["stream_start_t"] = claim.started
             ui["flags"] = flags
             # `ctx.response` holds the RAW text while generating (what the old
             # body called full_response); `postprocess` turns it into the clean
             # answer.
-            async for token, full_delta in rc._yield_engine_chunks(stream_ctx, flags, primed=primed):
+            async for token, full_delta in engine_call._yield_engine_chunks(stream_ctx, claim.primed):
                 ctx.response += full_delta
                 if token is not None:
                     yield token
@@ -853,7 +1083,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         ui["full_response"] = full_response
         clean_response, mem_saves, mem_deletes = text_clean.clean_full_response(full_response, ctx.message)
         # FD-S5: its OWN yield (a marker split across reads would not be parsed).
-        trunc_token = rc._gen_truncated_token(flags.trunc, flags.trunc_continuable, clean_response)
+        trunc_token = wire._gen_truncated_token(flags.trunc, flags.trunc_continuable, clean_response)
         if trunc_token:
             yield trunc_token
         # C4.5: one delete rule and one re-prompt for every door, in the core.
@@ -862,9 +1092,10 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         # the reply was empty, flag off or engine skipped alike).
         armed = await memory_deletes.arm_pending_deletes(
             stream_ctx.session, mem_deletes, stream_ctx.memory_helper, stream_ctx.rag_collections,
+            user_message=ctx.message,
         )
         if armed is not None:
-            yield rc.pending_delete_sentinel(armed.pending_delete_fact)
+            yield wire.pending_delete_sentinel(armed.pending_delete_fact)
         if not clean_response and mem_saves and not ctx.resume:
             parts: list[str] = []
             async for chunk in policy.reprompt_chunks(
@@ -894,6 +1125,14 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
     async def persist_stream(ctx: TurnContext) -> None:
         ui = _ui(ctx)
         stream_ctx = ui.get("stream_ctx")
+        if stream_ctx is None and ctx.outcomes.get("generate") == "cancelled":
+            # #1117: cancelled while the engine was still being claimed (Stop on
+            # the loading banner). It has not said a word, so there is no answer
+            # to store — the same as a cancel before the first token, below. The
+            # stream context only exists once an engine owns the stream.
+            _cancel_monitor(ctx)
+            session_mgr.release_lease(ctx.session_id, ctx.turn_id)
+            return
         if stream_ctx is None:
             # A short-circuited turn (memory command, internal error): no stream
             # ever started, the route's small stats apply.
@@ -925,9 +1164,9 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         elapsed = round(time.time() - ui["stream_start_t"], 1)
         # Disk first (decision 06/09): the facts' count lands in these stats
         # AFTER `memory.write` runs — see `memory_write_stream`.
-        stats = rc._build_mem_stats(
+        stats = wire._build_mem_stats(
             stream_ctx.session, stream_ctx.rag_count, stream_ctx.rag_items, stream_ctx.model_name,
-            elapsed, len(full_response), 0, ctx.facts,
+            elapsed, len(full_response), 0, ctx.facts, engine_name=ui.get("engine_name"),
         )
         persist_assistant_turn(
             stream_ctx.session, clean_response, full_response, stats, flags.trunc, flags.trunc_continuable,
@@ -1011,6 +1250,56 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         if outcome.saved:
             _record_saved_facts(session, outcome, session_mgr, accumulate=ctx.resume)
 
+    async def describe_image(ctx: TurnContext) -> None:
+        """#1144, post-commit: the conversation's latest image, if it has no
+        description yet, gets its own from the model that served this turn —
+        kept with the message it came on (the encrypted session) and by image
+        key. Later turns carry it as the image's note in the history
+        (core/turn/assemble.py). An image already described is not described
+        again; one whose description was preempted gets it on a later turn,
+        and one that came back empty is tried `MAX_DESCRIBE_ATTEMPTS` times. A
+        conversation deleted while this ran is not written back."""
+        from core.turn import image_memory
+
+        # The conversation's latest image still to be described, not only this
+        # turn's: the queue keeps one job per (session, step), so a later
+        # turn's job replaces a preempted one — live 03/10 that lost the
+        # description of the image whose job a quick follow-up had interrupted.
+        message = _latest_undescribed_image(ctx.session.messages)
+        if message is None or ctx.engine is None:
+            return
+        image_b64 = message["image_b64"]
+        key = image_memory.image_key(image_b64)
+        description = image_memory.DESCRIPTIONS.get(key) or await _describe_now(ctx, image_b64, key)
+        if not description:
+            return
+        message["image_description"] = description
+        if session_mgr.save_session_if_live(ctx.session):
+            logger.info("Image described for later turns (#1144): %d chars", len(description))
+
+    async def _describe_now(ctx: TurnContext, image_b64: str, key: str) -> str:
+        """One description call, counted only when the engine was asked; an
+        empty answer that was not a cancellation is a failed attempt."""
+        from core.endpoints.chat_engines.routing import engine_can_see_images  # deferred, as above
+        from core.turn import image_memory
+
+        if engine_can_see_images(ctx.engine) is False:
+            image_memory.note_failed_attempt(key)
+            logger.info("Image not described: the engine cannot see (#1144)")
+            return ""
+        cancel = ctx.usage.get("post_commit_cancel", {}).get("describe_image")
+        started = time.monotonic()
+        description = await image_memory.describe(
+            ctx.engine, _ui(ctx).get("model_name") or "", image_b64, ctx.lang, cancel_event=cancel)
+        record_llm_call(ctx, step="describe_image", engine=_ui(ctx).get("engine_name") or "",
+                        ms=(time.monotonic() - started) * 1000.0)
+        if description:
+            image_memory.DESCRIPTIONS.put(key, description)
+        elif cancel is None or not cancel.is_set():
+            image_memory.note_failed_attempt(key)
+            logger.info("Image description: none usable (#1144)")
+        return description
+
     async def compact(ctx: TurnContext) -> None:
         """Post-commit (C2.2): used to run inline, before generation, inside
         `_build_turn_context` (#1042, closed at C1) — `budget` now passes
@@ -1049,6 +1338,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         # attached — was folded (inline inside _build_turn_context, before
         # generation) until here. Same adapter for both wire shapes: compact
         # never touched the wire, streaming or not.
+        "describe_image": describe_image,
         "compact": compact,
     }
     if streaming:

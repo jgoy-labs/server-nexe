@@ -23,13 +23,14 @@ except ImportError:
 from core.dependencies import limiter
 from core.log_redact import redact_user_content
 import core.memory_facts as memory_facts
-from core.memory_facts.deletes import confirm_pending_delete
+from core.memory_facts.deletes import cancel_pending_delete, confirm_pending_delete
 
 logger = logging.getLogger(__name__)
 
 
 def register_memory_routes(router: APIRouter, *, session_mgr, require_ui_auth):
-    """Registers endpoints: POST /memory/save, POST /memory/recall, POST /memory/confirm-delete"""
+    """Registers endpoints: POST /memory/save, POST /memory/recall, POST /memory/confirm-delete,
+    POST /memory/cancel-delete"""
 
     # -- POST /memory/save --
 
@@ -120,3 +121,23 @@ def register_memory_routes(router: APIRouter, *, session_mgr, require_ui_auth):
             "message": outcome.text,
             "memory_action": outcome.memory_action,
         }
+
+    # -- POST /memory/cancel-delete --
+
+    @router.post("/memory/cancel-delete", operation_id="webui_memory_cancel_delete")
+    @limiter.limit("10/minute")
+    async def memory_cancel_delete(request: Request, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
+        """The dialog's «Cancel·la» and the CLI's "no" (#1136): disarm the
+        delete this session has pending. Until 03/10 the cancel never left the
+        client, and a bare "sí" next turn would still have deleted the entry.
+        Nothing is deleted either way; nothing pending → `cancelled: false`.
+        """
+        session_id = validate_string_input(
+            str(body.get("session_id") or "").strip(), max_length=100, context="path",
+        )
+        if not session_id:
+            raise HTTPException(status_code=400, detail="session_id required")
+        session = session_mgr.get_session(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="session not found")
+        return {"cancelled": cancel_pending_delete(session)}

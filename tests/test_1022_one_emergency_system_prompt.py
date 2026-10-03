@@ -49,6 +49,10 @@ from core.chat_prompt import EMERGENCY_SYSTEM_PROMPT
 ROOT = Path(__file__).resolve().parents[1]
 V1_DOOR = ROOT / "core" / "endpoints" / "chat.py"
 UI_DOOR = ROOT / "plugins" / "web_ui_module" / "api" / "routes_chat.py"
+# 2026-10-04: routes_chat.py was split; the door is now these files too — its
+# alphabet, its engine call, and the steps that call them.
+UI_API = ROOT / "plugins" / "web_ui_module" / "api"
+UI_WIRE, UI_ENGINE_CALL, UI_STEPS = (UI_API / f for f in ("wire.py", "engine_call.py", "turn_adapters.py"))
 # C4.2: the UI door's fallback moved into the core with the rest of the prompt
 # assembly (`_build_system_prompt_with_time`), so the scan follows it — a copy
 # reappearing in its new home is the same drift this file exists to catch.
@@ -79,7 +83,8 @@ class TestOneLiteral:
         )
 
     @pytest.mark.parametrize(
-        "door", [V1_DOOR, UI_DOOR, PROMPT_HOME], ids=["v1", "ui", "prompt"],
+        "door", [V1_DOOR, UI_DOOR, UI_WIRE, UI_ENGINE_CALL, UI_STEPS, PROMPT_HOME],
+        ids=["v1", "ui", "ui-wire", "ui-engine-call", "ui-steps", "prompt"],
     )
     def test_neither_door_carries_its_own_copy(self, door: Path):
         """A second literal is how the two drifted in the first place."""

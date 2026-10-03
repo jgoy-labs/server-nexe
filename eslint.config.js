@@ -15,7 +15,7 @@ export default [
   },
   js.configs.recommended,
   {
-    // Reproduccions de test executades amb Node (tests/frontend/*.mjs)
+    // Test reproductions run under Node (tests/frontend/*.mjs)
     files: ["tests/frontend/**/*.mjs"],
     languageOptions: {
       ecmaVersion: "latest",

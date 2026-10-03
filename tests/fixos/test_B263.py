@@ -23,6 +23,9 @@ import pytest
 import core.endpoints.chat as openai_chat
 import core.turn.prompt as prompt_mod
 import plugins.web_ui_module.api.routes_chat as rc
+import plugins.web_ui_module.api.engine_call as web_engine_call
+import plugins.web_ui_module.api.turn_adapters as web_steps
+import plugins.web_ui_module.api.wire as web_wire
 from core.endpoints.chat_sanitization import (
     _RAG_SECURITY_RULE,
     append_rag_security_rule,
@@ -60,7 +63,9 @@ class TestWebUiUnconditional:
     def test_tripwire_no_conditional_rule_in_handler(self):
         """Contra HEAD: el handler feia `if _ctx_injected: system_prompt +=
         rag_security_rule(...)`. Cap resta d'aquest patró pot sobreviure."""
-        for module in (rc, prompt_mod):
+        # 2026-10-04: the web door is split; the system prompt reaches the
+        # engine through engine_call.py, and the steps build it in turn_adapters.
+        for module in (rc, web_wire, web_engine_call, web_steps, prompt_mod):
             assert not re.search(
                 r"if _ctx_injected:\s*\n\s*system_prompt", inspect.getsource(module)
             ), "la regla RAG torna a ser condicional (#851 reobert)"

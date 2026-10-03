@@ -222,7 +222,7 @@ class SqliteStorageMixin:
 
     def _init_sqlite(self):
         """Initialize the SQLite DB with WAL mode."""
-        # mode= és modulat per l'umask → chmod posterior per garantir 0o700
+        # mode= is masked by the umask → a later chmod guarantees 0o700
         self.db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.db_path.parent, 0o700)
 

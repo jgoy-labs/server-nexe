@@ -402,7 +402,7 @@ Facts the model tags with `[MEM_SAVE:]` are persisted on the UI path (`memory_he
 
 Split into 6 route files:
 - **routes_auth.py** — API key verification, backend listing with model sizes, POST /ui/lang, Ollama auto-start on backend switch
-- **routes_chat.py** — SSE streaming, MEM_SAVE parsing, RAG 3-collection search, thinking tokens, input validation, RAG context sanitization
+- **routes_chat.py** — The POST /ui/chat route: it builds the turn and runs it through the shared pipeline (`core/turn/`), the same one `/v1` uses. The web's own turn steps are in `turn_adapters.py`, most of the markers the browser and the CLI read, the error notices and the saved stats in `wire.py`, and the engine call (starting it, reading its first chunk and its stream) in `engine_call.py`
 - **routes_files.py** — Document upload with session_id isolation, filename validation, rate limiting
 - **routes_memory.py** — Memory save/recall with input validation, rate limiting
 - **routes_sessions.py** — Session CRUD with path traversal protection, rate limiting

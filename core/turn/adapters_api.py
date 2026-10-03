@@ -74,6 +74,7 @@ from core.turn.reasoning import split_text
 from core.turn.text.clean import clean_full_response
 from core.turn.text.sse import SseCleaner
 from core.turn.validate import parse_content_parts, sanitize_user_text, validate_turn
+from core.turn import image_memory
 
 
 logger = logging.getLogger(__name__)
@@ -179,7 +180,7 @@ async def _arm_pending_delete(ctx: TurnContext, deletes: list, clean: str) -> st
     if ctx.session is None or helper is None:
         return clean
     armed = await arm_pending_deletes(
-        ctx.session, deletes, helper, getattr(ctx.body, "rag_collections", None),
+        ctx.session, deletes, helper, getattr(ctx.body, "rag_collections", None), user_message=ctx.message,
     )
     if armed is None:
         return clean
@@ -254,10 +255,12 @@ def _peel_content_parts(ctx: TurnContext) -> None:
     and said out loud, which is the half that was missing.
     """
     image_b64 = image_type = None
-    older_images = 0
+    older_images: list[tuple[int, str]] = []
+    undescribed_older: list[tuple[str, str]] = []  # (key, bytes), newest first
     # Backwards: the first image found walking from the newest message is the
     # one this turn should carry.
-    for msg in reversed(ctx.body.messages):
+    for index in range(len(ctx.body.messages) - 1, -1, -1):
+        msg = ctx.body.messages[index]
         if isinstance(msg.content, str):
             continue
         text, msg_image, msg_image_type = parse_content_parts(msg.content)
@@ -265,21 +268,53 @@ def _peel_content_parts(ctx: TurnContext) -> None:
             if image_b64 is None:
                 image_b64, image_type = msg_image, msg_image_type
             else:
-                older_images += 1
+                # #1144: an older image leaves its note — in the ENGINE's copy,
+                # at `budget` (`_with_image_notes`). Written here, it changed
+                # the client's text before `derive_session_id` compared it with
+                # the mirror, and every new image forked the thread (review 03/10).
+                older_key = image_memory.image_key(msg_image)
+                older_images.append((index, older_key))
+                if image_memory.describable(older_key):
+                    # Review 04/10: the queue keeps one job per session, so
+                    # this request's job replaced the one that would have
+                    # described it; this request's job does it instead.
+                    undescribed_older.append((older_key, msg_image))
         msg.content = text
+    ctx.attachments["older_images"] = older_images
+    ctx.attachments["undescribed_older"] = undescribed_older
     if image_b64:
         ctx.attachments["image_b64"] = image_b64
         ctx.attachments["image_type"] = image_type
+        # The CLIENT's bytes, before `validate` shrinks them (#1122): the key
+        # the image has when the client resends it on a later turn.
+        ctx.attachments["image_key"] = image_memory.image_key(image_b64)
     if older_images:
         logger.warning(
-            "%d older image(s) in the request history dropped — /v1 carries "
-            "one image per turn, the most recent one",
-            older_images,
+            "%d older image(s) in the request history not sent — /v1 carries "
+            "one image per turn, the most recent one; the others go as their note (#1144)",
+            len(older_images),
         )
     last_user = next(
         (m for m in reversed(ctx.body.messages) if m.role == "user"), None
     )
     ctx.message = (last_user.content if last_user else None) or ""
+
+
+def _with_image_notes(ctx: TurnContext):
+    """The request as the ENGINE gets it: each older image's note (#1144) in
+    front of its message, in the conversation's language. A copy — the client's
+    `messages` are what the mirror stores and the session is derived from, and
+    the note is the server's, not the client's: it also stays out of the
+    sanitizer, which refused a description quoting a jailbreak article."""
+    older = ctx.attachments.get("older_images") or []
+    if not older or ctx.resume:
+        return ctx.body
+    body = ctx.body.model_copy(deep=True)
+    for index, key in older:
+        msg = body.messages[index]
+        note = image_memory.note(image_memory.DESCRIPTIONS.get(key), ctx.lang)
+        msg.content = f"{note}\n\n{msg.content}" if msg.content else note
+    return body
 
 
 def _engine_prefix(engine: Optional[str]) -> str:
@@ -462,6 +497,25 @@ async def _stream_facts_only_reprompt(ctx: TurnContext, facts: list, finished: l
         yield format_sse_chunk(clean, _served_model(ctx), _engine_prefix(ctx.engine))
 
 
+def _image_to_describe(ctx: TurnContext) -> tuple:
+    """#1144: the newest image of this request still to be described — the
+    one it carries, else an older one the client resent — as (key, bytes)."""
+    carried = ctx.attachments.get("image_key"), ctx.attachments.get("image_b64")
+    pending = [carried] if all(carried) else []
+    pending += ctx.attachments.get("undescribed_older") or []
+    return next(((k, b) for k, b in pending if image_memory.describable(k)), (None, None))
+
+
+def _keep_description(key: str, description: str, cancel) -> None:
+    """A description is kept by its key; an empty one that was not a
+    cancellation counts as a failed attempt (`MAX_DESCRIBE_ATTEMPTS`)."""
+    if description:
+        image_memory.DESCRIPTIONS.put(key, description)
+        logger.info("Image described for later requests (#1144): %d chars", len(description))
+    elif cancel is None or not cancel.is_set():
+        image_memory.note_failed_attempt(key)
+
+
 def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> Adapters:
     """The adapter table for one request. Built per request because
     `persist_assistant_turn` needs this request's `BackgroundTasks`.
@@ -600,19 +654,19 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         )
 
     async def clock(ctx: TurnContext) -> None:
-        """C4.2: B007's on-demand clock, resolved once and written down.
+        """C4.2: the clock, resolved once and written down.
 
         `budget` prefixes it to this turn's user message (never the system
         prompt, which would poison the prefix cache for the whole
-        conversation). Resolved from `ctx.message` — the last user message,
-        which is the one the line is prefixed to.
+        conversation). #1125: every turn, the time the message was sent.
         """
         # Deferred: `core.chat_prompt` is cheap, but this module is imported
         # while `core.endpoints.chat` is still initialising and the import
         # graph there is the cycle `_trim_rag_context` documents.
-        from core.chat_prompt import time_context_line
+        from core.chat_prompt import turn_time_line
 
-        ctx.clock_line = time_context_line(ctx.message, ctx.lang)
+        # #1125: every turn, as at the web door — not only when a phrase asks.
+        ctx.clock_line = turn_time_line(ctx.lang)
 
     async def system_prompt(ctx: TurnContext) -> None:
         """C4.2: the same `turn_system_prompt` the web UI door runs.
@@ -667,7 +721,7 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
             # was about to drop anyway (see `_trim_rag_context`).
             document_chars = len(document_context)
         ctx.prompt, ctx.recall_text = chat._assemble_v1_messages(
-            ctx.body, ctx.system_prompt, context_text, ctx.clock_line,
+            _with_image_notes(ctx), ctx.system_prompt, context_text, ctx.clock_line,
             ctx.lang, ctx.context_window, document_chars,
             bool(ctx.recall_text), ctx.app_state,
             # #1081: the `validate` step above writes `image_b64` when the
@@ -894,6 +948,33 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         # 25/09: inline, before `emit` — this turn's own note (#1098).
         note_kept(ctx.usage, outcome.saved, outcome.kept)
 
+    async def describe_image(ctx: TurnContext) -> None:
+        """#1144, post-commit: the newest image of this request still to be
+        described — the one it carried, or an older one whose own job this
+        request's replaced — gets its own description from the model that
+        served it, kept by the key of the client's bytes. On a later request
+        where it is no longer the most recent image, its note carries the
+        description (`_peel_content_parts`). One that comes back empty is
+        tried `MAX_DESCRIBE_ATTEMPTS` times."""
+        from core.endpoints.chat_engines.routing import engine_can_see_images, get_engine_module  # deferred
+
+        key, image_b64 = _image_to_describe(ctx)
+        if key is None:
+            return
+        engine_module = get_engine_module(ctx.engine, ctx.app_state) if isinstance(ctx.engine, str) else ctx.engine
+        if engine_module is None or not hasattr(engine_module, "chat"):
+            return
+        if engine_can_see_images(engine_module) is False:
+            image_memory.note_failed_attempt(key)
+            return
+        started = time.monotonic()
+        cancel = ctx.usage.get("post_commit_cancel", {}).get("describe_image")
+        model = ctx.usage.get("served_model") or served_model_of(ctx.wire) or getattr(ctx.body, "model", "") or ""
+        description = await image_memory.describe(engine_module, model, image_b64, ctx.lang, cancel_event=cancel)
+        record_llm_call(ctx, step="describe_image", engine=str(ctx.engine or ""),
+                        ms=(time.monotonic() - started) * 1000.0)
+        _keep_description(key, description, cancel)
+
     async def compact(ctx: TurnContext) -> None:
         """C3.4: /v1 summarises a long conversation too.
 
@@ -1047,5 +1128,6 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         "persist_assistant_turn": persist_stream if streaming else persist_assistant_turn,
         "emit": emit_stream if streaming else emit,
         "memory.write": memory_write,
+        "describe_image": describe_image,
         "compact": compact,
     }

@@ -306,14 +306,15 @@ async def _startup_init(app: FastAPI) -> None:
     else:
         logger.info("onboarding_state: not completed — using defaults")
     # flag read by _startup to decide whether to start
-    # els subsistemes complets (memory, plugins, fastembed) o quedar-se
-    # en minimal_mode (només /installer/*, /health/*).
+    # the full subsystems (memory, plugins, fastembed) or stay
+    # in minimal_mode (only /installer/*, /health/*).
     server_state.has_onboarding = _onboarding is not None
 
     # runtime defense. hf_xet must be disabled (the Tauri
-    # Rust launcher seteja HF_HUB_DISABLE_XET=1 abans del spawn Python). Si
-    # arribem aquí amb xet actiu, sabem que les descàrregues de models grans
-    # es penjaran silenciosament — millor avisar fort i ben aviat. Empíric
+    # Rust launcher and, since #1138, ./nexe set HF_HUB_DISABLE_XET=1 before
+    # the Python spawn). If
+    # we arrive here with xet active, large model downloads
+    # will hang silently — better to warn loudly and early. Empirical
     # 2026-05-20 + GitHub issue huggingface_hub#3266.
     try:
         from huggingface_hub.constants import HF_HUB_DISABLE_XET
@@ -321,7 +322,7 @@ async def _startup_init(app: FastAPI) -> None:
         if not HF_HUB_DISABLE_XET and is_xet_active():
             logger.warning(
                 "hf_xet active at startup — model downloads WILL stall. "
-                "The sidecar launcher must set HF_HUB_DISABLE_XET=1 BEFORE "
+                "The launcher (./nexe, the sidecar) must set HF_HUB_DISABLE_XET=1 BEFORE "
                 "spawning the Python process (env vars are read at import)."
             )
     except Exception as exc:  # noqa: BLE001 — defensive only
@@ -351,13 +352,13 @@ async def _startup_init(app: FastAPI) -> None:
 
     # PID file — single-instance guard (B06, B07, B10)
     # in sidecar Tauri mode, SKIP the
-    # PID file completament. Tauri gestiona el cicle de vida del procés via
-    # NEXE_PARENT_PID watchdog (lifecycle.rs:graceful_quit). El single-instance
-    # guard és per a standalone (CLI), on hi pot haver col·lisió usuari.
-    # En mode sidecar, cada Tauri pot tenir el seu propi procés sidecar; el
-    # PID file global (storage/run/server.pid, un sol fitxer) provocava
-    # "Server already running" entre sessions Tauri successives — encara que
-    # el procés anterior estigués correctament aturat per Tauri.
+    # PID file entirely. Tauri manages the process lifecycle via
+    # NEXE_PARENT_PID watchdog (lifecycle.rs:graceful_quit). The single-instance
+    # guard is for standalone (CLI), where a user collision is possible.
+    # In sidecar mode, each Tauri can have its own sidecar process; the
+    # global PID file (storage/run/server.pid, a single file) caused
+    # "Server already running" between successive Tauri sessions — even when
+    # Tauri had already stopped the previous process correctly.
     from core.config import DEFAULT_PORT
     _srv_startup_cfg = server_state.config.get('core', {}).get('server', {})
     _startup_port = _srv_startup_cfg.get('port', DEFAULT_PORT)
@@ -366,7 +367,7 @@ async def _startup_init(app: FastAPI) -> None:
         from core.sidecar_config import get_sidecar_config
         sidecar_cfg = get_sidecar_config()
         if sidecar_cfg.is_sidecar:
-            _startup_port = sidecar_cfg.port  # NEXE_PORT injectat per Tauri
+            _startup_port = sidecar_cfg.port  # NEXE_PORT injected by Tauri
             _skip_pid_file = True
             logger.info("Sidecar mode: skipping PID file (Tauri manages lifecycle)")
     except Exception as exc:  # pragma: no cover — fallback behaviour pre-sidecar
@@ -646,13 +647,13 @@ async def _startup(app: FastAPI) -> None:
     await _startup_init(app)
 
     # if OnboardingState does not exist, do NOT start the
-    # subsistemes que depenen del model triat (memory, plugins, fastembed,
-    # auto_start_services, module_discovery). Els endpoints /installer/*,
-    # /health/* i /admin/system/* segueixen accessibles (registrats abans
-    # del lifespan). Quan l'usuari completi el wizard, OnboardingState es
-    # persisteix (POST /installer/finalize → save() atòmic) i Tauri reinicia
-    # el sidecar (invoke restart_sidecar); al next startup aquest check
-    # passarà i tot s'arrencarà normal.
+    # subsystems that depend on the chosen model (memory, plugins, fastembed,
+    # auto_start_services, module_discovery). The /installer/*,
+    # /health/* and /admin/system/* endpoints stay reachable (registered before
+    # the lifespan). When the user finishes the wizard, OnboardingState is
+    # persisted (POST /installer/finalize → atomic save()) and Tauri restarts
+    # the sidecar (invoke restart_sidecar); on the next startup this check
+    # passes and everything starts normally.
     # Resolves bugs: A (fastembed silent), B (MLXConfig fallback NEXE_HOME),
     # D (DreamingCycle embedder=missing cascade) a first boot.
     if not server_state.has_onboarding:

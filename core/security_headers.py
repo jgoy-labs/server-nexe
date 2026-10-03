@@ -46,17 +46,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     response = await call_next(request)
 
     # CSP policy:
-    # - script-src: NO 'unsafe-inline' in standalone (XSS protection); relaxat
-    #   en mode sidecar Tauri (la seguretat la dóna el webview aïllat de Tauri).
+    # - script-src: NO 'unsafe-inline' in standalone (XSS protection); relaxed
+    #   in Tauri sidecar mode (security comes from Tauri's isolated webview).
     # - style-src: 'unsafe-inline' allowed (needed for Web UI, low security risk)
     # - upgrade-insecure-requests: only on HTTPS (Safari blocks CSS/JS on HTTP if set)
     is_https = request.url.scheme == "https"
 
-    # Relaxar script-src en mode sidecar.
-    # En Tauri, el webview executa scripts dins un sandbox aïllat; la garantia
-    # de seguretat XSS la dóna l'aïllament del context Tauri, no aquesta CSP.
-    # Sense aquesta excepció, els scripts inline del web_ui (plugins/web_ui_module)
-    # són bloquejats i la UI no carrega.
+    # Relax script-src in sidecar mode.
+    # In Tauri, the webview runs scripts inside an isolated sandbox; the XSS
+    # guarantee comes from the Tauri context isolation, not from this CSP.
+    # Without this exception, the web_ui inline scripts (plugins/web_ui_module)
+    # are blocked and the UI does not load.
     script_src_extra = ""
     try:
       from core.sidecar_config import get_sidecar_config

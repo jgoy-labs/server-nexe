@@ -78,8 +78,8 @@ def setup_bootstrap_tokens(server_state, _translate) -> None:
     token_to_display = existing_bootstrap["token"]
     logger.info("Using existing master bootstrap token from DB")
 
-  # prefer SidecarConfig.is_production over direct NEXE_ENV,
-  # combinem amb OR sobre el raw env per a robustesa davant singletons stale.
+  # prefer SidecarConfig.is_production over a direct NEXE_ENV read;
+  # OR it with the raw env so a stale singleton cannot hide production.
   raw_is_production = os.getenv('NEXE_ENV', 'production').lower() == 'production'
   sidecar_is_production = False
   try:

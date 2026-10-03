@@ -15,8 +15,8 @@ Used by:
 - `memory.memory.memory_service.MemoryService`
 - `memory.memory.config.MemoryConfig.qdrant_path` (consumers default)
 
-Anomalia F1 A5 ("NEXE_QDRANT_PATH no respectat") resolta completament
-quan tots els mòduls memory/ adopten aquest helper.
+Anomaly F1 A5 ("NEXE_QDRANT_PATH no respectat") is fully resolved
+once every memory/ module adopts this helper.
 """
 from __future__ import annotations
 

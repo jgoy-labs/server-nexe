@@ -32,11 +32,11 @@ from .ollama_ready import wait_ollama_api_ready
 
 
 def _wait_api_after_install() -> bool:
-    """#833: èxit d'instal·lació = API responent (GET /api/tags == 200).
+    """#833: a successful install means the API is answering (GET /api/tags == 200).
 
-    Un port TCP obert o el binari CLI present NO garanteixen que el pull
-    posterior funcioni. En timeout retornem False — el "let the pull retry"
-    d'abans era mentida: cap retry existia.
+    An open TCP port or a CLI binary on disk does NOT guarantee the later
+    pull will work. On timeout we return False — the old "let the pull retry"
+    was a lie: no retry existed.
     """
     if wait_ollama_api_ready(timeout=30.0):
         print_success(t('ollama_installed'))
@@ -322,19 +322,19 @@ def _install_ollama_macos() -> bool:
             time.sleep(2)
             ollama_bin = _find_ollama()
             if os.path.isfile(ollama_bin):
-                # CLI al lloc; ara exigim l'API responent (#833)
+                # CLI in place; now we require the API to be answering (#833)
                 if _wait_api_after_install():
                     return True
-                # Review #833: el primer launch d'Ollama.app pot trigar >30s
-                # (Gatekeeper/first-run). No avortem TOT l'install: el pull
-                # queda gated igualment per _ollama_ensure_running (60s +
-                # spawn headless de recuperació) — l'invariant "mai pull amb
-                # Ollama mort" es manté aigües avall.
+                # Review #833: the first Ollama.app launch can take >30s
+                # (Gatekeeper/first-run). We do not abort the WHOLE install: the pull
+                # stays gated by _ollama_ensure_running anyway (60s +
+                # a headless recovery spawn) — the "never pull against a dead
+                # Ollama" invariant holds downstream.
                 print_warn("Ollama API slow to start — continuing; the model step re-checks it")
                 return True
 
-        # CLI mai aparegut: mateix criteri soft — el gate del pas de models
-        # (_ollama_ensure_running / gate SSE) és qui decideix si es pot tirar.
+        # CLI never showed up: same soft rule — the model-step gate
+        # (_ollama_ensure_running / SSE gate) is what decides whether we can go on.
         print_warn("Ollama.app installed but CLI not yet available — try again in a moment")
         return True
 

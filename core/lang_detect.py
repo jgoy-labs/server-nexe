@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import unicodedata
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -173,6 +174,114 @@ def detect_user_lang(message: str, fallback: Optional[str] = None) -> str:
     """
     detected = detect_user_lang_or_none(message)
     return detected if detected is not None else _fallback_lang(fallback)
+
+
+# ─── The reply language of a conversation: one decision, both doors ─────────
+# #850/#854 kept the same policy twice (core/turn/prompt.py for the web,
+# core/endpoints/chat.py for /v1), held together by a parity test. #1143 had
+# to change it, so it is written once here; each door still keeps the result
+# in its own store.
+
+#: Switch threshold: short acks and borrowings ("ok thanks", "merci!") stay
+#: below it; a genuine switch is a full sentence. Measured on the natural text.
+STICKY_SWITCH_MIN_CHARS = 25
+
+#: #1143 — a language named in a request switches at once, however short the
+#: message: «En Català perdona.» (18) stayed in Afrikaans on 03/10 because it
+#: was under the threshold. Folded names (no accents) → ISO 639-1.
+_NAMED_LANGS = {
+    "catala": "ca", "catalan": "ca",
+    "castella": "es", "castellano": "es", "espanyol": "es", "espanol": "es", "spanish": "es",
+    "angles": "en", "ingles": "en", "english": "en",
+    "frances": "fr", "francais": "fr", "french": "fr",
+    "italiano": "it", "italian": "it",
+    "alemany": "de", "aleman": "de", "german": "de", "deutsch": "de",
+    "portugues": "pt", "portuguese": "pt",
+}
+#: Asking for a translation, or how to SAY a word, names a language without
+#: asking to be answered in it (review 04/10: «com es diu gat en anglès?»).
+_TRANSLATE_RE = re.compile(
+    r"\b(?:tradu\w*|translat\w*)|\bcom (?:es|se) diu\b|\bcomo se dice\b"
+    r"|\bhow (?:do|would|can) (?:you|i|we) say\b"
+)
+#: A name alone is not a request (review 04/10: «vivo en Italia», «el llibre
+#: està escrit en francès», «amb català no m'aclareixo» all switched the
+#: conversation). It takes a word that asks: a verb of speaking, answering or
+#: switching — Jordi's typos included, «paralar» — or a please next to it.
+_ASK_VERB_RE = re.compile(
+    r"^(?:parl|paral|respo|contest|escriu|escriv|explic|habl|escrib|speak|talk|answer|repl"
+    r"|write|explain|switch|change|canvi|camb)\w*$"
+)
+_PLEASE_RE = re.compile(
+    r"\b(?:si us plau|sisplau|siusplau|per favor|por favor|porfa|please|pls|plis|perdona"
+    r"|s'il (?:te|vous) plait|bitte|per favore)\b"
+)
+_PREPS = frozenset({"en", "in", "amb", "em", "con", "a", "al", "to", "into"})
+_ARTICLES = frozenset({"el", "l", "the"})
+
+
+def _fold(text: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", (text or "").casefold())
+                   if unicodedata.category(c) != "Mn").replace("\u2019", "'")
+
+
+def _asks_for(words: list, i: int) -> bool:
+    """Does the language name at `words[i]` come with a word that asks?"""
+    if "_please_" in words[max(0, i - 1):i] + words[i + 1:i + 3]:
+        return True
+    if i and _ASK_VERB_RE.match(words[i - 1]):  # «parla català», «speak Spanish»
+        return True
+    j = i - 1
+    if j >= 0 and words[j] in _ARTICLES:
+        j -= 1
+    if j < 0 or words[j] not in _PREPS:
+        return False
+    before = [w for w in words[max(0, j - 3):j] if w not in _PREPS]
+    return any(_ASK_VERB_RE.match(w) for w in before)
+
+
+def requested_lang(user_text: str) -> Optional[str]:
+    """The language the user asks to be answered in, by name — «en català,
+    perdona», «in English please», «pots parlar amb català?», «switch to
+    English» — or None (#1143)."""
+    folded = _fold(user_text)
+    if _TRANSLATE_RE.search(folded):
+        return None
+    words = re.findall(r"\w+", _PLEASE_RE.sub(" _please_ ", folded))
+    for i, word in enumerate(words):
+        lang = _NAMED_LANGS.get(word)
+        if lang and _asks_for(words, i):
+            return lang
+    return None
+
+
+def decide_reply_lang(sticky: Optional[str], user_text: str) -> tuple[str, Optional[str]]:
+    """This turn's reply language, and the conversation's new sticky one.
+
+    Returns `(lang, new_sticky)`; `new_sticky` None means leave the store as
+    it is. The policy:
+
+    - a language asked for by name wins at once (#1143);
+    - the first REAL detection seeds the conversation — but on a short message
+      only if it is the install language (#1143: «quees aqursta imatge?» read
+      as Afrikaans, «què és aquesta imatge?» as Yoruba, and the first one set a
+      whole conversation in Afrikaans); a guess is returned, never seeded;
+    - a conversation switches on the first clear message in another language
+      (>= STICKY_SWITCH_MIN_CHARS of natural text, Jordi's decision 25/09).
+    """
+    asked = requested_lang(user_text)
+    if asked:
+        return asked, asked
+    detected = detect_user_lang_or_none(user_text)
+    home = _fallback_lang(None)
+    clear = natural_text_len(user_text) >= STICKY_SWITCH_MIN_CHARS
+    if sticky is None:
+        if detected is not None and (detected == home or clear):
+            return detected, detected
+        return home, None
+    if detected and detected != sticky and clear:
+        return detected, detected
+    return sticky, None
 
 
 def language_name_en(lang: str) -> str:

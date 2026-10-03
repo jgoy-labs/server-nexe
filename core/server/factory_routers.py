@@ -44,8 +44,8 @@ def register_core_routers(app: FastAPI, i18n: Any) -> None:
   app.include_router(get_system_router())
 
   # sidecar_stubs_router removed — web_ui_module now
-  # serveix /ui/* JSON endpoints en sidecar mode (HTML/static es salten
-  # condicionalment a plugins/web_ui_module/api/routes.py).
+  # serves the /ui/* JSON endpoints in sidecar mode (HTML/static are skipped
+  # conditionally in plugins/web_ui_module/api/routes.py).
 
   register_exception_handlers(app, i18n)
 

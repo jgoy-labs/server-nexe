@@ -23,26 +23,26 @@ from core.endpoints import installer_hf, installer_shared
 
 logger = logging.getLogger(__name__)
 
-# SSRF/disk-fill guard per a _stream_gguf (NEXE-SRV-WS2-01). El router
-# /installer és unauth + CSRF-exempt i model_id arriba verbatim, així que una
-# pàgina web cross-origin podria fer-lo servir per fer un fetch cec a un host
-# intern (p.ex. http://127.0.0.1:11434/api/tags) o per omplir el disc amb un cos
-# infinit. Restringim el fetch a https + host HF, imposem un cap de mida i un
-# timeout de lectura finit, i rebutgem les redireccions fora de l'allow-list.
-_GGUF_MAX_BYTES = 100 * 1024**3        # 100 GiB — sostre finit anti disk-fill
+# SSRF/disk-fill guard for _stream_gguf (NEXE-SRV-WS2-01). The
+# /installer router is unauth + CSRF-exempt and model_id arrives verbatim, so a
+# cross-origin web page could use it for a blind fetch to an internal
+# host (e.g. http://127.0.0.1:11434/api/tags) or to fill the disk with an
+# infinite body. We restrict the fetch to https + an HF host, impose a size cap and a
+# finite read timeout, and reject redirects off the allow-list.
+_GGUF_MAX_BYTES = 100 * 1024**3        # 100 GiB — finite ceiling against disk-fill
 
-_GGUF_MAX_REDIRECTS = 5                 # redireccions HF→CDN acotades
+_GGUF_MAX_REDIRECTS = 5                 # bounded HF→CDN redirects
 
-_GGUF_READ_TIMEOUT_S = 60.0            # sense bytes durant 60s → avorta (no penja)
+_GGUF_READ_TIMEOUT_S = 60.0            # no bytes for 60s → abort (does not hang)
 
 def _is_allowed_gguf_url(url: str) -> bool:
-    """True iff ``url`` és una font GGUF baixable: una URL https amb host a
-    l'allow-list del HuggingFace Hub.
+    """True iff ``url`` is a downloadable GGUF source: an https URL whose host is on
+    the HuggingFace Hub allow-list.
 
-    Guarda SSRF/disk-fill de _stream_gguf: reutilitza ``installer_hf._is_hf_hub_url`` per al
-    host i exigeix a més esquema ``https``, de manera que ni ``http://`` ni un
-    host intern (``http://127.0.0.1:11434/api/tags``) ni un host de catàleg
-    arbitrari poden arribar mai al fetch.
+    SSRF/disk-fill guard of _stream_gguf: reuses ``installer_hf._is_hf_hub_url`` for the
+    host and also requires the ``https`` scheme, so neither ``http://`` nor an
+    internal host (``http://127.0.0.1:11434/api/tags``) nor an arbitrary catalog
+    host can ever reach the fetch.
     """
     try:
         scheme = (urlparse(url).scheme or "").lower()
@@ -55,15 +55,15 @@ def _is_allowed_gguf_url(url: str) -> bool:
 async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
     """Download a GGUF model via HTTP with progress reporting.
 
-    SSRF/disk-fill guard (NEXE-SRV-WS2-01): ``model_id`` ha de ser una URL https
-    amb host del HuggingFace Hub. Qualsevol altre esquema/host es rebutja abans
-    del fetch (evita el fetch cec a hosts interns), s'imposa un cap de mida i un
-    timeout de lectura finit, i es rebutgen les redireccions que surtin de
-    l'allow-list.
+    SSRF/disk-fill guard (NEXE-SRV-WS2-01): ``model_id`` must be an https URL
+    on a HuggingFace Hub host. Any other scheme/host is rejected before
+    the fetch (no blind fetch to internal hosts), a size cap and a
+    finite read timeout are imposed, and redirects that leave the
+    allow-list are rejected.
     """
     import httpx
 
-    # Guarda d'entrada: cap fetch cap a un target no permès.
+    # Entry guard: no fetch to a target that is not allowed.
     if not _is_allowed_gguf_url(model_id):
         yield {
             "type": "error",
@@ -80,23 +80,23 @@ async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     # B255: a gated GGUF on the HF Hub needs an "Authorization: Bearer <HF_TOKEN>"
-    # header. model_id ja està restringit a hosts HF per la guarda de dalt, així
-    # que el token només pot anar a HF. En seguir redireccions manualment
-    # eliminem l'Authorization en canviar de host (el CDN de HF usa URLs signades
-    # i no el necessita), reproduint l'antic strip cross-origin d'httpx.
+    # header. model_id is already restricted to HF hosts by the guard above, so
+    # the token can only go to HF. When following redirects by hand
+    # we drop Authorization on a host change (the HF CDN uses signed URLs
+    # and does not need it), reproducing httpx's old cross-origin strip.
     headers: dict[str, str] = {}
     if installer_hf._is_hf_hub_url(model_id):
         token = await installer_hf._ensure_hf_token_in_env()
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
-    # Timeout finit: read=60s avorta un stream que es queda mut sense trencar les
-    # baixades llargues legítimes (cada chunk rebut reinicia el rellotge).
+    # Finite timeout: read=60s aborts a stream that goes silent without breaking
+    # legitimate long downloads (each received chunk restarts the clock).
     timeout = httpx.Timeout(
         connect=30.0, read=_GGUF_READ_TIMEOUT_S, write=60.0, pool=30.0,
     )
-    # follow_redirects=False: seguim els salts a mà per validar-ne cada destí
-    # contra l'allow-list (un 30x cap a un host no-HF avorta).
+    # follow_redirects=False: we follow hops by hand to validate each target
+    # against the allow-list (a 30x to a non-HF host aborts).
     async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
         url = model_id
         req_headers = dict(headers)
@@ -115,7 +115,7 @@ async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
                             ),
                         }
                         return
-                    # Canvi de host → no reenviïs el bearer (strip cross-origin).
+                    # Host change → do not forward the bearer (cross-origin strip).
                     if urlparse(next_url).hostname != urlparse(url).hostname:
                         req_headers = {
                             k: v for k, v in req_headers.items()
@@ -144,8 +144,8 @@ async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
                             return
                         downloaded += len(chunk)
                         if downloaded > _GGUF_MAX_BYTES:
-                            # Cap superat en streaming (cos sense content-length o
-                            # amb un de mentider): avorta i neteja el parcial.
+                            # Cap exceeded while streaming (body with no content-length or
+                            # with a lying one): abort and delete the partial.
                             fh.close()
                             try:
                                 dest.unlink()
@@ -167,7 +167,7 @@ async def _stream_gguf(model_id: str, request: Request) -> AsyncIterator[dict]:
                                 last_pct = pct
                                 yield {"type": "progress", "percent": pct, "speed": "—", "eta": "—"}
                 return
-        # Massa redireccions consecutives → avorta.
+        # Too many consecutive redirects → abort.
         yield {
             "type": "error",
             "code": "TOO_MANY_REDIRECTS",

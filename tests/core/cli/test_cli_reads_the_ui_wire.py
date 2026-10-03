@@ -59,6 +59,7 @@ def test_the_wire_reads_the_same_however_it_is_cut(step):
 class _Client:
     def __init__(self, confirm_result):
         self.memory_confirm_delete = AsyncMock(return_value=confirm_result)
+        self.memory_cancel_delete = AsyncMock(return_value=True)
 
     async def chat_ui_stream(self, **_):
         r = UiStreamReader()
@@ -80,9 +81,12 @@ def test_the_turn_is_printed_clean_with_its_memory(capsys, confirmed):
     if confirmed:
         # C4.5: the confirmation names the session whose pending entry dies.
         client.memory_confirm_delete.assert_awaited_once_with("el gos", "s")
+        client.memory_cancel_delete.assert_not_awaited()
         assert "🗑 Esborrat: el gos" in out
     else:
         client.memory_confirm_delete.assert_not_awaited()
+        # #1136: the "no" reaches the server, or a bare "sí" next turn deletes it.
+        client.memory_cancel_delete.assert_awaited_once_with("s")
 
 
 def test_show_thinking_prints_the_reasoning(capsys):

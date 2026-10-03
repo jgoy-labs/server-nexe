@@ -240,6 +240,56 @@ class TestMemoryStoreEndpoint:
         call_kwargs = mock_mem.store.call_args[1]
         assert call_kwargs["metadata"]["source"] == "chat-cli"
 
+    def test_accepted_service_store_is_also_written_where_search_reads(self):
+        """#1110: remember() alone lands in SQLite. /search reads Qdrant.
+        An accepted explicit store has to reach the requested collection
+        before the 200, or the search of the same second is empty.
+        """
+        client = TestClient(make_app())
+        mock_mem = make_mock_memory()
+        svc = MagicMock()
+        svc.initialized = True
+        svc.remember = AsyncMock(return_value="staging-1")
+        content = "Codi secret de test: abcdef12"
+
+        with patch("memory.memory.module.get_memory_service", return_value=svc), \
+             patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
+            resp = client.post(
+                "/memory/store",
+                json={"content": content, "metadata": {"source": "test_live_e2e"}},
+                headers={"X-Api-Key": API_KEY},
+            )
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["success"] is True
+        assert data["document_id"] == "doc-id-123"
+        svc.remember.assert_awaited()
+        call_kwargs = mock_mem.store.call_args.kwargs
+        assert call_kwargs["text"] == content
+        assert call_kwargs["collection"] == "personal_memory"
+        assert call_kwargs["metadata"]["source"] == "test_live_e2e"
+
+    def test_rejected_service_store_does_not_write_the_search_collection(self):
+        client = TestClient(make_app())
+        mock_mem = make_mock_memory()
+        svc = MagicMock()
+        svc.initialized = True
+        svc.remember = AsyncMock(return_value=None)
+
+        with patch("memory.memory.module.get_memory_service", return_value=svc), \
+             patch("memory.memory.api.v1.get_memory_api", AsyncMock(return_value=mock_mem)):
+            resp = client.post(
+                "/memory/store",
+                json={"content": "no"},
+                headers={"X-Api-Key": API_KEY},
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["success"] is False
+        assert resp.json()["document_id"] is None
+        mock_mem.store.assert_not_called()
+
 
 class TestMemorySearchEndpoint:
 

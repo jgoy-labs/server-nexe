@@ -3,9 +3,9 @@
 Server Nexe
 Author: Jordi Goy
 Location: core/i18n_utils.py
-Description: Canonical translate() helper. Unifica la traducció amb
-fallback que estava reimplementada a helpers.translate, bootstrap._t,
-system._t i inline a root.py amb maneig d'error inconsistent.
+Description: Canonical translate() helper. Unifies the fallback
+translation that was reimplemented in helpers.translate, bootstrap._t,
+system._t and inline in root.py with inconsistent error handling.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -20,9 +20,9 @@ def translate(i18n, key: str, fallback: str, **kwargs) -> str:
   """
   Translate a key with fallback support and format parameters.
 
-  Variant defensiva (la més segura): qualsevol error de l'i18n manager
-  degrada al fallback formatat, de manera que els call-sites mai propaguen
-  excepcions de traducció. Unifica el comportament previ sense regressions.
+  Defensive variant (the safest): any error from the i18n manager
+  degrades to the formatted fallback, so call sites never propagate
+  translation exceptions. Unifies the previous behaviour without regressions.
 
   Args:
     i18n: I18n manager instance (can be None)
@@ -41,6 +41,6 @@ def translate(i18n, key: str, fallback: str, **kwargs) -> str:
       return fallback.format(**kwargs) if kwargs else fallback
     return value
   except Exception:
-    # AP-G01: log diagnòstic sense canviar el flux (degrada al fallback formatat)
+    # AP-G01: diagnostic log without changing the flow (degrades to the formatted fallback)
     logger.debug("translate() degraded to fallback for key '%s'", key, exc_info=True)
     return fallback.format(**kwargs) if kwargs else fallback

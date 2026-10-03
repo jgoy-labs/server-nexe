@@ -56,7 +56,9 @@ DATE_PHRASE_BY_LANG: dict[str, str] = {
 # for it, and travels inside that turn's user message (ephemeral — the session
 # persists the raw message, so the cache diverges only on that turn).
 TIME_INTENT_RE = _re.compile(
-    r"(quina\s+hora|hora\s+(és|es\s+ara|tenim)"
+    # #1125: "hora es" without the accent is how people type it ("quin dia i
+    # hora es avui?", 02/10) — it found no clock and the model said it had none.
+    r"(quina\s+hora|hora\s+(és|es\b|tenim)"
     r"|qu[eé]\s+hora"
     r"|what(\s+is|'s)?\s+the\s+time|what\s+time|current\s+time)",
     _re.IGNORECASE,
@@ -71,6 +73,9 @@ TIME_PHRASE_BY_LANG: dict[str, str] = {
 def time_context_line(message: str, lang: str, _now=None) -> str:
     """Return a one-line current-time note when the user asks the time, else ''.
 
+    #1125: no door calls this since every message carries its time
+    (`turn_time_line`); kept for the B007 guards that pin its behaviour.
+
     Injected as a prefix of that turn's user message (never the system prompt),
     so the prefix cache only diverges on the turn that actually needs the clock.
     """
@@ -83,6 +88,57 @@ def time_context_line(message: str, lang: str, _now=None) -> str:
     return TIME_PHRASE_BY_LANG[base].format(
         hm=_now.strftime("%H:%M"), tz=_now.strftime("%Z")
     )
+
+
+#: #1125: the time each user message was sent, in front of it in the web
+#: door's prompt — the current one and every one in the history, from the
+#: `timestamp` the session stores with it. Never in the system prompt: a line
+#: that changed every minute there would change the whole prompt. Stored with
+#: the message, it renders the same every turn, so it never moves the prefix
+#: a prompt cache keeps. No phrase to match: "what time is it" is the last
+#: message's time, in every language.
+MESSAGE_TIME_BY_LANG: dict[str, str] = {
+    "ca": "[Hora del missatge: {when}]",
+    "es": "[Hora del mensaje: {when}]",
+    "en": "[Message time: {when}]",
+}
+
+
+def message_time_line(timestamp, lang: str, _now=None) -> str:
+    """The time-of-sending line for one user message, or '' if the time is unreadable.
+
+    `timestamp` is the session's ISO string (UTC) or an aware datetime. Shown
+    in this machine's local time; the date is added only when it is not
+    today's, since the system prompt already says what day it is.
+    """
+    from datetime import datetime as _dt
+
+    try:
+        when = timestamp if isinstance(timestamp, _dt) else _dt.fromisoformat(str(timestamp))
+        when = when.astimezone()
+    except (TypeError, ValueError):
+        return ""
+    now = (_now or _dt.now()).astimezone()
+    text = when.strftime("%H:%M")
+    if when.date() != now.date():
+        text = f"{when.day}/{when.month} {text}"
+    tz = when.strftime("%Z")
+    if tz:
+        text = f"{text} ({tz})"
+    base = lang[:2].lower() if lang else "en"
+    return MESSAGE_TIME_BY_LANG.get(base, MESSAGE_TIME_BY_LANG["en"]).format(when=text)
+
+
+def _utcnow():
+    from datetime import datetime as _dt, timezone as _tz
+
+    return _dt.now(_tz.utc)
+
+
+def turn_time_line(lang: str) -> str:
+    """This turn's line: its user message was sent now. The `clock` step of
+    both doors (#1125) — one rule, as for every other step."""
+    return message_time_line(_utcnow(), lang)
 
 
 def format_now_natural(_now, _lang: str) -> str:
@@ -152,6 +208,9 @@ __all__ = [
     "TIME_INTENT_RE",
     "TIME_PHRASE_BY_LANG",
     "time_context_line",
+    "MESSAGE_TIME_BY_LANG",
+    "message_time_line",
+    "turn_time_line",
     "format_now_natural",
     "build_system_prompt_with_time",
 ]

@@ -245,6 +245,18 @@ class MLXModule:
         `model_name` is ignored: MLX runs the one model it has loaded."""
         return bool(self._initialized and self._node is not None)
 
+    def can_see_images(self) -> bool:
+        """#1035: whether the model this engine runs can read an image.
+
+        The same check `chat` makes to take the VLM path (the loaded model's
+        config.json). Asked of a fallback, which answers with its own model: a
+        text model given a turn with an image would answer as if it saw it."""
+        if not (self._initialized and self._node is not None):
+            return False
+        from plugins.mlx_module.core import model_loader
+
+        return bool(model_loader._detect_vlm_capability(getattr(self._node.config, "model_path", "")))
+
     async def chat(
         self, messages: List[Dict[str, str]], system: str = "",
         session_id: str = "default", stream_callback=None, **kwargs,

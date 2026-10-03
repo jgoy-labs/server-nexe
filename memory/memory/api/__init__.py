@@ -117,7 +117,7 @@ class MemoryAPI:
                      batch_size override, no pre-warm, no mega-batch).
                      Introduced by bug #16 to remove hardcodes.
     """
-    # resol DEFAULT_QDRANT_PATH via SidecarConfig en sidecar mode
+    # resolve DEFAULT_QDRANT_PATH via SidecarConfig in sidecar mode
     from memory.memory._paths import resolve_qdrant_path
     if qdrant_path is None:
       qdrant_path = resolve_qdrant_path(self.DEFAULT_QDRANT_PATH)

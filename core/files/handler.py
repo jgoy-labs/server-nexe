@@ -325,7 +325,8 @@ class FileHandler:
                         "day": file_path.parent.name if file_path.parent != self.upload_dir else "",
                     })
             # Sort by modified time descending (newest first)
-            files.sort(key=lambda x: x["modified"], reverse=True)  # type: ignore[arg-type, return-value]  # lambda x["modified"]: float — dict[str,object] però "modified" sempre float
+            # "modified" is always a float; dict[str, object] hides that.
+            files.sort(key=lambda x: x["modified"], reverse=True)  # type: ignore[arg-type, return-value]
         except Exception as e:
             logger.error(f"Error listing files: {e}")
         return files

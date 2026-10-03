@@ -222,8 +222,8 @@ TURN_STEPS: tuple[Step, ...] = (
         writes_always=frozenset({"clock_line"}),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "plugins/web_ui_module/api/turn_adapters.py (clock -> core.chat_prompt.time_context_line)",
-            "api": "core/turn/adapters_api.py (clock -> the same time_context_line)",
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (clock -> core.chat_prompt.turn_time_line)",
+            "api": "core/turn/adapters_api.py (clock -> the same turn_time_line)",
         },
         note="C4.2: resolved once per turn and written down, at both doors — "
              "it used to be computed inside `_assemble_engine_messages` (ui) "
@@ -371,6 +371,21 @@ TURN_STEPS: tuple[Step, ...] = (
              "control characters and stops the turn at NEXE_MAX_STREAM_MB.",
     ),
     Step(
+        id="describe_image", kind=StepKind.LLM, must_have=False, replaceable=True,
+        idempotent=True,
+        reads=frozenset({"attachments", "engine", "lang", "session_id"}), writes=frozenset(),
+        doors_today=frozenset({"ui", "api"}),
+        today={
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (describe_image -> core.turn.image_memory.describe; kept on the message)",
+            "api": "core/turn/adapters_api.py (describe_image -> core.turn.image_memory.describe; kept by image key)",
+        },
+        note="#1144 (Jordi 03/10): a turn that brought a new image has the model that served it "
+             "write the image's own description, post-commit; later turns carry it as "
+             "`[IMATGE ADJUNTA] …` in the history (core/turn/assemble.py, adapters_api). An image "
+             "already described is not described again; skipped on a partial turn (core/turn/run.py) "
+             "and on a resume.",
+    ),
+    Step(
         id="compact", kind=StepKind.LLM, must_have=False, replaceable=True,
         idempotent=False,
         reads=frozenset({"session_id"}), writes=frozenset(),
@@ -393,4 +408,4 @@ TURN_STEPS: tuple[Step, ...] = (
 #: `persist_user_turn` is NOT here: at /v1 a resume still mirrors the client's
 #: turns (the client is the source of truth); at the web door there is simply
 #: no new message, and its adapter says so.
-SKIP_ON_RESUME: FrozenSet[str] = frozenset({"intent", "recall", "compact"})
+SKIP_ON_RESUME: FrozenSet[str] = frozenset({"intent", "recall", "describe_image", "compact"})

@@ -30,8 +30,8 @@ def _setup_qdrant(project_root: Path, server_state) -> None:
     """Configure Qdrant storage (external override or embedded mode).
 
     In sidecar mode consult SidecarConfig.qdrant_url and
-    SidecarConfig.vectors_dir; fallback al comportament previ via env vars
-    directes amb logger.debug si SidecarConfig no disponible.
+    SidecarConfig.vectors_dir; fall back to the previous behaviour via direct
+    env vars, with logger.debug if SidecarConfig is unavailable.
     """
     qdrant_url = None
     qdrant_path_str = None
@@ -157,12 +157,12 @@ async def _auto_start_services(config: Dict[str, Any], project_root: Path, serve
 
 
 def _signal_process(process, sig: int, direct) -> None:
-    """Senyala el grup de procés (os.killpg) amb fallback al procés directe.
+    """Signal the process group (os.killpg), falling back to the process itself.
 
-    si el procés es va llançar amb start_new_session=True, el seu
-    PID és líder de grup; senyalar el grup propaga als runners-fills. Si el
-    grup no es pot resoldre (ProcessLookupError/OSError), recau al senyal
-    directe sobre el procés pare per no trencar el shutdown actual.
+    If the process was launched with start_new_session=True, its
+    PID is the group leader; signalling the group reaches the child runners. If the
+    group cannot be resolved (ProcessLookupError/OSError), fall back to a direct
+    signal on the parent process so the current shutdown is not broken.
     """
     # Windows has no process groups: os.killpg/os.getpgid don't exist and would
     # raise AttributeError — which would ESCAPE the (ProcessLookupError, OSError)
@@ -204,5 +204,5 @@ def _stop_process(process, name: str) -> None:
                     process, getattr(_signal, "SIGKILL", _signal.SIGTERM), process.kill
                 )
             except Exception:
-                # AP-G01: log diagnòstic sense canviar el flux (force-stop best-effort)
+                # AP-G01: diagnostic log without changing the flow (force-stop best-effort)
                 logger.debug("Failed to force-stop %s process", name, exc_info=True)

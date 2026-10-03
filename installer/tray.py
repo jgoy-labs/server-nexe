@@ -277,6 +277,10 @@ class NexeTray(rumps.App):
             **os.environ,
             "PYTHONUNBUFFERED": "1",
             "NEXE_TRAY_PID": str(tray_pid),
+            # #1138: huggingface_hub reads it at import, and with hf_xet on large
+            # model downloads stall. The DMG starts the server from here
+            # (Nexe.app → tray → core.app). A value from outside still wins.
+            "HF_HUB_DISABLE_XET": os.environ.get("HF_HUB_DISABLE_XET", "1"),
         }
         log_dir = PROJECT_ROOT / "storage" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)

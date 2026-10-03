@@ -24,6 +24,18 @@ www.jgoy.net · https://server-nexe.org
 from __future__ import annotations
 
 import inspect
+import importlib
+
+#: The web door's modules: routes_chat.py was split on 2026-10-04 and the
+#: stream is written from these — a sentinel scan of routes_chat.py alone
+#: would pass with the literal back in any of the others.
+_WEB_DOOR = ("routes_chat", "wire", "engine_call", "turn_adapters")
+
+
+def _web_door_sources():
+    for name in _WEB_DOOR:
+        module = importlib.import_module(f"plugins.web_ui_module.api.{name}")
+        yield name, inspect.getsource(module)
 
 
 class TestRoutesChatNoDoneSentinel:
@@ -37,32 +49,28 @@ class TestRoutesChatNoDoneSentinel:
     """
 
     def test_module_source_does_not_contain_done_sentinel(self) -> None:
-        from plugins.web_ui_module.api import routes_chat
-
-        src = inspect.getsource(routes_chat)
-        assert 'data: [DONE]' not in src, (
-            "Bug A regression: routes_chat.py contains the literal "
-            "'data: [DONE]'. The /ui/chat endpoint is text/plain and the "
-            "frontend has no SSE parser — this sentinel must not be "
-            "re-introduced. See commit history around 2026-05-21 for context."
-        )
+        for name, src in _web_door_sources():
+            assert 'data: [DONE]' not in src, (
+                f"Bug A regression: {name}.py contains the literal "
+                "'data: [DONE]'. The /ui/chat endpoint is text/plain and the "
+                "frontend has no SSE parser — this sentinel must not be "
+                "re-introduced. See commit history around 2026-05-21 for context."
+            )
 
     def test_module_source_does_not_contain_yield_done(self) -> None:
         """Extra belt-and-braces: even if someone parameterises the string
         (e.g. via a constant), forbid the obvious 'yield ... DONE' pattern
-        in this module specifically."""
-        from plugins.web_ui_module.api import routes_chat
-
-        src = inspect.getsource(routes_chat)
+        in this door specifically."""
         # The '[DONE]' token in comments is fine; only forbid it as a
         # quoted string literal (single or double quotes).
         forbidden = ("'[DONE]'", '"[DONE]"')
-        for needle in forbidden:
-            assert needle not in src, (
-                f"Bug A regression: routes_chat.py contains the literal "
-                f"{needle!r}. The /ui/chat endpoint is text/plain and must "
-                "not emit any [DONE] sentinel."
-            )
+        for name, src in _web_door_sources():
+            for needle in forbidden:
+                assert needle not in src, (
+                    f"Bug A regression: {name}.py contains the literal "
+                    f"{needle!r}. The /ui/chat endpoint is text/plain and must "
+                    "not emit any [DONE] sentinel."
+                )
 
 
 class TestSystemPromptNaturalLanguageDate:

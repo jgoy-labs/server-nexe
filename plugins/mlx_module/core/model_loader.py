@@ -1,14 +1,14 @@
-"""Càrrega del model MLX: detecció de visió, guard de RAM i les tres branques de load.
+"""MLX model load: vision detection, the RAM guard, and the three load branches.
 
-Extret de `chat.py` a #966 (Tros B). Els cossos són els originals; les úniques
-modificacions són dues substitucions mecàniques i uniformes, `MLXChatNode.` -> `node_cls.`
-i `self.config` -> `config`, perquè el codi ja no viu dins el mètode d'una classe.
+Extracted from `chat.py` in #966 (slice B). The bodies are the originals; the only
+changes are two mechanical, uniform substitutions, `MLXChatNode.` -> `node_cls.`
+and `self.config` -> `config`, because the code no longer lives inside a class method.
 
-**`chat.py` hi accedeix PEL MÒDUL** (`model_loader._detect_vlm_capability(...)`), no
-important-ne els noms. És deliberat: `_detect_vlm_capability` la criden tant `execute()`
-com la càrrega, i si cada banda en resolgués una còpia pròpia, un `patch` sobre una
-d'elles n'interceptaria una i l'altra no — mateixa funció, dos comportaments. Amb un sol
-lloc de resolució, aquesta divergència no pot existir.
+**`chat.py` reaches it THROUGH THE MODULE** (`model_loader._detect_vlm_capability(...)`),
+not by importing the names. That is deliberate: both `execute()` and the load call
+`_detect_vlm_capability`, and if each side resolved its own copy, a `patch` on one
+would intercept one and miss the other — same function, two behaviours. With a single
+resolution site, that divergence cannot exist.
 """
 import json
 import logging
@@ -259,11 +259,11 @@ def _memory_snapshot_gb(vm: Any) -> Dict[str, float]:
 
 
 def load_model_into(node_cls, config) -> None:
-    """Carrega el model i deixa els singletons posats a `node_cls`.
+    """Load the model and leave the singletons set on `node_cls`.
 
-    Cos mogut de `MLXChatNode._get_model` sense canvis de lògica: manté l'ordre
-    exacte d'assignació de `_is_vlm` (abans de carregar, i a False al camí de
-    reserva sense PyTorch), que és observable si la càrrega peta pel mig.
+    Body moved from `MLXChatNode._get_model` with no logic change: it keeps the
+    exact assignment order of `_is_vlm` (before the load, and False on the
+    fallback path without PyTorch), which is observable if the load fails halfway.
     """
     try:
         import psutil
@@ -315,9 +315,9 @@ def load_model_into(node_cls, config) -> None:
         if _impossible and _mode != "off":
             import os as _os_oom  # noqa: PLC0415
             _lang = _os_oom.environ.get("NEXE_LANG", "en")[:2]
-            # Contract: routes_chat._is_oom detects OOM by substring
-            # and _oom_notice keeps the switch-engine advice only when
-            # "MLX" appears in the text (pinned by contract test).
+            # Contract: core.turn.errors.is_oom_error detects OOM by
+            # substring and wire._oom_notice (web UI) keeps the switch-engine
+            # advice only when "MLX" appears in the text (pinned by contract test).
             _hard_msgs = {
                 "ca": (
                     "Memòria insuficient: aquest model no cap a la RAM "

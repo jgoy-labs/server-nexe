@@ -44,10 +44,10 @@ from typing import Any, Optional
 
 from core.chat_prompt import EMERGENCY_SYSTEM_PROMPT, build_system_prompt_with_time
 from core.lang_detect import (
+    STICKY_SWITCH_MIN_CHARS,
+    decide_reply_lang,
     detect_user_lang,
-    detect_user_lang_or_none as _detect_lang_or_none,
-    fallback_lang as _fallback_lang,
-    natural_text_len,
+    fallback_lang as _fallback_lang,  # noqa: F401 — re-exported: turn_adapters imports it from here
 )
 from core.memory_access import DOCS_COLLECTION, KNOWLEDGE_COLLECTION, MEMORY_COLLECTION
 
@@ -132,53 +132,47 @@ def _collections_prompt_overrides(lang, rag_collections) -> str:
     return ("\n\n" + "\n".join(notes)) if notes else ""
 
 
-# #850: llindar de canvi de l'idioma sticky. Els acks/manlleus curts ("ok
-# thanks"=9, "thanks a lot"=12, "merci!"=6) queden per sota; un canvi genuí és
-# una frase sencera ("can we switch to English?" >= 25). 2.5x el
-# _MIN_DETECT_CHARS de lang_detect: zona on lingua és fiable.
-_STICKY_LANG_MIN_SWITCH_CHARS = 25
+# #850: threshold for switching the sticky language. Short acks and borrowings ("ok
+# thanks"=9, "thanks a lot"=12, "merci!"=6) stay below it; a genuine switch is
+# a full sentence ("can we switch to English?" >= 25). 2.5x lang_detect's
+# _MIN_DETECT_CHARS: the zone where lingua is reliable.
+_STICKY_LANG_MIN_SWITCH_CHARS = STICKY_SWITCH_MIN_CHARS  # one constant, core.lang_detect
 
 
 def _resolve_session_lang(session, user_text: str) -> str:
-    """#850: reply language sticky per sessió (patró thinking_enabled).
+    """#850: sticky reply language per session (thinking_enabled pattern).
 
-    La directiva CRITICAL va AL PRINCIPI del system: cada flip d'idioma
-    invalida el prefix des del token 0 (re-prefill complet; a llama.cpp,
-    recàrrega del GGUF). Política (endurida per la review adversarial):
-    - la 1a detecció REAL sembra l'sticky; el fallback (NEXE_LANG) es retorna
-      però MAI es sembra — un guess no es fixa, la 1a detecció real decidirà.
-    - el llindar del canvi es mesura sobre el TEXT NATURAL (codi/URLs fora):
-      "thanks mate https://…" no és un canvi d'idioma.
-    - canvi al 1r missatge clar (decisió d'en Jordi, 25/09): la histèresi de
-      2 torns es va treure quan la detecció va passar a exigir seguretat
-      (`core.lang_detect._MIN_RELATIVE_DISTANCE`) — el soroll ja no arriba
-      aquí com a detecció, i un canvi genuí no ha de pagar un torn de retard.
+    The CRITICAL directive goes AT THE START of the system prompt: every language
+    flip invalidates the prefix from token 0 (a full re-prefill; on llama.cpp,
+    a GGUF reload). Policy (tightened by the adversarial review):
+    - the 1st REAL detection seeds the sticky; the fallback (NEXE_LANG) is returned
+      but NEVER seeded — a guess is not pinned, the 1st real detection will decide.
+    - the switch threshold is measured on the NATURAL TEXT (code/URLs stripped):
+      "thanks mate https://…" is not a language switch.
+    - switch on the 1st clear message (Jordi's decision, 25/09): the 2-turn
+      hysteresis was removed when detection started requiring confidence
+      (`core.lang_detect._MIN_RELATIVE_DISTANCE`) — noise no longer arrives
+      here as a detection, and a genuine switch must not pay a turn of delay.
+    - #1143: a short line seeds only the install language, and a language the
+      user asks for by name wins at once — `core.lang_detect.decide_reply_lang`,
+      the one decision both doors make.
     """
-    sticky = getattr(session, "lang", None)
-    detected = _detect_lang_or_none(user_text)
-    if sticky is None:
-        if detected is not None and session is not None:
-            session.lang = detected
-            return detected
-        return _fallback_lang()
-    if (
-        detected
-        and detected != sticky
-        and natural_text_len(user_text) >= _STICKY_LANG_MIN_SWITCH_CHARS
-    ):
-        session.lang = detected
+    # #1143: the decision is core.lang_detect.decide_reply_lang, shared with
+    # /v1; this door keeps it on the ChatSession.
+    lang, new_sticky = decide_reply_lang(getattr(session, "lang", None), user_text)
+    if new_sticky and session is not None:
+        session.lang = new_sticky
         session.lang_pending = None
-        return detected
-    return sticky
+    return lang
 
 
 def _finalize_system_prompt(system_prompt: str, lang: str, rag_collections=None) -> str:
-    """Sufixos comuns de TOTS els torns: overrides de col·leccions + regla RAG.
+    """Suffixes shared by EVERY turn: collection overrides + the RAG rule.
 
-    #851: la regla de seguretat RAG és estàtica i INCONDICIONAL — qualsevol
-    sufix condicional parteix el namespace de la caché de prefix
-    (identity_hash cobreix el system sencer). La branca continue queda
-    coherent de retruc: ja no depèn de si el torn portava context.
+    #851: the RAG security rule is static and UNCONDITIONAL — any
+    conditional suffix splits the prefix-cache namespace
+    (identity_hash covers the whole system prompt). The continue branch stays
+    coherent as a side effect: it no longer depends on whether the turn carried context.
     """
     # Deferred: `core.endpoints.chat_sanitization` executes `core/endpoints/
     # __init__.py`, which eagerly imports `.v1` -> `.chat` -> this module.

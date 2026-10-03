@@ -10,6 +10,8 @@ Description:
   B156 — _start_server must not leak the server.log file handle: it must close a
          stale handle before reopening (re-entry) and release the just-opened
          handle if subprocess.Popen fails.
+  #1138 — the server _start_server launches gets HF_HUB_DISABLE_XET=1 (the DMG's
+          path: Nexe.app → tray → core.app), unless it comes set from outside.
 
   rumps is macOS-only and is mocked elsewhere as a bare MagicMock, which makes
   NexeTray (a rumps.App subclass) unusable. We load a private copy of
@@ -157,3 +159,35 @@ class TestStartServerHandleHygiene:
 
         assert len(opened) >= 2, opened
         assert opened[0].closed is True, "first log handle leaked (not closed)"
+
+
+# ── #1138 — the server the tray starts has hf_xet off ────────────────────────
+
+class TestStartServerDisablesXet:
+    """huggingface_hub reads HF_HUB_DISABLE_XET at import, and with hf_xet on
+    large model downloads stall. The DMG starts the server from the tray
+    (Nexe.app → tray → core.app), and nothing on that path set it."""
+
+    def _env_handed_to_the_server(self, tmp_path, monkeypatch, outside=None):
+        root = TestStartServerHandleHygiene()._prep_root(tmp_path)
+        if outside is None:
+            monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
+        else:
+            monkeypatch.setenv("HF_HUB_DISABLE_XET", outside)
+        popen = MagicMock()
+        with (
+            patch.object(tray, "PROJECT_ROOT", root),
+            patch.object(tray.threading, "Thread", MagicMock()),
+            patch.object(tray.subprocess, "Popen", popen),
+        ):
+            _bare_tray()._start_server()
+        args, kwargs = popen.call_args
+        assert args[0][1:] == ["-m", "core.app"], "this is the server's Popen"
+        return kwargs["env"]
+
+    def test_the_server_starts_with_xet_off(self, tmp_path, monkeypatch):
+        assert self._env_handed_to_the_server(tmp_path, monkeypatch)["HF_HUB_DISABLE_XET"] == "1"
+
+    def test_a_value_from_outside_wins(self, tmp_path, monkeypatch):
+        env = self._env_handed_to_the_server(tmp_path, monkeypatch, outside="0")
+        assert env["HF_HUB_DISABLE_XET"] == "0"

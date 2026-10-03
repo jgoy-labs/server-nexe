@@ -228,6 +228,21 @@ class NexeAPIClient:
                 logger.error("confirm-delete error: %s", e)
         return {}
 
+    async def memory_cancel_delete(self, session_id: str) -> bool:
+        """Refuse the forget this session has pending (#1136) — the web UI's
+        «Cancel·la» does the same POST. Without it the delete stayed armed and
+        a bare "sí" next turn still ran it. Returns whether one was pending."""
+        url = f"{self.base_url}/ui/memory/cancel-delete"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.post(url, json={"session_id": session_id}, headers=self.headers)
+                if response.status_code == 200:
+                    return bool(response.json().get("cancelled"))
+                logger.error("cancel-delete failed: HTTP %s", response.status_code)
+            except Exception as e:
+                logger.error("cancel-delete error: %s", e)
+        return False
+
     async def memory_store(self, content: str, metadata: Optional[Dict] = None) -> bool:
         """Store content in RAG memory."""
         url = f"{self.base_url}/v1/memory/store"

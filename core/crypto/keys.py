@@ -28,9 +28,9 @@ KEY_SIZE = 32  # 256 bits
 def _resolve_key_file_dir() -> Path:
     """Resolve master key path respecting NEXE_SIDECAR_DIR.
 
-    En mode sidecar (Tauri injecta NEXE_SIDECAR_DIR=~/.nexe per defecte),
-    usa aquest path. En standalone, fallback a ~/.nexe (compatibilitat
-    amb instal·lacions prèvies del DMG / CLI).
+    In sidecar mode (Tauri injects NEXE_SIDECAR_DIR=~/.nexe by default),
+    use that path. Standalone falls back to ~/.nexe (compatible with
+    earlier DMG / CLI installs).
     """
     if sidecar_dir := os.getenv("NEXE_SIDECAR_DIR"):
         return Path(sidecar_dir)

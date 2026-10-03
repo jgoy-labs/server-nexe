@@ -163,6 +163,7 @@ async def engine_events(chat_result: Any, model_name: "str | None", flags: Strea
     closing this generator does not reach a thread.
     """
     guard = StreamGuard()
+    labels = None
     try:
         if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
             first = True
@@ -197,4 +198,10 @@ async def engine_events(chat_result: Any, model_name: "str | None", flags: Strea
     except Exception as e:
         await close_quietly(chat_result)
         flags.error = e
+        # What the filter was still holding (a line that might have been a
+        # source caption, #1124) is text the screen has not shown yet; the
+        # partial turn stores it, so it is sent before the failure.
+        held = _visible(labels.flush()) if labels is not None else ""
+        if held:
+            yield Delta(held, "")
         yield Failed(e)

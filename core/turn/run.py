@@ -87,9 +87,10 @@ AFTER_CANCEL: frozenset[str] = frozenset({"persist_assistant_turn"})
 #: cancelled or short-circuited turn queues neither (unchanged from before).
 #: 25/09 (ADR-007 §6 amended): `memory.write` is back inline, before `emit` —
 #: queued, the news of what it saved reached the client one turn late and the
-#: UI badged the model's own text instead (#1098). Only `compact` (up to ~100 s)
-#: stays off the critical path.
-POST_COMMIT: frozenset[str] = frozenset({"compact"})
+#: UI badged the model's own text instead (#1098). `compact` (up to ~100 s)
+#: stays off the critical path, and so does `describe_image` (#1144: one more
+#: generation, for a turn that brought an image).
+POST_COMMIT: frozenset[str] = frozenset({"describe_image", "compact"})
 
 
 class TurnShortCircuit(Exception):
@@ -143,14 +144,15 @@ def _skipped_by_policy(ctx: TurnContext, step: Step) -> bool:
     """The steps this turn does not run, decided by what the turn IS.
 
     * #1040 (C2.4): a PARTIAL turn's `memory.write` — facts atomized from a
-      reply that broke mid-generation are not trustworthy. `compact` is
+      reply that broke mid-generation are not trustworthy — and (#1144) its
+      `describe_image`: the engine broke on this turn. `compact` is
       independent of this turn's own outcome and always runs.
     * C4.6: a RESUME turn's `SKIP_ON_RESUME` (steps.py) — no new message to
       read an intent in or recall for, and no compaction between the cut and
       the resume.
 
     Recorded `skipped`, never folded: the step did not run by decision."""
-    if step.id == "memory.write" and ctx.partial:
+    if step.id in ("memory.write", "describe_image") and ctx.partial:
         return True
     return ctx.resume and step.id in SKIP_ON_RESUME
 

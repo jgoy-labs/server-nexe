@@ -50,7 +50,7 @@ FAKE_ANSWER: str = "".join(FAKE_CHUNKS)
 class _FakeEngine:
     """A generic-shaped engine: `chat(messages, system=…)`, no `model` param.
 
-    `routes_chat._start_engine_call` picks its branch off this signature —
+    `engine_call._start_engine_call` picks its branch off this signature —
     a `model` parameter means the Ollama shape, `mlx`/`llama_cpp` mean the
     in-process queue, and anything else is this generic call. `stream_callback`
     and `images` are declared because the generic branch may pass them; the

@@ -418,7 +418,7 @@ independent del motor que serveixi la conversa, per a qui prefereixi un comporta
 
 Separat en 6 fitxers de rutes:
 - **routes_auth.py** — Verificacio de clau API, llistat de backends amb mides de models, POST /ui/lang, auto-arrencada d'Ollama al canviar de backend
-- **routes_chat.py** — Streaming SSE, parseig de MEM_SAVE, cerca RAG de 3 col·leccions, thinking tokens, validacio d'input, sanititzacio de context RAG
+- **routes_chat.py** — La ruta POST /ui/chat: munta el torn i el passa per la canonada comuna (`core/turn/`), la mateixa que fa servir `/v1`. Els passos del torn propis de la web són a `turn_adapters.py`, la majoria dels marcadors que llegeixen el navegador i el CLI, els avisos d'error i les estadístiques desades a `wire.py`, i la crida al motor (arrencar-lo, llegir-ne el primer tros i el flux) a `engine_call.py`
 - **routes_files.py** — Pujada de documents amb aillament per session_id, validacio de noms de fitxer, rate limiting
 - **routes_memory.py** — Guardar/recuperar memoria amb validacio d'input, rate limiting
 - **routes_sessions.py** — CRUD de sessions amb proteccio contra path traversal, rate limiting

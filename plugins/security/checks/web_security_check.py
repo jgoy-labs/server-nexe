@@ -23,18 +23,18 @@ class WebSecurityCheck:
         self.project_root = project_root or Path(__file__).parent.parent.parent.parent
 
     def _effective_cors_origins(self) -> List[str]:
-        """Els orígens que MANEN, en el mateix ordre que els aplica el servidor.
+        """The origins that WIN, in the same order the server applies them.
 
-        #865: aquest check llegia `NEXE_CORS_ORIGINS`, una variable que no
-        existeix enlloc del producte — auditava un fantasma i deia «no
-        configurat» encara que server.toml tingués el CORS restringit (i mai
-        hauria vist un `cors_origins = ["*"]` de debò). La font real és la de
-        `core/middleware.py:setup_cors`: en mode sidecar mana
-        `SidecarConfig.cors_origins` (hi entren els orígens Tauri) i, si no,
-        `[core.server].cors_origins` de server.toml.
+        #865: this check read `NEXE_CORS_ORIGINS`, a variable that does not
+        exist anywhere in the product — it audited a ghost and said "not
+        configured" even when server.toml had CORS restricted (and it would never
+        have seen a real `cors_origins = ["*"]`). The real source is
+        `core/middleware.py:setup_cors`: in sidecar mode
+        `SidecarConfig.cors_origins` wins (the Tauri origins are in there) and, otherwise,
+        `[core.server].cors_origins` from server.toml.
 
-        No s'hi afegeix cap variable d'entorn nova: una segona font de veritat
-        és precisament el que #918 acaba de decidir evitar.
+        No new env var is added: a second source of truth
+        is exactly what #918 just decided to avoid.
         """
         try:
             from core.sidecar_config import get_sidecar_config
@@ -42,8 +42,8 @@ class WebSecurityCheck:
             if sidecar_cfg.is_sidecar:
                 return list(sidecar_cfg.cors_origins)
         except Exception as e:
-            # Mateix criteri defensiu que setup_cors: si SidecarConfig no es pot
-            # llegir, es cau a server.toml en comptes de deixar el check cec.
+            # Same defensive rule as setup_cors: if SidecarConfig cannot be
+            # read, fall back to server.toml instead of leaving the check blind.
             logger.debug("CORS check: SidecarConfig unavailable, using server.toml: %s", e)
 
         from core.config import load_config
@@ -55,7 +55,7 @@ class WebSecurityCheck:
         """Runs the web security checks."""
         findings = []
 
-        # Check 1: CORS origins configured? (llegit de la font que mana)
+        # Check 1: CORS origins configured? (read from the source that wins)
         cors_origins = self._effective_cors_origins()
         if not cors_origins:
             findings.append({
@@ -119,13 +119,13 @@ class WebSecurityCheck:
                 "recommendation": "Check plugins/security/sanitizer/"
             })
 
-        # #865: aquí hi havia un «Check 4: HTTPS in production?» que exigia
-        # `NEXE_SSL_CERT`. Retirat: el producte és local-first sobre loopback i
-        # no serveix TLS enlloc — zero paràmetres de certificat o clau privada
-        # a tot el codi de producte, cosa que vigila
-        # tests/plugins/security/test_g16_cors_ssl_real_source.py (els noms
-        # exactes viuen allà a posta: escrits aquí, el check es denunciaria a
-        # si mateix). Un check que reclama un certificat que el producte no pot
-        # tenir és soroll que tapa els findings de debò.
+        # #865: there used to be a "Check 4: HTTPS in production?" that required
+        # `NEXE_SSL_CERT`. Removed: the product is local-first on loopback and
+        # serves TLS nowhere — zero certificate or private-key parameters
+        # in the whole product tree, which is watched by
+        # tests/plugins/security/test_g16_cors_ssl_real_source.py (the exact
+        # names live there on purpose: written here, the check would report
+        # itself). A check that demands a certificate the product cannot
+        # have is noise that hides the real findings.
 
         return findings

@@ -88,6 +88,8 @@ NexeUI.extend({
             this.filePreview.replaceChildren();
             this.filePreview.classList.remove('active');
         }
+        if (this._docCard) this._docCard.remove();
+        this._docCard = null;
         this.uploadedFile = null;
     },
 
@@ -101,7 +103,8 @@ NexeUI.extend({
     async _attachImageFile(file) {
         const allowed = ['image/jpeg', 'image/png', 'image/webp'];
         if (!allowed.includes(file.type)) {
-            alert('Only JPEG, PNG and WebP images are supported.');
+            // #1128: an iPhone photo (HEIC) lands here; say what to do with it.
+            alert(this.t('image_unsupported'));
             return;
         }
         const b64 = await new Promise((resolve, reject) => {
@@ -131,9 +134,11 @@ NexeUI.extend({
         const file = event.target.files?.[0] || event;
         if (!file || !file.name) return;
 
-        // If it's an image, redirect to VLM flow instead of document RAG
-        const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-        const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
+        // If it's an image, redirect to VLM flow instead of document RAG.
+        // HEIC/HEIF too (#1128): the image flow refuses it with what to do
+        // instead; as a document it only failed the upload.
+        const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+        const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'];
         const _ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
         if (IMAGE_TYPES.includes(file.type) || IMAGE_EXTS.includes(_ext)) {
             await this._attachImageFile(file);
@@ -200,8 +205,6 @@ NexeUI.extend({
                     this.loadSessions();
                 }
 
-                this.addUploadedFile(data);
-
                 // Bug #17: specific prompt for images vs documents
                 const isImage = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(data.filename || file.name || '');
 
@@ -212,8 +215,8 @@ NexeUI.extend({
                 }
 
                 const elapsed = Math.round((Date.now() - t0) / 1000);
-                const chunkMsg = data.chunks_saved ? ` (${data.chunks_saved} ${this.t('doc_fragments')})` : '';
-                this.addMessageToChat('assistant', `${this.t('doc_uploaded').replace('{name}', data.filename).replace('{chunks}', chunkMsg).replace('{time}', elapsed)}\nℹ️ ${this.t('doc_chat_only')}`);
+                const chunks = data.chunks_saved ? `${data.chunks_saved} ${this.t('doc_fragments')} · ` : '';
+                this.addUploadedFile(data, `${chunks}${elapsed}s`);
                 this.messageInput.value = this.t(isImage ? 'image_describe' : 'doc_summarize');
                 this.messageInput.focus();
                 this.messageInput.select();
@@ -234,23 +237,33 @@ NexeUI.extend({
         }
     },
 
-    addUploadedFile(fileData) {
-        // Update file preview to show uploaded file
+    addUploadedFile(fileData, detail = '') {
+        // #1126: the document goes into the conversation. Over the box the user
+        // types in, it read as something still waiting to be sent.
+        if (this._docCard) this._docCard.remove();
         const sizeKB = (fileData.size / 1024).toFixed(1);
-        this.filePreview.innerHTML = `
-            <div class="uploaded-file">
-                <span class="uploaded-file-icon"><i data-lucide="file-text"></i></span>
-                <span class="uploaded-file-name">${this.escapeHtml(fileData.filename)}</span>
-                <span class="uploaded-file-size">(${sizeKB} KB)</span>
-                <button class="uploaded-file-remove" onclick="nexeUI.removeFilePreview()">✕</button>
+        const card = document.createElement('div');
+        card.className = 'doc-card';
+        card.innerHTML = `
+            <span class="uploaded-file-icon"><i data-lucide="file-text"></i></span>
+            <div class="doc-card-body">
+                <div>
+                    <span class="uploaded-file-name">${this.escapeHtml(fileData.filename)}</span>
+                    <span class="uploaded-file-size">(${sizeKB} KB${detail ? ' · ' + this.escapeHtml(detail) : ''})</span>
+                </div>
+                <div class="uploaded-file-notice">${this.t('doc_in_chat')}</div>
             </div>
-            <div class="uploaded-file-notice">${this.t('doc_chat_only')}</div>
+            <button class="uploaded-file-remove" title="${this.t('doc_remove')}" onclick="nexeUI.removeFilePreview()">✕</button>
         `;
-        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [this.filePreview] });
-        this.filePreview.classList.add('active');
+        this.chatMessages.appendChild(card);
+        this._docCard = card;
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [card] });
+        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     },
 
     removeFilePreview() {
+        if (this._docCard) this._docCard.remove();
+        this._docCard = null;
         this.filePreview.replaceChildren();
         this.filePreview.classList.remove('active');
         this.uploadedFile = null;

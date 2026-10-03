@@ -116,7 +116,7 @@ async def _module_health_status(instance) -> str:
 @limiter.limit("30/minute")
 async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
   """Root endpoint with system information"""
-  # usem translate() canònica en comptes de l'inline ternari.
+  # use the canonical translate() instead of the inline ternary.
   return SystemResponse(
     system=f"Nexe {__version__}",
     description=translate(i18n, 'server_core.api.welcome.description',
@@ -131,7 +131,7 @@ async def root(request: Request, i18n=Depends(get_i18n)) -> SystemResponse:
 @limiter.limit("60/minute")
 async def health_check(request: Request, i18n=Depends(get_i18n)) -> HealthResponse:
   """System health check"""
-  # usem translate() canònica en comptes de l'inline ternari.
+  # use the canonical translate() instead of the inline ternary.
   return HealthResponse(
     status=translate(i18n, 'server_core.api.health.status', "operational"),
     message=translate(i18n, 'server_core.api.health.message',
@@ -221,7 +221,7 @@ async def system_info(request: Request, i18n=Depends(get_i18n)) -> ApiInfoRespon
   # OpenAPI schema; enumerating app.routes here would expose the whole attack
   # surface to unauthenticated callers. The summary/model no longer promise
   # completeness.
-  # usem translate() canònica en comptes de l'inline ternari.
+  # use the canonical translate() instead of the inline ternary.
   endpoints = [
     EndpointInfo(
       path="/",

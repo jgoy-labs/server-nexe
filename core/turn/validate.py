@@ -50,8 +50,11 @@ so `core → plugins` stays at 0 and this module pulls in no plugin at import.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
+import io
 import logging
+import struct
 from typing import Any, Optional
 
 from fastapi import HTTPException
@@ -75,6 +78,22 @@ ALLOWED_IMAGE_TYPES: frozenset[str] = frozenset({"image/jpeg", "image/png", "ima
 
 #: 10 MB, the same ceiling the UI door has always enforced.
 MAX_IMAGE_BYTES: int = 10 * 1024 * 1024
+
+#: The longest side, in pixels, an attached image keeps on its way to a model
+#: (#1122). A VLM pays per pixel, not per byte: Qwen3.5 spends one token on
+#: every 32×32 square and accepts up to 16.7 MP, so a phone photo reached MLX
+#: as 16,113 tokens and took 75 s before the first word. At 1,536 the same
+#: photo is about 1,700 tokens.
+MAX_IMAGE_SIDE: int = 1536
+
+#: A shrunk image is saved the way interzone's heic2jpg saves one
+#: (`-auto-orient -resize NxN> -quality 85 -strip`), with Pillow instead of
+#: ImageMagick: the product also runs where there is no `magick`.
+SHRUNK_IMAGE_TYPE = "image/jpeg"
+_SHRUNK_JPEG_QUALITY = 85
+
+#: Pillow's names for the formats of ALLOWED_IMAGE_TYPES.
+_PILLOW_FORMATS = ("JPEG", "PNG", "WEBP")
 
 #: The i18n key of the empty-message 400. Kept verbatim from the UI door so a
 #: locale catalogue that already translates it keeps working; the fallback below
@@ -149,6 +168,83 @@ def decode_image_attachment(image_b64: Any, image_type: Any) -> Optional[bytes]:
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=400, detail="Image too large (max 10MB)")
     return image_bytes
+
+
+#: What Pillow raises for bytes it cannot read: UnidentifiedImageError and a
+#: truncated file are OSErrors, a broken PNG chunk is a SyntaxError, and the
+#: EXIF reader raises the rest on a damaged block (Pillow catches the same set
+#: around its own EXIF reads). Nothing wider: a bug in here has to fail the
+#: turn, not quietly send the full-size image again.
+_UNREADABLE = (OSError, ValueError, SyntaxError, struct.error, EOFError, IndexError, TypeError, KeyError)
+
+
+def _upright(img):
+    """The EXIF orientation applied to the pixels. A damaged EXIF block is
+    common in phone and app output: the photo is then kept as it is stored,
+    unturned, rather than refused."""
+    from PIL import ImageOps
+
+    try:
+        return ImageOps.exif_transpose(img)
+    except _UNREADABLE:
+        logger.info("validate: unreadable EXIF on an attached image; shrunk without turning it")
+        return img.copy()
+
+
+def _to_rgb(img):
+    """RGB, before resizing: Pillow resizes palette and 1-bit images
+    nearest-neighbour, which turns fine text into blocks. JPEG has no alpha, so
+    a transparent PNG goes onto white, not onto black. 16-bit greyscale is
+    scaled down to 8 bits first: a plain convert clips it to white."""
+    from PIL import Image
+
+    if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+        rgba = img.convert("RGBA")
+        flat = Image.new("RGB", rgba.size, (255, 255, 255))
+        flat.paste(rgba, mask=rgba.getchannel("A"))
+        return flat
+    if img.mode.startswith("I;16") or img.mode == "I":
+        img = img.convert("I").point(lambda v: v * (1 / 256)).convert("L")
+    return img if img.mode == "RGB" else img.convert("RGB")
+
+
+def shrink_image(image_bytes: bytes) -> Optional[bytes]:
+    """The image as a JPEG whose longest side is `MAX_IMAGE_SIDE` (#1122), or
+    None when it already fits.
+
+    Upright first (the EXIF orientation is applied to the pixels, because the
+    re-encode drops the tag that said how to turn them), never enlarged, and
+    without metadata. An image that fits is left byte for byte as it came: a
+    re-encode would only lose quality for no token saved. So is one Pillow
+    cannot read — the engine gets it as it always did, and the log says why it
+    was not shrunk.
+    """
+    from PIL import Image
+
+    try:
+        # Only the decoders of ALLOWED_IMAGE_TYPES: the bytes come from the
+        # user, and a "PNG" that is really a JPEG2000 or a TGA would otherwise
+        # reach a decoder this door never meant to open.
+        with Image.open(io.BytesIO(image_bytes), formats=_PILLOW_FORMATS) as original:
+            width, height = original.size
+            if max(width, height) <= MAX_IMAGE_SIDE:
+                return None
+            img = _to_rgb(_upright(original))
+            img.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE), Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            img.save(out, format="JPEG", quality=_SHRUNK_JPEG_QUALITY)
+    except (*_UNREADABLE, Image.DecompressionBombError):
+        logger.warning(
+            "validate: an attached image could not be read to shrink it; it goes as it came",
+            exc_info=True,
+        )
+        return None
+    shrunk = out.getvalue()
+    logger.info(
+        "Image shrunk for the model: %dx%d -> %dx%d, %d -> %d bytes",
+        width, height, img.size[0], img.size[1], len(image_bytes), len(shrunk),
+    )
+    return shrunk
 
 
 def parse_content_parts(content: Any) -> tuple[str, Optional[str], Optional[str]]:
@@ -301,12 +397,24 @@ async def validate_turn(ctx: TurnContext) -> None:
     Writes `attachments["image_bytes"]` — which is why `validate` declares
     `attachments` in `writes` (`core/turn/steps.py`). A door with no attachment
     support hands over an empty dict and nothing here touches it.
+
+    #1122: an image larger than `MAX_IMAGE_SIDE` is shrunk here, once for both
+    doors, and the smaller one replaces `image_b64` and `image_type`. Every
+    reader downstream takes the base64, not these bytes — the engines, the
+    session the message is stored in, a Continue that re-attaches it.
     """
     attachments = ctx.attachments or {}
     if attachments.get("image_b64"):
-        attachments["image_bytes"] = decode_image_attachment(
+        image_bytes = decode_image_attachment(
             attachments.get("image_b64"), attachments.get("image_type")
         )
+        # Off the event loop: about 100 ms for a phone photo, more for a big PNG.
+        shrunk = await asyncio.to_thread(shrink_image, image_bytes)
+        if shrunk is not None:
+            image_bytes = shrunk
+            attachments["image_b64"] = base64.b64encode(shrunk).decode("ascii")
+            attachments["image_type"] = SHRUNK_IMAGE_TYPE
+        attachments["image_bytes"] = image_bytes
         ctx.attachments = attachments
 
     # An image with no caption IS a turn: "what is this?" is the canonical

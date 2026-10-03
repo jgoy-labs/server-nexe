@@ -248,9 +248,9 @@ def _turn_state(ctx) -> dict:
             for call in llm_calls
         ],
     }
-    # `model` at `/ui/chat` is the REQUESTED model (`ui["model_name"]`,
-    # `turn_adapters.py:347`: the body's `model` or `NEXE_DEFAULT_MODEL`);
-    # at `/v1` it is (or, until #1054 is fixed, would be) the model that
+    # `model` at `/ui/chat` is the REQUESTED model when the picked engine
+    # answers (`ui["model_name"]`: the body's `model` or `NEXE_DEFAULT_MODEL`)
+    # and a fallback's own loaded one when it does (#1035); at `/v1` it is (or, until #1054 is fixed, would be) the model that
     # ACTUALLY SERVED the turn (`resolve_loaded_model_name`,
     # `_common.py:316-334` — echoing `request.model` back "would lie about
     # which model answered", B075-C3). Converging them is not a rename: `/v1`

@@ -402,7 +402,7 @@ Los hechos que el modelo marca con `[MEM_SAVE:]` se persisten en el camino de la
 
 Dividido en 6 ficheros de rutas:
 - **routes_auth.py** — Verificacion de API key, listado de backends con tamanos de modelo, POST /ui/lang, auto-arranque de Ollama al cambiar de backend
-- **routes_chat.py** — Streaming SSE, parsing de MEM_SAVE, busqueda RAG de 3 colecciones, thinking tokens, validacion de entrada, sanitizacion de contexto RAG
+- **routes_chat.py** — La ruta POST /ui/chat: monta el turno y lo pasa por la canalización común (`core/turn/`), la misma que usa `/v1`. Los pasos del turno propios de la web están en `turn_adapters.py`, la mayoría de los marcadores que leen el navegador y el CLI, los avisos de error y las estadísticas guardadas en `wire.py`, y la llamada al motor (arrancarlo, leer su primer fragmento y el flujo) en `engine_call.py`
 - **routes_files.py** — Upload de documentos con aislamiento por session_id, validacion de nombre de fichero, rate limiting
 - **routes_memory.py** — Guardar/recuperar memoria con validacion de entrada, rate limiting
 - **routes_sessions.py** — CRUD de sesiones con proteccion contra path traversal, rate limiting

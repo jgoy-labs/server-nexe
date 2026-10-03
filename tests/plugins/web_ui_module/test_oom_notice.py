@@ -9,7 +9,7 @@ advice, non-MLX failures must NOT be told to switch to Ollama.
 
 import pytest
 
-from plugins.web_ui_module.api.routes_chat import _oom_notice
+from plugins.web_ui_module.api.wire import _oom_notice
 
 # The exact strings the MLX pre-load guard raises (plugins/mlx_module/core/chat.py).
 _GUARD_MSG = {

@@ -147,7 +147,7 @@ class VectorStore(Protocol):
     Examples:
       >>> ids = store.add_vectors(
       ...   vectors=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
-      ...   texts=["primer document", "segon document"],
+      ...   texts=["first document", "second document"],
       ...   metadatas=[{"source": "a"}, {"source": "b"}]
       ... )
       >>> print(ids)
@@ -181,8 +181,8 @@ class VectorStore(Protocol):
       >>> hits = store.search(request)
       >>> for hit in hits:
       ...   print(f"{hit.id}: {hit.score:.3f} - {hit.text[:50]}")
-      doc-1: 0.950 - Aquest document és molt similar...
-      doc-2: 0.820 - Aquest altre també és rellevant...
+      doc-1: 0.950 - This document is very similar...
+      doc-2: 0.820 - This other one is relevant too...
     """
     ...
 
@@ -201,8 +201,8 @@ class VectorStore(Protocol):
 
     Examples:
       >>> num_deleted = store.delete(["doc-1", "doc-2", "doc-3"])
-      >>> print(f"Eliminats {num_deleted} documents")
-      Eliminats 3 documents
+      >>> print(f"Deleted {num_deleted} documents")
+      Deleted 3 documents
     """
     ...
 

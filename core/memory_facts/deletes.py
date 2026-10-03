@@ -18,6 +18,7 @@ sentinel; the JSON web path overwrote the pending one and put the ENTRY's text;
 own alphabet — the web UI's `\\x00[PENDING_DELETE:…]\\x00` sentinel, a header and
 a field at `/v1` — and `confirm_pending_delete` is what the dialog and the CLI
 call: the same path a typed "sí" takes, by exact id, with the B093 guard.
+`cancel_pending_delete` is their «no» (#1136): it disarms on the server.
 
 www.jgoy.net · https://server-nexe.org
 ────────────────────────────────────
@@ -27,19 +28,75 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from typing import Optional
 
 from core.log_redact import redact_user_content
 from core.memory_facts import intents
+from core.memory_facts.intent_patterns import matches_clear_all_confirm
 
 logger = logging.getLogger(__name__)
 
 #: A tag shorter than this names nothing that could be found in memory.
 MIN_FACT_CHARS = 3
 
+#: The user's own words asking to forget — wider than intent_patterns'
+#: DELETE_TRIGGERS on purpose: the model's tag is the fallback for the
+#: phrasings those miss («el Bombolla ja no hi és», «treu-ho»). Matched on
+#: the FOLDED text (review 04/10: «Bórralo», «Olvídate», «Elimínalo» carry
+#: an accent inside the stem and armed nothing, while the model said it had
+#: forgotten).
+_ASKED_TO_FORGET_RE = re.compile(
+    r"\b(?:oblid|esborr|elimin|treu|tregu|olvid|borr|quit|suprim|forget|delet|eras|remov|wipe)\w*"
+    r"|\bno\s+(?:ho\s+|lo\s+|te\s+)?(?:recordis|recordes|recuerdes)\b|\bscratch\s+that\b"
+    r"|\b(?:ja|ya)\s+no\b|\bno\s+longer\b|\banymore\b"
+)
+#: A short yes, the second step of «oblida X» — «sí» — «Sí!», «sí, si us
+#: plau», «d'acord», «ok», «yes please» (review 04/10: only a bare «sí»
+#: counted). At most five words: a yes that goes on is a new request.
+_SHORT_YES_RE = re.compile(
+    r"^\W*(?:si|yes|ok|okay|vale|val|d'acord|dacord|endavant|fes-ho|confirmo|confirma"
+    r"|claro|dale|sure|yep|yeah|correcte|correcto|exacte|exacto)\b"
+)
+_SHORT_YES_MAX_WORDS = 5
+
+
+def _fold(text: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", (text or "").casefold())
+                   if unicodedata.category(c) != "Mn").replace("\u2019", "'")
+
+
+def _asks_to_forget(text: str) -> bool:
+    return bool(_ASKED_TO_FORGET_RE.search(_fold(text)))
+
+
+def _is_short_yes(text: str) -> bool:
+    folded = _fold(text).strip()
+    return bool(_SHORT_YES_RE.match(folded)) and len(re.findall(r"\w+", folded)) <= _SHORT_YES_MAX_WORDS
+
+
+def user_asked_to_forget(session, user_message: str) -> bool:
+    """Did the USER ask for this? (#1135, live 03/10, second case.)
+
+    Asked how its memory works, the 9B made up an example with the user's real
+    name — `[MEM_DELETE: L'usuari es diu Jordi]` — and the dialog offered to
+    delete it. No rule on the tag's content can tell that from a request; what
+    can is that nobody asked. True when this turn's message asks to forget, or
+    is a short yes right after one that did (the instructions' two steps).
+    """
+    message = user_message or ""
+    if _asks_to_forget(message):
+        return True
+    if not (matches_clear_all_confirm(message) or _is_short_yes(message)):
+        return False
+    users = [m.get("content") or "" for m in (getattr(session, "messages", None) or []) if m.get("role") == "user"]
+    if users and users[-1].strip() == message.strip():
+        users = users[:-1]  # this turn's own message (persist_user_turn stores it as is)
+    return bool(users) and _asks_to_forget(users[-1])
+
 
 async def arm_pending_deletes(
-    session, deletes: list, port, collections: Optional[list] = None,
+    session, deletes: list, port, collections: Optional[list] = None, *, user_message: str,
 ) -> Optional[intents.IntentOutcome]:
     """Arm the confirmation for the first tag that matches an entry; never delete.
 
@@ -60,6 +117,9 @@ async def arm_pending_deletes(
       exactly what dies, never cross-collection collateral.
     """
     if not deletes:
+        return None
+    if not user_asked_to_forget(session, user_message):
+        logger.info("MEM_DELETE (model tag): the user asked to forget nothing — a mention, not armed (#1135)")
         return None
     if getattr(session, "_pending_partial_delete", None):
         logger.info("MEM_DELETE (model tag): a confirmation is already pending; the new tag waits")
@@ -87,6 +147,21 @@ async def arm_pending_deletes(
             pending_delete_fact=(best[0].get("text") or fact),
         )
     return None
+
+
+def cancel_pending_delete(session) -> bool:
+    """The dialog's «Cancel·la», the CLI's "no": disarm the session's pending
+    delete, so a bare "sí" next turn finds nothing to confirm (#1136).
+
+    Until 03/10 the cancel stayed in the client: the flag waited for the next
+    message, and a "sí" to anything else would have deleted the entry the
+    user had just refused. Returns whether something was pending.
+    """
+    pending = bool(getattr(session, "_pending_partial_delete", None))
+    session._pending_partial_delete = None
+    if pending:
+        logger.info("MEM_DELETE: cancelled by the user, nothing deleted")
+    return pending
 
 
 def _same_text(a: str, b: str) -> bool:

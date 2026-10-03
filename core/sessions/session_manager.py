@@ -284,9 +284,14 @@ class ChatSession:
             self.id[:8], old_count, len(keep), self.compaction_count
         )
 
-    def get_context_messages(self) -> List[Dict[str, str]]:
+    def get_context_messages(self, stamp=None) -> List[Dict[str, str]]:
         """Get messages to send to the model (with summary if it exists).
         Guarantees that the role sequence alternates user/assistant correctly.
+
+        `stamp` (#1125): given a stored user message, the line that goes in
+        front of its text — the web door's time of sending. Applied before
+        consecutive messages are merged, while each still has its own
+        `timestamp`. None leaves the text as stored.
         """
         msgs = []
         if self.context_summary:
@@ -298,7 +303,9 @@ class ChatSession:
                 "role": "assistant",
                 "content": "Understood, I have the context from the previous conversation."
             })
-        msgs.extend(self.messages)
+        for m in self.messages:
+            line = stamp(m) if stamp is not None and m.get("role") == "user" else ""
+            msgs.append({**m, "content": f"{line}\n\n{m.get('content', '')}"} if line else m)
         # Collapse consecutive duplicate roles (prevents VLM errors) using the
         # ONE canonical policy — #963: this layer used to keep the latest and
         # drop the rest (MC-116) while the engine merged them, two answers to
@@ -345,7 +352,7 @@ class ChatSession:
         outlived the process that granted it would be a lock nobody still
         running can ever release. Every session loads with `lease=None`.
         """
-        session = cls(session_id=data.get("id"))  # type: ignore[arg-type]  # Any|None; session_id=None → UUID autogenerat (L34)
+        session = cls(session_id=data.get("id"))  # type: ignore[arg-type]  # Any|None; no id → new UUID (L34)
         _ca = data.get("created_at")
         session.created_at = datetime.fromisoformat(_ca) if _ca else datetime.now(timezone.utc)
         _la = data.get("last_activity")
@@ -355,7 +362,7 @@ class ChatSession:
         session.attached_document = data.get("attached_document")
         session.custom_name = data.get("custom_name")
         session.thinking_enabled = data.get("thinking_enabled", False)
-        session.lang = data.get("lang")  # legacy .enc sense lang → None (re-seed al 1r torn)
+        session.lang = data.get("lang")  # legacy .enc without lang → None (re-seed on turn 1)
         session.rag_collections = data.get("rag_collections")
         session.context_summary = data.get("context_summary")
         session.compaction_count = data.get("compaction_count", 0)
@@ -643,6 +650,20 @@ class SessionManager:
             session = self._sessions.get(session_id)
             if session:
                 self._save_session_to_disk(session)
+
+    def save_session_if_live(self, session: ChatSession) -> bool:
+        """Persist `session` only if it is still this manager's (review 04/10).
+
+        A background job (the image description, the compaction) holds the
+        session object for seconds; a conversation the user deleted meanwhile
+        was written back to disk and came back after a restart, its image
+        with it. Returns whether it was saved."""
+        with self._sessions_lock:
+            if self._sessions.get(session.id) is not session:
+                logger.info("Session %s: gone (deleted meanwhile) — not written back", session.id[:8])
+                return False
+            self._save_session_to_disk(session)
+            return True
 
     def get_or_create_session(self, session_id: str = None) -> ChatSession:  # type: ignore[assignment]  # no_implicit_optional
         """Get an existing session or create a new one.

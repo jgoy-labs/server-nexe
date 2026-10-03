@@ -124,13 +124,18 @@ class TestBothDoorsShareIt:
         assert "llm" not in ctx.usage
 
     def test_the_policy_left_the_plugin(self):
-        import plugins.web_ui_module.api.routes_chat as rc
+        import importlib
 
-        assert not hasattr(rc, "_reprompt_enabled")
-        assert not hasattr(rc, "_mem_save_fallback_text")
-        assert not hasattr(rc, "_REPROMPT_OVERRIDE")
-        # C4.5: the second call and the delete rule left too — no door keeps a copy.
-        for gone in ("_yield_reprompt", "_reprompt_nonstreaming", "_postprocess_nonstreaming",
-                     "NonStreamRepromptContext", "_arm_mem_deletes_nonstreaming",
-                     "_yield_mem_delete_prompts", "_yield_reprompt_when_only_mem_saves"):
-            assert not hasattr(rc, gone), gone
+        # 2026-10-04: routes_chat.py was split; a copy would come back next to
+        # `RepromptSetup` (engine_call.py) as naturally as in the route.
+        door = [importlib.import_module(f"plugins.web_ui_module.api.{name}")
+                for name in ("routes_chat", "wire", "engine_call", "turn_adapters")]
+        for module in door:
+            assert not hasattr(module, "_reprompt_enabled"), module.__name__
+            assert not hasattr(module, "_mem_save_fallback_text"), module.__name__
+            assert not hasattr(module, "_REPROMPT_OVERRIDE"), module.__name__
+            # C4.5: the second call and the delete rule left too — no door keeps a copy.
+            for gone in ("_yield_reprompt", "_reprompt_nonstreaming", "_postprocess_nonstreaming",
+                         "NonStreamRepromptContext", "_arm_mem_deletes_nonstreaming",
+                         "_yield_mem_delete_prompts", "_yield_reprompt_when_only_mem_saves"):
+                assert not hasattr(module, gone), f"{module.__name__}.{gone}"

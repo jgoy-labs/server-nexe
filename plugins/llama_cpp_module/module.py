@@ -236,6 +236,14 @@ class LlamaCppModule:
         """
         return bool(self._initialized and self._node is not None)
 
+    def can_see_images(self) -> bool:
+        """#1035: whether the model this engine runs can read an image — a
+        CLIP projector is configured (`LLAMA_MMPROJ_PATH`). Without one the
+        node drops the image and answers from the text alone."""
+        if not (self._initialized and self._node is not None):
+            return False
+        return bool(getattr(self._node.config, "mmproj_path", ""))
+
     async def chat(
         self, messages: List[Dict[str, str]], system: str = "",
         session_id: str = "default", stream_callback=None, **kwargs,

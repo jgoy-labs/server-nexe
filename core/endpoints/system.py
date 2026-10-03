@@ -36,7 +36,7 @@ def _get_i18n():
 
 def _t(key: str, fallback: str, **kwargs) -> str:
   """Helper to translate with fallback."""
-  # la resolució + maneig d'error viu a core.i18n_utils.translate.
+  # resolution and error handling live in core.i18n_utils.translate.
   return translate(_get_i18n(), key, fallback, **kwargs)
 
 _logs_dir = get_logs_dir()
@@ -195,8 +195,8 @@ async def restart_server(
       (the Tauri host manages the restart, not the sidecar).
   """
   # the sidecar MUST NOT try to restart itself —
-  # és Tauri host qui en gestiona el cicle de vida (spawn_sidecar_process).
-  # el guard try/except viu ara a is_sidecar_mode (sidecar_config).
+  # the Tauri host manages its lifecycle (spawn_sidecar_process).
+  # the try/except guard now lives in is_sidecar_mode (sidecar_config).
   from core.sidecar_config import is_sidecar_mode
   if is_sidecar_mode("restart_server", logger):
     raise HTTPException(

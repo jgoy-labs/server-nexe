@@ -332,7 +332,20 @@ NexeUI.extend({
                     }
                 }).catch(() => {});
             } else {
-                this.addMessageToChat('assistant', `↩️ ${this.t('delete_cancelled')}`);
+                // #1136: tell the server too, or the delete stays armed and a bare
+                // "sí" next turn still deletes the entry the user just refused.
+                // «Cancel·lat» only once the server says so: a 429/5xx or no
+                // network leaves it armed, and the user has to know.
+                this.fetchWithCsrf('/ui/memory/cancel-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: this.currentSessionId })
+                }).then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    this.addMessageToChat('assistant', `↩️ ${this.t('delete_cancelled')}`);
+                }).catch(() => {
+                    this.addMessageToChat('assistant', `⚠️ ${this.t('delete_cancel_unconfirmed')}`);
+                });
             }
         };
 
