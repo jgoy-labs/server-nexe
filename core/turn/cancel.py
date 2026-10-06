@@ -5,8 +5,8 @@ Extracted out of the web UI's `_start_disconnect_monitor`
 plugin dependency to begin with (FastAPI's `Request`, stdlib
 threading/asyncio) — the only reason `/v1` never had a disconnect monitor,
 or a way to arm a deadline (C2.5), was that the mechanism lived in a module
-`core/turn/` cannot import. `routes_chat.py` keeps `_start_disconnect_monitor`
-as a re-export for the FD-S6 `continue` path, which still calls it directly.
+`core/turn/` cannot import. Since C4.8-d both doors start it through
+`core/turn/engine_hold.py`.
 """
 from __future__ import annotations
 

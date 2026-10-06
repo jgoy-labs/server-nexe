@@ -2,9 +2,11 @@
 
 One adapter per step of `core.turn.steps.TURN_STEPS`, each a thin wrapper over a
 function that ALREADY exists in the core or in the door's other modules:
-`wire.py` (the sentinels built outside the stream, the curated notices, the
-saved stats) and `engine_call.py` (starting an engine and reading it), both
-split out of `routes_chat.py` on 2026-10-04. The adapters live in the plugin,
+`wire.py` (the sentinels built outside the stream, the saved stats),
+`engine_call.py` (reading an engine's stream in this door's alphabet) and, since
+C4.8-b, `engine_doors.py` (how one attempt is set up and what this door tells the
+core's cascade, `core/turn/engine_claim.py`, which walks the engines); the first
+two were split out of `routes_chat.py` on 2026-10-04. The adapters live in the plugin,
 not in `core/turn/`: the UI's behaviour is plugin code, and the layering gate
 keeps `core → plugins` at zero. Calls into `wire`, `engine_call` and
 `routes_chat` (`_rc()`, three names) are looked up on the module at call time;
@@ -37,13 +39,10 @@ Since C4.6 nothing bypasses these adapters: FD-S6's Continue is a turn with
 """
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import inspect
 import logging
 import os
 import time
-from dataclasses import dataclass
 from typing import Any
 
 from fastapi import HTTPException
@@ -59,17 +58,18 @@ from core.memory_facts import deletes as memory_deletes
 from core.memory_facts.write import needs_atomising, note_kept, write_facts
 import core.turn.policy as policy
 from core.sessions.compactor import compact_session
+from core.turn.engine_claim import Claim, claim_engine, claim_one, live_candidates
+from core.turn.engine_hold import EngineHold, cancel_monitor
 from core.turn.post_commit import queue_for
 from core.turn.errors import StreamCapExceeded, classify_engine_error
 from core.turn.persist import persist_assistant_turn, persist_partial_assistant
-from core.turn.stream import Failed, StreamFlags, close_quietly
+from core.turn.stream import Failed
 from core.turn.text import clean as text_clean
 from core.turn.prompt import _fallback_lang, _resolve_session_lang, turn_system_prompt
 from core.turn.recall import _build_rag_context, collections_for_turn
 from core.turn.run import Adapters, TurnShortCircuit
 from core.turn.validate import (
     jailbreak_notice,
-    parse_top_p,
     sanitize_user_text,
     validate_turn,
 )
@@ -77,6 +77,7 @@ from core.turn.validate import (
 # The web door's alphabet and its engine call, split out of routes_chat.py
 # (2026-10-04): looked up on the module at call time, like `_rc()` below.
 from plugins.web_ui_module.api import engine_call, wire
+from plugins.web_ui_module.api.engine_doors import JsonDoor, StreamDoor
 
 logger = logging.getLogger(__name__)
 
@@ -103,52 +104,11 @@ def _internal_error(ctx: TurnContext, exc: BaseException) -> TurnShortCircuit:
     return TurnShortCircuit(INTERNAL_ERROR_TEXT, reason="internal_error")
 
 
-@dataclass
-class _Claim:
-    """One engine attempt of a streaming turn, its first event already read
-    (#1117): the engine that claimed the stream, or the first one that failed
-    before a byte when none did."""
-    engine_name: str
-    engine_obj: Any
-    prepared: tuple
-    primed: tuple
-    flags: StreamFlags
-    started: float
-
-
-#: `_prepare_or_decide`'s answer when an engine fails to start in a way every
-#: engine would repeat, and an earlier failure's notice is already in hand.
-_KEEP_THE_NOTICE = object()
-
-
 async def _switch_model(engine, engine_name: str, model_name: str) -> None:
     # Deferred: a plugin must not pull core at import time (layering gate, #471).
     from core.endpoints.chat_engines.model_switch import model_switch_lock, switch_engine_model
     async with model_switch_lock():
         await switch_engine_model(engine, engine_name, model_name)
-
-
-def _model_on_fallback(engine, requested: str) -> str:
-    """#1035: the model a fallback engine answers with — the one it has loaded.
-
-    A model name belongs to one engine: an MLX directory is not a .gguf, and
-    neither is an Ollama tag. The web doors used to ask the next engine in the
-    cascade to load the name picked for another one; its validation raised
-    ValueError("not found"), final for the cascade policy, so with a model
-    selected in the UI (always) no fallback ever answered. `/v1` already runs
-    a fallback with its loaded model; the web doors do the same now. An engine
-    with no single loaded model (Ollama picks one per request) gets the
-    requested name, as before.
-    """
-    # Deferred, as above.
-    from core.endpoints.chat_engines._common import resolve_loaded_model_name
-    return resolve_loaded_model_name(engine, requested)
-
-
-class _CannotSeeTheImage(RuntimeError):
-    """#1035: a fallback whose own model cannot read the turn's image. A
-    RuntimeError, so the cascade moves on to the next engine; a ValueError
-    would end the turn for every engine."""
 
 
 def _reattach_mentioned_image(ctx: TurnContext) -> None:
@@ -200,16 +160,6 @@ def _latest_undescribed_image(messages: list) -> "dict | None":
                  and not image_memory.gave_up(image_memory.image_key(m["image_b64"]))), None)
 
 
-def _require_sight(engine, engine_name: str, model_name: str) -> None:
-    """A fallback answers with its own model (#1035), and a text model given a
-    turn with an image would answer as if it saw it. An engine that says it
-    cannot see is skipped; one that does not say (it takes the requested
-    model, Ollama) is left as before."""
-    from core.endpoints.chat_engines.routing import engine_can_see_images  # deferred, as above
-    if engine_can_see_images(engine) is False:
-        raise _CannotSeeTheImage(f"{engine_name} runs {model_name}, which cannot see the image")
-
-
 def _serve_with(ctx: TurnContext, engine_obj, ui: dict) -> None:
     """The engine that answers becomes the turn's — and so does its window.
 
@@ -222,19 +172,6 @@ def _serve_with(ctx: TurnContext, engine_obj, ui: dict) -> None:
         from core.context_window import ask_engine_window  # deferred, as above
         ctx.context_window = ask_engine_window(engine_obj)
     ctx.engine = engine_obj
-
-
-def _refit_for(engine, system_prompt: str, messages: list) -> list:
-    """#976 on a fallback engine: the prompt was fitted to the window of the
-    engine that was resolved; another one may hold less."""
-    from core.context_window import ask_engine_window
-    from core.context_budget import fit_prompt_to_window
-    from core.endpoints.chat_sanitization import CHARS_PER_TOKEN_ESTIMATE, DEFAULT_CONTEXT_WINDOW
-    window = ask_engine_window(engine) or DEFAULT_CONTEXT_WINDOW
-    fitted, _ = fit_prompt_to_window(
-        system_prompt, messages, window, reply_budget_tokens=500 // CHARS_PER_TOKEN_ESTIMATE,
-    )
-    return fitted
 
 
 def _last_results(ctx: TurnContext) -> dict:
@@ -348,26 +285,6 @@ def _end_partial(ctx: TurnContext, exc: Exception) -> None:
         ctx.cancel_token[0].set()
 
 
-def _cancel_monitor(ctx: TurnContext) -> None:
-    token = ctx.cancel_token
-    if token is None:
-        return
-    _event, task = token
-    if task is not None and not task.done():
-        task.cancel()
-
-
-def _arm_deadline(ctx: TurnContext, cancel_event) -> "asyncio.TimerHandle | None":
-    """#1041 (C2.5): fire the SAME cancel_event a client disconnect would set,
-    after ctx.deadline seconds — the engine cannot tell the two apart, and
-    does not need to. Returns the handle so the caller can cancel it once the
-    turn is done (a stray timer firing after the turn has no effect, but
-    leaving it armed is untidy and it is cheap to cancel)."""
-    if not ctx.deadline:
-        return None
-    return asyncio.get_running_loop().call_later(ctx.deadline, cancel_event.set)
-
-
 def _resume_from(ctx: TurnContext) -> None:
     """C4.6 (FD-S6): what a Continue takes from its session, read-only.
 
@@ -429,19 +346,6 @@ def _rag_collections(ctx: TurnContext):
     if ctx.resume:
         return getattr(ctx.session, "rag_collections", None)
     return ctx.body.get("rag_collections")
-
-
-def _able_to_continue(candidates: list, model_name: str) -> list:
-    """C4.6: on a resume, only the engines that can end their prompt inside the
-    last assistant message. None → a clear 400: before this, a Continue that
-    reached another engine either raised mid-stream or started a new answer
-    that was glued onto the cut one."""
-    from core.endpoints.chat_engines.routing import engine_can_continue
-
-    able = [(name, eng) for name, eng in candidates if engine_can_continue(eng, model_name)]
-    if not able:
-        raise HTTPException(status_code=400, detail="continue is not supported by the available engines")
-    return able
 
 
 def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
@@ -632,9 +536,10 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
 
     async def engine(ctx: TurnContext) -> None:
         ui = _ui(ctx)
+        # Deferred (layering gate, #471); outside the `try` so the handler below always has it.
+        from core.endpoints.chat_engines.routing import raise_if_terminal
         try:
             from core.lifespan import get_server_state
-            from core.endpoints.chat_engines.routing import iter_live_engines, resolve_engine_cascade
             from core.context_window import ask_engine_window
 
             module_manager = get_server_state().module_manager
@@ -646,18 +551,14 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 raise HTTPException(status_code=400, detail="Model name too long (max 100 chars)")
             preferred_engine = (ctx.body.get("backend") or os.getenv("NEXE_MODEL_ENGINE", "auto")).lower()
             logger.info("Available modules: %s", [m.name for m in module_manager.registry.list_modules()])
-            cascade = resolve_engine_cascade(preferred_engine, ctx.app_state)
-            logger.info("Engine cascade for this turn: %s", cascade)
-            candidates = list(iter_live_engines(cascade, ctx.app_state))
-            if not candidates:
-                # D-I phase 2 / #884: a failed request, not an assistant turn.
-                raise HTTPException(status_code=503, detail="No AI engine available")
-            if ctx.resume:
-                candidates = _able_to_continue(candidates, model_name)
+            # The live engines in the cascade's order; on a Continue only those
+            # that can resume (a 503 when none is live, a 400 when none can).
+            candidates = live_candidates(preferred_engine, ctx.app_state, resume=ctx.resume, model_name=model_name)
+            logger.info("Engine cascade for this turn: %s", [name for name, _ in candidates])
             ui["model_name"] = model_name
             ui["candidates"] = candidates
             ui["engine_name"], ctx.engine = candidates[0]
-            if ctx.body.get("model"):
+            if ctx.model_follows_request and ctx.body.get("model"):
                 await _switch_model(ctx.engine, ui["engine_name"], model_name)
             ctx.context_window = ask_engine_window(ctx.engine)
             ctx.deadline = resolve_deadline_s() or None
@@ -665,6 +566,10 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         except HTTPException:
             raise
         except Exception as exc:
+            # #1141: a model the engine does not have ("not found") or a bad
+            # request is the same verdict the cascade gives at `generate`
+            # (FD-S4): final, and said as its HTTP answer, not as a generic 200.
+            raise_if_terminal(exc, ui.get("engine_name", ""))
             raise _internal_error(ctx, exc) from exc
 
     async def budget(ctx: TurnContext) -> None:
@@ -708,101 +613,28 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         except Exception as exc:
             raise _internal_error(ctx, exc) from exc
 
-    async def _prepare_call(ctx: TurnContext, index: int, engine_name: str, engine_obj, cancel_event, *, stream: bool):
-        """One engine attempt's setup: its model, signature, prompt refit, start.
-
-        The first candidate was switched to the requested model in `engine`; a
-        fallback answers with the model it has loaded (#1035), and only if
-        that model can see the turn's image when there is one. The model comes
-        back last: this attempt's text is parsed, recorded and stored as its."""
-        ui = _ui(ctx)
-        model_name = ui["model_name"] if index == 0 else _model_on_fallback(engine_obj, ui["model_name"])
-        image_b64 = ctx.attachments.get("image_b64")
-        if image_b64 and ctx.attachments.get("image_reattached"):
-            # #1144: a re-attached image is a help, never a reason to pass an
-            # engine over — one that cannot see answers from the image's note.
-            from core.endpoints.chat_engines.routing import engine_can_see_images  # deferred, as in _require_sight
-            if engine_can_see_images(engine_obj) is False:
-                image_b64 = None
-        elif index > 0 and image_b64:
-            _require_sight(engine_obj, engine_name, model_name)
-        thinking_enabled = getattr(ctx.session, "thinking_enabled", False)
-        sig = inspect.signature(engine_obj.chat)
-        messages = ctx.prompt if index == 0 else _refit_for(engine_obj, ctx.system_prompt, ctx.prompt)
-        top_p = parse_top_p(ctx.body)
-        sampling_kwargs = {"top_p": top_p} if top_p is not None else {}
-        chat_result = engine_call._start_engine_call(
-            engine_obj, engine_name, sig, model_name, ctx.system_prompt, messages,
-            stream=stream, image_b64=image_b64,
-            thinking_enabled=thinking_enabled, cancel_event=cancel_event,
-            sampling_kwargs=sampling_kwargs, session_id=ctx.session.id, _continue=ctx.resume,
-        )
-        return chat_result, sig, messages, thinking_enabled, model_name
-
     # ---------------------------------------------------------- JSON mode
 
     async def generate_json(ctx: TurnContext) -> None:
         ui = _ui(ctx)
-        cancel_event, monitor = rc._start_disconnect_monitor(ctx.request)
-        ctx.cancel_token = (cancel_event, monitor)
-        deadline_handle = _arm_deadline(ctx, cancel_event)
-        gate = gate_for(ctx.app_state)
-        try:
-            slot = await gate.acquire(
-                Priority.USER_TURN, holder=ctx.turn_id, cancel_event=cancel_event, timeout=_gate_wait_s(),
-            )
-        except GateBusy:
-            _cancel_monitor(ctx)
-            if deadline_handle is not None:
-                deadline_handle.cancel()
-            raise HTTPException(status_code=429, detail="Server busy, try again in a moment")
-        ctx.gpu_slot = slot
-        try:
-            from core.endpoints.chat_engines.routing import raise_if_terminal
-            for index, (engine_name, engine_obj) in enumerate(ui["candidates"]):
-                logger.info("Trying engine: %s", engine_name)
-                _call_started = time.monotonic()
-                try:
-                    chat_result, sig, messages, thinking_enabled, model_name = await _prepare_call(
-                        ctx, index, engine_name, engine_obj, cancel_event, stream=False,
-                    )
-                    # C4.5: how this door asks the engine once more, if the
-                    # turn cleans down to nothing but tags (`postprocess`).
-                    ui["reprompt_call"] = engine_call.reprompt_call_for(
-                        engine_obj, sig, model_name, messages, thinking_enabled,
-                    )
-                    chunks: list[str] = []
-                    if await engine_call._accumulate_nonstreaming_response(chat_result, chunks):
-                        _end_partial(ctx, StreamCapExceeded())
-                    text = "".join(chunks)
-                    if text:
-                        logger.info("%s succeeded!", engine_name)
-                        record_llm_call(
-                            ctx, step="generate", engine=engine_name, model=model_name,
-                            ms=(time.monotonic() - _call_started) * 1000.0,
-                        )
-                        ctx.response = text
-                        _serve_with(ctx, engine_obj, ui)
-                        ui["engine_name"] = engine_name
-                        ui["model_name"] = model_name  # #1035: the one that answered
-                        return
-                except Exception as exc:
-                    # F-D block 5: which errors end the turn and which are worth
-                    # another engine is one decision, and it lives in the core.
-                    raise_if_terminal(exc, engine_name)
-                    logger.warning("%s failed: %s", engine_name, exc)
-                    logger.debug("Engine error details:", exc_info=True)
-                    continue
-            raise HTTPException(status_code=503, detail="No AI engine available")
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise _internal_error(ctx, exc) from exc
-        finally:
-            _cancel_monitor(ctx)
-            if deadline_handle is not None:
-                deadline_handle.cancel()
-            await gate.release(slot)
+        async with EngineHold(ctx) as hold:
+            try:
+                door = JsonDoor(ctx, ui, hold.cancel_event, on_capped=lambda: _end_partial(ctx, StreamCapExceeded()))
+                claim = await claim_one(ui["candidates"], door, cancel_event=hold.cancel_event)
+                reply = claim.opened.value
+                logger.info("%s succeeded!", claim.engine_name)
+                record_llm_call(
+                    ctx, step="generate", engine=claim.engine_name, model=reply.prepared[-1],
+                    ms=(time.monotonic() - reply.started) * 1000.0,
+                )
+                ctx.response = reply.text
+                _serve_with(ctx, claim.engine, ui)
+                ui["engine_name"] = claim.engine_name
+                ui["model_name"] = reply.prepared[-1]  # #1035: the one that answered
+            except HTTPException:
+                raise
+            except Exception as exc:
+                raise _internal_error(ctx, exc) from exc
 
     async def postprocess_json(ctx: TurnContext) -> None:
         """C4.5: the same three moves the streaming shape makes — the core's
@@ -898,122 +730,16 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             # The error is already on the wire (as text, via _stream_error_notice).
             _end_partial(ctx, flags.error)
 
-    async def _prepare_or_decide(ctx: TurnContext, index: int, engine_name: str, engine_obj, cancel_event,
-                                 *, have_notice: bool):
-        """`_prepare_call` for the streaming claim, and what a failure there
-        means: `None` tries the next engine; an error the cascade policy treats
-        as final (`should_try_next_engine`) is raised as its HTTP answer —
-        unless a notice is already in hand (`have_notice`, #1117), and then
-        `_KEEP_THE_NOTICE` writes it instead of cutting a stream whose 200 is
-        already out. Either way the error is logged here: the notice the user
-        sees is the earlier engine's, and this one would otherwise leave no trace."""
-        from core.endpoints.chat_engines.routing import raise_if_terminal, should_try_next_engine
-        try:
-            return await _prepare_call(ctx, index, engine_name, engine_obj, cancel_event, stream=True)
-        except Exception as exc:
-            logger.warning("%s failed: %s", engine_name, exc)
-            logger.debug("Engine error details:", exc_info=True)
-            if have_notice and not should_try_next_engine(exc):
-                return _KEEP_THE_NOTICE
-            raise_if_terminal(exc, engine_name)
-            return None
-
-    async def _claim_stream_engine(ctx: TurnContext, ui: dict, cancel_event, holder: list):
-        """The engine that owns this stream, chosen before any of its bytes.
-
-        Each candidate is started (`_prepare_call`, which also says the model
-        it runs: a fallback's is the one it has loaded, #1035), the loading
-        banner goes out if that model is not in memory, and its first event is
-        read (`engine_call.claim_engine_start`). A
-        real event claims the stream. A failure tries the next engine, unless
-        the cascade policy treats it as final (`should_try_next_engine`).
-
-        #1117: the response is committed by now, so when no engine claims the
-        stream the FIRST one that failed on its first event keeps the turn,
-        that event already read, and the normal path writes its notice (the
-        out-of-memory one included) — usually the engine the user picked, and
-        the wire 32f9cbd0 sent. A raise cuts the connection, so it is left for
-        the two cases 32f9cbd0 already raised in: no engine got as far as its
-        first event, or one failed to start with a final error before any
-        notice was in hand.
-
-        The loading banner names the first engine that needed a load. When it
-        fails and another one loads, nexe-chat.js keeps that first label (a
-        second banner would spin for ever there).
-
-        Only wire strings come out. The claim goes into `holder`: Starlette
-        encodes every chunk, so nothing else may reach the wire.
-        """
-        from core.endpoints.chat_engines.routing import should_try_next_engine
-        announced = False
-        first_failure = None
-        pending = None
-        try:
-            for index, (engine_name, engine_obj) in enumerate(ui["candidates"]):
-                if index > 0 and cancel_event.is_set():
-                    break  # the turn is cancelled (client gone, deadline): no other engine is asked
-                logger.info("Trying engine: %s", engine_name)
-                prepared = await _prepare_or_decide(
-                    ctx, index, engine_name, engine_obj, cancel_event, have_notice=first_failure is not None,
-                )
-                if prepared is _KEEP_THE_NOTICE:
-                    break
-                if prepared is None:
-                    continue
-                pending = prepared[0]
-                if not announced:
-                    # After `_prepare_call`: it says which model this attempt
-                    # runs (a fallback's own, #1035), and that is the one the
-                    # banner asks about and names.
-                    # Once per turn: nexe-chat.js keeps a second banner spinning.
-                    async for token in wire._yield_model_loading_check(engine_obj, prepared[-1], engine_name):
-                        announced = True
-                        yield token
-                flags = StreamFlags()
-                started = time.time()  # the load and the first token are this call's time
-                events, first = await engine_call.claim_engine_start(prepared[0], prepared[-1], flags)
-                pending = None
-                attempt = _Claim(engine_name, engine_obj, prepared, (events, first), flags, started)
-                if not isinstance(first, Failed):
-                    holder.append(attempt)
-                    return
-                logger.warning("%s failed before its first byte: %s", engine_name, first.exc)
-                logger.debug("Engine error details:", exc_info=first.exc)
-                if first_failure is None:
-                    # Replayed, its `started` also covers the engines tried after it.
-                    first_failure = attempt
-                if not should_try_next_engine(first.exc):
-                    break  # final for the cascade policy: no other engine is asked
-            if first_failure is None:
-                raise HTTPException(status_code=503, detail="No AI engine available")
-            holder.append(first_failure)
-        finally:
-            if pending is not None:
-                await close_quietly(pending)
-
     async def generate_stream(ctx: TurnContext):
         ui = _ui(ctx)
-        cancel_event, monitor = rc._start_disconnect_monitor(ctx.request)
-        ctx.cancel_token = (cancel_event, monitor)
-        deadline_handle = _arm_deadline(ctx, cancel_event)
-        gate = gate_for(ctx.app_state)
-        try:
-            slot = await gate.acquire(
-                Priority.USER_TURN, holder=ctx.turn_id, cancel_event=cancel_event, timeout=_gate_wait_s(),
-            )
-        except GateBusy:
-            _cancel_monitor(ctx)
-            if deadline_handle is not None:
-                deadline_handle.cancel()
-            raise HTTPException(status_code=429, detail="Server busy, try again in a moment")
-        ctx.gpu_slot = slot
-        # The slot is held for as long as THIS GENERATOR is alive — released in
-        # the `finally` below, which PEP 525's `aclose()` reaches even if the
+        # The slot is held for as long as THIS GENERATOR is alive — released by
+        # the hold's exit below, which PEP 525's `aclose()` reaches even if the
         # client disconnects mid-stream (run.py's `_drive_generator` always
         # closes it). Before C2.1 the UI's `Semaphore(2)` released when
         # `_chat_inner` returned the `StreamingResponse` OBJECT, before a single
-        # token was generated — this is the fix.
-        try:
+        # token was generated — this is the fix. The monitor outlives the hold
+        # (`keep_monitor`): `persist_stream` stops it.
+        async with EngineHold(ctx, keep_monitor=True) as hold:
             # #1117: the headers first — none of them depends on the engine
             # that will answer. The loading banner goes out inside the claim,
             # with the engine that is about to load.
@@ -1022,28 +748,34 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 ctx.session.compaction_count, ui["doc_truncated_pct"],
             ):
                 yield header
-            holder: list = []
+            claim = None
             try:
-                async with contextlib.aclosing(_claim_stream_engine(ctx, ui, cancel_event, holder)) as claiming:
-                    async for token in claiming:
-                        yield token
+                door = StreamDoor(ctx, ui, hold.cancel_event)
+                async with contextlib.aclosing(
+                    claim_engine(ui["candidates"], door, cancel_event=hold.cancel_event)
+                ) as claiming:
+                    async for item in claiming:
+                        if isinstance(item, Claim):
+                            claim = item
+                        else:
+                            yield item
             except HTTPException:
-                _cancel_monitor(ctx)
+                cancel_monitor(ctx)
                 raise
             except Exception as exc:
-                _cancel_monitor(ctx)
+                cancel_monitor(ctx)
                 raise _internal_error(ctx, exc) from exc
 
-            claim = holder[0]
-            engine_name, engine_obj, flags = claim.engine_name, claim.engine_obj, claim.flags
-            chat_result, sig, messages, thinking_enabled, model_name = claim.prepared
+            start = claim.opened.value
+            engine_name, engine_obj, flags = claim.engine_name, claim.engine, start.flags
+            chat_result, sig, messages, thinking_enabled, model_name = start.prepared
             _serve_with(ctx, engine_obj, ui)
             ui["engine_name"] = engine_name
             # #1035: from here on the turn's model is the one that answers. The
             # `[MODEL:]` header above went out with the requested one; the
             # client keeps the last it reads, so a fallback's goes out now —
             # when it answers, not when its failure is the notice replayed.
-            if not isinstance(claim.primed[1], Failed):
+            if not isinstance(start.primed[1], Failed):
                 if model_name != ui["model_name"]:
                     yield wire.model_token(model_name)
                 yield wire.engine_token(engine_name)  # #1146: the footer names the engine
@@ -1057,24 +789,20 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 session=ctx.session, session_mgr=session_mgr, memory_helper=ui["memory_helper"],
                 engine=engine_obj, engine_name=engine_name, chat_result=chat_result, sig=sig,
                 system_prompt=ctx.system_prompt, messages=messages, thinking_enabled=thinking_enabled,
-                lang=ctx.lang, message=ctx.message, disconnect_monitor_task=monitor,
+                lang=ctx.lang, message=ctx.message, disconnect_monitor_task=hold.monitor,
                 rag_collections=_rag_collections(ctx),
             )
             ui["stream_ctx"] = stream_ctx
-            ui["stream_start_t"] = claim.started
+            ui["stream_start_t"] = start.started
             ui["flags"] = flags
             # `ctx.response` holds the RAW text while generating (what the old
             # body called full_response); `postprocess` turns it into the clean
             # answer.
-            async for token, full_delta in engine_call._yield_engine_chunks(stream_ctx, claim.primed):
+            async for token, full_delta in engine_call._yield_engine_chunks(stream_ctx, start.primed):
                 ctx.response += full_delta
                 if token is not None:
                     yield token
             _finish_generation(ctx, ui, flags, engine_name, ui["stream_start_t"])
-        finally:
-            if deadline_handle is not None:
-                deadline_handle.cancel()
-            await gate.release(slot)
 
     async def postprocess_stream(ctx: TurnContext):
         ui = _ui(ctx)
@@ -1130,7 +858,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             # the loading banner). It has not said a word, so there is no answer
             # to store — the same as a cancel before the first token, below. The
             # stream context only exists once an engine owns the stream.
-            _cancel_monitor(ctx)
+            cancel_monitor(ctx)
             session_mgr.release_lease(ctx.session_id, ctx.turn_id)
             return
         if stream_ctx is None:
@@ -1152,7 +880,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                     resume=ctx.resume,
                 )
                 ui["assistant_saved"] = True
-            _cancel_monitor(ctx)
+            cancel_monitor(ctx)
             # C2.3: `emit` never runs on this path (AFTER_CANCEL is only
             # persist_assistant_turn) — this is the only chance to release
             # the lease so the session is not stuck until the TTL expires.
@@ -1202,7 +930,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             from core.context_window import ask_engine_window
             if stream_ctx.session.needs_compaction(ask_engine_window(stream_ctx.engine)):
                 yield "\x00[WILL_COMPACT:1]\x00"
-        _cancel_monitor(ctx)  # stream finished cleanly — release the monitor
+        cancel_monitor(ctx)  # stream finished cleanly — release the monitor
         session_mgr.release_lease(ctx.session_id, ctx.turn_id)  # C2.3: turn answered
 
     async def memory_write(ctx: TurnContext) -> None:

@@ -194,7 +194,7 @@ class TestDispatchForwardsImages:
     pins: the plan only named the schema/parse/validate files — none of
     the THREE forwarders (`_forward_to_ollama`/`_forward_to_mlx`/
     `_forward_to_llama_cpp`) took an `images` param at all before this,
-    unlike the UI door's unified `_start_engine_call`. An image that
+    unlike the UI door's unified `start_engine_call`. An image that
     validated fine would have been silently dropped one layer down —
     exactly the silence this project has paid for before (#899/#965/#1079).
     """

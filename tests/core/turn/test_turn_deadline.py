@@ -4,7 +4,7 @@
 end-to-end is exercised through `/v1`'s `generate` adapter with a fake MLX
 module (same `_Engine` shape `test_fd_block5_engine_routing.py` uses, so it
 carries a real `_node` and passes `_engine_available`) that hangs until
-`cancel_event` fires. The UI's own `_arm_deadline` reuses the exact same
+`cancel_event` fires. The web door's hold (`core/turn/engine_hold.py`, as the API's) reuses the exact same
 `cancel_event` the client-disconnect monitor already sets — a mechanism
 `test_session_lease.py`/`test_turn_lease.py` and every MC-011 test already
 exercise for the disconnect case — so it only needs its own timer verified,

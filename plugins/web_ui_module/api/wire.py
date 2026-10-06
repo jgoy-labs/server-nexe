@@ -18,7 +18,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 from typing import TYPE_CHECKING, Any
 
-from core.turn.errors import is_oom_error
+from core.turn.errors import curated_error_text, oom_notice
 
 if TYPE_CHECKING:  # an annotation only: no import-time edge to core.memory_facts
     from core.memory_facts import intents as memory_intents
@@ -139,39 +139,18 @@ async def _yield_model_loading_check(engine, model_name: str, engine_name: str):
         logger.debug("Model loaded check failed for %s: %s", model_name, e)
 
 
-def _oom_notice(err_msg: str, lang: str) -> str:
-    """Curated out-of-memory notice for the chat body, by originating engine.
-
-    The MLX pre-load guard already raises a message telling the user to switch
-    engines, but the streaming handler used to replace every OOM with a generic
-    "close other applications" — and since the UI always streams, that advice
-    never reached anyone. It is restored here, gated on the failure actually
-    coming from MLX: this branch also catches OOM raised by other engines, and
-    telling a user who is already on Ollama to switch to Ollama is nonsense.
-
-    MC-133 still holds: the text is curated per language and never echoes the
-    raw exception, which can carry internal paths or state.
-    """
-    mlx_specific = {
-        "ca": "Memòria insuficient per carregar el model amb MLX. Canvia el motor a Ollama (fa servir molta menys memòria) o tanca altres aplicacions i torna-ho a provar.",
-        "es": "Memoria insuficiente para cargar el modelo con MLX. Cambia el motor a Ollama (usa mucha menos memoria) o cierra otras aplicaciones e inténtalo de nuevo.",
-        "en": "Not enough memory to load the model with MLX. Switch the engine to Ollama (it uses far less memory) or close other applications and try again.",
-    }
-    generic = {
-        "ca": "Memòria insuficient. Tanca altres aplicacions per alliberar memòria i torna-ho a provar.",
-        "es": "Memoria insuficiente. Cierra otras aplicaciones para liberar memoria e inténtalo de nuevo.",
-        "en": "Not enough memory. Close other applications to free up memory and try again.",
-    }
-    table = mlx_specific if "MLX" in (err_msg or "") else generic
-    return table.get(lang, table["en"])
+# The curated texts moved to the core with C4.8-b (`core/turn/errors.py`): a JSON
+# reply and /v1 say the same words as this door's notice. Kept under the old
+# name for the callers and the tests that import it from here.
+_oom_notice = oom_notice
 
 
 def _stream_error_notice(exc: Exception, lang: "str | None") -> str:
     """Chat-body text for an exception raised mid-generation (MC-133).
 
     Logs the full detail (with traceback) locally and returns ONLY the curated,
-    localized notice: the raw exception text can carry internal paths or state
-    and must never reach the wire. OOM keeps its own message (`_oom_notice`).
+    localized notice (`curated_error_text`): the raw exception text can carry
+    internal paths or state and must never reach the wire.
     """
     err_msg = repr(exc) if not str(exc) else str(exc)
     # MC-133: the full detail (with traceback) belongs in the local log,
@@ -179,17 +158,7 @@ def _stream_error_notice(exc: Exception, lang: "str | None") -> str:
     # exception itself, not True: this runs from a `Failed` event, outside
     # any `except`, where True logs "NoneType: None" (#1117).
     logger.error("Streaming error: %s", err_msg, exc_info=exc)
-    _lk = lang[:2] if lang else "ca"
-    if is_oom_error(err_msg):
-        return f"\n⚠️ {_oom_notice(err_msg, _lk)}"
-    # MC-133: do not echo the raw exception text (err_msg) — it can
-    # carry internal paths/state. Surface a generic, localized notice.
-    _err = {
-        "ca": "S'ha produït un error en generar la resposta. Torna-ho a provar.",
-        "es": "Se ha producido un error al generar la respuesta. Inténtalo de nuevo.",
-        "en": "An error occurred while generating the response. Please try again.",
-    }
-    return f"\n⚠️ {_err.get(_lk, _err['en'])}"
+    return f"\n⚠️ {curated_error_text(exc, lang)}"
 
 
 def _gen_truncated_token(

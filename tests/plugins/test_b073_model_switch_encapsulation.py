@@ -120,6 +120,7 @@ def test_mlx_switch_by_path_delegates_to_public_switch(monkeypatch, tmp_path):
     model = tmp_path / "B"
     model.mkdir()
     (model / "config.json").write_text("{}")
+    (model / "model.safetensors").write_bytes(b"w")
     monkeypatch.setattr(MLXConfig, "from_env", lambda: SimpleNamespace(model_path=str(model)))
 
     module = MLXModule()
@@ -155,6 +156,7 @@ def test_the_env_override_never_leaks_past_the_switch(monkeypatch, tmp_path):
     model = tmp_path / "B"
     model.mkdir()
     (model / "config.json").write_text("{}")
+    (model / "model.safetensors").write_bytes(b"w")
 
     def _boom():
         raise RuntimeError("from_env exploded")

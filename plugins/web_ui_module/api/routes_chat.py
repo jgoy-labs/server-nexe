@@ -16,9 +16,8 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Depends, Request as FastAPIRequest
 from fastapi.responses import StreamingResponse
 from core.dependencies import limiter
-# The adapters (`turn_adapters.py`) reach these three through this module, at
+# The adapters (`turn_adapters.py`) reach these two through this module, at
 # call time (`_rc()`); tests read `_assemble_engine_messages` here.
-from core.turn.cancel import start_disconnect_monitor as _start_disconnect_monitor  # noqa: F401
 from core.turn.assemble import _assemble_engine_messages, _build_turn_context  # noqa: F401
 from core.turn.context import TurnContext
 from core.turn.lease import release_turn_lease, releasing
@@ -78,6 +77,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         ctx = TurnContext(
             turn_id=uuid4().hex,
             entry="ui",
+            # D1: the picker names the model and the first engine is switched to it.
+            model_follows_request=True,
             # C4.1 (#1044): WHO `require_ui_auth` authenticated, recorded on the
             # request by `auth_dependencies._remember_principal`. This door was
             # already fail-closed, so the turn's `authorize` step never fires

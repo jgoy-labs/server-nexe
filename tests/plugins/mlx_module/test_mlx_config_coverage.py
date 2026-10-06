@@ -201,6 +201,7 @@ class TestMLXConfigValidate:
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
         (model_dir / "config.json").write_text("{}")
+        (model_dir / "model.safetensors").write_bytes(b"w")
         config = MLXConfig(model_path=str(model_dir), temperature=3.0)
         # temperature warning is not fatal
         assert config.validate() is True
@@ -220,6 +221,7 @@ class TestMLXConfigValidate:
         model_dir = tmp_path / "model_dir"
         model_dir.mkdir()
         (model_dir / "config.json").write_text("{}")
+        (model_dir / "model.safetensors").write_bytes(b"w")
         config = MLXConfig(model_path=str(model_dir))
         assert config.validate() is True
 

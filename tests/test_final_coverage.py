@@ -137,7 +137,7 @@ class TestChatFinalCoverage:
 
         req = MagicMock()
         req.app.state.config = {}
-        req.app.state.modules = {}
+        req.app.state.modules = {"ollama_module": MagicMock()}  # R4: no live engine is a 503
         req.headers = {"x-api-key": "k"}
         # #1078: an unconfigured MagicMock answers get_attached_document()
         # truthy, which `budget` now treats as a real attached document.
@@ -171,7 +171,7 @@ class TestChatFinalCoverage:
 
         req = MagicMock()
         req.app.state.config = {"plugins": {"models": {"preferred_engine": "mlx"}}}
-        req.app.state.modules = {"ollama_module": True}  # Only ollama available
+        req.app.state.modules = {"ollama_module": MagicMock()}  # Only ollama available
         req.headers = {"x-api-key": "k"}
         # #1078: an unconfigured MagicMock answers get_attached_document()
         # truthy, which `budget` now treats as a real attached document.

@@ -80,7 +80,7 @@ class TestV1ChatCompletionsDoesNotWriteMemory:
         remember, store, svc, api = _spies()
         req = MagicMock()
         req.app.state.config = {}
-        req.app.state.modules = {}
+        req.app.state.modules = {"ollama_module": MagicMock()}  # R4: no live engine is a 503
         req.app.state.engine_gate = EngineGate(slots=100)
         req.headers = {"x-api-key": "test-key"}
         # #1078: an unconfigured MagicMock answers get_attached_document()

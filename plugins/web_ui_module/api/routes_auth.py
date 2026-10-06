@@ -259,6 +259,8 @@ async def _scan_ollama_backend(module_manager) -> "Optional[dict]":
 
 def _scan_mlx_backend(models_dir: "Path") -> "Optional[dict]":
     """Return MLX backend dict or None if no MLX models found."""
+    # Deferred: a plugin must not pull core at import time (layering gate, #471).
+    from core.paths.helpers import has_model_weights
     try:
         if not models_dir.exists():
             return None
@@ -269,7 +271,10 @@ def _scan_mlx_backend(models_dir: "Path") -> "Optional[dict]":
             # 8 GB M1 (2026-07-23) a ~/models/mlx folder reached the UI
             # dropdown, the chat sent model="mlx" and the switch chased a
             # ghost path into a raw FileNotFoundError.
-            if d.is_dir() and (d / "config.json").is_file():
+            # #1154: and its weights. A directory with only the config (the
+            # Qwen3.5-35B whose weights were moved out) is not a model: it
+            # was offered, and the first message died on "No safetensors".
+            if d.is_dir() and (d / "config.json").is_file() and has_model_weights(d):
                 size = sum(f.stat().st_size for f in d.rglob("*.safetensors") if f.is_file())
                 mlx_list.append({"name": d.name, "size_gb": round(size / (1024 ** 3), 1) if size else 0})
         if mlx_list:
@@ -587,11 +592,12 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         # ghost re-appeared on every app restart precisely because it had
         # been persisted as NEXE_DEFAULT_MODEL. `auto`: best-effort, accept.
         if canonical_backend == "mlx":
-            from core.paths.helpers import get_models_dir
+            from core.paths.helpers import get_models_dir, has_model_weights
             _p = get_models_dir() / model_name
-            if not (_p / "config.json").is_file():
+            # #1154: weights too — a config alone is a ghost, as in the dropdown.
+            if not ((_p / "config.json").is_file() and has_model_weights(_p)):
                 logger.warning(
-                    "set_backend: refusing ghost MLX model %r (no config.json)",
+                    "set_backend: refusing ghost MLX model %r (no config.json or no weights)",
                     model_name,
                 )
                 return False

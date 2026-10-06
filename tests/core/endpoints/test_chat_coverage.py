@@ -359,7 +359,7 @@ class TestChatCompletionsRagBranches:
         mock_rag = MagicMock()
         mock_rag.search = AsyncMock(return_value=[])
 
-        req = _make_request(modules={"rag": mock_rag})
+        req = _make_request(modules={"rag": mock_rag, "ollama_module": MagicMock()})
         bg = BackgroundTasks()
         request = ChatCompletionRequest(
             messages=[Message(role="user", content="hello")],
@@ -380,7 +380,7 @@ class TestChatCompletionsRagBranches:
         mock_rag = MagicMock()
         mock_rag.search = AsyncMock(return_value="plain text results")
 
-        req = _make_request(modules={"rag": mock_rag})
+        req = _make_request(modules={"rag": mock_rag, "ollama_module": MagicMock()})
         bg = BackgroundTasks()
         request = ChatCompletionRequest(
             messages=[Message(role="user", content="hello")],
@@ -579,7 +579,9 @@ def _make_request(modules=None, config=None):
     """Create a mock FastAPI Request."""
     req = MagicMock()
     req.app.state.config = config or {}
-    req.app.state.modules = modules or {}
+    # R4 (C4.8-c): /v1 with no live engine is a 503, so a turn that patches the
+    # forwarder still needs one engine registered (Ollama is live by being there).
+    req.app.state.modules = modules or {"ollama_module": MagicMock()}
     req.headers = {"x-api-key": "test-key"}
     # #1078: `session` reads this into ctx.attachments["document"]. An
     # unconfigured MagicMock answers truthy, which `budget` now treats as a

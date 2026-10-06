@@ -46,11 +46,6 @@ from .chat_engines.routing import (
     _get_preferred_engine,
     _engine_available,
     _resolve_engine,
-    engine_can_continue,
-    engine_can_see_images,
-    get_engine_module,
-    raise_if_terminal,
-    resolve_engine_cascade,
 )
 from .chat_engines.ollama import (
     _forward_to_ollama,
@@ -62,7 +57,7 @@ from .chat_engines.ollama import (
 )
 from .chat_engines.mlx import _forward_to_mlx, _mlx_stream_generator
 from .chat_engines.llama_cpp import _forward_to_llama_cpp, _llama_cpp_stream_generator
-from .chat_engines._common import persist_v1_turn, served_model_of
+from .chat_engines._common import persist_v1_turn
 from core.dependencies import limiter
 from core.turn.adapters_api import api_adapters
 from core.turn.recall import _build_rag_context as recall_for_turn
@@ -627,7 +622,7 @@ async def _dispatch_to_engine(
     since either one ending the call is enough).
 
     ``images`` (#1081): a single base64 string in a list, same shape
-    the UI door's `_start_engine_call` has always passed — which engine
+    the UI door's `start_engine_call` has always passed — which engine
     actually reads it is that engine's own decision, never this door's.
     """
     if engine.lower() == "ollama":
@@ -752,111 +747,6 @@ def _fit_v1_messages_to_window(
     return ([system_msg] + fitted) if system_msg else fitted
 
 
-def _engines_that_can_resume(cascade: list, body: ChatCompletionRequest, app_state: Any) -> list:
-    """The engines in `cascade` whose prompt can end inside the cut answer.
-
-    None left is a 400: a resume that reached an engine that cannot continue
-    used to start a new answer and glue it onto the one that was cut.
-    """
-    model = getattr(body, "model", None)
-    able = [
-        name for name in cascade
-        if engine_can_continue(get_engine_module(name, app_state), model)
-    ]
-    if not able:
-        raise HTTPException(
-            status_code=400,
-            detail="continue is not supported by the available engines",
-        )
-    return able
-
-
-async def _dispatch_through_cascade(
-    body: ChatCompletionRequest, request: Request, messages: list[dict],
-    last_user_msg: Optional[str], session_id: str, engine: str,
-    preferred_fallback: Optional[str], *, cancel_event: Any = None,
-    images: Optional[list[str]] = None, resume: bool = False,
-) -> tuple:
-    """Try the resolved engine, then the rest of the cascade. Returns
-    ``(response, engine_that_answered, fallback_from, fallback_reason,
-    model_that_answered)``.
-
-    ``images`` (#1081): threaded unchanged to every candidate in the
-    cascade. The engine that was resolved decides what to do with one; a
-    FALLBACK whose model says it cannot see (`engine_can_see_images`) is
-    skipped, because it answers with the model it has loaded and would answer
-    as if it saw the picture — the rule the UI door follows too (#1035).
-
-    The last element is #1054: the engine's NAME is not the model's, and the
-    turn's LLM counter had no way to reach the second one — every streamed /v1
-    call was logged with ``model=null`` while the UI door logged the real name.
-    Read off the response the forwarder just built (`served_model_of`), so no
-    forwarder signature changes and a patched double that returns a bare dict
-    keeps working.
-
-    F-D block 5. This door used to dispatch exactly once: whatever the single
-    engine raised became the client's error, while /ui/chat quietly walked down
-    its list and answered. The list and the policy are now the same at both
-    doors (resolve_engine_cascade / should_try_next_engine), and the response
-    headers name the engine that actually answered rather than the one that was
-    picked.
-
-    An HTTPException is never retried — that is how the forwarders report a
-    backend that is down, and it is the answer, not a crash. What IS retried is
-    an engine failing at this moment: a corrupt model, an out-of-memory, a
-    driver. This is now the ONLY fallback mechanism (#1036, C2.4): the MLX and
-    llama.cpp forwarders used to catch their own execution errors and jump
-    straight to Ollama, a second mechanism that pre-empted this cascade and
-    skipped llama.cpp entirely — removed, so every failure (including one
-    raised before a streaming response's first byte) lands here.
-    """
-    cascade = resolve_engine_cascade(body.engine, request.app.state) or [engine]
-    # `is True`: a MagicMock body grows a truthy `.resume` on access, and that
-    # used to reject every non-resume turn as "continue is not supported".
-    if resume or body.resume is True:
-        cascade = _engines_that_can_resume(cascade, body, request.app.state)
-    last_exc: Optional[BaseException] = None
-    reason = "preferred_unavailable"
-    for index, candidate in enumerate(cascade):
-        if index > 0 and images and engine_can_see_images(
-            get_engine_module(candidate, request.app.state)
-        ) is False:
-            logger.warning("Engine %s cannot see the image; trying the next in the cascade", candidate)
-            continue
-        start_time = time.time()
-        try:
-            # #976, per engine: the prompt was fitted to the window of the engine
-            # that was RESOLVED, and this loop can hand it to a different one.
-            # Falling back from a 32k engine to a 2048 one with the first one's
-            # prompt is the very crash the fit guard exists to prevent — and it
-            # would only appear on the fallback path, which is the one nobody
-            # exercises. Fitting an already-fitted list to a bigger window
-            # returns it unchanged.
-            attempt_messages = _fit_v1_messages_to_window(
-                messages, get_effective_context_window(candidate, request.app.state), body
-            )
-            response = await _dispatch_to_engine(
-                candidate, attempt_messages, body, request, request.app.state, last_user_msg, session_id,
-                cancel_event=cancel_event, images=images,
-            )
-        except Exception as exc:
-            _record_engine_metrics(candidate, "error", start_time)
-            raise_if_terminal(exc, candidate)
-            logger.warning("Engine %s failed (%s); trying the next in the cascade", candidate, exc)
-            last_exc = exc
-            # From here on a fallback is not "the one you asked for was not
-            # live" — it is "it was live and it broke".
-            reason = "execution_failed"
-            continue
-        _record_engine_metrics(candidate, "success", start_time)
-        if candidate != engine and not preferred_fallback:
-            preferred_fallback = engine
-        return response, candidate, preferred_fallback, reason, served_model_of(response)
-
-    # Every live engine failed with something retryable.
-    raise last_exc if last_exc is not None else RuntimeError("no engine available")
-
-
 # --- Main Endpoint ---
 
 @router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion with RAG support and engine auto-routing", operation_id="chat_completions")
@@ -879,6 +769,9 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
     ctx = TurnContext(
         turn_id=uuid4().hex,
         entry="api",
+        # B075-C3 (D1): an engine here runs the model it has loaded; the model
+        # the client names is not switched to.
+        model_follows_request=False,
         # C4.1 (#1044): WHO the route dependency authenticated. `require_api_key`
         # records it on the request (`auth_dependencies._remember_principal`);
         # the turn's `authorize` step refuses a missing one, and refuses the

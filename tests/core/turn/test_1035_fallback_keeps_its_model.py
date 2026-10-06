@@ -26,6 +26,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from core.turn.api_cascade import dispatch_v1
 from plugins.ollama_module.core.errors import ModelNotFoundError
 from plugins.web_ui_module.api.wire import _stream_error_notice
 
@@ -378,7 +379,7 @@ def _v1_tries(images):
     request = MagicMock()
     request.app.state = state
     with patch.object(chat_mod, "_dispatch_to_engine", _dispatch):
-        asyncio.run(chat_mod._dispatch_through_cascade(
+        asyncio.run(dispatch_v1(
             body, request, [], "hola", "sid", "mlx", None, images=images,
         ))
     return tried

@@ -256,14 +256,14 @@ async def test_a_fallback_that_cannot_start_keeps_the_notice_in_hand(turn_lab, a
     down = RuntimeError("connection reset")
     mlx = _StartRefusesTheRequest()
     app_state.modules = {"ollama_module": _OllamaShaped(down), "mlx_module": mlx}
-    with caplog.at_level(logging.DEBUG, logger="plugins.web_ui_module.api.turn_adapters"):
+    with caplog.at_level(logging.DEBUG, logger="core.turn.engine_claim"):
         ctx = await turn_lab.ui(streaming=True, session_id="r1117-start", message="hola",
                                 body_extra={"backend": "ollama", "model": "qwen3.5:4b"})
     chunks = _wire(ctx)
     assert mlx.calls == 1
     assert _stream_error_notice(down, ctx.lang) in chunks
     assert ctx.outcomes["generate"] == "degraded"
-    mine = [r for r in caplog.records if r.name == "plugins.web_ui_module.api.turn_adapters"]
+    mine = [r for r in caplog.records if r.name == "core.turn.engine_claim"]
     assert any("mlx failed" in r.getMessage() and "cannot take it" in r.getMessage() for r in mine)
     assert any(r.exc_info and r.exc_info[1] is down for r in mine)
 

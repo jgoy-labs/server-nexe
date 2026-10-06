@@ -169,6 +169,7 @@ class TestModuleBelt:
         real = tmp_path / "real"
         real.mkdir()
         (real / "config.json").write_text("{}")
+        (real / "model.safetensors").write_bytes(b"w")
         module = MLXModule()
         node = MagicMock()
         node.config.model_path = "/somewhere/else"

@@ -86,8 +86,8 @@ class TestBothDoorsShareIt:
         assert "reprompt" not in ctx.usage.get("degraded", {})
 
     async def test_v1_spends_the_second_generation_and_counts_it_once(self):
-        """D3, whole (C4.5): a MEM_SAVE-only turn re-enters the cascade for a
-        real reply — the trace no longer declares a missing half, it counts one
+        """D3, whole (C4.5): a MEM_SAVE-only turn asks the engine that answered for a
+        real reply (R1) — the trace no longer declares a missing half, it counts one
         `reprompt` call against the model that served, and the model is asked
         under the override in the turn's language."""
         ctx = TurnContext(turn_id="t", entry="api", lang="ca", engine="ollama")
@@ -95,9 +95,9 @@ class TestBothDoorsShareIt:
         ctx.prompt = [{"role": "system", "content": "sys"}, {"role": "user", "content": ctx.message}]
         ctx.wire = {"choices": [{"message": {"content": "[MEM_SAVE: L'usuari viu a Manresa]"}}], "model": "llama3"}
         second = {"choices": [{"message": {"content": "Perfecte, ho recordaré."}}], "model": "llama3"}
-        cascade = AsyncMock(return_value=(second, "ollama", None, "preferred_unavailable", "llama3"))
+        cascade = AsyncMock(return_value=second)
 
-        with patch("core.endpoints.chat._dispatch_through_cascade", new=cascade):
+        with patch("core.turn.api_cascade.ask_again", new=cascade):
             await api_adapters(BackgroundTasks())["postprocess"](ctx)
 
         assert ctx.wire["choices"][0]["message"]["content"] == "Perfecte, ho recordaré."
@@ -108,6 +108,7 @@ class TestBothDoorsShareIt:
         asked = cascade.await_args.args[2]
         assert asked[0]["role"] == "system" and asked[0]["content"].endswith(policy.REPROMPT_OVERRIDE["ca"])
         assert asked[1:] == ctx.prompt[1:]
+        assert cascade.await_args.args[5] == "ollama"   # the engine that answered, and no other
 
     async def test_v1_reprompt_is_the_only_second_call_and_off_means_none(self, monkeypatch):
         monkeypatch.setenv(policy.ENV_REPROMPT_IF_ONLY_MEMSAVE, "false")
@@ -116,7 +117,7 @@ class TestBothDoorsShareIt:
         ctx.wire = {"choices": [{"message": {"content": "[MEM_SAVE: The user lives in Manresa]"}}]}
         cascade = AsyncMock()
 
-        with patch("core.endpoints.chat._dispatch_through_cascade", new=cascade):
+        with patch("core.turn.api_cascade.ask_again", new=cascade):
             await api_adapters(BackgroundTasks())["postprocess"](ctx)
 
         cascade.assert_not_awaited()

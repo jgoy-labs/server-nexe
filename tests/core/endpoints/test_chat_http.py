@@ -1023,7 +1023,7 @@ class TestForwardToMLX:
     def test_no_mlx_module_raises(self):
         """#1036 (C2.4): without mlx_module, raises instead of falling back to
         Ollama on its own — the mlx→llama_cpp→ollama cascade in
-        _dispatch_through_cascade is the only fallback mechanism now."""
+        the cascade (`engine_claim`) is the only fallback mechanism now."""
         from core.endpoints.chat import _forward_to_mlx
 
         req = self._make_fastapi_request(modules={})
@@ -1120,7 +1120,7 @@ class TestForwardToMLX:
 
     def test_mlx_exception_propagates(self):
         """#1036 (C2.4): a non-streaming execution error propagates untouched
-        instead of being swallowed into a fallback — _dispatch_through_cascade
+        instead of being swallowed into a fallback — the cascade
         is what decides whether to try the next engine."""
         from core.endpoints.chat import _forward_to_mlx
 
@@ -1180,7 +1180,7 @@ class TestForwardToLlamaCpp:
 
     def test_no_llama_module_raises(self):
         """#1036 (C2.4): without llama_cpp_module, raises instead of falling
-        back to Ollama on its own — _dispatch_through_cascade is the only
+        back to Ollama on its own — the cascade (`engine_claim`) is the only
         fallback mechanism now."""
         from core.endpoints.chat import _forward_to_llama_cpp
 
@@ -1235,7 +1235,7 @@ class TestForwardToLlamaCpp:
 
     def test_llama_cpp_exception_propagates(self):
         """#1036 (C2.4): a non-streaming execution error propagates untouched
-        instead of being swallowed into a fallback — _dispatch_through_cascade
+        instead of being swallowed into a fallback — the cascade
         is what decides whether to try the next engine."""
         from core.endpoints.chat import _forward_to_llama_cpp
 

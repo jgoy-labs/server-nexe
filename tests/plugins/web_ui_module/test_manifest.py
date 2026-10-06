@@ -29,7 +29,7 @@ def set_api_key(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _ensure_module_initialized():
+def _ensure_module_initialized(monkeypatch, private_sessions):
     """Post-fix 5abd171 (session_manager late-init).
 
     WebUIModule.__init__ no longer builds a SessionManager; initialize()
@@ -38,13 +38,15 @@ def _ensure_module_initialized():
     _SessionManagerProxy raises "accessed before initialize()" on the
     first endpoint call.
 
-    crypto_provider is None here because get_server_state() is not
-    patched — that's fine, the SessionManager degrades to plaintext
-    which is exactly what these tests expect.
+    The manager the routes then use is the test's own (`private_sessions`,
+    #1145). Without it initialize() binds the core's (plaintext here, as
+    get_server_state() carries no crypto), whose folder is the product's.
     """
     inst = get_module_instance()
     if not inst._initialized:
         asyncio.run(inst.initialize({"config": {}}))
+    # #1145: the routes write to this manager; it must not be the product's.
+    monkeypatch.setattr(inst, "session_manager", private_sessions)
 
 
 @pytest.fixture(autouse=True)
@@ -698,3 +700,15 @@ class TestGetModuleInstance:
 
 # ─── TestGenerateRagMetadata ──────────────────────────────────────────────────
 
+
+class TestTheseTestsLeaveTheProductsSessionsAlone:
+    """#1145: the routes write sessions; they must write to the test's own
+    folder, never to `storage/data/sessions` (DEV's sidebar)."""
+
+    def test_a_new_session_is_stored_in_the_tests_folder(self, client, auth, private_sessions, product_sessions):
+        before = product_sessions()
+        r = client.post("/ui/session/new", headers=auth)
+        assert r.status_code == 200
+        stored = [p.stem for p in private_sessions._storage_path.iterdir()]
+        assert stored == [r.json()["session_id"]]
+        assert product_sessions() == before

@@ -25,7 +25,7 @@ from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
 from ._common import mark_served_model
 from .ollama_helpers import auto_num_ctx
-from ._streaming import MAX_STREAM_BYTES, NEXE_END, _close_agen, _prepend_chunk, stream_end
+from ._streaming import MAX_STREAM_BYTES, stream_end
 
 logger = logging.getLogger(__name__)
 
@@ -237,29 +237,21 @@ async def _ollama_streaming_response(
     fallback_from: Optional[str], fallback_reason: Optional[str],
     session_id: Optional[str] = None,
 ) -> StreamingResponse:
-    """Peek the first chunk, then build the StreamingResponse.
+    """The StreamingResponse for an Ollama stream, its generator not yet read.
 
-    Same as MLX and llama.cpp (#1036): a failure before any token raises out
-    of this call, so the cascade can still answer with HTTP instead of an SSE
-    error the client only sees after a 200.
+    Same as MLX and llama.cpp (#1036): the cascade peeks the first chunk
+    before it commits to this engine (`peek_stream`, C4.8-c), so a failure
+    before any token raises there and the cascade can still answer with HTTP
+    instead of an SSE error the client only sees after a 200.
     """
     headers = {"X-Nexe-Engine": "ollama"}
     if fallback_from:
         headers["X-Nexe-Fallback-From"] = fallback_from
         headers["X-Nexe-Fallback-Reason"] = fallback_reason or "fallback"
     agen = _ollama_stream_generator(url, payload, app_state, user_msg, session_id=session_id)
-    try:
-        first = await agen.__anext__()
-    except StopAsyncIteration:
-        await _close_agen(agen)
-        raise RuntimeError("Ollama produced no stream")
-    end = first.get(NEXE_END) if isinstance(first, dict) else None
-    if isinstance(end, dict) and end.get("failure"):
-        await _close_agen(agen)
-        raise RuntimeError(end["failure"])
     # #1054: the name is already in the payload this stream was built from.
     return mark_served_model(StreamingResponse(
-        _prepend_chunk(first, agen),
+        agen,
         media_type="text/event-stream",
         headers=headers,
     ), payload.get("model") or "")

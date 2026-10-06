@@ -37,6 +37,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
+from core.turn.api_cascade import dispatch_v1
 from core.endpoints.chat_engines.routing import (
     engine_error_to_http,
     iter_live_engines,
@@ -224,7 +225,7 @@ class TestTheCascadeIsTheSameAtBothDoors:
         mechanisms: mocking `_dispatch_to_engine` skipped the forwarders
         entirely, AND the real forwarders had their own fallback-to-Ollama
         that jumped straight past llama.cpp. Both are gone: the cascade in
-        `_dispatch_through_cascade` is now the only thing deciding what runs
+        `dispatch_v1` is now the only thing deciding what runs
         next, and it must land on llama.cpp (not skip to ollama)."""
         mlx = _Engine(raises=RuntimeError("model went bad"))
         llama = _Engine(reply="from llama")
@@ -240,7 +241,7 @@ class TestTheCascadeIsTheSameAtBothDoors:
         request.headers.get = lambda key, default=None: default if default is not None else ""
 
         response, answered, fallback_from, reason, _model = asyncio.run(
-            chat_mod._dispatch_through_cascade(body, request, [], "hola", "sid", "mlx", None)
+            dispatch_v1(body, request, [], "hola", "sid", "mlx", None)
         )
         assert mlx.calls == 1
         assert llama.calls == 1, "the cascade skipped llama.cpp and went straight to ollama"
@@ -273,7 +274,7 @@ class TestTheCascadeIsTheSameAtBothDoors:
         request.headers.get = lambda key, default=None: default if default is not None else ""
 
         response, answered, fallback_from, reason, _model = asyncio.run(
-            chat_mod._dispatch_through_cascade(body, request, [], "hola", "sid", "mlx", None)
+            dispatch_v1(body, request, [], "hola", "sid", "mlx", None)
         )
         assert mlx.calls == 1
         assert llama.calls == 1, "the cascade skipped llama.cpp and went straight to ollama"
@@ -308,7 +309,7 @@ class TestTheCascadeIsTheSameAtBothDoors:
         request = MagicMock()
         request.app.state = state
         with patch.object(chat_mod, "_dispatch_to_engine", _dispatch):
-            asyncio.run(chat_mod._dispatch_through_cascade(
+            asyncio.run(dispatch_v1(
                 body, request, big_prompt, "hola", "sid", "mlx", None,
             ))
         assert seen["ollama"] < seen["mlx"], (
@@ -325,7 +326,7 @@ class TestTheCascadeIsTheSameAtBothDoors:
         request.app.state = state
         with patch.object(chat_mod, "_dispatch_to_engine", dispatch):
             return asyncio.run(
-                chat_mod._dispatch_through_cascade(
+                dispatch_v1(
                     body, request, [], "hola", "sid", requested, None,
                 )
             )
@@ -495,7 +496,7 @@ class TestTheSwitchIsNotOnTheApiDoor:
         request = MagicMock()
         request.app.state = state
         with patch.object(chat_mod, "_dispatch_to_engine", _dispatch):
-            asyncio.run(chat_mod._dispatch_through_cascade(
+            asyncio.run(dispatch_v1(
                 body, request, [], "hola", "sid", "ollama", None,
             ))
         assert engine.switch_model_by_path.call_count == 0, (
@@ -537,7 +538,7 @@ class TestTheCascadeNamesTheModelThatAnswered:
     forwarder has already built, so no forwarder signature changes.
 
     Mutation guard: return `None` instead of `served_model_of(response)` in
-    `_dispatch_through_cascade` and the first two go red.
+    `dispatch_v1` and the first two go red.
     """
 
     def _cascade_over(self, response):
@@ -552,7 +553,7 @@ class TestTheCascadeNamesTheModelThatAnswered:
         request = MagicMock()
         request.app.state = _state(mlx=_Engine())
         with patch.object(chat_mod, "_dispatch_to_engine", _dispatch):
-            return asyncio.run(chat_mod._dispatch_through_cascade(
+            return asyncio.run(dispatch_v1(
                 body, request, [], "hola", "sid", "mlx", None,
             ))
 

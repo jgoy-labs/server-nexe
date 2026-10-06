@@ -258,8 +258,8 @@ TURN_STEPS: tuple[Step, ...] = (
         writes_always=frozenset({"context_window", "engine"}),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "plugins/web_ui_module/api/turn_adapters.py (resolve_engine_cascade, iter_live_engines, _switch_model)",
-            "api": "core/endpoints/chat_engines/routing.py (resolve_engine_cascade) + core/endpoints/chat.py (_dispatch_through_cascade)",
+            "ui": "core/turn/engine_claim.py (live_candidates), then plugins/web_ui_module/api/turn_adapters.py (_switch_model)",
+            "api": "core/endpoints/chat_engines/routing.py (resolve_engine_cascade), then core/turn/api_cascade.py (dispatch_v1) over core/turn/engine_claim.py (claim_engine)",
         },
         note="Contract today is duck typing (hasattr(module,'chat')): no Protocol "
              "in core/. The two competing fallback mechanisms (finding #1036) "
@@ -303,7 +303,7 @@ TURN_STEPS: tuple[Step, ...] = (
         writes_always=frozenset({"engine", "response"}),
         doors_today=frozenset({"ui", "api"}),
         today={
-            "ui": "plugins/web_ui_module/api/turn_adapters.py (generate_json, generate_stream, _prepare_call: engine.chat, one GPU slot per turn)",
+            "ui": "plugins/web_ui_module/api/turn_adapters.py (generate_json, generate_stream) over core/turn/engine_claim.py (claim_engine) and plugins/web_ui_module/api/engine_doors.py (prepare_call: engine.chat, one GPU slot per turn)",
             "api": "core/endpoints/chat_engines/{mlx,llama_cpp,ollama}.py (module.chat / HTTP)",
         },
         note="C2.5 / #1041: both doors arm ctx.deadline "

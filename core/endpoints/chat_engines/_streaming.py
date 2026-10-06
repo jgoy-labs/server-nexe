@@ -213,8 +213,8 @@ class TokenBridge:
 async def _prepend_chunk(first: str, agen):
     """Re-emit ``first`` (already pulled off ``agen`` by the caller), then drain it.
 
-    #1036 (C2.4): the forwarders must "peek" the generator's first chunk
-    before wrapping it in a ``StreamingResponse``, so an error that happens
+    #1036 (C2.4): the cascade must "peek" the generator's first chunk
+    (`peek_stream`) before it hands the ``StreamingResponse`` on, so an error that happens
     before any token reaches the client raises out of that peek as a real
     exception the cascade can retry — instead of only surfacing once
     ``StreamingResponse`` starts draining the generator, by which point the
@@ -231,6 +231,31 @@ async def _prepend_chunk(first: str, agen):
             yield chunk
     finally:
         await _close_agen(agen)
+
+
+async def peek_stream(response) -> None:
+    """Read the first chunk of a `StreamingResponse`'s body BEFORE the response
+    is handed to a client, and put it back in front.
+
+    #1036 (C2.4), C4.8-c: the cascade peeks, not each forwarder. An error that
+    happens before any token reaches the client is raised here as a real
+    exception the cascade can still retry — instead of surfacing once
+    `StreamingResponse` starts draining the generator, by which point the
+    cascade's own `try` has long since returned. A stream that ends without a
+    word, or whose first word is the engine's own failure sentinel, is a
+    failure of that engine too.
+    """
+    agen = response.body_iterator
+    try:
+        first = await agen.__anext__()
+    except StopAsyncIteration:
+        await _close_agen(agen)
+        raise RuntimeError("engine produced no stream")
+    end = first.get(NEXE_END) if isinstance(first, dict) else None
+    if isinstance(end, dict) and end.get("failure"):
+        await _close_agen(agen)
+        raise RuntimeError(end["failure"])
+    response.body_iterator = _prepend_chunk(first, agen)
 
 
 def format_engine_token(token: "str | dict", model_name: str, engine_prefix: str) -> "str | None":

@@ -50,7 +50,7 @@ FAKE_ANSWER: str = "".join(FAKE_CHUNKS)
 class _FakeEngine:
     """A generic-shaped engine: `chat(messages, system=…)`, no `model` param.
 
-    `engine_call._start_engine_call` picks its branch off this signature —
+    `engine_start.start_engine_call` picks its branch off this signature —
     a `model` parameter means the Ollama shape, `mlx`/`llama_cpp` mean the
     in-process queue, and anything else is this generic call. `stream_callback`
     and `images` are declared because the generic branch may pass them; the
@@ -308,7 +308,8 @@ class TurnLab:
         )
 
     async def ui(self, *, streaming: bool, session_id: str, entry: str = "ui",
-                 message: str = "hola", body_extra: Optional[dict] = None):
+                 message: str = "hola", body_extra: Optional[dict] = None,
+                 model_follows_request: bool = True):
         """One real `/ui/chat` turn through `ui_adapters`, returning its context.
 
         Streaming turns are DRAINED here: the steps from `generate` on live
@@ -328,6 +329,7 @@ class TurnLab:
             # C4.6: what `_chat_inner` does with the body's `continue`.
             resume=body.get("continue") is True,
             body=body, request=make_request(self.app_state), app_state=self.app_state,
+            model_follows_request=model_follows_request,
         )
         adapters = ui_adapters(self.session_manager, streaming=streaming)
         # What the door actually put on the wire. On the streaming path

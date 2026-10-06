@@ -53,6 +53,7 @@ class TestTheOverrideCarriesThePath:
         model = tmp_path / "B"
         model.mkdir()
         (model / "config.json").write_text("{}")
+        (model / "model.safetensors").write_bytes(b"w")
         monkeypatch.delenv("NEXE_MLX_MODEL", raising=False)
         seen = self._observe(monkeypatch, MLXConfig, "NEXE_MLX_MODEL", model)
 

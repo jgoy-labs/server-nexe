@@ -51,7 +51,7 @@ def session_manager(tmp_path, monkeypatch):
 def _request(session_manager):
     req = MagicMock()
     req.app.state.config = {}
-    req.app.state.modules = {}
+    req.app.state.modules = {"ollama_module": MagicMock()}  # R4: no live engine is a 503
     req.app.state.session_manager = session_manager
     # C2.1: the `generate` adapter reads ctx.app_state.engine_gate — a real
     # gate (not a MagicMock, which is not awaitable) so `await gate.acquire`

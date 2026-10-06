@@ -183,6 +183,24 @@ def get_models_dir() -> Path:
   return get_repo_root() / "storage" / "models"
 
 
+def has_model_weights(model_dir: Path) -> bool:
+  """True when an MLX model directory holds weights: a non-empty
+  ``*.safetensors`` file at its top level (where ``mlx_lm`` looks for them).
+
+  #1154: a directory with only its ``config.json`` (the download was cut, or
+  the weights were moved out) is not a model — listing it or switching to it
+  ends in "No safetensors found" at the first message. A broken symlink or a
+  0-byte placeholder is no weight either.
+  """
+  for f in model_dir.glob("*.safetensors"):  # glob itself yields nothing on a missing or unreadable dir
+    try:
+      if f.stat().st_size > 0:
+        return True
+    except OSError:  # a dangling symlink: skip it, a shard next to it may be fine
+      continue
+  return False
+
+
 def discover_first_model(predicate: Callable[[Path], bool], label: str) -> str:
   """
   Auto-discover the first model under get_models_dir() matching a predicate.
@@ -230,6 +248,7 @@ __all__ = [
   "get_cache_dir",
   "get_models_dir",
   "discover_first_model",
+  "has_model_weights",
   "get_system_logs_dir",
   "get_core_root",
 ]

@@ -28,7 +28,7 @@ async def test_v1_fallback_refreshes_the_window(turn_lab):
     async def _cascade(*_a, **_k):
         return reply, "llama_cpp", "ollama", "unavailable", "m"
 
-    with patch("core.endpoints.chat._dispatch_through_cascade", _cascade), \
+    with patch("core.turn.api_cascade.dispatch_v1", _cascade), \
          patch("core.endpoints.chat.get_effective_context_window",
                lambda engine, _state: WINDOWS.get(engine, 1)):
         ctx = await turn_lab.api(session_id="s-c44-window")

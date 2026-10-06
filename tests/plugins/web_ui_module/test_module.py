@@ -33,14 +33,22 @@ def disable_rate_limiter():
     limiter.enabled = True
 
 
+@pytest.fixture(autouse=True)
+def _sessions_stay_in_the_test(private_sessions):
+    """#1145: every test here, the ones that only call initialize() included —
+    that first call is what binds the core's manager (the product's folder) for
+    whatever runs after this file."""
+
+
 @pytest.fixture
 def module():
     return WebUIModule()
 
 
 @pytest.fixture
-def initialized_module(tmp_path, monkeypatch):
-    """Module initialized with a temporary directory."""
+def initialized_module(tmp_path, monkeypatch, private_sessions):
+    """Module initialized with a temporary directory, and its own sessions
+    (#1145: `private_sessions` is what initialize() binds)."""
     monkeypatch.setenv("NEXE_API_BASE_URL", "http://127.0.0.1:9119")
     mod = WebUIModule()
     context = {"config": {"core": {"server": {"host": "127.0.0.1", "port": 9119}}}}
@@ -456,3 +464,25 @@ class TestWebUIModuleChatErrors:
                 json={"message": "Hello!", "session_id": sid, "stream": True}
             )
         assert response.status_code == 200
+
+
+class TestTheseTestsLeaveTheProductsSessionsAlone:
+    """#1145: the routes write sessions; they must write to the test's own
+    folder, never to `storage/data/sessions` (DEV's sidebar)."""
+
+    def test_initialize_alone_does_not_bind_the_products_folder(self, tmp_path):
+        """The first initialize() of a process binds the core's manager for
+        every later test (the integration ones included)."""
+        from core.paths.helpers import get_data_dir
+
+        mod = WebUIModule()
+        asyncio.run(mod.initialize({}))
+        assert mod.session_manager._storage_path.resolve() != get_data_dir("sessions").resolve()
+
+    def test_a_new_session_is_stored_in_the_tests_folder(self, client, auth_headers, private_sessions, product_sessions):
+        before = product_sessions()
+        r = client.post("/ui/session/new", headers=auth_headers)
+        assert r.status_code == 200
+        stored = [p.stem for p in private_sessions._storage_path.iterdir()]
+        assert stored == [r.json()["session_id"]]
+        assert product_sessions() == before

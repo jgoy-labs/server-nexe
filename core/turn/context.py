@@ -37,6 +37,12 @@ class TurnContext:
     # instead of answering a new user message (FD-S6, the web door's
     # Continue). A property of the turn, not of the door: the steps read it.
     resume: bool = False
+    # C4.8 (D1, provisional): does the model the request names become the model
+    # of the FIRST engine? The web door says yes (its picker names the model and
+    # the engine is switched to it); `/v1` says no (an engine runs the model it
+    # has loaded, B075-C3, and a fallback always does). A property the door
+    # declares when it builds the turn, so no step asks which door it is (I1).
+    model_follows_request: bool = True
 
     # --- Given by the door, transitional (see module docstring) ---
     body: Any = None        # the request body as received (pydantic model or dict)

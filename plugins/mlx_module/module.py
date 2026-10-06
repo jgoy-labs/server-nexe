@@ -180,6 +180,7 @@ class MLXModule:
         """
         from pathlib import Path as _Path
 
+        from core.paths.helpers import has_model_weights
         from core.runtime_state import get_override, set_override
 
         from plugins.mlx_module.core.config import MLXConfig
@@ -198,6 +199,14 @@ class MLXModule:
             raise ValueError(
                 f"Model '{_path.name}' not found: no MLX model (config.json) "
                 f"under the models directory"
+            )
+        # #1154: a config with no weights is no model either. Said here, in words,
+        # instead of at the first message as "No safetensors found" (and, with
+        # the web door, as nothing the user could read).
+        if not has_model_weights(_path):
+            raise ValueError(
+                f"Model '{_path.name}' not found: it has no weights "
+                f"(*.safetensors) under the models directory"
             )
 
         _prev = get_override("NEXE_MLX_MODEL")

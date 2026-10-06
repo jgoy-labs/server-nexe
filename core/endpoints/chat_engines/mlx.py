@@ -18,7 +18,7 @@ from fastapi.responses import StreamingResponse
 
 from ..chat_schemas import ChatCompletionRequest
 from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, mark_served_model, resolve_loaded_model_name
-from ._streaming import TokenBridge, _prepend_chunk, format_engine_token, stream_end
+from ._streaming import TokenBridge, format_engine_token, stream_end
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ async def _mlx_stream_generator(
     Uses :class:`TokenBridge` to bridge the synchronous MLX callback
     to the async generator that FastAPI requires.
 
-    `cancel_event` (#1041, C2.5): the UI's own `_start_engine_call` already
+    `cancel_event` (#1041, C2.5): the UI's own `start_engine_call` already
     threads one through for a client disconnect; `/v1` never had a monitor at
     all before C2.5 (`core.turn.adapters_api::generate`), so a deadline timer
     is the first thing that sets it here. Either way the module's own token
@@ -98,7 +98,7 @@ async def _mlx_stream_generator(
 
         # If the engine task failed, surface it as the end sentinel instead of
         # closing as a clean stop. Before any token the raise leaves this
-        # function so the forwarder's peek can retry the cascade (#1036).
+        # function so the cascade's peek can retry it (#1036).
         if bridge.error:
             if not got_any_token:
                 raise RuntimeError(bridge.error)
@@ -134,7 +134,7 @@ async def _forward_to_mlx(
 
     #1036 (C2.4): this used to catch its own failures and jump straight to
     Ollama, a second fallback mechanism that contradicted (and pre-empted)
-    the mlx→llama_cpp→ollama cascade in ``_dispatch_through_cascade``. Every
+    the mlx→llama_cpp→ollama cascade in the core cascade (`core/turn/engine_claim.py`). Every
     exception here now propagates instead, so the cascade is the ONLY place
     that decides what runs next.
 
@@ -143,7 +143,7 @@ async def _forward_to_mlx(
     at all.
 
     `images` (#1081): a single base64 string in a list, the same shape
-    `_start_engine_call` has always passed at the UI door — MLX decides
+    `start_engine_call` has always passed at the UI door — MLX decides
     whether the loaded model reads it (`_detect_vlm_capability`), never this
     forwarder.
     """
@@ -185,12 +185,11 @@ async def _forward_to_mlx(
             thinking_enabled=thinking,
             **continued,
         )
-        # Peek the first chunk BEFORE committing to a StreamingResponse: an
-        # error before any token reaches the client raises here as a real
-        # exception (#1036), which the cascade can still retry.
-        first_chunk = await agen.__anext__()
+        # Not peeked here: the cascade reads the first chunk before it commits
+        # to this engine (`peek_stream`, C4.8-c), so an error before any token
+        # is still a real exception it can retry (#1036).
         return mark_served_model(StreamingResponse(
-            _prepend_chunk(first_chunk, agen),
+            agen,
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
         ), model_name)

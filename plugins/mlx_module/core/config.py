@@ -351,9 +351,10 @@ class MLXConfig:
         Use centralized get_models_dir() which honours
         NEXE_STORAGE_PATH (sidecar override) → NEXE_DATA_DIR/models → cwd → repo.
         """
-        from core.paths.helpers import discover_first_model
+        from core.paths.helpers import discover_first_model, has_model_weights
+        # #1154: with weights — a config alone is not a model to boot with.
         return discover_first_model(
-            lambda p: p.is_dir() and (p / "config.json").exists(),
+            lambda p: p.is_dir() and (p / "config.json").exists() and has_model_weights(p),
             "MLX model",
         )
 
@@ -487,6 +488,15 @@ class MLXConfig:
 
         if not 0.0 <= self.top_p <= 1.0:
             logger.error("MLXConfig: top_p must be between 0 and 1")
+            return False
+
+        # #1154: and its weights, where mlx-lm looks for them.
+        from core.paths.helpers import has_model_weights
+        if not has_model_weights(model_path):
+            logger.error(
+                "MLXConfig: model_path has no *.safetensors weights: %s",
+                self.model_path
+            )
             return False
 
         return True

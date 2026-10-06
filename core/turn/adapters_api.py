@@ -35,7 +35,6 @@ step, and the other three run for themselves through
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
@@ -61,12 +60,11 @@ from core.endpoints.chat_engines._streaming import (
 from core.memory_facts import intents
 from core.memory_facts.deletes import arm_pending_deletes
 from core.memory_facts.write import note_kept, write_facts
-from core.turn import policy
+from core.turn import api_cascade, policy
 from core.turn.budget import record_llm_call
-from core.turn.cancel import start_disconnect_monitor
 from core.turn.context import TurnContext
 from core.turn.deadline import resolve_deadline_s
-from core.turn.gate import GateBusy, Priority, _gate_wait_s, gate_for
+from core.turn.engine_hold import EngineHold
 from core.turn.post_commit import queue_for
 from core.turn.authorize import authorize_turn
 from core.turn.run import Adapters, TurnShortCircuit
@@ -138,10 +136,10 @@ def _note_reprompt_reasoning(ctx: TurnContext, reasoning: str) -> None:
 
 def _v1_reprompt_call(ctx: TurnContext):
     """This door's way of asking its engine once more — `policy.reprompt_chunks`'s
-    `call` (C4.5). The same cascade `generate` walked, non-streaming, with the
-    turn's prompt under the override; the reply's reasoning is set apart as
-    `postprocess` does with the first one (ADR-010), kept only if asked for."""
-    chat = _chat()
+    `call` (C4.5). The engine that answered the first call, non-streaming, with
+    the turn's prompt under the override (R1: no cascade, as at the web door);
+    the reply's reasoning is set apart as `postprocess` does with the first one
+    (ADR-010), kept only if asked for."""
 
     def call(system_prompt: str):
         prompt = list(ctx.prompt)
@@ -151,10 +149,8 @@ def _v1_reprompt_call(ctx: TurnContext):
             prompt.insert(0, {"role": "system", "content": system_prompt})
 
         async def chunks():
-            response, _served_by, _fallback_from, _reason, _model = await chat._dispatch_through_cascade(
-                ctx.body, ctx.request, prompt, ctx.message or None,
-                ctx.session_id, ctx.engine, ctx.engine_fallback_from,
-                resume=False,
+            response = await api_cascade.ask_again(
+                ctx.body, ctx.request, prompt, ctx.message or None, ctx.session_id, ctx.engine,
             )
             if isinstance(response, StreamingResponse):
                 async for text in _text_of_reprompt_stream(response.body_iterator):
@@ -400,43 +396,22 @@ def _release(ctx: TurnContext) -> None:
 
 
 async def _open_stream_call(ctx: TurnContext):
-    """Gate, deadline, cascade. The slot stays held: the caller releases it
-    when the generator ends, including when the client leaves."""
+    """Gate, deadline, cascade. The slot stays held: the caller releases the
+    hold when the generator ends, including when the client leaves."""
     chat = _chat()
-    gate = gate_for(ctx.app_state)
-    cancel_event, monitor = start_disconnect_monitor(ctx.request)
-    ctx.cancel_token = (cancel_event, monitor)
-    deadline_handle = None
-    if ctx.deadline:
-        deadline_handle = asyncio.get_running_loop().call_later(ctx.deadline, cancel_event.set)
-
-    def stop() -> None:
-        if deadline_handle is not None:
-            deadline_handle.cancel()
-        if not monitor.done():
-            monitor.cancel()
-
-    try:
-        slot = await gate.acquire(
-            Priority.USER_TURN, holder=ctx.turn_id, cancel_event=cancel_event, timeout=_gate_wait_s(),
-        )
-    except GateBusy:
-        stop()
-        raise HTTPException(status_code=429, detail="Server busy, try again in a moment")
-    ctx.gpu_slot = slot
+    hold = await EngineHold(ctx).open()
     started = time.monotonic()
     try:
         image = ctx.attachments.get("image_b64")
-        response, served_by, fallback_from, reason, served_model = await chat._dispatch_through_cascade(
+        response, served_by, fallback_from, reason, served_model = await api_cascade.dispatch_v1(
             ctx.body, ctx.request, ctx.prompt, ctx.message or None,
             ctx.session_id, ctx.engine, ctx.engine_fallback_from,
-            cancel_event=cancel_event,
+            cancel_event=hold.cancel_event,
             images=[image] if image else None,
-            resume=ctx.resume,
+            resume=ctx.resume, lang=ctx.lang,
         )
     except BaseException:
-        await gate.release(slot)
-        stop()
+        await hold.release()
         raise
     ctx.usage["served_model"] = served_model or ""
     if served_by != ctx.engine:
@@ -444,7 +419,7 @@ async def _open_stream_call(ctx: TurnContext):
     ctx.engine = served_by
     ctx.engine_fallback_from = fallback_from
     ctx.engine_fallback_reason = reason
-    return response, served_by, served_model, slot, gate, stop, started
+    return response, served_by, served_model, hold, started
 
 
 async def _drain_engine(ctx: TurnContext, response: Any, cleaner: SseCleaner):
@@ -736,42 +711,20 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
 
     async def generate(ctx: TurnContext) -> None:
         chat = _chat()
-        gate = gate_for(ctx.app_state)
         # #1041 (C2.5): /v1 had no cancellation channel at all before this —
         # neither a client-disconnect monitor nor a deadline. One event now
-        # covers both: the same monitor the UI has always used, shared with a
-        # timer armed below when ctx.deadline is set (`engine` adapter).
-        cancel_event, monitor = start_disconnect_monitor(ctx.request)
-        ctx.cancel_token = (cancel_event, monitor)
-        deadline_handle = None
-        if ctx.deadline:
-            deadline_handle = asyncio.get_running_loop().call_later(ctx.deadline, cancel_event.set)
-
-        def _stop_cancellation() -> None:
-            if deadline_handle is not None:
-                deadline_handle.cancel()
-            if not monitor.done():
-                monitor.cancel()
-
-        try:
-            slot = await gate.acquire(
-                Priority.USER_TURN, holder=ctx.turn_id, cancel_event=cancel_event, timeout=_gate_wait_s(),
-            )
-        except GateBusy:
-            _stop_cancellation()
-            raise HTTPException(status_code=429, detail="Server busy, try again in a moment")
-        ctx.gpu_slot = slot
-        released = False
-        _gen_started = time.monotonic()
-        try:
+        # covers both: the hold starts the same monitor the UI has always used,
+        # shared with a timer armed when ctx.deadline is set (`engine` adapter).
+        async with EngineHold(ctx) as hold:
+            _gen_started = time.monotonic()
             _image_b64 = ctx.attachments.get("image_b64")
-            response, served_by, fallback_from, reason, served_model = await chat._dispatch_through_cascade(
+            response, served_by, fallback_from, reason, served_model = await api_cascade.dispatch_v1(
                 ctx.body, ctx.request, ctx.prompt, ctx.message or None,
                 ctx.session_id, ctx.engine, ctx.engine_fallback_from,
-                cancel_event=cancel_event,
+                cancel_event=hold.cancel_event,
                 # #1081: same shape as the UI door's `_images_arg`.
                 images=[_image_b64] if _image_b64 else None,
-                resume=ctx.resume,
+                resume=ctx.resume, lang=ctx.lang,
             )
             # I8 (C2.5): the cascade may have tried more than one engine, but
             # `served_by` is the one that actually generated — a retry that
@@ -797,12 +750,14 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
                 # the engine forwarder, well after this adapter returns — the
                 # slot must outlive `generate`, not end with it (C2.4 splits
                 # this forwarder up; until then the slot follows the object).
-                released = True
                 inner = response.body_iterator
                 # C4.4-b: the model's format is cleaned here, on the one seam
                 # the three engine forwarders share — /v1 no longer streams
                 # <think>, harmony channels or memory tags to its client.
                 cleaner = SseCleaner(served_model, keep_reasoning=_wants_reasoning(ctx))
+                # Last, so nothing that can still fail comes between taking the
+                # release over and the body that will call it.
+                release = hold.hand_over()
 
                 async def _release_after(inner=inner):
                     try:
@@ -812,14 +767,9 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
                         for out in cleaner.close():
                             yield out
                     finally:
-                        await gate.release(slot)
-                        _stop_cancellation()
+                        await release()
 
                 response.body_iterator = _release_after()
-        finally:
-            if not released:
-                await gate.release(slot)
-                _stop_cancellation()
 
     async def persist_assistant_turn(ctx: TurnContext) -> None:
         # JSON only. A stream writes the answer in `persist_stream`, once the
@@ -1020,7 +970,7 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         model does not hold the headers until the answer starts. I8's time is
         the whole generation, not the wait for that first token."""
         ctx.response = ""
-        response, served_by, served_model, slot, gate, stop, started = await _open_stream_call(ctx)
+        response, served_by, served_model, hold, started = await _open_stream_call(ctx)
         try:
             yield format_sse_role(served_model or served_by, _engine_prefix(served_by))
             cleaner = SseCleaner(served_model, keep_reasoning=_wants_reasoning(ctx))
@@ -1031,8 +981,7 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
                 ms=(time.monotonic() - started) * 1000.0,
             )
         finally:
-            await gate.release(slot)
-            stop()
+            await hold.release()
 
     async def postprocess_stream(ctx: TurnContext):
         """Clean the raw answer, arm a delete, and ask again when the reply
