@@ -33,6 +33,7 @@ _VALID_KEYS: frozenset[str] = frozenset({
     "NEXE_DEFAULT_MODEL",
     "NEXE_MLX_MODEL",
     "NEXE_LLAMA_CPP_MODEL",
+    "NEXE_ALLOW_CLOUD_ENGINES",  # the "Allow cloud engines" switch (core/providers/cloud.py)
 })
 
 

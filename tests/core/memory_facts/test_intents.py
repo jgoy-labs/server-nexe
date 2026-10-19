@@ -29,6 +29,7 @@ def _session(messages=None):
     s.messages = messages if messages is not None else []
     s._pending_partial_delete = None
     s._pending_clear_all = False
+    s._pending_replace = None
     return s
 
 
@@ -69,6 +70,13 @@ class TestSave:
         port.save_to_memory.return_value = {"success": False, "duplicate": True}
         outcome = await _resolve("save", "ja ho sap", port=port)
         assert (outcome.mem_saved, outcome.continue_turn) == (0, True)
+
+    async def test_a_similar_fact_that_is_not_the_same_is_not_told_as_kept(self):
+        port = _port()
+        port.save_to_memory.return_value = {"success": False, "duplicate": True, "same": False}
+        outcome = await _resolve("save", "tinc 46 anys", port=port)
+        assert (outcome.mem_saved, outcome.continue_turn) == (0, True)
+        assert outcome.kept_facts == []
 
     async def test_failure_does_not_break_the_turn(self):
         port = _port()
@@ -445,3 +453,124 @@ class TestBothDoorsRunIt:
 
         step = next(s for s in TURN_STEPS if s.id == "intent")
         assert step.doors_today == frozenset({"ui", "api"})
+
+
+# ═══════════════════════════════════════════════════════════════
+# replace — TOKENS-20261015-13: a changed value is asked, never silently dropped
+# ═══════════════════════════════════════════════════════════════
+
+class TestReplace:
+
+    async def test_a_save_close_to_a_stored_fact_arms_a_replace_and_changes_nothing(self):
+        port = _port()
+        port.save_to_memory.return_value = {
+            "success": False, "duplicate": True, "same": False, "similar_to": "L'usuari té 45 anys",
+        }
+        session = _session()
+        outcome = await _resolve("save", "tinc 46 anys", session=session, port=port)
+        assert session._pending_replace == {"old": "L'usuari té 45 anys", "new": "tinc 46 anys"}
+        assert outcome.kept_facts == [] and outcome.mem_saved == 0
+        port.delete_memory_entries.assert_not_awaited()
+
+    def test_a_yes_next_turn_is_a_replace_confirmation(self):
+        port = _port()
+        port.detect_intent.return_value = ("chat", None)
+        port.matches_clear_all_confirm.return_value = True
+        session = _session()
+        session._pending_replace = {"old": "a", "new": "b"}
+        assert intents.detect_with_pending(session, "sí", port)[0] == "replace_confirm"
+
+    def test_anything_else_drops_the_pending_replace(self):
+        port = _port()
+        port.detect_intent.return_value = ("chat", None)
+        port.matches_clear_all_confirm.return_value = False
+        session = _session()
+        session._pending_replace = {"old": "a", "new": "b"}
+        assert intents.detect_with_pending(session, "què tal", port)[0] == "chat"
+        assert session._pending_replace is None
+
+    async def test_the_yes_deletes_the_old_entry_by_id_then_saves_the_new_one(self):
+        port = _port()
+        entry = {"id": "e1", "text": "L'usuari té 45 anys"}
+        port.preview_delete_from_memory.return_value = {"success": True, "candidates": [entry]}
+        port.delete_memory_entries.return_value = {"success": True, "deleted": 1}
+        port.save_to_memory.return_value = {"success": True, "document_id": "d2"}
+        session = _session()
+        session._pending_replace = {"old": "L'usuari té 45 anys", "new": "L'usuari té 46 anys"}
+        outcome = await _resolve("replace_confirm", session=session, port=port)
+        port.delete_memory_entries.assert_awaited_once_with([entry])
+        assert port.save_to_memory.await_args.kwargs["content"] == "L'usuari té 46 anys"
+        assert (outcome.mem_saved, outcome.mem_deleted) == (1, 1)
+        assert "46" in outcome.text and session._pending_replace is None
+
+    async def test_if_the_old_entry_is_gone_nothing_is_saved_and_it_says_so(self):
+        port = _port()
+        port.preview_delete_from_memory.return_value = {"success": True, "candidates": []}
+        session = _session()
+        session._pending_replace = {"old": "L'usuari té 45 anys", "new": "L'usuari té 46 anys"}
+        outcome = await _resolve("replace_confirm", session=session, port=port)
+        port.delete_memory_entries.assert_not_awaited()
+        port.save_to_memory.assert_not_awaited()
+        assert outcome.mem_saved == 0 and "45" in outcome.text
+
+    async def test_it_never_replaces_a_neighbour_that_is_not_the_armed_fact(self):
+        port = _port()
+        port.preview_delete_from_memory.return_value = {
+            "success": True, "candidates": [{"id": "x", "text": "L'usuari viu a Vic"}],
+        }
+        session = _session()
+        session._pending_replace = {"old": "L'usuari té 45 anys", "new": "L'usuari té 46 anys"}
+        await _resolve("replace_confirm", session=session, port=port)
+        port.delete_memory_entries.assert_not_awaited()
+
+
+class TestReplaceQuestion:
+    """pla-comportament-segons-mida-model, C: the server asks for the model it accompanies."""
+
+    def _armed(self, messages=None):
+        s = _session(messages)
+        s._pending_replace = {"old": "L'usuari té 45 anys", "new": "L'usuari té 46 anys"}
+        return s
+
+    def test_an_accompanied_model_is_asked_by_the_server(self):
+        q = intents.replace_question(self._armed(), accompany=True, lang="ca")
+        assert "L'usuari té 45 anys" in q and "L'usuari té 46 anys" in q and "sí" in q
+
+    def test_an_autonomous_model_asks_by_itself(self):
+        s = self._armed()
+        assert intents.replace_question(s, accompany=False, lang="ca") == ""
+        assert "asked" not in s._pending_replace
+
+    def test_nothing_waiting_nothing_asked(self):
+        assert intents.replace_question(_session(), accompany=True, lang="ca") == ""
+
+    def test_asked_once_per_arming(self):
+        s = self._armed()
+        assert intents.replace_question(s, accompany=True, lang="ca")
+        assert intents.replace_question(s, accompany=True, lang="ca") == ""
+
+    def test_arming_again_asks_again(self):
+        s = self._armed()
+        intents.replace_question(s, accompany=True, lang="ca")
+        intents.arm_replace(s, "a", "b")
+        assert intents.replace_question(s, accompany=True, lang="ca")
+
+    def test_the_question_joins_the_stored_answer(self):
+        s = self._armed([{"role": "user", "content": "tinc 46"}, {"role": "assistant", "content": "Entesos."}])
+        q = intents.replace_question(s, accompany=True, lang="ca")
+        assert s.messages[-1]["content"] == f"Entesos.\n\n{q}"
+        assert s.messages[0]["content"] == "tinc 46"
+
+    def test_a_history_that_does_not_end_in_the_answer_is_left_alone(self):
+        s = self._armed([{"role": "user", "content": "tinc 46"}])
+        intents.replace_question(s, accompany=True, lang="ca")
+        assert s.messages == [{"role": "user", "content": "tinc 46"}]
+
+    @pytest.mark.parametrize("lang,word", [("ca", "Vols"), ("es", "Quieres"), ("en", "Do you want")])
+    def test_in_the_turns_language(self, lang, word):
+        assert word in intents.replace_question(self._armed(), accompany=True, lang=lang).replace("¿", "")
+
+    def test_it_changes_nothing_in_memory(self):
+        s = self._armed()
+        intents.replace_question(s, accompany=True, lang="ca")
+        assert s._pending_replace["old"] == "L'usuari té 45 anys" and s._pending_replace["new"] == "L'usuari té 46 anys"

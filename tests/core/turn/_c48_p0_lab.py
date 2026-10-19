@@ -38,14 +38,20 @@ from typing import Any, Optional
 from unittest.mock import AsyncMock, patch
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
 from fastapi.responses import StreamingResponse
 
+from core.turn.errors import BadRequest, ModelNotFound
 from plugins.ollama_module.core.errors import ModelNotFoundError, OllamaSemanticError
 from plugins.web_ui_module.api.wire import _stream_error_notice
 
 from .conftest import door_patches, make_request
 from .test_1117_cascade_keeps_the_notice import OOM, _MlxShaped, _OllamaShaped
+
+#: The real client, captured before any patch: the `/v1` patch below replaces `httpx.AsyncClient`
+#: on the shared `httpx` module, and the API engine's own client (it is given a `transport`, the
+#: lab's way of putting a fake provider behind it) must keep being a real one.
+_REAL_ASYNC_CLIENT = httpx.AsyncClient
 
 ENGINES = ("mlx", "llama_cpp", "ollama")
 MODULE_KEY = {"mlx": "mlx_module", "llama_cpp": "llama_cpp_module", "ollama": "ollama_module"}
@@ -83,14 +89,20 @@ def failure_for(engine: str, mode: str) -> Optional[Exception]:
             # The module turns the daemon's 400 into its semantic error, a plain
             # Exception: the cascade policy retries it (a ValueError would be final).
             return OllamaSemanticError("bad request: this engine cannot take it", 400)
-        return ValueError("bad request: this engine cannot take it")
+        return BadRequest("bad request: this engine cannot take it")
     if mode == "not_found" and engine == "ollama":
         return ModelNotFoundError("model-que-no-existeix")
+    if mode == "unauthorized" and engine == "ollama":  # Ollama behind a proxy that wants a key
+        return _http_status_error(401, "Client error '401 Unauthorized' for url 'http://127.0.0.1:11434/api/chat'")
     if mode == "unreachable":
         return httpx.ConnectError("connection refused") if engine == "ollama" else ConnectionError("refused")
     if mode == "timeout":
         return httpx.ReadTimeout("timed out") if engine == "ollama" else TimeoutError("took too long")
     return None
+
+
+#: What the lab's in-process engines say a call cost (pla-tokens-reals).
+PROMPT_TOKENS, CACHED_TOKENS = 7, 3
 
 
 class InProc(_MlxShaped):
@@ -126,24 +138,39 @@ class InProc(_MlxShaped):
         if self.fail is not None and self.after is None:
             raise self.fail
         self.loaded = True
+        cancel = kwargs.get("cancel_event")
+        # The real MLX loop: the first token is out before the loop checks its cancel
+        # event, and every later one is checked first (`generate_helpers`). An engine
+        # handed an event that is already set answers one token and stops.
+        stopped = lambda number: number > 0 and cancel is not None and cancel.is_set()  # noqa: E731
         if stream_callback is None:  # /v1, non-streaming: the answer is in the result
             if self.fail is not None:
                 raise self.fail
-            return {"response": "".join(self.tokens), "finish_reason": "stop", "tokens": 2}
+            said = []
+            for number, token in enumerate(self.tokens):
+                if stopped(number):
+                    break
+                said.append(token)
+            return {"response": "".join(said), "finish_reason": "stop", "tokens": len(said),
+                    "prompt_tokens": PROMPT_TOKENS}
         for number, token in enumerate(self.tokens):
+            if stopped(number):
+                break
             if self.after is not None and number == self.after:
                 raise self.fail
             stream_callback(token)
         if self.after is not None and self.after >= len(self.tokens):
             raise self.fail
-        return {"finish_reason": "stop"}
+        # What a real engine's result carries (MLX also says what its cache reused).
+        return {"finish_reason": "stop", "prompt_tokens": PROMPT_TOKENS, "tokens": len(self.tokens),
+                **({"cached_tokens": CACHED_TOKENS} if self.name == "mlx" else {})}
 
     def can_see_images(self) -> bool:
         return bool(self.sees)
 
     def switch_model_by_path(self, local_path) -> bool:
         if self.switch_refuses:
-            raise ValueError(f"Model '{local_path}' not found: no such model")
+            raise ModelNotFound(f"Model '{local_path}' not found: no such model")
         return super().switch_model_by_path(local_path)
 
 
@@ -187,7 +214,7 @@ class OllamaModule(_OllamaShaped):
                 raise owner.exc
             # the real module closes with the daemon's `done` chunk, marked `continuable`
             yield {"message": {"role": "assistant", "content": ""}, "done": True, "done_reason": "stop",
-                   "continuable": False}
+                   "continuable": False, "prompt_eval_count": PROMPT_TOKENS, "eval_count": len(owner.tokens)}
 
         return _gen()
 
@@ -278,6 +305,8 @@ class FakeOllamaDaemon:
         self.log: list | None = None  # the world's chronological call log, wired by `World`
 
     def client(self, **kwargs):
+        if kwargs.get("transport") is not None:  # not the Ollama forwarder: the API engine, with its fake provider
+            return _REAL_ASYNC_CLIENT(**kwargs)
         return _Client(self, **kwargs)
 
     async def respond(self, blocking: bool = False) -> _Response:
@@ -291,6 +320,8 @@ class FakeOllamaDaemon:
             return _Response(500, body={"error": text})
         if mode == "bad_request":
             return _Response(400, body={"error": "bad request"})
+        if mode == "unauthorized":  # Ollama behind a proxy that wants a key
+            return _Response(401, body={"error": "unauthorized"})
         if mode == "timeout":
             raise httpx.ReadTimeout("timed out")
         first, second = says("ollama")
@@ -419,6 +450,7 @@ class Seen:
     saved_text: str = ""
     engine_tags: tuple = ()
     model_tags: tuple = ()
+    usage_tags: tuple = ()  # `[USAGE:in|out|cached]`, the footer's count (pla-tokens-reals D)
     loading: int = 0
     headers: dict = field(default_factory=dict)
     fallback: Optional[tuple] = None
@@ -427,6 +459,8 @@ class Seen:
     saved_stats: dict = field(default_factory=dict)
     ctx: Any = None
     asked: tuple = ()
+    #: The headers a JSON answer carried (the response object the route was handed).
+    json_headers: dict = field(default_factory=dict)
 
     def sig(self) -> str:
         """One line: what the matrix compares, in the order a client meets it —
@@ -505,11 +539,19 @@ def _sse_text(chunks: list) -> tuple[str, Optional[str]]:
     return "".join(out), finish
 
 
+#: C5 part C: a client that STOPS reading after this many chunks (and closes the
+#: stream, as the server does when the connection drops). None reads it all.
+STOP_AFTER: dict = {"chunks": None}
+
+
 async def _drain(response: StreamingResponse, seen: Seen) -> list:
     chunks: list = []
     try:
         async for chunk in response.body_iterator:
             chunks.append(chunk)
+            if STOP_AFTER["chunks"] is not None and len(chunks) >= STOP_AFTER["chunks"]:
+                await response.body_iterator.aclose()
+                break
     except HTTPException as exc:
         seen.cut = f"HTTPException({exc.status_code})"
     except Exception as exc:
@@ -525,6 +567,7 @@ def _read_labels(raw: str, seen: Seen) -> None:
     tags = [(m.group(1), m.group(2)) for m in _SENTINEL.finditer(raw.replace("\\u0000", "\x00"))]
     seen.engine_tags = tuple(v for k, v in tags if k == "ENGINE")
     seen.model_tags = tuple(v for k, v in tags if k == "MODEL")
+    seen.usage_tags = tuple(v for k, v in tags if k == "USAGE")
     seen.loading = sum(1 for k, _v in tags if k == "MODEL_LOADING")
 
 
@@ -601,7 +644,9 @@ async def _run_ui(lab, world: World, *, stream: bool, backend: str, sid: str, me
     seen = Seen()
     with door_patches(lab.server_state, lab.memory_helper), \
          _spy_on_turn("plugins.web_ui_module.api.routes_chat", seen):
-        response = await _answer_of(endpoint(request, body, None), seen)
+        sink = Response()
+        response = await _answer_of(endpoint(request, body, None, sink), seen)
+        seen.json_headers = dict(sink.headers)
         if isinstance(response, StreamingResponse):
             _read_web_stream(await _drain(response, seen), seen)
             seen.headers = dict(response.headers)
@@ -672,7 +717,9 @@ async def _run_v1(lab, world: World, *, stream: bool, engine: str, sid: str, mes
     tasks = BackgroundTasks()
     seen = Seen()
     with _v1_patches(lab, world), _spy_on_turn("core.endpoints.chat", seen):
-        response = await _answer_of(chat_completions(body, request, tasks), seen, keep_message=True)
+        sink = Response()
+        response = await _answer_of(chat_completions(body, request, tasks, sink), seen, keep_message=True)
+        seen.json_headers = dict(sink.headers)
         if isinstance(response, StreamingResponse):
             await _read_v1_stream(response, seen)
         elif response is not None:

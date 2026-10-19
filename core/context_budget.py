@@ -351,6 +351,23 @@ def _inject_context_into_messages(
 PROMPT_FIT_MARGIN_TOKENS = 256
 PROMPT_FIT_MARGIN_RATIO = 0.05
 
+#: What a fitted prompt leaves for the reply when the client did not say how
+#: long the reply may be: the 500-char response reserve `compute_context_budget`
+#: holds back (`response_buffer`), in tokens.
+DEFAULT_REPLY_RESERVE_TOKENS = 500 // CHARS_PER_TOKEN_ESTIMATE
+
+
+def reply_reserve_tokens(max_tokens: int | None = None) -> int:
+    """The reply reserve `fit_prompt_to_window` is given (C4.8 B1).
+
+    One rule for both doors and for every engine, the first one and the ones in
+    reserve: what the client asked for (`max_tokens`) when it said, the default
+    reserve when it did not. The web sends no `max_tokens`, so it always holds
+    back the default; a `/v1` client without one used to be held back nothing,
+    and its reply was left the margin alone. A reserve bigger than the window is
+    clamped by `fit_prompt_to_window`, not here."""
+    return int(max_tokens) if max_tokens else DEFAULT_REPLY_RESERVE_TOKENS
+
 
 _ELISION = "\n\n[…]\n\n"
 

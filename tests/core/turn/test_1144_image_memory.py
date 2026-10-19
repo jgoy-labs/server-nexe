@@ -439,6 +439,25 @@ async def test_a_fallback_that_cannot_see_answers_without_the_reattached_image(t
     assert not blind.turns[-1].get("images")
 
 
+async def test_ollama_in_reserve_answers_a_reattached_turn_without_the_image(turn_lab, app_state, monkeypatch):
+    """C4.8 B2/D1-x: Ollama in reserve runs its own default model and does not say
+    whether it sees. A re-attached image is a help, never a reason to pass an
+    engine over: Ollama gets the turn without it, as a blind fallback does."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "qwen3.5:4b")
+    first, ollama = _SeeingMlx(), _OllamaShaped(chunks=("D'acord.",))
+    app_state.modules = {"mlx_module": first}
+    await _turn(turn_lab, "i1144-o", "què és aquesta imatge?", _png())
+
+    async def _dies(*_a, **_k):
+        raise RuntimeError("worker died")
+    first.chat = _dies
+    app_state.modules = {"mlx_module": first, "ollama_module": ollama}
+    await _turn(turn_lab, "i1144-o", "torna a mirar la imatge")
+    assert ollama.calls, "Ollama in reserve answered"
+    assert ollama.calls[0]["model"] == "qwen3.5:4b"
+    assert not ollama.calls[0]["images"]
+
+
 async def test_a_continue_of_a_reattached_turn_keeps_the_image(turn_lab, app_state, session_manager):
     """Review 03/10: the resume reads the image off the stored message, and a
     re-attached image is not stored there — it resumed without it."""

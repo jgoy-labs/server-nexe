@@ -127,8 +127,9 @@ async def test_the_engine_field_names_the_engine_at_both_doors(caplog):
     the UI door holds the module. Reading `type().__name__` blindly logged the
     literal "str" for every API turn — seen live on 08/09.
 
-    Mutation guard: drop the `isinstance(ctx.engine, str)` branch in
-    `emit_turn_trace` and the API case goes RED — "str" instead of "mlx".
+    C5 B: the line reads `ctx.engine_name`, which both doors write (the module at
+    the UI door is no longer turned into a class name). Mutation guard: read
+    `type(ctx.engine).__name__` again and the UI case goes RED — "_EngineModule".
     """
     caplog.set_level(logging.INFO, logger=TRACE_LOGGER)
 
@@ -136,11 +137,12 @@ async def test_the_engine_field_names_the_engine_at_both_doors(caplog):
         pass
 
     api_ctx = _ctx(turn_id="t-engine-api", entry="api")
-    api_ctx.engine = "mlx"
+    api_ctx.engine = api_ctx.engine_name = "mlx"
     await run_turn(api_ctx, _fake_adapters())
 
     ui_ctx = _ctx(turn_id="t-engine-ui", entry="ui")
     ui_ctx.engine = _EngineModule()
+    ui_ctx.engine_name = "mlx"
     await run_turn(ui_ctx, _fake_adapters())
 
     by_id = {
@@ -149,7 +151,7 @@ async def test_the_engine_field_names_the_engine_at_both_doors(caplog):
         for r in _trace_records(caplog)
     }
     assert by_id["t-engine-api"]["engine"] == "mlx"
-    assert by_id["t-engine-ui"]["engine"] == "_EngineModule"
+    assert by_id["t-engine-ui"]["engine"] == "mlx"
 
 
 async def test_the_turn_line_bills_the_atomisers_call(caplog):

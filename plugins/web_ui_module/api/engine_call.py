@@ -23,7 +23,8 @@ from typing import Any
 from core.endpoints.chat_engines._common import extract_engine_text as _engine_text
 from core.turn.errors import StreamCapExceeded
 from core.turn.stream import (
-    Delta, Failed, Ready, StreamFlags, StreamGuard, Whole, close_quietly, engine_events,
+    Delta, Failed, Ready, StreamFlags, StreamGuard, Whole, add_chunk_usage, add_result_usage, close_quietly,
+    engine_events,
 )
 from plugins.web_ui_module.api.wire import _stream_error_notice
 from plugins.web_ui_module.core.latex_sanitizer import LatexStreamBuffer, latex_to_unicode
@@ -71,23 +72,37 @@ def _json_chunk_text(chunk) -> "str | None":
     return None
 
 
-async def _accumulate_nonstreaming_response(chat_result, response_chunks: list) -> bool:
+async def _accumulate_nonstreaming_response(chat_result, response_chunks: list, on_first_chunk=None,
+                                            said: "dict | None" = None) -> bool:
     """Accumulate chunks from a non-streaming chat_result into response_chunks.
 
     #1039: through the core's `StreamGuard`, like the streaming shape — no
     control characters, and a reply that grows past `NEXE_MAX_STREAM_MB` stops
     there. Returns True when it did: the text so far is kept, and the caller
     ends the turn partial and stops the engine's worker.
+
+    `on_first_chunk` (#1165) is called once, when the engine hands over its
+    first chunk: the JSON door's first byte. An engine whose answer comes
+    whole (a coroutine) hands over nothing before its end.
+
+    `said`, if given, receives `usage`: what the engine says the call cost.
     """
     guard = StreamGuard()
     try:
         if inspect.isasyncgen(chat_result) or hasattr(chat_result, '__aiter__'):
             async for chunk in chat_result:
+                if on_first_chunk is not None:
+                    on_first_chunk()
+                    on_first_chunk = None
+                if said is not None:
+                    add_chunk_usage(said, chunk)
                 text = _json_chunk_text(chunk)
                 if text is not None:
                     response_chunks.append(guard.take(text, "")[0])
         else:
             result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
+            if said is not None:
+                add_result_usage(said, result)
             content = _engine_text(result)
             if content:
                 response_chunks.append(guard.take(content, "")[0])

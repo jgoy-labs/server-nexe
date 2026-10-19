@@ -82,7 +82,7 @@ def _format_rag_bar(score: float, width: int = 8) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
-_ENGINE_NAMES = {"mlx": "MLX", "ollama": "Ollama", "llama_cpp": "llama.cpp"}
+_ENGINE_NAMES = {"mlx": "MLX", "ollama": "Ollama", "llama_cpp": "llama.cpp", "api": "API"}
 
 
 def _format_stats_line(elapsed: float, char_count: int, model_name: Optional[str] = None,

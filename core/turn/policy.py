@@ -26,6 +26,7 @@ www.jgoy.net · https://server-nexe.org
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os as _os
 import re as _re
@@ -33,6 +34,7 @@ import time
 from typing import Any, AsyncIterator, Callable, Optional
 
 from core.turn.budget import record_llm_call
+from core.turn.trace import note_attempt
 from core.turn.context import TurnContext
 from core.turn.gate import GateBusy, Priority, _gate_wait_s, gate_for
 from core.turn.stream import StreamGuard
@@ -140,12 +142,13 @@ async def reprompt_chunks(
     if call is None:
         logger.info("Re-prompt skipped: %s has no way to call its engine again from this door", engine_name)
         return
-    gate = gate_for(ctx.app_state)
+    gate = gate_for(ctx.app_state, ctx.engine)
     slot = await _take_slot(gate, ctx.turn_id)
     if slot is None:
         return
     started = time.monotonic()
     asked = False
+    failed = False
     produced = 0
     try:
         stream = call(reprompt_system_prompt(ctx.system_prompt, ctx.lang))
@@ -157,14 +160,17 @@ async def reprompt_chunks(
         async for content in _visible_text(stream):
             produced += len(content)
             yield content
+    except (asyncio.CancelledError, GeneratorExit):
+        failed = True  # a call that was cut is not a success
+        raise
     except Exception as exc:
+        failed = True
         logger.warning("Re-prompt failed: %s", exc)
     finally:
         if asked:
-            record_llm_call(
-                ctx, step="reprompt", engine=engine_name, model=model,
-                ms=(time.monotonic() - started) * 1000.0,
-            )
+            ms = (time.monotonic() - started) * 1000.0
+            record_llm_call(ctx, step="reprompt", engine=engine_name, model=model, ms=ms)
+            note_attempt(ctx, "postprocess", engine_name, not failed, ms)
             logger.info("Re-prompt done: %d chars back from %s", produced, model or engine_name)
         await gate.release(slot)
 

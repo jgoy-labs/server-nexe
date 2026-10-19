@@ -24,7 +24,9 @@ from typing import Any, AsyncIterator, Optional
 
 from fastapi import HTTPException
 
-from core.turn.errors import curated_error_text
+from core.turn.cancel import TurnCancel, client_gone, first_byte
+from core.turn.trace import note_attempt
+from core.turn.errors import CANNOT_SEE, NO_OWN_MODEL, UserFacingHTTPException, curated_error_text, no_engine_can_answer
 
 logger = logging.getLogger(__name__)
 
@@ -60,17 +62,60 @@ def able_to_continue(candidates: list, model_name: Optional[str]) -> list:
 
 
 def live_candidates(requested_engine: Optional[str], app_state: Any, *, resume: bool = False,
-                    model_name: Optional[str] = None) -> list:
+                    model_name: Optional[str] = None, cloud_ok: bool = False,
+                    image: bool = False, lang: Optional[str] = None) -> list:
     """`(name, module)` of every engine worth trying for this turn, best first.
 
     The live ones in the cascade's order (`resolve_engine_cascade`), narrowed
-    to the engines that can resume when the turn is a Continue: the filter is
-    a condition of being a candidate, not a third copy of the loop's own
-    checks. Nothing live is a 503."""
-    candidates = list(_routing().iter_live_engines(_routing().resolve_engine_cascade(requested_engine, app_state), app_state))
+    to the engines that can resume when the turn is a Continue and to those
+    that can answer it at all (`_able_to_answer`): the filters are conditions
+    of being a candidate, not copies of the loop's own checks. Nothing live is
+    a 503; engines live and none able is a 503 that says why. `cloud_ok` is the
+    door saying the cloud gate was passed for this turn; without it the API
+    engine is never a candidate. `image`: the turn brings one of its own (an
+    image re-attached from the conversation is a help, never a reason, #1144)."""
+    cascade = _routing().resolve_engine_cascade(requested_engine, app_state, cloud_ok=cloud_ok)
+    # A hosted engine is handed to the turn bound to the turn's model (its
+    # window, its sight and the model a compaction asks for are THIS turn's).
+    candidates = [(name, _routing().bind_to_model(module, model_name))
+                  for name, module in _routing().iter_live_engines(cascade, app_state)]
     if not candidates:
         raise HTTPException(status_code=503, detail=NO_ENGINE_DETAIL)
-    return able_to_continue(candidates, model_name) if resume else candidates
+    if resume:
+        candidates = able_to_continue(candidates, model_name)
+    return _able_to_answer(candidates, requested_engine, app_state, image=image, lang=lang)
+
+
+def _able_to_answer(candidates: list, requested_engine: Optional[str], app_state: Any, *,
+                    image: bool, lang: Optional[str]) -> list:
+    """The candidates that can answer this turn. A fallback with no model of its
+    own (Ollama without one said in words, B2/D1-x) is left out, and so is one
+    that does not say it sees when the turn brings an image. The engine the
+    client asked for is always kept: it decides for itself.
+
+    Decided here, before anything is sent, and not as a door's skip in the
+    loop: a door whose response is already out (the web stream) would find
+    nobody left to try with no failure to show, and the connection would drop.
+    None left is a 503 that says why, at every door, like nothing live."""
+    from core.endpoints.chat_engines._common import no_model_of_its_own  # deferred, as `_routing`
+
+    routing = _routing()
+    asked = routing.asked_engine(requested_engine, app_state)
+    able, why = [], []
+    for index, (name, module) in enumerate(candidates):
+        if routing.in_reserve(index, name, asked):
+            if no_model_of_its_own(name, app_state):
+                logger.warning("Engine %s has no model of its own to stand in with; left out", name)
+                why.append(NO_OWN_MODEL)
+                continue
+            if image and routing.engine_can_see_images(module) is not True:
+                logger.warning("Engine %s does not say it can see the image; left out", name)
+                why.append(CANNOT_SEE)
+                continue
+        able.append((name, module))
+    if not able:
+        raise UserFacingHTTPException(status_code=503, detail=no_engine_can_answer(why, lang))
+    return able
 
 
 @dataclass
@@ -105,13 +150,33 @@ class Claim:
         return "execution_failed" if self.passed_over else "preferred_unavailable"
 
 
+def fallback_of(claim: "Claim", first_asked: str, already: Optional[str] = None) -> Optional[str]:
+    """The engine this turn fell back FROM, if it did (B3/N6): told against the first
+    engine the turn ASKED, not against what the `engine` step resolved — on a Continue,
+    an engine that cannot resume is left out before the loop, and an engine never
+    asked is not one the turn fell back from. `already` (the `engine` step's own,
+    when the one named was not live) is kept. One rule for both doors."""
+    if claim.engine_name != first_asked and not already:
+        return first_asked
+    return already
+
+
 class CascadeDoor:
     """What a door tells the cascade. The defaults are the plainest door: no
-    engine skipped, nothing announced, nothing observed, no cancel check."""
+    engine skipped, nothing announced, nothing observed. When to stop asking
+    is not a door's to say: a client that left is asked nothing more, at
+    every door (`_cancelled`, N4)."""
 
-    #: Stop asking engines once the turn's cancel event is set (client gone,
-    #: deadline). The doors that do not set it keep asking.
-    stop_when_cancelled: bool = False
+    #: The cancel event of the engine being asked: the cascade hands each engine
+    #: one of its own (`TurnCancel.attempt`) and the door starts that engine with it.
+    cancel_event: Any = None
+
+    #: The engine the client asked for (`routing.asked_engine`); None when it named none.
+    asked: Optional[str] = None
+
+    def in_reserve(self, index: int, name: str) -> bool:
+        """Is this engine a fallback — not the one the client asked for (`routing.in_reserve`)?"""
+        return _routing().in_reserve(index, name, self.asked)
 
     #: The turn's reply language: the curated text of a failure is said in it.
     lang: Optional[str] = None
@@ -135,8 +200,15 @@ class CascadeDoor:
         this engine failing."""
         raise NotImplementedError
 
+    #: The turn's context, when the door has one to say its attempts to (C5 E).
+    trace_ctx: Any = None
+
     def observe(self, name: str, ok: bool, started: float) -> None:
-        """One attempt is over (a metric, a log)."""
+        """One attempt is over: said once on the turn (engine, ok, ms up to its first
+        event), and the next `generate` event carries it to every sink. The
+        same at every door — no door counts on its own any more."""
+        if self.trace_ctx is not None:
+            note_attempt(self.trace_ctx, "generate", name, ok, (time.time() - started) * 1000.0)
 
     def stand_in(self, index: int, name: str, engine: Any, first_error: Exception) -> Optional[Opened]:
         """A door whose response is already out cannot raise a 503 (it would
@@ -180,12 +252,15 @@ async def _try_engine(door: CascadeDoor, index: int, name: str, engine: Any, hav
             door.observe(name, False, started)
             logger.warning("%s failed: %s", name, exc)
             logger.debug("Engine error details:", exc_info=True)
-            if have_kept and not _routing().should_try_next_engine(exc):
+            # N5: what the failure means decides, and a model missing from an
+            # engine in reserve (never asked for that name) is worth the next one.
+            in_reserve = door.in_reserve(index, name)
+            if have_kept and not _routing().should_try_next_engine(exc, in_reserve=in_reserve):
                 # A notice is already in hand and the response is out: a raise
                 # would cut the connection, so the notice is what is shown.
                 yield _Verdict("keep", error=exc)
                 return
-            _routing().raise_if_terminal(exc, name)
+            _routing().raise_if_terminal(exc, name, in_reserve=in_reserve, lang=door.lang)
             yield _Verdict("next", error=exc)
             return
     finally:
@@ -201,10 +276,19 @@ async def _try_engine(door: CascadeDoor, index: int, name: str, engine: Any, hav
     yield _Verdict("first_failed", opened=opened, error=opened.failure)
 
 
-def _cancelled(door: CascadeDoor, index: int, cancel_event: Any) -> bool:
-    """The turn is cancelled (client gone, deadline) and this door asks no
-    other engine for it. The first engine is always asked."""
-    return bool(index > 0 and door.stop_when_cancelled and cancel_event is not None and cancel_event.is_set())
+def _attempt_event(cancel_event: Any) -> Any:
+    """The event the next engine is handed (P2-1): one of its own, linked to the
+    turn's, so a deadline an earlier engine used up never reaches it. An event
+    that is not the turn's (a plain Event, none) is handed on as it is."""
+    return cancel_event.attempt() if isinstance(cancel_event, TurnCancel) else cancel_event
+
+
+def _cancelled(index: int, cancel_event: Any) -> bool:
+    """The client of this turn has left: no other engine is asked for an answer
+    nobody will read, at any door (N4). A turn that ran out of time is not a
+    client that left: the cascade goes on as it would (`client_gone` reads why
+    the event was set). The first engine is always asked."""
+    return index > 0 and client_gone(cancel_event)
 
 
 @dataclass
@@ -215,7 +299,7 @@ class _Run:
     kept: Optional[Claim] = None
     first: Optional[tuple] = None  # (index, name, engine, error) of the first attempt that failed
 
-    def settle(self, verdict: _Verdict, index: int, name: str, engine: Any) -> bool:
+    def settle(self, verdict: _Verdict, index: int, name: str, engine: Any, *, in_reserve: bool) -> bool:
         """Take one failed attempt into account. True: stop asking engines."""
         self.passed_over.append((name, verdict.error))
         if self.first is None:
@@ -226,7 +310,8 @@ class _Run:
             return False
         if self.kept is None:
             self.kept = Claim(index, name, engine, verdict.opened, [], kept=True)
-        return not _routing().should_try_next_engine(verdict.error)  # final for the policy: no other engine
+        # final for the policy: no other engine
+        return not _routing().should_try_next_engine(verdict.error, in_reserve=in_reserve)
 
 
 def _stood_in(door: CascadeDoor, run: _Run) -> Claim:
@@ -246,7 +331,8 @@ async def claim_engine(candidates: list, door: CascadeDoor, *, cancel_event: Any
     """Try the candidates in order; yield what the door announces and, last, the `Claim`.
 
     A candidate that fails with an error the policy calls final ends the turn
-    (`raise_if_terminal`, an HTTP answer) — unless the door's response is
+    (`raise_if_terminal`, an HTTP answer; what is final is what the failure
+    means, `routing.classify`, N5) — unless the door's response is
     already out and an earlier failure is in hand, and then that failure is
     what is shown. One that fails any other way is passed over for the next.
     When nobody claims: the first failure that reached its first event is kept
@@ -259,12 +345,15 @@ async def claim_engine(candidates: list, door: CascadeDoor, *, cancel_event: Any
     raise, and the connection drops."""
     run = _Run()
     for index, (name, engine) in enumerate(candidates):
-        if _cancelled(door, index, cancel_event):
+        if _cancelled(index, cancel_event):
             break
         if door.skip(index, name, engine):
             logger.warning("Engine %s skipped; trying the next in the cascade", name)
             continue
         logger.info("Trying engine: %s", name)
+        engine_event = _attempt_event(cancel_event)
+        if engine_event is not cancel_event:
+            door.cancel_event = engine_event
         verdict = None
         # aclosing: leaving this loop by an exception (a client that went away)
         # does not close the generator being iterated (PEP 525), and that is
@@ -276,9 +365,12 @@ async def claim_engine(candidates: list, door: CascadeDoor, *, cancel_event: Any
                 else:
                     yield item
         if verdict.kind == "claimed":
+            # #1165: this engine has started answering (a stream's first event,
+            # or a whole JSON answer): its deadline stops watching.
+            first_byte(engine_event)
             yield Claim(index, name, engine, verdict.opened, run.passed_over)
             return
-        if run.settle(verdict, index, name, engine):
+        if run.settle(verdict, index, name, engine, in_reserve=door.in_reserve(index, name)):
             break
     if run.kept is None:
         run.kept = _stood_in(door, run)

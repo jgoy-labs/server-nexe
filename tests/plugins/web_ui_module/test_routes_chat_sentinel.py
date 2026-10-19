@@ -94,17 +94,14 @@ class TestSystemPromptNaturalLanguageDate:
 
     @staticmethod
     def _build_with_fixed_now(fixed_dt, lang_env=None, monkeypatch=None):
-        from unittest.mock import patch, MagicMock
-        import datetime as _datetime_mod
+        from tests.frozen_clock import frozen_datetime
         # C4.2: the function moved out of the plugin into `core/turn/prompt.py`
         # with the rest of the prompt assembly. Same function, same fallback.
         from core.turn import prompt as prompt_mod
 
         if monkeypatch is not None and lang_env is not None:
             monkeypatch.setenv("NEXE_LANG", lang_env)
-        mock_cls = MagicMock()
-        mock_cls.now.return_value.astimezone.return_value = fixed_dt
-        with patch.object(_datetime_mod, "datetime", mock_cls):
+        with frozen_datetime(fixed_dt):
             return prompt_mod._build_system_prompt_with_time()
 
     def test_old_now_prefix_completely_removed(self) -> None:

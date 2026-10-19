@@ -33,14 +33,16 @@ NEXE_END = "__nexe_end__"
 
 
 def stream_end(*, finish_reason: str | None = None, truncated: bool = False,
-               failure: str | None = None) -> dict:
+               failure: str | None = None, usage: dict | None = None) -> dict:
     """One stream is over. `failure` set means tokens already went out and the
     rest of the turn is partial; a failure before the first token is a raise,
-    so the cascade can still try the next engine."""
+    so the cascade can still try the next engine. `usage` is what the engine
+    says the call cost (`core.turn.usage`), or None when it said nothing."""
     return {NEXE_END: {
         "finish_reason": finish_reason,
         "truncated": bool(truncated),
         "failure": failure,
+        "usage": usage,
     }}
 
 
@@ -115,6 +117,10 @@ class TokenBridge:
         self.done = asyncio.Event()
         self.result = None
         self.error = None
+        # N1: the engine's own exception, so a failure before any token reaches
+        # the cascade with its meaning (a bad request stays final) and not as a
+        # bare RuntimeError of its text.
+        self.exc: "BaseException | None" = None
         self._loop = asyncio.get_running_loop()
         self._response_parts: list = []
         # running byte counter for the cap below.
@@ -192,6 +198,17 @@ class TokenBridge:
         if self.error is None:
             self.error = error
         self._loop.call_soon_threadsafe(self.done.set)
+
+    def fail(self, exc: BaseException) -> None:
+        """The engine raised: generation is over, with this error (the first wins)."""
+        if self.exc is None and self.error is None:
+            self.exc = exc
+        self.set_done(error=str(exc))
+
+    def failure(self) -> BaseException:
+        """What a failure before any token raises: the engine's own exception
+        when it raised one, a RuntimeError of the error text otherwise (the cap)."""
+        return self.exc if self.exc is not None else RuntimeError(self.error)
 
     def get_response_text(self) -> str:
         """Return the full accumulated response text."""

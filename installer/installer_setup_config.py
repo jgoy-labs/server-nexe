@@ -60,7 +60,7 @@ def generate_env_file(project_root, model_config=None):
                 # Non-Apple-Silicon Macs get mlx_module anyway; the module
                 # itself checks for mlx-lm availability and self-disables if
                 # missing (same defensive init as llama_cpp_module).
-                approved_modules = "security,web_ui_module,ollama_module,mlx_module,llama_cpp_module"
+                approved_modules = "security,web_ui_module,ollama_module,mlx_module,llama_cpp_module,api_module"
                 f.write(f"NEXE_APPROVED_MODULES={approved_modules}\n")
                 f.write(f"NEXE_LANG={lang}\n")
                 f.write("# Model configuration\n")
@@ -137,7 +137,7 @@ def _compute_approved_modules(engine):
     removed from the allowlist. The `engine` arg is kept for signature
     compatibility; each backend module self-disables if its runtime is missing.
     """
-    return "security,web_ui_module,ollama_module,mlx_module,llama_cpp_module"
+    return "security,web_ui_module,ollama_module,mlx_module,llama_cpp_module,api_module"
 
 
 def _rewrite_mlx_line(line, model_id, model_engine):

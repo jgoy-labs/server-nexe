@@ -28,6 +28,11 @@ import re
 from core.turn.text.captions import CaptionFilter
 from core.turn.text.clean import CTX_HEADERS_RE
 
+# MEM-20261016-1: the prompt teaches by example with slots (`‹nom›`) and a
+# model sometimes writes one into its answer («el teu nom és ‹nom›»). A slot is
+# never text for the reader. Longer than this it is prose, released.
+_MAX_SLOT = 40
+
 # The longest memory tag the extractor accepts: "[MEM_DELETE: " + 250 + "]".
 _MAX_TAG = 270
 # Every memory tag name the extractor reads, and the ones it strips as
@@ -91,6 +96,8 @@ class TagStreamFilter:
         self._memory = memory
         self._labels = labels
         self._held = ""
+        self._slot = ""
+        self._in_tag = False
         self._captions = CaptionFilter() if labels else None
         # What was dropped, in order — a door that still wants to SAY a fact
         # was saved (the CLI) reads it from here instead of from the text.
@@ -109,7 +116,37 @@ class TagStreamFilter:
     def feed(self, text: str) -> str:
         if self._captions is not None:
             text = self._captions.feed(text)
+        if self._labels:
+            text = self._feed_slots(text)
         return self._feed_tags(text)
+
+    def _feed_slots(self, text: str) -> str:
+        """Drops `‹…›`, split across chunks or not; releases what is not one.
+
+        Not inside a `[…]`: a memory tag keeps its slot, so the extractor can
+        tell `[MEM_SAVE: L'usuari es diu ‹nom›]` is an example, not a fact."""
+        out: list[str] = []
+        for ch in text:
+            if self._in_tag:
+                self._in_tag = ch not in "]\n\r"
+                out.append(ch)
+            elif self._slot:
+                self._slot += ch
+                if ch == "›":
+                    self._slot = ""
+                elif ch in "\n\r‹" or len(self._slot) > _MAX_SLOT:
+                    released, self._slot = self._slot, ""
+                    if released.endswith("‹"):
+                        out.append(released[:-1])
+                        self._slot = "‹"
+                    else:
+                        out.append(released)
+            elif ch == "‹":
+                self._slot = "‹"
+            else:
+                self._in_tag = ch == "["
+                out.append(ch)
+        return "".join(out)
 
     def _feed_tags(self, text: str) -> str:
         out: list[str] = []
@@ -136,7 +173,12 @@ class TagStreamFilter:
         return "".join(out)
 
     def flush(self) -> str:
-        out = self._feed_tags(self._captions.flush()) if self._captions is not None else ""
+        tail = self._captions.flush() if self._captions is not None else ""
+        if self._labels:
+            tail = self._feed_slots(tail)
+            tail += self._slot
+            self._slot = ""
+        out = self._feed_tags(tail)
         released, self._held = self._held, ""
         return out + released
 

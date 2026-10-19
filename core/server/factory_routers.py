@@ -26,6 +26,7 @@ def register_core_routers(app: FastAPI, i18n: Any) -> None:
   from core.endpoints.bootstrap import router as bootstrap_router
   from core.endpoints.installer import router as installer_router
   from core.endpoints.system import get_router as get_system_router
+  from core.endpoints.providers import get_router as get_providers_router
   from core.metrics import metrics_router
 
   # installer endpoints for the onboarding wizard (unauthenticated — no
@@ -42,6 +43,8 @@ def register_core_routers(app: FastAPI, i18n: Any) -> None:
   app.include_router(bootstrap_router)
 
   app.include_router(get_system_router())
+
+  app.include_router(get_providers_router())
 
   # sidecar_stubs_router removed — web_ui_module now
   # serves the /ui/* JSON endpoints in sidecar mode (HTML/static are skipped

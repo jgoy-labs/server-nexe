@@ -47,18 +47,25 @@ def _expose_session_manager(app, server_state) -> None:
 async def _startup_engine_gate(server_state) -> None:
     """Create the process-wide EngineGate (ADR-007 §7, C2.1) after the session
     manager — same slot, no reason to be earlier or later."""
-    from core.turn.gate import attach_engine_gate
+    from core.turn.gate import attach_cloud_gate, attach_engine_gate
     attach_engine_gate(server_state)
+    attach_cloud_gate(server_state)  # the hosted engines' own: never the local slot
 
 
 def _expose_engine_gate(app, server_state) -> None:
-    """Mirror the gate onto `app.state`, same reason as `_expose_session_manager`
-    above: the turn adapters read `ctx.app_state.engine_gate`, not `server_state`."""
+    """Mirror the gates onto `app.state`, same reason as `_expose_session_manager`
+    above: the turn adapters read `ctx.app_state.engine_gate` (and
+    `.cloud_engine_gate`), not `server_state`."""
     gate = getattr(server_state, "engine_gate", None)
     if gate is None:
         logger.warning("EngineGate not attached on server_state — generation will run unguarded")
         return
     app.state.engine_gate = gate
+    cloud = getattr(server_state, "cloud_engine_gate", None)
+    if cloud is None:
+        logger.warning("Cloud EngineGate not attached on server_state — hosted engines will run unguarded")
+        return
+    app.state.cloud_engine_gate = cloud
 
 
 async def _startup_post_commit_queue(server_state) -> None:
@@ -68,11 +75,16 @@ async def _startup_post_commit_queue(server_state) -> None:
     different doors into Metal. Starts its worker task immediately: nothing
     is queued yet, but the queue must be draining before the first request
     that queues something can arrive."""
-    from core.turn.gate import attach_engine_gate
+    from core.turn.gate import attach_cloud_gate, attach_engine_gate
     from core.turn.post_commit import attach_post_commit_queue
-    queue = attach_post_commit_queue(server_state, gate=attach_engine_gate(server_state))
+    queue = attach_post_commit_queue(
+        server_state, gate=attach_engine_gate(server_state), cloud_gate=attach_cloud_gate(server_state),
+    )
     queue.start()
     server_state._post_commit_task = queue._task
+    # The hosted jobs' worker too: shutdown cancels what is listed (core/lifespan.py), and a job in flight to a
+    # provider must not outlive it.
+    server_state._post_commit_cloud_task = queue._cloud_task
 
 
 def _expose_post_commit_queue(app, server_state) -> None:
@@ -83,6 +95,16 @@ def _expose_post_commit_queue(app, server_state) -> None:
         logger.warning("PostCommitQueue not attached on server_state — memory.write/compact run inline")
         return
     app.state.post_commit_queue = queue
+
+
+def _expose_trace_sinks(app) -> None:
+    """The sinks every turn publishes to (C5): the log line, the metrics and the
+    last turns' traces (`GET /v1/turns/{id}/trace`).
+    On `app.state`, where `sinks_for(ctx.app_state)` reads them."""
+    from core.turn.metrics_sink import MetricsSink
+    from core.turn.trace import LogSink
+    from core.turn.turn_store import TurnStore
+    app.state.trace_sinks = (LogSink(), MetricsSink(), TurnStore())
 
 
 async def _startup_memory_helper(server_state) -> None:

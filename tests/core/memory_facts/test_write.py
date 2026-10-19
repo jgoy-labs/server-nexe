@@ -206,6 +206,23 @@ class TestFailuresAreNotSilent:
         # ...but it IS in memory: remembered, so the badge may list it (#1098).
         assert outcome.kept == ["L'usuari viu a Manresa"]
 
+    async def test_a_similar_fact_that_is_not_the_same_is_not_kept(self, port):
+        """TOKENS-20261015-13: not in memory, so the reply may not say it was kept."""
+        port.save_to_memory = AsyncMock(
+            return_value={"success": False, "duplicate": True, "same": False, "similar_to": "L'usuari té 45 anys"}
+        )
+        outcome = await write_facts(["L'usuari té 46 anys"], _FakeSession(), port)
+        assert outcome.saved == 0
+        assert outcome.kept == []
+
+    async def test_a_similar_fact_arms_a_replace_for_the_users_next_yes(self, port):
+        port.save_to_memory = AsyncMock(
+            return_value={"success": False, "duplicate": True, "same": False, "similar_to": "L'usuari té 45 anys"}
+        )
+        session = _FakeSession()
+        await write_facts(["L'usuari té 46 anys"], session, port)
+        assert session._pending_replace == {"old": "L'usuari té 45 anys", "new": "L'usuari té 46 anys"}
+
     async def test_an_exception_while_saving_does_not_break_the_turn(self, port):
         port.save_to_memory = AsyncMock(side_effect=RuntimeError("db crash"))
         outcome = await write_facts(["L'usuari viu a Manresa"], _FakeSession(), port)

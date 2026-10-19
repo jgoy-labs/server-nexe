@@ -184,9 +184,11 @@ class TestChatFinalCoverage:
         )
 
         from core.dependencies import limiter as _limiter
+        # Ollama is a fallback here (MLX is the one preferred): it answers only
+        # with a model of its own, said in words (C4.8 B2/D1-x, P2-4).
         with patch("core.endpoints.chat._forward_to_ollama",
                    new=AsyncMock(return_value=streaming)), \
-             patch.dict(os.environ, {"NEXE_MODEL_ENGINE": ""}), \
+             patch.dict(os.environ, {"NEXE_MODEL_ENGINE": "", "NEXE_OLLAMA_MODEL": "llama3.2"}), \
              patch.object(_limiter, "enabled", False):
             result = asyncio.run(chat_completions(request, req, bg))
             assert isinstance(result, StreamingResponse)

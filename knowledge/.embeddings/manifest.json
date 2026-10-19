@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_utc": "2026-10-03T22:42:44Z",
+  "generated_utc": "2026-10-06T22:30:29Z",
   "prefix_format_version": "1.0",
   "vector_dim": 768,
   "vector_dtype": "float32",
@@ -11,22 +11,22 @@
   "chunker_source_sha256": "f7d3cc436561af6da07385f61263673df0914e4b5b3fbf81d9265a5eefbab053",
   "langs": {
     "ca": {
-      "chunks": 363,
-      "source_sha256": "5a3e8fd557dcddde8b56aa584f8597011f4fab7d3e307548e78160adf97c00a9",
-      "vectors_sha256": "ec174ef52dc3a46a149aba649cdfcdd38ba04f88ce8680faab6499c8ad7bf8ff",
-      "metadata_sha256": "41b6ba2ee9ac3b3de5711ee43f29113a2e8b4989857f3fe84320451481576210"
+      "chunks": 373,
+      "source_sha256": "a06cbf994b0ace77b529829f71e4d718a4a28679c138d3223b9a95c842ee43cf",
+      "vectors_sha256": "60c59fb628493b9b4b218fe238b710410953fc5f31496bf8acd3119ef40bbb0b",
+      "metadata_sha256": "2c51084c7800c030f09ed3da974a1d8bc14900d3f43cc43f30fdff404c2d5e62"
     },
     "en": {
-      "chunks": 345,
-      "source_sha256": "74398a3ca31ad8c37b22829d2958e51ee7d699c738626fbd703e945bb0ac70eb",
-      "vectors_sha256": "8452322cabbc6cf4f005ff87a20429d3b27704e06ecb9aa50f871a9ee5cf8054",
-      "metadata_sha256": "8aaf05489af3322d69e60fadd0e83c13c0e81b6a115c1bf5508b7b3a0608bd20"
+      "chunks": 355,
+      "source_sha256": "fd382b33b7abccccaedf6933d3adc0c0d173bff194f29589db27eb1385bed582",
+      "vectors_sha256": "9e9c5212c906aa6618134287000fdfa541f8a31b2f88c852c887234ef9186266",
+      "metadata_sha256": "6b022b18dcfe8ad074afe0abaaee9a5216a4985beb5f62e9bede1a5dbacb57b4"
     },
     "es": {
-      "chunks": 367,
-      "source_sha256": "64b0c2c2b6af55ef9744b7f268bb62d31854d3fbfbc396138ac5878cb9f996f5",
-      "vectors_sha256": "fb69525f58b861079c3d121d0f2d3de3ebc383d5f94040b2f29ebafa53e47489",
-      "metadata_sha256": "634d06ab13a6ce8e00189c29f96c9611ff56fd6e42076f877fdcfb2464025cf7"
+      "chunks": 379,
+      "source_sha256": "e5b08af95cdcf7442246988b8f6619154328c6eac832bb30a16746a86c08a307",
+      "vectors_sha256": "03ea51d50770a659f515458c244c22273d213dfd7523e0ba52753ffc15e02aff",
+      "metadata_sha256": "3c0a3d76a220e19bce6a3532f091ab89dd4c1aa40aec8820093ce21db0aa305d"
     }
   }
 }

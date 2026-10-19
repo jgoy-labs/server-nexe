@@ -16,6 +16,7 @@ import hashlib
 import logging
 import time
 import unicodedata
+from datetime import datetime
 from typing import Any, Optional
 
 from core.memory_access import (
@@ -36,6 +37,7 @@ from core.rag.collections import (  # noqa: F401  (re-export, see above)
     RAG_MEMORY_THRESHOLD,
     source_for,
 )
+from core.rag.profile import profile_hits
 from core.rag.registry import registered_names
 
 logger = logging.getLogger(__name__)
@@ -316,14 +318,16 @@ async def build_rag_context(
             for results in per_collection:
                 all_results.extend(results)
 
-            if all_results:
+            all_results, profile = await _with_stated_facts(memory, names, all_results)
+
+            if all_results or profile:
                 _effective_limit = limit if limit is not None else system_rag_limit()
                 unique = _deduplicate_results(all_results)[:_effective_limit]
-                context_text = _format_results(unique, server_lang)
+                context_text = _format_results([*unique, *profile], server_lang)
                 rag_items = [(getattr(r, "collection", "?"), getattr(r, "score", 0.0)) for r in unique]
                 logger.info(
-                    "RAG Context found (MemoryAPI): %d chars, %d results",
-                    len(context_text), len(unique),
+                    "RAG Context found (MemoryAPI): %d chars, %d results, %d stated facts",
+                    len(context_text), len(unique), len(profile),
                 )
         except Exception as mem_err:
             # #899: this is where `_rag_module_fallback` used to run (the legacy RAG,
@@ -346,6 +350,27 @@ async def build_rag_context(
 
 
 # ─── Private helpers ─────────────────────────────────────────────────────────
+
+
+async def _with_stated_facts(memory: Any, names: list, results: list) -> tuple[list, list]:
+    """(results without the memory hits the profile already says, the profile).
+
+    What the user stated about themselves is LISTED, not searched, and travels
+    outside the hit limit (core/rag/profile.py). Only when the memory source is
+    among the ones asked: a user who turned memory off for the turn gets no
+    personal facts either.
+    """
+    if MEMORY_COLLECTION not in names:
+        return results, []
+    profile = await profile_hits(memory)
+    if not profile:
+        return results, []
+    listed = {h.text for h in profile}
+    kept = [
+        r for r in results
+        if not (getattr(r, "collection", None) == MEMORY_COLLECTION and getattr(r, "text", None) in listed)
+    ]
+    return kept, profile
 
 
 def _has_text(r: Any) -> bool:
@@ -408,10 +433,43 @@ def _format_results(results: list, server_lang: str = "en") -> str:
             else "memory" if collection == MEMORY_COLLECTION
             else "knowledge"
         )
-        source = getattr(r, 'metadata', {}).get('source', 'unknown') if hasattr(r, 'metadata') else 'unknown'
+        metadata = getattr(r, 'metadata', None) or {}
+        if key == "memory":
+            # A stated fact is a line the user said, with WHEN — not a document
+            # with a `[Font: web_ui]` the model cannot read (13/10: it saw no
+            # origin for "tens 45 anys" and took it back). No date: no phrase.
+            buckets[key].append(r.text + _stated_on(metadata, server_lang))
+            continue
+        source = metadata.get('source', 'unknown')
         buckets[key].append(f"[Font: {source}]\n{r.text}")
+    # Memory first: if the budget has to cut the block, it cuts from the end,
+    # and who the user is must outlive the documentation.
     sections = [
-        f"[{labels[key]}]\n" + "\n\n".join(buckets[key])
-        for key in ("docs", "knowledge", "memory") if buckets[key]
+        f"[{labels[key]}]\n" + ("\n".join(buckets[key]) if key == "memory" else "\n\n".join(buckets[key]))
+        for key in ("memory", "docs", "knowledge") if buckets[key]
     ]
     return "\n\n".join(sections)
+
+
+_STATED_ON = {
+    "ca": " (t'ho va dir l'usuari el {d})",
+    "es": " (te lo dijo el usuario el {d})",
+    "en": " (the user told you on {d})",
+}
+
+
+def _stated_on(metadata: dict, lang: str) -> str:
+    """" (the user told you on 02/10/2026)" from the fact's own `created_at`,
+    or "" when it has none or it is not a date. Never a guess."""
+    raw = metadata.get("created_at") or metadata.get("saved_at")
+    if not isinstance(raw, str):
+        return ""
+    try:
+        moment = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        # Stored in UTC; the day the user lived it is the local one (00:30 CEST on the 3rd is the 2nd in UTC).
+        day = (moment.astimezone() if moment.tzinfo else moment).date()
+    except ValueError:
+        return ""
+    code = (lang or "en").split("-")[0].lower()
+    shown = day.isoformat() if code not in ("ca", "es") else day.strftime("%d/%m/%Y")
+    return _STATED_ON.get(code, _STATED_ON["en"]).format(d=shown)

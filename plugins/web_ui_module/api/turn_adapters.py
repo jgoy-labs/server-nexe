@@ -42,13 +42,14 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import asyncio
 import time
 from typing import Any
 
 from fastapi import HTTPException
 
 from core.turn.authorize import authorize_turn
-from core.turn.budget import record_llm_call
+from core.turn.budget import footer_usage, note_usage, record_llm_call
 from core.turn.context import TurnContext
 from core.turn.deadline import resolve_deadline_s
 from core.turn.gate import GateBusy, Priority, _gate_wait_s, gate_for
@@ -58,7 +59,7 @@ from core.memory_facts import deletes as memory_deletes
 from core.memory_facts.write import needs_atomising, note_kept, write_facts
 import core.turn.policy as policy
 from core.sessions.compactor import compact_session
-from core.turn.engine_claim import Claim, claim_engine, claim_one, live_candidates
+from core.turn.engine_claim import Claim, claim_engine, claim_one, fallback_of, live_candidates
 from core.turn.engine_hold import EngineHold, cancel_monitor
 from core.turn.post_commit import queue_for
 from core.turn.errors import StreamCapExceeded, classify_engine_error
@@ -109,6 +110,80 @@ async def _switch_model(engine, engine_name: str, model_name: str) -> None:
     from core.endpoints.chat_engines.model_switch import model_switch_lock, switch_engine_model
     async with model_switch_lock():
         await switch_engine_model(engine, engine_name, model_name)
+
+
+def _requested_engine(ctx: TurnContext) -> str:
+    """The engine this turn asks for: the body's `backend` (the selector, always
+    sent by the UI), else the installation's preference.
+
+    The API is an explicit choice and only that: a preference for it left in the
+    environment (`NEXE_MODEL_ENGINE=api`, by hand — the selector never persists
+    it) is read as "auto" here, for the gate AND for the cascade, as `/v1` has
+    always read it."""
+    from core.providers.cloud import CLOUD_ENGINE  # deferred (layering gate, #471)
+
+    explicit = ctx.body.get("backend")
+    if explicit:
+        return str(explicit).lower()
+    preferred = os.getenv("NEXE_MODEL_ENGINE", "auto").lower()
+    return "auto" if preferred.strip() == CLOUD_ENGINE else preferred
+
+
+def _cloud_gate(ctx: TurnContext) -> bool:
+    """True when this turn goes to an external API provider, and it may.
+
+    The cloud gate (`core/providers/cloud.py`): the global switch, a model a
+    provider owns with its key configured, and this session's consent — sent
+    with the request (the dialog's "yes") or already remembered by the
+    session. A refusal is a 403/400 whose body says why (`code`), which is
+    how the UI knows to ask for consent and send the turn again.
+
+    Asked by `session` (before the user's message is stored: a refused turn
+    leaves no orphan message, so the retry after the dialog does not duplicate
+    it) and again by `engine`, which is the step that opens the way to the
+    provider. A turn on a local engine takes the consent away from the
+    session: it does not outlive the use of the cloud.
+    """
+    from core.endpoints.chat_engines.routing import _normalize_engine  # deferred (layering gate, #471)
+    from core.providers.cloud import CLOUD_ENGINE, CloudRefusal, require_cloud_turn
+
+    requested = _normalize_engine(_requested_engine(ctx))
+    if requested != CLOUD_ENGINE:
+        ctx.session.cloud_consent = None
+        return False
+    try:
+        provider = require_cloud_turn(
+            ctx.body.get("model"),
+            requested_consent=ctx.body.get("cloud_consent"),
+            session_consent=getattr(ctx.session, "cloud_consent", None),
+        )
+    except CloudRefusal as refusal:
+        raise HTTPException(status_code=refusal.status, detail=refusal.detail()) from None
+    ctx.session.cloud_consent = provider.key
+    return True
+
+
+def _cloud_still_consented(ctx: TurnContext) -> bool:
+    """May a step that runs AFTER the turn still call the hosted engine?
+
+    Compaction and image description are queued and run later, on the engine that
+    answered. The session's consent is what lets a turn reach a provider, and the
+    next turn on a local engine takes it away (`_cloud_gate`): a queued job of the
+    turn before must not use what was withdrawn in between, nor the switch turned
+    off, nor a key taken out. The consent asked is the SESSION's, not the body's:
+    the body of the turn that sent it is still on the context.
+    """
+    from core.endpoints.chat_engines.routing import engine_is_cloud  # deferred (layering gate, #471)
+    from core.providers.cloud import CloudRefusal, require_cloud_turn
+
+    if not engine_is_cloud(ctx.engine):
+        return True
+    try:
+        require_cloud_turn(ctx.body.get("model"), requested_consent=None,
+                           session_consent=getattr(ctx.session, "cloud_consent", None))
+    except CloudRefusal:
+        return False
+    return True
 
 
 def _reattach_mentioned_image(ctx: TurnContext) -> None:
@@ -174,6 +249,20 @@ def _serve_with(ctx: TurnContext, engine_obj, ui: dict) -> None:
     ctx.engine = engine_obj
 
 
+def _bill_cut(ctx: TurnContext, engine_name: str, model: "str | None", ms: float, outcome: str = "cancelled") -> None:
+    """A call that did not end well (C5 C, D6): billed `cancelled` when the client stopped it,
+    `failed` when the engine broke, with the time it ran."""
+    record_llm_call(ctx, step="generate", engine=engine_name, model=model, ms=ms, outcome=outcome)
+
+
+def _settle_engine(ctx: TurnContext, claim: Claim, ui: dict) -> None:
+    """Who answered, and whether the turn fell back from another (C5 B: the same
+    record `/v1` keeps, so the trace and the metrics read one thing at both doors)."""
+    ui["engine_name"] = ctx.engine_name = claim.engine_name
+    ctx.engine_fallback_from = fallback_of(claim, ui["candidates"][0][0], ctx.engine_fallback_from)
+    ctx.engine_fallback_reason = claim.reason
+
+
 def _last_results(ctx: TurnContext) -> dict:
     """What the previous turn's post-commit work reported (C3.3).
 
@@ -216,6 +305,24 @@ def _mem_sentinel(ctx: TurnContext) -> str:
     return f"\x00[MEM:{saved}:{'|'.join(kept)}]\x00" if kept else f"\x00[MEM:{saved}]\x00"
 
 
+async def _keyed_memory(ctx: TurnContext, ui: dict, session, session_mgr):
+    """The keyed pass of `memory.write` (core.turn.keyed_pass). Its outcome says whether it
+    read facts out of the message; they stand in for the model's tags, and the tags it
+    does not account for stay in `ctx.facts` for the old path."""
+    from core.turn import keyed_pass  # deferred: a plugin must not pull core at import time
+
+    outcome = await keyed_pass.run(
+        ctx, engine=ctx.engine, engine_name=ui.get("engine_name") or "",
+        model_name=ui.get("model_name") or "", session=session, port=ui.get("memory_helper"),
+        rag_collections=_rag_collections(ctx),
+    )
+    if outcome.handled:
+        note_kept(ctx.usage, outcome.saved, outcome.kept)
+        if outcome.saved:
+            _record_saved_facts(session, outcome, session_mgr, accumulate=ctx.resume)
+    return outcome
+
+
 async def _atomiser_slot(ctx: TurnContext, engine):
     """(engine, gate, slot) for `memory.write`'s atomiser.
 
@@ -227,7 +334,7 @@ async def _atomiser_slot(ctx: TurnContext, engine):
     """
     if engine is None or not any(needs_atomising(f) for f in ctx.facts):
         return None, None, None
-    gate = gate_for(ctx.app_state)
+    gate = gate_for(ctx.app_state, engine)
     try:
         slot = await gate.acquire(Priority.USER_TURN, holder=ctx.turn_id, timeout=_gate_wait_s())
     except GateBusy:
@@ -399,6 +506,8 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
     async def session(ctx: TurnContext) -> None:
         ctx.session = session_mgr.get_or_create_session(ctx.body.get("session_id"))
         ctx.session_id = ctx.session.id
+        # Before the lease and before anything is stored: see `_cloud_gate`.
+        _cloud_gate(ctx)
         if ctx.resume:
             _resume_from(ctx)
             # `intent`, which sets the memory port up, does not run on a resume.
@@ -537,7 +646,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
     async def engine(ctx: TurnContext) -> None:
         ui = _ui(ctx)
         # Deferred (layering gate, #471); outside the `try` so the handler below always has it.
-        from core.endpoints.chat_engines.routing import raise_if_terminal
+        from core.endpoints.chat_engines.routing import asked_engine, engine_is_cloud, in_reserve, raise_if_terminal
         try:
             from core.lifespan import get_server_state
             from core.context_window import ask_engine_window
@@ -549,16 +658,31 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             model_name = ctx.body.get("model") or os.getenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
             if len(model_name) > 100:
                 raise HTTPException(status_code=400, detail="Model name too long (max 100 chars)")
-            preferred_engine = (ctx.body.get("backend") or os.getenv("NEXE_MODEL_ENGINE", "auto")).lower()
+            preferred_engine = _requested_engine(ctx)
             logger.info("Available modules: %s", [m.name for m in module_manager.registry.list_modules()])
             # The live engines in the cascade's order; on a Continue only those
             # that can resume (a 503 when none is live, a 400 when none can).
-            candidates = live_candidates(preferred_engine, ctx.app_state, resume=ctx.resume, model_name=model_name)
+            # The engine step is the one that opens the way to a provider: it
+            # asks the gate itself, whatever an earlier step already did.
+            candidates = live_candidates(
+                preferred_engine, ctx.app_state, resume=ctx.resume, model_name=model_name,
+                cloud_ok=_cloud_gate(ctx), image=bool(ctx.attachments.get("image_b64")), lang=ctx.lang,
+            )
             logger.info("Engine cascade for this turn: %s", [name for name, _ in candidates])
             ui["model_name"] = model_name
             ui["candidates"] = candidates
+            ui["asked_engine"] = asked_engine(preferred_engine, ctx.app_state)
             ui["engine_name"], ctx.engine = candidates[0]
-            if ctx.model_follows_request and ctx.body.get("model"):
+            ctx.engine_name = ui["engine_name"]
+            if ui["asked_engine"] and ui["asked_engine"] != ui["engine_name"]:
+                # What `/v1` says when the engine named is not live (`_resolve_engine`):
+                # on the context for the trace only — the web wire keeps its own words.
+                ctx.engine_fallback_from, ctx.engine_fallback_reason = ui["asked_engine"], "preferred_unavailable"
+            ctx.left_machine = engine_is_cloud(ctx.engine)
+            # The picker's model is the engine asked for's: a first engine that is
+            # a fallback (the one asked for is not live) runs its own (B2).
+            first_is_asked = not in_reserve(0, ui["engine_name"], ui["asked_engine"])
+            if ctx.model_follows_request and ctx.body.get("model") and first_is_asked:
                 await _switch_model(ctx.engine, ui["engine_name"], model_name)
             ctx.context_window = ask_engine_window(ctx.engine)
             ctx.deadline = resolve_deadline_s() or None
@@ -569,7 +693,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             # #1141: a model the engine does not have ("not found") or a bad
             # request is the same verdict the cascade gives at `generate`
             # (FD-S4): final, and said as its HTTP answer, not as a generic 200.
-            raise_if_terminal(exc, ui.get("engine_name", ""))
+            raise_if_terminal(exc, ui.get("engine_name", ""), lang=ctx.lang)
             raise _internal_error(ctx, exc) from exc
 
     async def budget(ctx: TurnContext) -> None:
@@ -620,16 +744,23 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         async with EngineHold(ctx) as hold:
             try:
                 door = JsonDoor(ctx, ui, hold.cancel_event, on_capped=lambda: _end_partial(ctx, StreamCapExceeded()))
-                claim = await claim_one(ui["candidates"], door, cancel_event=hold.cancel_event)
+                asked_at = time.monotonic()
+                try:
+                    claim = await claim_one(ui["candidates"], door, cancel_event=hold.cancel_event)
+                except asyncio.CancelledError:
+                    _bill_cut(ctx, ui["engine_name"], ui["model_name"], (time.monotonic() - asked_at) * 1000.0)
+                    raise
                 reply = claim.opened.value
                 logger.info("%s succeeded!", claim.engine_name)
                 record_llm_call(
                     ctx, step="generate", engine=claim.engine_name, model=reply.prepared[-1],
                     ms=(time.monotonic() - reply.started) * 1000.0,
                 )
+                note_usage(ctx, reply.usage)
+                ui["usage"] = reply.usage
                 ctx.response = reply.text
                 _serve_with(ctx, claim.engine, ui)
-                ui["engine_name"] = claim.engine_name
+                _settle_engine(ctx, claim, ui)
                 ui["model_name"] = reply.prepared[-1]  # #1035: the one that answered
             except HTTPException:
                 raise
@@ -681,18 +812,44 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         if ctx.resume:
             # C4.6: the tail MERGES into the answer it continues (FD-S6) — the
             # legacy JSON Continue did it raw; this is the cleaned text.
-            persist_assistant_turn(ctx.session, ctx.response, ctx.response, {}, False, False, resume=True)
+            # #1152: only the names of the engine that finished it travel; the
+            # rest of the first half's stats stay.
+            persist_assistant_turn(
+                ctx.session, ctx.response, ctx.response,
+                {"model": str(model_name)[:100] if model_name else None, "engine": ui.get("engine_name") or None},
+                False, False, resume=True,
+            )
         else:
-            ctx.session.add_message("assistant", ctx.response, stats={
-                "tokens": max(1, len(ctx.response) // 4),
+            ctx.session.add_message("assistant", ctx.response, stats=wire._with_left_machine({
+                **wire.token_stats(footer_usage(ctx, ui.get("usage")), max(1, len(ctx.response) // 4)),
                 "elapsed": round(time.time() - ui.get("start_t", time.time()), 1),
                 "model": str(model_name)[:100] if model_name else None,
                 "engine": ui.get("engine_name") or None,
                 "mem_deleted": ui.get("mem_deleted") or None,
-            })
+            }, ui.get("engine_name")))
         session_mgr._save_session_to_disk(ctx.session)
 
+    async def _ask_replace(ctx: TurnContext, session) -> str:
+        """The question for a change waiting on the user's yes, when the model
+        answering is one the server accompanies (pla-comportament-segons-mida-model, C).
+        Nothing for a turn no engine answered (a memory command)."""
+        ui = _ui(ctx)
+        if session is None or not ui.get("engine_name"):
+            return ""
+        # Deferred import: a plugin must not pull core at import time.
+        from core.turn.replace_ask import question_for as replace_question_for
+
+        question = await replace_question_for(
+            ctx, session, ui.get("engine_name"), ui.get("model_name"), getattr(ctx.app_state, "config", None),
+        )
+        if question:
+            session_mgr._save_session_to_disk(session)  # the history now carries it too
+        return question
+
     async def emit_json(ctx: TurnContext) -> None:
+        question = await _ask_replace(ctx, ctx.session)
+        if question:
+            ctx.response = f"{ctx.response}\n\n{question}" if ctx.response else question
         ctx.wire = {
             "response": ctx.response,
             "session_id": ctx.session.id,
@@ -724,6 +881,8 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             ctx, step="generate", engine=engine_name, model=ui["model_name"],
             ms=(time.time() - gen_started) * 1000.0,
         )
+        note_usage(ctx, flags.usage)
+        ui["usage"] = flags.usage
         if not flags.has_any_thinking:
             logger.info("Model did not produce thinking tokens (model decides when to think)")
         if flags.error is not None:
@@ -770,15 +929,20 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             engine_name, engine_obj, flags = claim.engine_name, claim.engine, start.flags
             chat_result, sig, messages, thinking_enabled, model_name = start.prepared
             _serve_with(ctx, engine_obj, ui)
-            ui["engine_name"] = engine_name
+            _settle_engine(ctx, claim, ui)
             # #1035: from here on the turn's model is the one that answers. The
             # `[MODEL:]` header above went out with the requested one; the
             # client keeps the last it reads, so a fallback's goes out now —
             # when it answers, not when its failure is the notice replayed.
             if not isinstance(start.primed[1], Failed):
-                if model_name != ui["model_name"]:
-                    yield wire.model_token(model_name)
-                yield wire.engine_token(engine_name)  # #1146: the footer names the engine
+                try:
+                    if model_name != ui["model_name"]:
+                        yield wire.model_token(model_name)
+                    yield wire.engine_token(engine_name)  # #1146: the footer names the engine
+                except (asyncio.CancelledError, GeneratorExit):
+                    # The engine has accepted the call: a client that leaves here still owes its bill.
+                    _bill_cut(ctx, engine_name, model_name, (time.time() - start.started) * 1000.0)
+                    raise
             ui["model_name"] = model_name
             ui["reprompt_call"] = engine_call.reprompt_call_for(
                 engine_obj, sig, model_name, messages, thinking_enabled,
@@ -798,11 +962,20 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             # `ctx.response` holds the RAW text while generating (what the old
             # body called full_response); `postprocess` turns it into the clean
             # answer.
-            async for token, full_delta in engine_call._yield_engine_chunks(stream_ctx, start.primed):
-                ctx.response += full_delta
-                if token is not None:
-                    yield token
-            _finish_generation(ctx, ui, flags, engine_name, ui["stream_start_t"])
+            unbilled = "failed"  # what the call is billed as if the loop does not end well
+            try:
+                async for token, full_delta in engine_call._yield_engine_chunks(stream_ctx, start.primed):
+                    ctx.response += full_delta
+                    if token is not None:
+                        yield token
+                unbilled = None  # `_finish_generation` bills it, from here on
+                _finish_generation(ctx, ui, flags, engine_name, ui["stream_start_t"])
+            except (asyncio.CancelledError, GeneratorExit):
+                unbilled = "cancelled"  # C5 C: the client stopped it; the call is still on the bill
+                raise
+            finally:
+                if unbilled:
+                    _bill_cut(ctx, engine_name, ui["model_name"], (time.time() - ui["stream_start_t"]) * 1000.0, unbilled)
 
     async def postprocess_stream(ctx: TurnContext):
         ui = _ui(ctx)
@@ -878,6 +1051,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
                 persist_partial_assistant(
                     stream_ctx.session, stream_ctx.session_mgr, full_response, stream_ctx.message,
                     resume=ctx.resume,
+                    stats={"model": stream_ctx.model_name, "engine": ui.get("engine_name")},
                 )
                 ui["assistant_saved"] = True
             cancel_monitor(ctx)
@@ -895,6 +1069,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         stats = wire._build_mem_stats(
             stream_ctx.session, stream_ctx.rag_count, stream_ctx.rag_items, stream_ctx.model_name,
             elapsed, len(full_response), 0, ctx.facts, engine_name=ui.get("engine_name"),
+            usage=footer_usage(ctx, ui.get("usage")),
         )
         persist_assistant_turn(
             stream_ctx.session, clean_response, full_response, stats, flags.trunc, flags.trunc_continuable,
@@ -906,6 +1081,10 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
     async def emit_stream(ctx: TurnContext):
         ui = _ui(ctx)
         stream_ctx = ui.get("stream_ctx")
+        if stream_ctx is not None:
+            question = await _ask_replace(ctx, stream_ctx.session)
+            if question:
+                yield f"\n\n{question}"
         # C3.3: the news of what the PREVIOUS turn's background work did (the
         # decision of 06/09, finally wired). `emit` runs after `generate`, so
         # this lands at the end of this answer's stream.
@@ -924,6 +1103,9 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             # before emit) rides after the answer — the facts the server
             # confirms, never the model's own tags.
             yield note
+        said = wire.usage_token(footer_usage(ctx, ui.get("usage")))
+        if said:  # what the engine said the call cost, for the footer (exact, not estimated)
+            yield said
         if ctx.response:
             # #859/#965: the turn that fills the window warns about the one after
             # it. Deferred import: a plugin must not pull core at import time.
@@ -941,11 +1123,12 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         the model's own tags instead (#1098). It notes what it kept on the turn
         (`note_kept`) and `emit` sends it as `[MEM:n:facts]`.
         """
-        if not ctx.facts:
-            return
         ui = _ui(ctx)
         stream_ctx = ui.get("stream_ctx")
         session = stream_ctx.session if stream_ctx is not None else ctx.session
+        keyed_out = await _keyed_memory(ctx, ui, session, session_mgr)
+        if not ctx.facts:
+            return
         started = time.monotonic()
         engine, gate, slot = await _atomiser_slot(
             ctx, stream_ctx.engine if stream_ctx is not None else None,
@@ -976,7 +1159,7 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
             )
         note_kept(ctx.usage, outcome.saved, outcome.kept)
         if outcome.saved:
-            _record_saved_facts(session, outcome, session_mgr, accumulate=ctx.resume)
+            _record_saved_facts(session, outcome, session_mgr, accumulate=ctx.resume or keyed_out.handled)
 
     async def describe_image(ctx: TurnContext) -> None:
         """#1144, post-commit: the conversation's latest image, if it has no
@@ -995,6 +1178,9 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         # description of the image whose job a quick follow-up had interrupted.
         message = _latest_undescribed_image(ctx.session.messages)
         if message is None or ctx.engine is None:
+            return
+        if not _cloud_still_consented(ctx):
+            logger.info("Image not described: the consent for the provider no longer holds")
             return
         image_b64 = message["image_b64"]
         key = image_memory.image_key(image_b64)
@@ -1036,6 +1222,10 @@ def ui_adapters(session_mgr, *, streaming: bool) -> Adapters:
         # anything to summarise (session.needs_compaction()) and is a no-op
         # otherwise — comparing compaction_count before/after is the only way
         # to tell "ran and did nothing" from "actually spent an LLM call".
+        if not _cloud_still_consented(ctx):
+            logger.info("Compaction skipped: the consent for the provider no longer holds")
+            ctx.usage.setdefault("degraded", {})["compact"] = "the consent for the provider no longer holds"
+            return
         _compacted_before = ctx.session.compaction_count
         _compact_started = time.monotonic()
         cancel = ctx.usage.get("post_commit_cancel", {}).get("compact")

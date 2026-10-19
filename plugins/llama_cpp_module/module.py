@@ -180,6 +180,7 @@ class LlamaCppModule:
         from pathlib import Path as _Path
 
         from core.runtime_state import get_override, set_override
+        from core.turn.errors import ModelNotFound
 
         from plugins.llama_cpp_module.core.config import LlamaCppConfig
 
@@ -187,7 +188,7 @@ class LlamaCppModule:
         # plugin's knowledge, so the check lives with it.
         _path = _Path(local_path)
         if not (_path.is_file() and _path.suffix == ".gguf"):
-            raise ValueError(f"Model '{_path.name}' not found: not a GGUF file")
+            raise ModelNotFound(f"Model '{_path.name}' not found: not a GGUF file")
 
         _prev = get_override("NEXE_LLAMA_CPP_MODEL")
         try:

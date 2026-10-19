@@ -81,6 +81,11 @@ class ChatSession:
         self.lang_pending: Optional[str] = None  # #850 hysteresis: candidate awaiting 2nd confirmation (transient)
         self.rag_collections: Optional[list] = None  # #851: last turn's toggles — continue has no body copy
         self._recently_deleted_facts: list = []  # Transient, not persisted to disk
+        # Consent to send this conversation to ONE external API provider (its
+        # key). Transient on purpose, like `lease`: never written to disk and
+        # never read back, so a restart or a reload asks again. Taken away by
+        # any turn that runs on a local engine (`turn_adapters._cloud_gate`).
+        self.cloud_consent: Optional[str] = None
         # C2.3 (ADR-007 §9, I9): the session's one live writer, if any —
         # {"holder", "turn_id", "where", "since", "expires"}. In-memory only,
         # NEVER read back by from_dict (see there): a lease that outlived the

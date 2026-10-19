@@ -503,10 +503,11 @@ class TestChatCompletionsEndpoint:
         mock_client.get = AsyncMock(return_value=mock_tags)
         mock_client.post = AsyncMock(return_value=mock_chat_resp)
 
-        # mlx preferred but only Ollama available
+        # mlx preferred but only Ollama available: Ollama is a fallback, and answers
+        # with a model of its own (C4.8 B2/D1-x, P2-4)
         with patch("httpx.AsyncClient", return_value=mock_client), \
              patch("memory.memory.api.v1.get_memory_api", side_effect=Exception("no")), \
-             patch.dict(os.environ, {"NEXE_MODEL_ENGINE": "mlx"}):
+             patch.dict(os.environ, {"NEXE_MODEL_ENGINE": "mlx", "NEXE_OLLAMA_MODEL": "llama3.2"}):
             client = self._client(modules={"ollama_module": MagicMock()})
             resp = client.post("/chat/completions",
                                json=self._payload(engine=None, use_rag=False),

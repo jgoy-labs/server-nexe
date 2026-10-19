@@ -83,12 +83,15 @@ class TestASwitchToItSaysWhatIsMissing:
         module._node.apply_config.assert_not_called()
 
     def test_the_cascade_policy_turns_it_into_a_404_with_that_text(self, tmp_path):
+        """The switch says, in words, what is missing — the very fix of #1154 (it
+        used to reach the user as nothing readable) — and the client gets those
+        words whole: written for the user, not an engine's raw text (P2-7)."""
         d = _model(tmp_path, "Qwen3.5-35B-A3B-4bit", weights=None)
         with pytest.raises(ValueError) as raised:
             self._module().switch_model_by_path(str(d))
-        status, detail = engine_error_to_http(raised.value, "mlx")
+        status, detail = engine_error_to_http(raised.value, "mlx", "en")
         assert status == 404
-        assert "weights" in detail
+        assert detail == str(raised.value) and "weights" in detail
 
     def test_a_model_with_weights_still_switches(self, tmp_path):
         module = self._module()

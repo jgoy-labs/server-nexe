@@ -14,6 +14,7 @@ www.jgoy.net · https://server-nexe.org
 from typing import Dict, Any
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Depends, Request as FastAPIRequest
+from fastapi import Response
 from fastapi.responses import StreamingResponse
 from core.dependencies import limiter
 # The adapters (`turn_adapters.py`) reach these two through this module, at
@@ -48,7 +49,8 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
 
     @router.post("/chat", operation_id="webui_chat")
     @limiter.limit("20/minute")
-    async def chat(request: FastAPIRequest, body: Dict[str, Any], _auth=Depends(require_ui_auth)):
+    async def chat(request: FastAPIRequest, body: Dict[str, Any], _auth=Depends(require_ui_auth),
+                   response: Response = None):
         """Chat endpoint with streaming and memory intent detection.
 
         Concurrency is the engine gate's job now (ADR-007 §7, C2.1,
@@ -58,7 +60,11 @@ def register_chat_routes(router: APIRouter, *, session_mgr, require_ui_auth):
         whole of the old `Semaphore(2)` here: it released before a single
         token was generated).
         """
-        return await _chat_inner(request, body, _auth)
+        result = await _chat_inner(request, body, _auth)
+        if response is not None and isinstance(result, dict) and result.get("turn_id"):
+            # C5 F: the id the trace is asked by, also on a JSON answer (it was in the body only).
+            response.headers["X-Nexe-Turn-Id"] = result["turn_id"]
+        return result
 
     async def _chat_inner(request: FastAPIRequest, body: Dict[str, Any], _auth):
         """Inner chat logic: validates the session id and walks the turn."""

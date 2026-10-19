@@ -20,7 +20,7 @@ from core.modules.core_modules import get_core_modules
 @pytest.fixture(autouse=True)
 def setup_allowlist(monkeypatch):
     """Configure default allowlist for the tests."""
-    monkeypatch.setenv("NEXE_APPROVED_MODULES", "security,rag,mlx_module,llama_cpp_module,web_ui_module,ollama_module")
+    monkeypatch.setenv("NEXE_APPROVED_MODULES", "security,rag,mlx_module,llama_cpp_module,web_ui_module,ollama_module,api_module")
 
 def test_approved_modules_environment_configured() -> None:
   """Test that NEXE_APPROVED_MODULES environment variable is configured."""

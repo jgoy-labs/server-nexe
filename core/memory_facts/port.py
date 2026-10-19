@@ -29,6 +29,7 @@ class MemoryPort(Protocol):
         session_id: str,
         metadata: Optional[Dict[str, Any]] = None,
         collections: Optional[List[str]] = None,
+        force: bool = False,
     ) -> Dict[str, Any]:
         ...
 

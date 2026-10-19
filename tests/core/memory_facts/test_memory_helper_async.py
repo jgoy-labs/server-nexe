@@ -332,6 +332,30 @@ class TestSaveToMemory:
         assert result["document_id"] is None
         mem.store.assert_not_called()
 
+    def test_a_close_fact_with_another_value_is_not_the_same(self):
+        """TOKENS-20261015-13: «codi NEXE_a» vs «codi NEXE_b» score 0.97; only
+        the value changed, so the new fact is not in memory and must say so."""
+        mem = make_memory_mock(search_results=[make_result(text="El codi és NEXE_a", score=0.97)])
+        helper = MemoryHelper()
+
+        with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
+            result = asyncio.run(helper.save_to_memory("El codi és NEXE_b", "sess-1"))
+
+        assert result["duplicate"] is True
+        assert result["same"] is False
+        assert result["similar_to"] == "El codi és NEXE_a"
+        mem.store.assert_not_called()
+
+    def test_the_same_fact_with_other_punctuation_is_the_same(self):
+        mem = make_memory_mock(search_results=[make_result(text="L'usuari viu a Vic.", score=0.99)])
+        helper = MemoryHelper()
+
+        with patch.object(helper, "get_memory_api", AsyncMock(return_value=mem)):
+            result = asyncio.run(helper.save_to_memory("l'usuari viu a vic", "sess-1"))
+
+        assert result["duplicate"] is True
+        assert result["same"] is True
+
     def test_memory_not_available(self):
         helper = MemoryHelper()
 

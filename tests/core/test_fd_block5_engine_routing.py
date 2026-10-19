@@ -38,12 +38,21 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from core.turn.api_cascade import dispatch_v1
+from core.turn.errors import BadRequest, ModelNotFound
 from core.endpoints.chat_engines.routing import (
+    _resolve_engine,
     engine_error_to_http,
     iter_live_engines,
     resolve_engine_cascade,
     should_try_next_engine,
 )
+
+
+@pytest.fixture(autouse=True)
+def _ollama_has_a_model_of_its_own(monkeypatch):
+    """Ollama answers as a fallback only with a model of its own, said in words
+    (C4.8 B2/D1-x): these tests have it answer behind other engines, so it has one."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "llama3.2:3b")
 
 _MODULE_KEYS = {"mlx": "mlx_module", "llama_cpp": "llama_cpp_module", "ollama": "ollama_module"}
 
@@ -324,10 +333,13 @@ class TestTheCascadeIsTheSameAtBothDoors:
         body = ChatCompletionRequest(messages=[Message(role="user", content="hola")], engine=requested)
         request = MagicMock()
         request.app.state = state
+        # What the `engine` step hands the cascade: the engine it resolved and,
+        # when the one asked for is not live, that one as the switch.
+        engine, fallback_from = _resolve_engine(requested, state)
         with patch.object(chat_mod, "_dispatch_to_engine", dispatch):
             return asyncio.run(
                 dispatch_v1(
-                    body, request, [], "hola", "sid", requested, None,
+                    body, request, [], "hola", "sid", engine, fallback_from,
                 )
             )
 
@@ -378,32 +390,39 @@ class TestASelectedModelMeetsTheCascade:
 
 class TestWhichErrorsAreWorthAnotherEngine:
     """One decision, in one place. It was four except clauses in the plugin and
-    nothing at all in the core."""
+    nothing at all in the core; since C4.8 N5 it reads what a failure MEANS."""
 
     @pytest.mark.parametrize("exc,status", [
-        (ValueError("Model 'x' not found: no MLX model"), 404),
-        (ValueError("bad request"), 400),
-        (ConnectionError("refused"), 503),
-        (TimeoutError("slow"), 504),
+        (ModelNotFound("Model 'x' not found: no MLX model"), 404),
+        (BadRequest("bad request"), 400),
     ])
     def test_a_terminal_error_keeps_its_meaning(self, exc, status):
+        """Said on purpose, in words written for the user: they reach the client whole (P2-7)."""
         assert should_try_next_engine(exc) is False
-        assert engine_error_to_http(exc, "mlx")[0] == status
+        assert engine_error_to_http(exc, "mlx", "en") == (status, str(exc))
 
-    @pytest.mark.parametrize("exc", [RuntimeError("oom"), MemoryError(), KeyError("k")])
+    @pytest.mark.parametrize("exc", [
+        RuntimeError("oom"), MemoryError(), KeyError("k"), ConnectionError("refused"), TimeoutError("slow"),
+        ValueError("a ValueError nobody marked"),
+    ])
     def test_an_engine_failing_now_is_worth_the_next_one(self, exc):
+        """Failing, unreachable or too slow (N5): the next engine, whoever raised it."""
         assert should_try_next_engine(exc) is True
         assert engine_error_to_http(exc, "mlx") is None
 
-    def test_an_http_exception_is_the_answer_not_a_crash(self):
-        """How the /v1 forwarders report a backend that is down. Retrying it
-        would turn a deliberate 502 into another engine's 200."""
-        exc = HTTPException(status_code=502, detail="ollama is down")
-        assert should_try_next_engine(exc) is False
-        assert engine_error_to_http(exc, "ollama") is None
+    def test_an_http_exception_is_read_for_what_it_says(self):
+        """How the /v1 forwarders report a backend: a 5xx is an engine down
+        (the next one answers, and the footer and headers say which); a 400 is a
+        bad request, final with its status and curated words (P2-7)."""
+        down = HTTPException(status_code=502, detail="ollama is down")
+        assert should_try_next_engine(down) is True
+        assert engine_error_to_http(down, "ollama") is None
+        bad = HTTPException(status_code=400, detail="bad")
+        assert should_try_next_engine(bad) is False
+        assert engine_error_to_http(bad, "ollama", "en") == (400, "The engine could not accept this request.")
 
     def test_the_ui_stops_on_a_terminal_error_instead_of_trying_on(self):
-        mlx = _Engine(raises=ValueError("nope"))
+        mlx = _Engine(raises=BadRequest("nope"))
         llama = _Engine()
         state = _state(mlx=mlx, llama_cpp=llama, ollama=_Engine())
         with pytest.raises(HTTPException) as raised:
@@ -416,12 +435,12 @@ class TestWhichErrorsAreWorthAnotherEngine:
 
         async def _dispatch(engine, *a, **kw):
             tried.append(engine)
-            raise HTTPException(status_code=502, detail="down")
+            raise HTTPException(status_code=400, detail="bad request")
 
         state = _state(mlx=_Engine(), ollama=_Engine())
         with pytest.raises(HTTPException) as raised:
             TestTheCascadeIsTheSameAtBothDoors()._v1_dispatch(state, "mlx", _dispatch)
-        assert raised.value.status_code == 502
+        assert raised.value.status_code == 400
         assert tried == ["mlx"]
 
 

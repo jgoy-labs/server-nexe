@@ -182,6 +182,7 @@ class MLXModule:
 
         from core.paths.helpers import has_model_weights
         from core.runtime_state import get_override, set_override
+        from core.turn.errors import ModelNotFound
 
         from plugins.mlx_module.core.config import MLXConfig
 
@@ -191,12 +192,12 @@ class MLXModule:
         # ghost path, the RAM guard estimated a model that did not exist and the
         # user got a raw FileNotFoundError. A *failed* gate fell through silently
         # too: the user kept chatting with the OLD model with no signal at all.
-        # ValueError with "not found" is deliberate — engine_error_to_http maps
-        # it to a clean 404 instead of the engine loop swallowing it as "this
-        # engine failed, try the next".
+        # ModelNotFound is deliberate — the cascade's policy reads it as a missing
+        # model (a 404 for the engine asked for) instead of "this engine failed,
+        # try the next".
         _path = _Path(local_path)
         if not (_path / "config.json").is_file():
-            raise ValueError(
+            raise ModelNotFound(
                 f"Model '{_path.name}' not found: no MLX model (config.json) "
                 f"under the models directory"
             )
@@ -204,7 +205,7 @@ class MLXModule:
         # instead of at the first message as "No safetensors found" (and, with
         # the web door, as nothing the user could read).
         if not has_model_weights(_path):
-            raise ValueError(
+            raise ModelNotFound(
                 f"Model '{_path.name}' not found: it has no weights "
                 f"(*.safetensors) under the models directory"
             )
@@ -315,7 +316,10 @@ class MLXModule:
     async def shutdown(self) -> None:
         """Cleanup logic"""
         if self._node:
-            self._node.reset_model()
+            # Off the event loop (#1153): it first waits for the class lock, which
+            # a generation in flight holds, then (at most `_RESET_WAIT_S`) for the
+            # MLX worker.
+            await asyncio.to_thread(self._node.reset_model)
         self._initialized = False
 
     def get_info(self) -> Dict[str, Any]:

@@ -275,8 +275,12 @@ class OllamaModule:
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
         images: Optional[List[str]] = None, thinking_enabled: bool = False,
         top_p: Optional[float] = None, continue_final: bool = False,
+        response_schema: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         """Send a chat request to Ollama, yielding streamed response chunks.
+
+        `response_schema`: a JSON schema Ollama enforces on the reply (`format`) —
+        for a short extraction pass that must come back as JSON.
 
         `continue_final` (C4.6-a2): the transcript already ends on the cut
         assistant answer. Explicit, not `**kwargs`, so the door can see it
@@ -284,4 +288,4 @@ class OllamaModule:
         """
         return self.chat_mgr.chat(model, messages, stream=stream, images=images,
                                   thinking_enabled=thinking_enabled, top_p=top_p,
-                                  continue_final=continue_final)
+                                  continue_final=continue_final, response_schema=response_schema)

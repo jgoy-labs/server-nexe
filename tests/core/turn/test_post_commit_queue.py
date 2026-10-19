@@ -125,12 +125,12 @@ async def test_short_circuit_queues_nothing():
     assert q.pending(ctx.session_id) == set()
 
 
-async def test_partial_turn_queues_no_memory_write_but_still_queues_compact():
+async def test_partial_turn_queues_neither_memory_write_nor_compact():
     """#1040 (C2.4): a turn marked PARTIAL (an engine error surfaced mid-
     stream, already committed to the wire) never queues memory.write — facts
-    atomized from a broken reply are not trustworthy. `compact` is unrelated
-    to this turn's own outcome (it summarises the session's history) and
-    queues exactly as it would for a clean turn."""
+    atomized from a broken reply are not trustworthy. (#1149) Nor `compact`:
+    it would be asked of the engine that just failed; the session is compacted
+    by size, so the next clean turn does it."""
     calls: list[str] = []
 
     def _mark_partial(step_id: str):
@@ -145,14 +145,14 @@ async def test_partial_turn_queues_no_memory_write_but_still_queues_compact():
     assert ctx.outcomes["generate"] == "degraded", "a step that signals ctx.error on itself is degraded, not ok"
     assert ctx.outcomes["memory.write"] == "skipped"
     assert ctx.outcomes["describe_image"] == "skipped", "#1144: nothing to describe from a broken turn"
-    assert ctx.outcomes["compact"] == "queued"
-    assert q.pending(ctx.session_id) == {"compact"}
+    assert ctx.outcomes["compact"] == "skipped", "#1149: not against the engine that failed"
+    assert q.pending(ctx.session_id) == set()
 
     q.start()
     await q.drain()
     await q.stop()
     assert "memory.write" not in calls and "describe_image" not in calls
-    assert "compact" in calls
+    assert "compact" not in calls
 
 
 async def test_no_queue_means_inline_exactly_as_before():

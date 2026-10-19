@@ -49,6 +49,10 @@ class _MlxShaped:
     async def is_model_loaded(self, model_name):
         return True
 
+    def can_see_images(self):
+        # A vision model: in reserve, an engine has to SAY it sees (C4.8 B2/D1-x).
+        return True
+
     def can_continue(self, model_name=None):
         return self.resumable
 
@@ -391,3 +395,86 @@ async def test_a_resume_without_an_image_sends_none(turn_lab, session_manager, m
     _cut_session(session_manager, "c46-noimg")
     await _resume(turn_lab, "c46-noimg")
     assert not mlx.calls[-1].get("images")
+
+
+# ── #1152: the footer of a continued answer names who finished it ───────────
+
+
+@pytest.mark.parametrize("streaming", [True, False])
+async def test_a_continue_served_by_another_engine_names_it_in_the_saved_footer(
+        turn_lab, session_manager, mlx, streaming):
+    """The live footer reads the tokens of the stream that just ended, so after a
+    Continue it names the engine that finished the answer. The saved one kept the
+    first half's, and a reload showed another engine than the screen had."""
+    sid = f"c46-footer-{int(streaming)}"
+    _cut_session(session_manager, sid, stats={"model": "Qwen_Qwen3-30B-A3B-Q4_K_M.gguf", "engine": "llama_cpp", "tokens": 7})
+    await _resume(turn_lab, sid, streaming=streaming)
+    last = _on_disk(session_manager, sid)["messages"][-1]
+    assert last["content"] == PARTIAL + "ada i acabada."
+    assert last["stats"]["engine"] == "mlx"
+    assert last["stats"]["model"] and last["stats"]["model"] != "Qwen_Qwen3-30B-A3B-Q4_K_M.gguf"
+    assert last["stats"]["tokens"] == 7, "only the names move: the rest of the first half's stats stay"
+
+
+def test_a_stats_dict_that_names_nobody_leaves_the_old_footer():
+    from core.turn.persist import _name_the_last_engine
+
+    for stats in (None, {}, {"model": None, "engine": ""}, "not a dict"):
+        message = {"role": "assistant", "stats": {"model": "m1", "engine": "e1"}}
+        _name_the_last_engine(message, stats)
+        assert message["stats"] == {"model": "m1", "engine": "e1"}, stats
+    bare = {"role": "assistant"}
+    _name_the_last_engine(bare, {"model": "m2", "engine": "e2"})
+    assert bare["stats"] == {"model": "m2", "engine": "e2"}, "a message with no stats gets them"
+
+
+async def test_stop_mid_resume_also_names_the_engine_that_wrote_the_tail(
+        app_state, session_manager, memory_helper, server_state, mlx):
+    """#1152 for the Continue that is stopped: the merged tail on disk carries the
+    engine that wrote it, as the one that was allowed to finish does."""
+    from core.turn.context import TurnContext
+    from core.turn.run import stream_turn
+    from plugins.web_ui_module.api.turn_adapters import ui_adapters
+
+    mlx.tokens = ("ada", " i", " més", " coses")
+    _cut_session(session_manager, "c46-stop-footer", stats={"model": "Old-Model.gguf", "engine": "llama_cpp", "tokens": 7})
+    ctx = TurnContext(
+        turn_id="turn-c46-stop-footer", entry="ui", principal=LAB_PRINCIPAL, resume=True,
+        body={"message": "", "session_id": "c46-stop-footer", "stream": True, **RESUME},
+        request=make_request(app_state), app_state=app_state,
+    )
+    with door_patches(server_state, memory_helper):
+        body = await stream_turn(ctx, ui_adapters(session_manager, streaming=True))
+        async for chunk in body:
+            if isinstance(chunk, str) and chunk and not chunk.startswith("\x00"):
+                break
+        await body.aclose()
+
+    last = _on_disk(session_manager, "c46-stop-footer")["messages"][-1]
+    assert last["content"].startswith(PARTIAL + "ada")
+    assert last["stats"]["engine"] == "mlx"
+    assert last["stats"]["model"] and last["stats"]["model"] != "Old-Model.gguf"
+    assert last["stats"]["tokens"] == 7
+
+
+def test_a_partial_merge_names_the_engine_only_when_it_merges():
+    from types import SimpleNamespace
+
+    from core.turn.persist import persist_partial_assistant
+
+    def session_with(stats):
+        s = SimpleNamespace(messages=[{"role": "user", "content": "q"},
+                                      {"role": "assistant", "content": "cut", "stats": stats}])
+        s.add_message = lambda *a, **k: s.messages.append({"role": a[0], "content": a[1], "stats": k.get("stats")})
+        return s
+
+    saved = []
+    mgr = SimpleNamespace(_save_session_to_disk=lambda s: saved.append(1))
+    merged = session_with({"model": "m1", "engine": "e1"})
+    persist_partial_assistant(merged, mgr, "tail", "q", resume=True, stats={"model": "m2", "engine": "e2"})
+    assert merged.messages[-1]["stats"] == {"model": "m2", "engine": "e2"}
+    # Not a Continue: a new interrupted message, the old one is untouched.
+    fresh = session_with({"model": "m1", "engine": "e1"})
+    persist_partial_assistant(fresh, mgr, "tail", "q", resume=False, stats={"model": "m2", "engine": "e2"})
+    assert fresh.messages[1]["stats"] == {"model": "m1", "engine": "e1"}
+    assert fresh.messages[-1]["stats"] == {"interrupted": True}

@@ -77,18 +77,32 @@ def detect_with_pending(session, message: str, port) -> tuple[str, Optional[str]
     """The intent for this message, honouring a confirmation armed last turn.
 
     Bug #18 P0 / B028: a pending confirmation hijacks the intent; anything else
-    clears the flag and falls through to normal detection.
+    clears the flag and falls through to normal detection. Only ONE pending can
+    be answered by a message: whichever is answered (yes or not), the others are
+    dropped too — a yes meant for one question must never reach another one a
+    turn later (review 19/10).
     """
     detected, extracted = port.detect_intent(message)
-    if getattr(session, "_pending_clear_all", False):
-        if port.matches_clear_all_confirm(message):
-            return "clear_all_confirm", extracted
-        session._pending_clear_all = False
-    elif getattr(session, "_pending_partial_delete", None):
-        if port.matches_clear_all_confirm(message):
-            return "delete_confirm", extracted
-        session._pending_partial_delete = None
-    return detected, extracted
+    clear_all = getattr(session, "_pending_clear_all", False)
+    partial = getattr(session, "_pending_partial_delete", None)
+    replace = getattr(session, "_pending_replace", None)
+    session._pending_clear_all = False
+    session._pending_partial_delete = None
+    session._pending_replace = None
+    if not (clear_all or partial or replace):
+        return detected, extracted
+    if not port.matches_clear_all_confirm(message):
+        return detected, extracted
+    if clear_all:
+        session._pending_clear_all = True  # `_clear_all_confirm` resets it
+        return "clear_all_confirm", extracted
+    if partial:
+        session._pending_partial_delete = partial
+        return "delete_confirm", extracted
+    # TOKENS-20261015-13: the server asked «vols que ho canviï?» and armed this
+    # at `memory.write`; only the user's very next yes carries it out.
+    session._pending_replace = replace
+    return "replace_confirm", extracted
 
 
 def sanitize_delete_history(session, content_to_delete: str) -> None:
@@ -170,7 +184,9 @@ def split_first_person(content: str) -> list:
     return parts if len(parts) >= 2 else [content]
 
 
-async def _save(extracted_content: str, message: str, session_id: str, rag_collections, port) -> IntentOutcome:
+async def _save(
+    extracted_content: str, message: str, session_id: str, rag_collections, port, session=None,
+) -> IntentOutcome:
     """D6: save the fact and hand the turn back to the model.
 
     The fact is persisted here, deterministically, before anything is generated:
@@ -194,8 +210,15 @@ async def _save(extracted_content: str, message: str, session_id: str, rag_colle
         if result["success"] and result.get("document_id"):
             saved += 1
             kept.append(fact)
-        elif result.get("duplicate"):
+        elif result.get("duplicate") and result.get("same", True):
             kept.append(fact)
+        elif result.get("duplicate"):
+            # Similar to a stored fact, not the same: it was not saved, so the
+            # turn must not say it was (TOKENS-20261015-13) — and the model
+            # asks whether to replace it; the user's next yes does.
+            logger.info("memory intent 'save' not kept: similar to a stored fact, not the same")
+            if session is not None and result.get("similar_to"):
+                arm_replace(session, result["similar_to"], fact)
         else:
             logger.warning("memory intent 'save' did not persist: %s", result.get("message", "unknown"))
     return IntentOutcome(
@@ -277,6 +300,90 @@ async def _delete_confirm(session, port, message: str, *, explicit_reference: bo
     )
 
 
+def arm_replace(session, old: str, new: str, keyed: Optional[dict] = None) -> None:
+    """A fact close to a stored one but not the same: remember the pair for the
+    user's next yes. Nothing is changed here — B028: a model's tag asks, the
+    user's own answer decides.
+
+    Several changes in one message wait together, in `more`, and one yes does
+    them all (review 19/10: the second used to overwrite the first). `keyed` is
+    the key the new fact will carry when it is saved.
+    """
+    item = {"old": old, "new": new}
+    if keyed:
+        item["keyed"] = keyed
+    pending = getattr(session, "_pending_replace", None)
+    if pending and not pending.get("asked"):
+        pending.setdefault("more", []).append(item)
+    else:
+        session._pending_replace = dict(item)
+    logger.info("MEM_SAVE: replace armed, waiting for the user's yes")
+
+
+async def _remove_old_fact(port, old: str) -> bool:
+    """Delete the stored entry that IS `old`, by exact id. False on any doubt."""
+    from core.memory_facts.helper import same_fact  # deferred: helper imports this module
+
+    try:
+        preview = await port.preview_delete_from_memory(old)
+        entry = next((c for c in (preview.get("candidates") or []) if same_fact(c.get("text", ""), old)), None)
+        if not (preview.get("success") and entry):
+            return False
+        removed = await port.delete_memory_entries([entry])
+        return bool(removed.get("success") and removed.get("deleted", 0) > 0)
+    except Exception:  # noqa: BLE001 — the answer must say nothing was changed
+        logger.warning("replace: removing the old fact failed", exc_info=True)
+        return False
+
+
+async def _replace_one(session, port, old: str, new: str, keyed: Optional[dict]) -> tuple[bool, bool]:
+    """(removed, stored): delete the stored entry that IS `old`, then save `new`."""
+    if not await _remove_old_fact(port, old):
+        return False, False
+    session._recently_deleted_facts = [*getattr(session, "_recently_deleted_facts", []), old]
+    # `force`: the user has just said yes to THIS pair, and the closeness test
+    # would refuse the new fact for resembling some other stored one.
+    saved = await port.save_to_memory(
+        content=new, session_id=session.id, metadata=dict(keyed or {"type": "user_fact", "is_mem_save": True}),
+        force=True,
+    )
+    stored = bool(saved.get("document_id"))
+    if not stored:
+        logger.error("replace: the old fact is gone and the new one was not saved: %s", saved.get("message"))
+    return True, stored
+
+
+async def _replace_confirm(session, port) -> IntentOutcome:
+    """The user said yes to «vols que ho canviï?»: for each pair, delete the old
+    entry by exact id, then save the new fact. Either both or the old one stays."""
+    pending = getattr(session, "_pending_replace", None) or {}
+    session._pending_replace = None
+    pairs = [pending, *pending.get("more", [])] if pending else []
+    pairs = [p for p in pairs if p.get("old") and p.get("new")]
+    if not pairs:
+        return IntentOutcome(kind="replace", text=_t("delete.nothing_pending"), memory_action="replace")
+    session._recently_deleted_facts = []
+    lines: list = []
+    saved_n = deleted_n = 0
+    kept: list = []
+    for pair in pairs:
+        removed, stored = await _replace_one(session, port, pair["old"], pair["new"], pair.get("keyed"))
+        if not removed:
+            lines.append(_t("replace.failed", old=pair["old"][:100]))
+            continue
+        deleted_n += 1
+        if stored:
+            saved_n += 1
+            kept.append(pair["new"])
+            lines.append(_t("replace.done", old=pair["old"][:100], new=pair["new"][:100]))
+        else:
+            lines.append(_t("replace.lost", old=pair["old"][:100], new=pair["new"][:100]))
+    return IntentOutcome(
+        kind="replace", text=" ".join(lines), memory_action="replace",
+        mem_saved=saved_n, mem_deleted=deleted_n, kept_facts=kept,
+    )
+
+
 async def _list(rag_collections, port) -> IntentOutcome:
     list_result = await port.list_memories(limit=20, collections=rag_collections)
     if not (list_result["success"] and list_result["facts"]):
@@ -319,7 +426,7 @@ async def resolve(
     """
 
     if intent == "save":
-        return await _save(extracted_content, message, session.id, rag_collections, port)
+        return await _save(extracted_content, message, session.id, rag_collections, port, session)
     if intent == "delete":
         return await _delete(extracted_content, session, rag_collections, port)
     if intent == "list":
@@ -336,6 +443,8 @@ async def resolve(
         return await _clear_all_confirm(session, port)
     if intent == "delete_confirm":
         return await _delete_confirm(session, port, message)
+    if intent == "replace_confirm":
+        return await _replace_confirm(session, port)
     if intent == "recall":
         # Recall is not a command: the model answers it with the recalled context.
         return IntentOutcome(kind="chat", memory_action="recall", continue_turn=True)
@@ -354,3 +463,29 @@ def intent_enabled() -> bool:
 def outcome_for(ctx_intent: str, outcome: IntentOutcome) -> str:
     """The resolved intent name for the trace/wire ('chat' when the turn goes on)."""
     return "chat" if outcome.continue_turn else (outcome.kind or ctx_intent)
+
+
+def replace_question(session, *, accompany: bool, lang: Optional[str] = None) -> str:
+    """The question a change waiting for the user's yes is asked with, written by
+    the server (pla-comportament-segons-mida-model, C).
+
+    Only for a model the server accompanies (`core.turn.model_tier`); an
+    autonomous one asks by itself. Asked once per arming, and it joins the last
+    assistant message of the history so a reload shows what the user answered.
+    The change itself stays untouched: B028 — the user's own yes carries it out.
+    """
+    pending = getattr(session, "_pending_replace", None)
+    if not (accompany and pending and not pending.get("asked")):
+        return ""
+    pending["asked"] = True
+    more = pending.get("more") or []
+    if more:
+        pairs = "; ".join(f"«{p['old'][:100]}» → «{p['new'][:100]}»" for p in [pending, *more])
+        question = _t("replace.ask_many", lang=lang, pairs=pairs)
+    else:
+        question = _t("replace.ask", lang=lang, old=pending["old"][:100], new=pending["new"][:100])
+    messages = getattr(session, "messages", None) or []
+    if messages and messages[-1].get("role") == "assistant":
+        last = messages[-1]
+        last["content"] = f"{last.get('content') or ''}\n\n{question}".lstrip()
+    return question

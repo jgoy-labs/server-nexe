@@ -13,6 +13,9 @@ import re as _re
 
 from core.turn.text.chunks import ANGLE_TAG_RE, PIPE_TAG_RE
 
+# A `‹nom›` slot, or a whole `[…]` (matched first so a memory tag keeps its slot).
+_SLOT_OR_TAG_RE = _re.compile(r"\[[^\[\]\n]*\]|‹[^›\n]{0,40}›")
+
 # Context headers the model may echo back (compiled once).
 CTX_HEADERS_RE = _re.compile(
     # (?:FI\s+)?CONTEXT(?:\s+hex)? covers [CONTEXT], [FI CONTEXT] and the
@@ -126,6 +129,8 @@ def clean_model_text(text: str) -> str:
     from core.turn.text.captions import drop_source_captions
 
     text = drop_source_captions(text)
+    # MEM-20261016-1: a template slot (`‹nom›`) copied from the prompt's examples.
+    text = _SLOT_OR_TAG_RE.sub(lambda m: m.group(0) if m.group(0)[0] == "[" else "", text)
     return CTX_HEADERS_RE.sub('', text).strip()
 
 

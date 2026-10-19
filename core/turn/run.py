@@ -49,7 +49,9 @@ FastAPI or any engine — the adapters do (C1.2 for the API, C1.3 for the UI).
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import inspect
+import logging
 import threading
 import time
 from typing import (
@@ -60,10 +62,12 @@ from typing import (
 from core.turn.context import TurnContext
 from core.turn.gate import Priority
 from core.turn.steps import SKIP_ON_RESUME, TURN_STEPS, Step
-from core.turn.trace import emit_turn_trace
+from core.turn.trace import emit_turn_trace, publish_step, step_event
 
 if TYPE_CHECKING:
     from core.turn.post_commit import PostCommitQueue
+
+logger = logging.getLogger(__name__)
 
 StepAdapter = Callable[[TurnContext], Awaitable[None]]
 StreamingStepAdapter = Callable[[TurnContext], AsyncIterator[Any]]
@@ -128,7 +132,19 @@ def _check_adapters(adapters: Adapters, steps: Sequence[Step], *, streaming: boo
             )
 
 
-def _record(ctx: TurnContext, step: Step, outcome: str, started: float, *, error: Optional[BaseException] = None) -> None:
+def _say(ctx: TurnContext, step: Step, outcome: str, ms: float, error: "BaseException | None") -> None:
+    """Publish the step's event; building it must never take the turn down either (it runs inside
+    the `except` of a failed step, where a second exception would hide the first)."""
+    try:
+        publish_step(ctx, step_event(ctx, step.id, step.kind.value, outcome, ms, error=error))
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("trace event for step %s not published: %s", step.id, exc)
+
+
+def _record(
+    ctx: TurnContext, step: Step, outcome: str, started: float, *,
+    error: Optional[BaseException] = None, publish: bool = True,
+) -> None:
     entry: dict[str, Any] = {
         "ms": round((time.perf_counter() - started) * 1000.0, 3),
         "outcome": outcome,
@@ -138,6 +154,8 @@ def _record(ctx: TurnContext, step: Step, outcome: str, started: float, *, error
         entry["error"] = f"{type(error).__name__}: {error}"
     ctx.outcomes[step.id] = outcome
     ctx.usage.setdefault("steps", {})[step.id] = entry
+    if publish:
+        _say(ctx, step, outcome, entry["ms"], error)
 
 
 def _skipped_by_policy(ctx: TurnContext, step: Step) -> bool:
@@ -145,14 +163,16 @@ def _skipped_by_policy(ctx: TurnContext, step: Step) -> bool:
 
     * #1040 (C2.4): a PARTIAL turn's `memory.write` — facts atomized from a
       reply that broke mid-generation are not trustworthy — and (#1144) its
-      `describe_image`: the engine broke on this turn. `compact` is
-      independent of this turn's own outcome and always runs.
+      `describe_image`: the engine broke on this turn. (#1149) Its `compact`
+      too: it would be queued against `ctx.engine`, which on a broken turn is
+      the engine that failed (or the first one asked, when none answered). The
+      session is compacted by size, so the next clean turn does it.
     * C4.6: a RESUME turn's `SKIP_ON_RESUME` (steps.py) — no new message to
       read an intent in or recall for, and no compaction between the cut and
       the resume.
 
     Recorded `skipped`, never folded: the step did not run by decision."""
-    if step.id in ("memory.write", "describe_image") and ctx.partial:
+    if step.id in ("memory.write", "describe_image", "compact") and ctx.partial:
         return True
     return ctx.resume and step.id in SKIP_ON_RESUME
 
@@ -194,6 +214,7 @@ def _mark_skipped(ctx: TurnContext, steps: Iterable[Step]) -> None:
             continue
         ctx.outcomes[step.id] = "skipped"
         ctx.usage.setdefault("steps", {})[step.id] = {"ms": 0.0, "outcome": "skipped", "kind": step.kind.value}
+        _say(ctx, step, "skipped", 0.0, None)
 
 
 def _enqueue_post_commit(ctx: TurnContext, step: Step, adapter: Adapter, queue: "PostCommitQueue") -> None:
@@ -232,24 +253,34 @@ def _enqueue_post_commit(ctx: TurnContext, step: Step, adapter: Adapter, queue: 
                 **(ctx.usage.get("post_commit_result", {}).get(step.id) or {}),
             }
         finally:
-            # #1060: this step's LLM calls landed in `ctx.usage["llm"]` AFTER
-            # the turn's trace was already serialised, so that line under-
-            # reported `total_calls`/`total_ms` every time in production —
-            # `generate` was the only call that ever arrived on time. The trace
-            # is emitted again now, same `turn_id`, and the one with an empty
-            # `post_commit_pending` is the turn's final word. In the `finally`
-            # so a job that failed still empties the list; a job SUPERSEDED by
-            # a fresher turn never runs at all, and then the first line — which
-            # names what is still pending — stays the last thing said.
+            # #1060: this step's LLM calls land in `ctx.usage["llm"]` AFTER the turn's line
+            # was written. Until C5 G the line was written again, whole, by every job;
+            # now the job's end is a short `turn.step` line (its own calls) and the
+            # long one is said once, when the wire closes. In the `finally` so a job
+            # that failed still empties the list.
             pending = ctx.usage.get("post_commit_pending") or []
             if step.id in pending:
                 pending.remove(step.id)
-            emit_turn_trace(ctx)
+
+    def _finish(result: dict) -> None:
+        # The step's event, once its job ends (`queued` was not one): ok,
+        # failed, preempted, or superseded by a fresher turn's.
+        event = step_event(
+            ctx, step.id, step.kind.value, result.get("outcome", "failed"),
+            float(result.get("ms", 0.0)), error=result.get("error"),
+            started_at=(result["at"] - result["ms"] / 1000.0) if "at" in result and "ms" in result else None,
+        )
+        calls = tuple(c for c in (ctx.usage.get("llm") or {}).get("calls", []) if c.get("step") == step.id)
+        publish_step(ctx, dataclasses.replace(event, late=True, calls=calls))
 
     priority = Priority.COMPACT if step.id == "compact" else Priority.MEMORY_WRITE
+    from core.endpoints.chat_engines.routing import engine_is_cloud  # deferred: endpoints → turn
+
     queue.enqueue(
         priority, turn_id=ctx.turn_id, session_id=ctx.session_id,
         step_id=step.id, run=_run, cancel=cancel_event,
+        # A job that calls a hosted engine waits on THAT engine's gate.
+        cloud=engine_is_cloud(ctx.engine), finish=_finish,
     )
 
 
@@ -337,6 +368,16 @@ async def run_turn(
     _check_adapters(adapters, steps, streaming=False)
     ctx.streaming = False
     steps = list(steps)
+    try:
+        await _walk(ctx, adapters, steps, post_commit)
+    finally:
+        # C5-0: a turn that ends in an exception (a `must_have` step that fell, a
+        # client that left) left NO line; its bill is owed all the same.
+        emit_turn_trace(ctx)
+    return ctx
+
+
+async def _walk(ctx: TurnContext, adapters: Adapters, steps: list[Step], post_commit: Optional["PostCommitQueue"]) -> None:
     for index, step in enumerate(steps):
         if _skipped_by_policy(ctx, step):
             _mark_skipped(ctx, [step])
@@ -344,7 +385,7 @@ async def run_turn(
         if post_commit is not None and step.id in POST_COMMIT:
             started = time.perf_counter()
             _enqueue_post_commit(ctx, step, adapters[step.id], post_commit)
-            _record(ctx, step, "queued", started)
+            _record(ctx, step, "queued", started, publish=False)
             continue
         sc = await _run_awaitable(ctx, step, adapters[step.id])
         if sc is None:
@@ -354,8 +395,22 @@ async def run_turn(
         for tail_step in run:
             await _run_awaitable(ctx, tail_step, adapters[tail_step.id])
         break
-    emit_turn_trace(ctx)
-    return ctx
+
+
+async def _run_prefix(
+    ctx: TurnContext, adapters: Adapters, prefix: Sequence[Step], body_steps: list[Step],
+) -> list[Step]:
+    """The steps before the boundary; returns what is left to run in the body."""
+    for index, step in enumerate(prefix):
+        if _skipped_by_policy(ctx, step):
+            _mark_skipped(ctx, [step])
+            continue
+        sc = await _run_awaitable(ctx, step, adapters[step.id])
+        if sc is not None:
+            run, skip = _split_on_short_circuit(list(prefix[index + 1:]) + body_steps)
+            _mark_skipped(ctx, skip)
+            return run
+    return body_steps
 
 
 async def stream_turn(
@@ -386,16 +441,11 @@ async def stream_turn(
         )
 
     tail: list[Step] = body_steps
-    for index, step in enumerate(prefix):
-        if _skipped_by_policy(ctx, step):
-            _mark_skipped(ctx, [step])
-            continue
-        sc = await _run_awaitable(ctx, step, adapters[step.id])
-        if sc is not None:
-            run, skip = _split_on_short_circuit(prefix[index + 1:] + body_steps)
-            _mark_skipped(ctx, skip)
-            tail = run
-            break
+    try:
+        tail = await _run_prefix(ctx, adapters, prefix, body_steps)
+    except BaseException:
+        emit_turn_trace(ctx)  # C5-0: the line of a turn that fell before the first byte
+        raise
 
     async def _body() -> AsyncIterator[Any]:
         done: set[str] = set()
@@ -466,7 +516,7 @@ async def _run_steps(
             if post_commit is not None and step.id in POST_COMMIT:
                 started = time.perf_counter()
                 _enqueue_post_commit(ctx, step, adapters[step.id], post_commit)
-                _record(ctx, step, "queued", started)
+                _record(ctx, step, "queued", started, publish=False)
                 done.add(step.id)
                 continue
             adapter = adapters[step.id]

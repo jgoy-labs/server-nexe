@@ -88,7 +88,7 @@ class Step:
 # it is data, and the layering gate has nothing to say about it.
 GIVEN_BY_DOOR: FrozenSet[str] = frozenset({
     "turn_id", "session_id", "entry", "principal", "pipeline_version",
-    "message", "attachments", "cancel_token", "deadline", "trace_id", "resume",
+    "message", "attachments", "cancel_token", "deadline", "resume",
     # transitional plumbing the C1 adapters need (see context.py docstring)
     "body", "request", "app_state", "streaming",
 })
@@ -254,8 +254,9 @@ TURN_STEPS: tuple[Step, ...] = (
         id="engine", kind=StepKind.COMPUTE, must_have=True, replaceable=False,
         idempotent=False,
         reads=frozenset({"body", "app_state", "resume"}),
-        writes=frozenset({"engine", "gpu_slot", "context_window", "engine_fallback_from", "engine_fallback_reason"}),
-        writes_always=frozenset({"context_window", "engine"}),
+        writes=frozenset({"engine", "engine_name", "gpu_slot", "context_window", "engine_fallback_from",
+                          "engine_fallback_reason", "left_machine"}),
+        writes_always=frozenset({"context_window", "engine", "engine_name", "left_machine"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "core/turn/engine_claim.py (live_candidates), then plugins/web_ui_module/api/turn_adapters.py (_switch_model)",
@@ -299,8 +300,8 @@ TURN_STEPS: tuple[Step, ...] = (
         id="generate", kind=StepKind.LLM, must_have=True, replaceable=True,
         idempotent=False,
         reads=frozenset({"prompt", "engine", "cancel_token", "deadline", "context_window", "resume"}),
-        writes=frozenset({"response", "wire", "engine", "engine_fallback_from", "engine_fallback_reason"}),
-        writes_always=frozenset({"engine", "response"}),
+        writes=frozenset({"response", "wire", "engine", "engine_name", "engine_fallback_from", "engine_fallback_reason"}),
+        writes_always=frozenset({"engine", "engine_name", "response"}),
         doors_today=frozenset({"ui", "api"}),
         today={
             "ui": "plugins/web_ui_module/api/turn_adapters.py (generate_json, generate_stream) over core/turn/engine_claim.py (claim_engine) and plugins/web_ui_module/api/engine_doors.py (prepare_call: engine.chat, one GPU slot per turn)",

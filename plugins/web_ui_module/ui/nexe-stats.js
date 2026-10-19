@@ -89,14 +89,25 @@ NexeUI.extend({
     /**
      * The footer's model, and the engine that answered it (#1146 — Jordi,
      * 03/10: «posa'm el motor al peu»). One label for the live footer and the
-     * one a reload paints, so the two cannot drift: «Qwen3.5-9B-MLX-4bit · MLX».
+     * one a reload paints, so the two cannot drift: «MLX · Qwen3.5-9B-MLX-4bit».
      */
     _modelFooterLabel(model, engine) {
         const name = model ? String(model).split('/').pop() : '';
-        const ENGINE_NAMES = { mlx: 'MLX', ollama: 'Ollama', llama_cpp: 'llama.cpp' };
+        const ENGINE_NAMES = { mlx: 'MLX', ollama: 'Ollama', llama_cpp: 'llama.cpp', api: 'API' };
         const label = engine ? (ENGINE_NAMES[engine] || String(engine)) : '';
         if (!name) return '';
-        return label ? `${name} · ${label}` : name;
+        // The engine goes FIRST (#1155): the box is a fixed width and the ellipsis
+        // eats the end, so with a long model name «name · engine» lost the one
+        // part the footer is there to show (a reserve engine answering).
+        return label ? `${label} · ${name}` : name;
+    },
+
+    // The tooltip of the tokens figure: exact or estimated, and what went in / was reused.
+    _tokensTitle(exact, tokensIn, cached) {
+        const parts = [this.t(exact ? 'tokens_exact' : 'tokens_estimated')];
+        if (tokensIn !== null && tokensIn !== undefined) parts.push(`${this.t('tokens_in')}: ${tokensIn}`);
+        if (cached !== null && cached !== undefined) parts.push(`${this.t('tokens_cached')}: ${cached}`);
+        return parts.join(' · ');
     },
 
     _renderSavedStats(statsDiv, stats, textDiv) {
@@ -120,7 +131,13 @@ NexeUI.extend({
             return span;
         };
 
-        if (tok > 0) statsDiv.appendChild(addStat('activity', `${tok} tok`));
+        if (tok > 0) {
+            // Only a count the engine said is shown as exact; the rest was estimated (`~`).
+            const exact = stats.tokens_exact === true;
+            const item = addStat('activity', `${exact ? '' : '~'}${tok} tok`);
+            item.title = this._tokensTitle(exact, stats.tokens_in ?? null, stats.cached_in ?? null);
+            statsDiv.appendChild(item);
+        }
         if (elapsed > 0) {
             const timeText = speed ? `${elapsed}s · ${speed} tok/s` : `${elapsed}s`;
             statsDiv.appendChild(addStat('timer', timeText));

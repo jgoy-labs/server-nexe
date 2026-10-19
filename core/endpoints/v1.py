@@ -15,6 +15,7 @@ import logging
 from core.version import __version__
 from .attachments import router as attachments_router
 from .chat import router as chat_router
+from .turns import router as turns_router
 from .workflows import router_workflows
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 router_v1 = APIRouter(prefix="/v1", tags=["v1"])
 router_v1.include_router(chat_router)
 router_v1.include_router(attachments_router)
+router_v1.include_router(turns_router)
 router_v1.include_router(router_workflows)
 
 @router_v1.get("", include_in_schema=True, summary="API v1 root — available endpoints and status", operation_id="v1_root")

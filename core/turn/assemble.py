@@ -324,13 +324,11 @@ def _assemble_engine_messages(
         _inject_context_into_messages,
         compute_context_budget,
         fit_prompt_to_window,
+        reply_reserve_tokens,
         resolve_history_ratio,
         resolve_max_context_chars,
     )
-    from core.endpoints.chat_sanitization import (
-        CHARS_PER_TOKEN_ESTIMATE,
-        DEFAULT_CONTEXT_WINDOW,
-    )
+    from core.endpoints.chat_sanitization import DEFAULT_CONTEXT_WINDOW
 
     context_messages = turn.context_messages
     document_context = turn.document_context
@@ -418,7 +416,8 @@ def _assemble_engine_messages(
     _window_tokens = ask_engine_window(engine) or DEFAULT_CONTEXT_WINDOW
     messages, _ = fit_prompt_to_window(
         system_prompt, engine_messages, _window_tokens,
-        # The same 500-char reply reserve compute_context_budget was given above.
-        reply_budget_tokens=500 // CHARS_PER_TOKEN_ESTIMATE,
+        # The reply reserve both doors use (B1): the web sends no max_tokens, so
+        # the default — the same 500 chars compute_context_budget was given above.
+        reply_budget_tokens=reply_reserve_tokens(),
     )
     return messages, _doc_truncated_pct

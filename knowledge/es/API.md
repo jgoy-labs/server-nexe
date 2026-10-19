@@ -92,7 +92,7 @@ Chat completion compatible con OpenAI con soporte de RAG y streaming.
 
 - `model`: null por defecto (no "auto"). Para **Ollama** un valor pasado selecciona el modelo con fallback por nombre parcial (p. ej. `llama3` → `llama3.1:8b`); 404 solo si ningún modelo de chat encaja. Para **MLX / llama.cpp** el valor se **ignora** — corren el único modelo configurado — y la respuesta reporta el nombre del modelo realmente cargado, nunca el solicitado
 - `use_rag`: true por defecto — busca en 3 colecciones Qdrant
-- `engine`: "auto" (defecto), "ollama", "mlx", "llama_cpp"
+- `engine`: "auto" (defecto), "ollama", "mlx", "llama_cpp", o "api" (un proveedor externo: opt-in explícito, véase abajo)
 - `stream`: true retorna stream SSE con marcadores
 - `temperature`: 0.0-2.0 (defecto 0.7)
 - `top_p`: 0 < top_p ≤ 1 (null por defecto) — nucleus sampling; null deja que cada motor use su propio default (≈ 0.9)
@@ -129,6 +129,53 @@ El campo **no esta** cuando no se ha cortado nada. Si ocurren las dos cosas a la
 `"overflow"`.
 
 **Bloque `[IMAGEN ADJUNTA]`:** Cuando un mensaje incluye una imagen (backend VLM), el endpoint de chat inyecta un bloque `[IMAGEN ADJUNTA]` que **prioriza la imagen sobre el contexto RAG**. El modelo procesa la imagen directamente y el RAG queda relegado a contexto secundario, evitando que documentos recuperados distraigan la descripcion visual.
+
+### Traza de un turno (qué ha hecho un turno reciente)
+
+Cada respuesta de chat lleva el id del turno en la cabecera **`X-Nexe-Turn-Id`** (en flujo o JSON; el cuerpo JSON conserva también `turn_id`).
+`GET /v1/turns/{turn_id}/trace` (hace falta la clave de API) devuelve los pasos de ese turno: el resultado, la duración, el motor,
+el código de error y el motivo de cancelación de cada paso, las llamadas al LLM que ha hecho (`outcome`: `ok` o `cancelled`),
+y `final` cuando no queda nada pendiente (los trabajos de después, `compact` y `describe_image`, se añaden al mismo registro
+cuando terminan). Un turno en curso ya está, con los pasos que lleva hechos. Se guarda en memoria para los **últimos 256 turnos**
+del servidor en marcha; `404` si el id es desconocido o más antiguo. Nunca contiene lo que has escrito ni lo que ha contestado
+el modelo. El registro duradero es el log: una línea `turn.trace` al cerrarse la conexión y una corta, `turn.step`, por cada
+trabajo de después.
+
+Cada llamada al LLM de la traza lleva `tokens_in`, `tokens_out` y `cached_in` (los tokens que el **motor** dice haber gastado, y los de la caché del prefijo que ha reaprovechado). Lo que un motor no dice es `null`, **nunca `0`**: MLX dice entrada, salida y caché; llama.cpp, Ollama y las APIs (DeepSeek, OpenAI) dicen entrada y salida. El pie del mensaje en la web muestra ese recuento tal cual; si el motor no lo da, muestra una estimación con un `~` delante. `/metrics` suma el total en `core_turn_tokens_total{engine,kind}` (`kind`: `in`, `out`, `cached`).
+
+`/metrics` cuenta los motores igual en las dos puertas: `core_chat_engine_requests_total{engine,status}` y
+`core_chat_engine_duration_seconds{engine}` (tiempo hasta el primer evento del motor, una fila por motor pedido, el
+re-prompt incluido), más `core_turn_steps_total{step,outcome}` y `core_turn_step_duration_seconds{step}`.
+
+### Proveedores de API externos (opt-in)
+
+`"engine": "api"` envía la petición a un proveedor externo compatible con OpenAI (DeepSeek u OpenAI) en lugar de un motor local. Es un **opt-in explícito** y nunca un recambio: la API solo responde cuando la pides por su nombre. Un motor local que falla no lo responde la API, y un proveedor que falla no lo responde un motor local. `"engine": "auto"`, o un `NEXE_MODEL_ENGINE=api` olvidado en el entorno, nunca llega a la nube.
+
+Lo que sale de la máquina: la conversación, los documentos recuperados y la memoria de esa petición, más los pasos internos que corren en el mismo motor (compactar la conversación, describir una imagen, el re-prompt de memoria). Nada más, y nunca la clave.
+
+Una petición con `"engine": "api"` se rechaza si no se cumple **todo** esto:
+
+1. `api_module` está en `NEXE_APPROVED_MODULES` (si no, `503`: el motor API no está cargado; las comprobaciones de abajo se hacen primero).
+2. El interruptor global está encendido: `NEXE_ALLOW_CLOUD_ENGINES=1` (apagado por defecto; es el interruptor «Permitir motores en la nube» de la web, y se vuelve a leer en cada petición). Apagado: `403` `cloud_engines_disabled`.
+3. `model` es un modelo de un proveedor con la clave configurada en el servidor: `deepseek-chat` o `deepseek-reasoner` (`DEEPSEEK_API_KEY`), o `gpt-*` (`OPENAI_API_KEY`). La clave vive solo en el `.env` del servidor: el cliente no la envía nunca y nada la muestra. Sin modelo, o un modelo local: `400` `cloud_model_not_allowed`. Sin clave: `400` `cloud_provider_not_configured`.
+4. La petición lleva su propio consentimiento: `"nexe_cloud_consent": "<clave del proveedor>"` (`"deepseek"` o `"openai"`). `/v1` no tiene sesión donde recordarlo, así que se pide en **cada** petición, para un solo proveedor. Si falta, o es el de otro proveedor: `403` `cloud_consent_required`.
+
+```bash
+curl -X POST http://127.0.0.1:9119/v1/chat/completions \
+  -H "X-API-Key: TU_CLAVE" -H "Content-Type: application/json" \
+  -d '{"engine": "api", "model": "deepseek-chat", "nexe_cloud_consent": "deepseek",
+       "messages": [{"role": "user", "content": "Hola"}]}'
+```
+
+Con el SDK de OpenAI: `extra_body={"engine": "api", "nexe_cloud_consent": "deepseek"}`. El cuerpo de un rechazo es `{"code", "message", "provider"}`, nunca una clave. Una petición que la puerta rechaza (los `400` y `403` de arriba) no guarda nada y no envía nada.
+
+- La respuesta lleva `X-Nexe-Engine: api` (`nexe_engine` en un cuerpo JSON), `model` es el que has dicho, y no hay cabecera de recambio.
+- `temperature` y `max_tokens` **no** se reenvían (algunos modelos de los proveedores los renombran o los rechazan): valen los valores por defecto del proveedor. Sí van `top_p` y las imágenes (para un modelo que sabe leerlas: `gpt-4o`, `gpt-4.1`, `gpt-5`). `reasoning_effort` no cambia nada de lo que se envía (que un modelo del proveedor razone es su naturaleza): solo decide si el razonamiento que vuelve se devuelve, como `reasoning`. `resume` (Continuar) se rechaza con `400`: un proveedor no puede reanudar a mitad de frase.
+- Errores: una clave rechazada (401/403) es `502`; un saldo (402), un límite de peticiones (429), cualquier 5xx o una petición que el proveedor rechaza es `503`; un tiempo de espera es `504` (`NEXE_API_TIMEOUT`, segundos entre dos trozos, 120 por defecto). El texto dice el proveedor y el estado HTTP, nunca la clave ni el cuerpo del proveedor.
+- Tiene una puerta de concurrencia propia (`NEXE_CLOUD_ENGINE_SLOTS`, 4 por defecto): una respuesta de la nube no ocupa nunca el sitio de los motores locales. Un límite de tiempo, o un cliente que se va, detiene la lectura HTTP.
+- La línea de traza del turno, y un mensaje de la web guardado de un proveedor, llevan `left_machine: true`.
+
+Admin: `GET /admin/providers/status` (qué claves hay, nunca la clave) y `POST /admin/providers/{provider}/check` (una petición mínima). CLI: `nexe providers status` y `nexe providers check <proveedor>`.
 
 ### Informacion del sistema
 

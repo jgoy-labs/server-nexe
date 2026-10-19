@@ -22,6 +22,13 @@ from plugins.web_ui_module.module import WebUIModule
 from plugins.web_ui_module.manifest import router_public
 
 
+@pytest.fixture(autouse=True)
+def _ollama_has_a_model_of_its_own(monkeypatch):
+    """Ollama answers as a fallback only with a model of its own, said in words
+    (C4.8 B2/D1-x): these tests have it answer behind other engines, so it has one."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "llama3.2:3b")
+
+
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)

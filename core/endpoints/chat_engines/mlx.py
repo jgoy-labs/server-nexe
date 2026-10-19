@@ -18,6 +18,8 @@ from fastapi.responses import StreamingResponse
 
 from ..chat_schemas import ChatCompletionRequest
 from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, mark_served_model, resolve_loaded_model_name
+from core.turn.usage import from_engine_result as usage_from_result
+
 from ._streaming import TokenBridge, format_engine_token, stream_end
 
 logger = logging.getLogger(__name__)
@@ -69,7 +71,7 @@ async def _mlx_stream_generator(
             )
             bridge.set_done(result=result)
         except Exception as e:
-            bridge.set_done(error=str(e))
+            bridge.fail(e)
             logger.error("MLX streaming error: %s", e, exc_info=True)
 
     mlx_task = asyncio.create_task(run_mlx())
@@ -86,7 +88,7 @@ async def _mlx_stream_generator(
             await mlx_task
         except asyncio.CancelledError:
             logger.debug("MLX stream cancelled (client disconnected)")
-            return
+            raise  # a cancellation leaves: the turn must not see a clean end
         except Exception as e:
             logger.exception("MLX streaming failed")
             # Before any token this is still the cascade's to retry (#1036).
@@ -101,7 +103,7 @@ async def _mlx_stream_generator(
         # function so the cascade's peek can retry it (#1036).
         if bridge.error:
             if not got_any_token:
-                raise RuntimeError(bridge.error)
+                raise bridge.failure()  # N1: its own class, not a bare RuntimeError
             logger.error("MLX streaming error surfaced to client: %s", bridge.error)
             yield stream_end(failure=str(bridge.error), truncated=bridge._truncated)
             return
@@ -113,6 +115,7 @@ async def _mlx_stream_generator(
         yield stream_end(
             truncated=bridge._truncated,
             finish_reason=(bridge.result or {}).get("finish_reason"),
+            usage=usage_from_result(bridge.result),
         )
 
         if bridge.result:

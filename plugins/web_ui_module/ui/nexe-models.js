@@ -145,6 +145,8 @@ NexeUI.extend({
             const data = await resp.json();
             this._backends = data.backends;
             this._currentModel = data.current_model || '';
+            this._cloud = data.cloud || { allowed: false, providers: [] };
+            this._updateCloudToggle();
 
             if (!data.backends.length && retryCount < 3) {
                 setTimeout(() => this.loadBackends(retryCount + 1), 2000 * (retryCount + 1));
@@ -156,7 +158,10 @@ NexeUI.extend({
                 const opt = document.createElement('option');
                 opt.value = b.id;
                 const disconnected = b.connected === false;
-                opt.textContent = disconnected ? `${b.name} (${this.t('disconnected')})` : b.name;
+                // The API group is the only one whose answers leave the machine:
+                // a cloud in front of it says so before anything is chosen.
+                const label = b.cloud ? `☁️ ${b.name}` : b.name;
+                opt.textContent = disconnected ? `${label} (${this.t('disconnected')})` : label;
                 opt.dataset.connected = disconnected ? '0' : '1';
                 if (b.active) opt.selected = true;
                 backendSel.appendChild(opt);
@@ -172,6 +177,8 @@ NexeUI.extend({
                     this._updateModelSelect(backendSel.value);
                     this._applyBackendChange();
                 });
+                const cloudCb = document.getElementById('cloudToggle');
+                if (cloudCb) cloudCb.addEventListener('change', () => this._onCloudToggleChange());
                 modelSel.addEventListener('change', () => {
                     this._applyBackendChange();
                 });
@@ -181,6 +188,142 @@ NexeUI.extend({
             if (retryCount < 3) {
                 setTimeout(() => this.loadBackends(retryCount + 1), 2000 * (retryCount + 1));
             }
+        }
+    },
+
+    // ── Cloud engines (API providers) ──────────────────────────────────
+    // The global switch, the consent dialog and the follow-up to a refusal.
+    // The server is the authority on all three: the UI only asks and shows.
+
+    _updateCloudToggle() {
+        const cb = document.getElementById('cloudToggle');
+        if (!cb) return;
+        const cloud = this._cloud || { allowed: false, providers: [] };
+        cb.checked = cloud.allowed === true;
+        const configured = (cloud.providers || []).filter(p => p.configured).map(p => p.name);
+        // Never a key: only which providers have one on the server.
+        cb.title = configured.length
+            ? `${this.t('cloud_allow_info')} (${configured.join(', ')})`
+            : `${this.t('cloud_allow_info')} — ${this.t('cloud_no_provider')}`;
+    },
+
+    async _onCloudToggleChange() {
+        const cb = document.getElementById('cloudToggle');
+        if (!cb) return;
+        const desired = cb.checked;
+        try {
+            const resp = await this.fetchWithCsrf('/ui/cloud-engines', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: desired })
+            });
+            if (!resp.ok) {
+                cb.checked = !desired;  // the server did not take it: show the truth
+                return;
+            }
+        } catch (e) {
+            console.error('Error toggling cloud engines:', e);
+            cb.checked = !desired;
+            return;
+        }
+        // The API group appears or disappears with the switch.
+        await this.loadBackends();
+    },
+
+    // Resolves true only on an explicit yes. Everything the dialog shows goes
+    // through textContent: the provider's name comes from the server.
+    _askCloudConsent(providerName) {
+        return new Promise((resolve) => {
+            const existing = document.getElementById('nexe-cloud-consent');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'nexe-cloud-consent';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+
+            const box = document.createElement('div');
+            box.style.cssText = 'background:var(--bg-secondary,#1e1e2e);border:1px solid var(--border,#333);border-radius:12px;padding:24px 28px;max-width:460px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4)';
+
+            const title = document.createElement('h3');
+            title.style.cssText = 'margin:0 0 8px;font-size:15px;color:var(--text-primary,#cdd6f4)';
+            title.textContent = `☁️ ${this.t('cloud_consent_title')}`;
+
+            const msg = document.createElement('p');
+            msg.style.cssText = 'margin:0 0 20px;font-size:13px;color:var(--text-secondary,#a6adc8)';
+            msg.textContent = this.t('cloud_consent_msg').replace(/\{provider\}/g, providerName);
+
+            const btnRow = document.createElement('div');
+            btnRow.style.cssText = 'display:flex;gap:10px;justify-content:flex-end';
+
+            const noBtn = document.createElement('button');
+            noBtn.style.cssText = 'padding:8px 16px;border-radius:8px;border:1px solid var(--border,#333);background:transparent;color:var(--text-secondary,#a6adc8);cursor:pointer;font-size:13px';
+            noBtn.textContent = this.t('cloud_consent_no');
+
+            const yesBtn = document.createElement('button');
+            yesBtn.style.cssText = 'padding:8px 16px;border-radius:8px;border:none;background:#2e86de;color:#fff;cursor:pointer;font-size:13px;font-weight:600';
+            yesBtn.textContent = this.t('cloud_consent_yes');
+
+            btnRow.appendChild(noBtn);
+            btnRow.appendChild(yesBtn);
+            box.appendChild(title);
+            box.appendChild(msg);
+            box.appendChild(btnRow);
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+
+            const close = (yes) => { overlay.remove(); resolve(yes); };
+            yesBtn.addEventListener('click', () => close(true));
+            noBtn.addEventListener('click', () => close(false));
+            // Outside the box is a "no": consent is never given by accident.
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+        });
+    },
+
+    // The server's reason for a refusal of the cloud gate, in the UI's language
+    // (the server's own English text when the code is one the UI does not know).
+    async _cloudErrorText(response) {
+        let detail = null;
+        try { detail = (await response.clone().json()).detail; } catch { /* not JSON */ }
+        if (!detail || typeof detail !== 'object' || typeof detail.code !== 'string') return '';
+        if (!detail.code.startsWith('cloud_')) return '';
+        const known = this.t(`err_${detail.code}`);
+        return known && known !== `err_${detail.code}` ? known : (detail.message || '');
+    },
+
+    // After a 403/400 on /ui/chat: null when the refusal is not the cloud
+    // gate's (the caller keeps its generic path). On "consent required" it
+    // asks and, on a yes, sends the same turn again with the consent.
+    async _cloudRefusalFollowUp(response, chatBody) {
+        let detail = null;
+        try { detail = (await response.clone().json()).detail; } catch { /* not JSON */ }
+        if (!detail || typeof detail !== 'object' || typeof detail.code !== 'string') return null;
+        if (detail.code === 'cloud_consent_required') {
+            const yes = await this._askCloudConsent(detail.provider_name || detail.provider || '');
+            if (!yes) return { declined: true };
+            const again = await this.fetchWithCsrf('/ui/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...chatBody, cloud_consent: detail.provider }),
+                signal: this.abortController ? this.abortController.signal : undefined
+            });
+            return { response: again };
+        }
+        const why = await this._cloudErrorText(response);
+        return why ? { refused: why } : null;
+    },
+
+    // A turn the server refused before storing it: take the bubble back out
+    // and give the user their text (and picture) again.
+    _undoUnsentTurn(message, pendingImage, continueState) {
+        if (continueState) return;
+        const last = this.chatMessages && this.chatMessages.lastElementChild;
+        if (last && last.classList && last.classList.contains('user')) last.remove();
+        if (this.messageInput) this.messageInput.value = message;
+        if (pendingImage && this.imagePreviewBar) {
+            this._selectedImage = pendingImage;
+            this.imagePreviewThumb.src = `data:${pendingImage.type};base64,${pendingImage.b64}`;
+            this.imagePreviewName.textContent = pendingImage.name || '';
+            this.imagePreviewBar.style.display = 'flex';
         }
     },
 
@@ -198,7 +341,7 @@ NexeUI.extend({
                 opt.value = name;
                 // Shows 👁️ if has vision, 🧠 if thinks + approximate RAM size
                 const hasVision = this._modelHasVision(name, backendId);
-                const hasThinking = this._canThink(name);
+                const hasThinking = this._canThink(name, backendId);
                 const sizeGb = typeof m === 'object' ? m.size_gb : 0;
                 const sizeTag = sizeGb > 0 ? ` (~${sizeGb}GB)` : '';
                 const prefix = (hasVision ? '👁️ ' : '') + (hasThinking ? '🧠 ' : '');
@@ -216,6 +359,13 @@ NexeUI.extend({
     /// backend: 'ollama'|'mlx'|'llamacpp' — used to exclude models that need
     /// runtime deps not present on a given engine.
     _modelHasVision(name, backend) {
+        // A hosted model is not judged by its name: the server says, per model,
+        // whether the provider's entry declares it image-capable.
+        if (backend === 'api') {
+            const group = (this._backends || []).find(b => b.id === 'api');
+            const entry = group && group.models.find(m => (typeof m === 'object' ? m.name : m) === name);
+            return !!(entry && typeof entry === 'object' && entry.vision === true);
+        }
         const n = (name || '').toLowerCase();
         // Models that historically crashed on MLX because they needed torch
         // and the dev/DMG bundles did not ship it. Empirical 2026-05-13:
@@ -299,6 +449,9 @@ NexeUI.extend({
                 } else {
                     if (el) el.textContent = `${model} · ${backend}`;
                 }
+            } else if (backend === 'api') {
+                const why = await this._cloudErrorText(resp);
+                if (el && why) el.textContent = why;
             }
         } catch (e) {
             console.error('Failed to set backend:', e);

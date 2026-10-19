@@ -92,6 +92,7 @@ from .lifespan_sessions import (  # noqa: E402  # after warnings filter
     _expose_memory_helper,
     _expose_post_commit_queue,
     _expose_session_manager,
+    _expose_trace_sinks,
     _startup_context_presenter,
     _startup_engine_gate,
     _startup_file_handler,
@@ -398,6 +399,7 @@ async def _startup_init(app: FastAPI) -> None:
     _expose_engine_gate(app, server_state)
     await _startup_post_commit_queue(server_state)
     _expose_post_commit_queue(app, server_state)
+    _expose_trace_sinks(app)
     await _startup_memory_helper(server_state)
     _expose_memory_helper(app, server_state)
     await _startup_context_presenter(server_state)
@@ -712,7 +714,8 @@ async def _cancel_background_tasks() -> None:
             _dreaming_cycle.stop()
         except Exception:
             logger.debug("DreamingCycle.stop() during pre-shutdown raised", exc_info=True)
-    for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task', '_knowledge_ingest_task', '_dreaming_task', '_post_commit_task'):
+    for _task_attr in ('_cleanup_task', '_session_cleanup_task', '_prewarm_task', '_knowledge_ingest_task', '_dreaming_task', '_post_commit_task',
+                       '_post_commit_cloud_task'):
         _task = getattr(server_state, _task_attr, None)
         if _task is not None and not _task.done():
             _task.cancel()

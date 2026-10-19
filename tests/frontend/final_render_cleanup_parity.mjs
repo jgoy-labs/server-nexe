@@ -55,7 +55,7 @@ function oldStripLeakedTags(text) {
 }
 
 const extract = (s) => {
-    const r = NexeUI.prototype._extractMemSave.call({}, s);
+    const r = NexeUI.prototype._extractMemSave.call({ _dropQuotedMemTags: NexeUI.prototype._dropQuotedMemTags }, s);
     return { text: r.text, facts: [...r.facts] };
 };
 const strip = (s) => NexeUI.prototype._stripLeakedTags.call({}, s);

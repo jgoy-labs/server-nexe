@@ -115,7 +115,7 @@ class ChatCompletionRequest(BaseModel):
     Pydantic anti-DoS constraints:
       - messages: max_length=100 (no real conversation needs more; prevents DoS via 1M msgs)
       - model: max_length=200 (long enough for HF-style ``org/repo-name:tag``)
-      - engine: max_length=50 (``mlx``/``ollama``/``llama_cpp``/``auto``)
+      - engine: max_length=50 (``mlx``/``ollama``/``llama_cpp``/``api``/``auto``)
     """
 
     messages: List[Message] = Field(..., min_length=1, max_length=100)
@@ -142,6 +142,12 @@ class ChatCompletionRequest(BaseModel):
     # web UI's default too (decision of 25/09).
     reasoning_effort: Optional[str] = Field(default=None, max_length=20)
     reasoning: Optional[Dict[str, Any]] = None
+    # Phase 3 of the API providers: `engine="api"` sends the conversation, the
+    # retrieved documents and the memory to an external provider. This door has no
+    # session and no dialog, so the consent is the request's own: the KEY of the
+    # provider it agrees to ("deepseek"), per request, remembered nowhere. Without
+    # it (or with another provider's) the request is refused with a 403.
+    nexe_cloud_consent: Optional[str] = Field(default=None, max_length=50)
 
     model_config = ConfigDict(protected_namespaces=())
 

@@ -157,6 +157,21 @@ class TestDeriveSessionIdFromFirstUserMessage:
         messages = [{"role": "user", "content": "hola"}]
         assert derive_session_id(req, messages) == "explicit-id"
 
+    def test_header_that_is_not_a_safe_id_is_a_400_not_a_500(self):
+        """API-20261016-1: «a.b» (a dot, a slash) names no file we would write;
+        it used to reach the session store and come back as an unhandled 500."""
+        import pytest
+        from fastapi import HTTPException
+
+        from core.endpoints.chat_engines._common import derive_session_id
+
+        for bad in ("a.b", "../x", "a b", "x/y"):
+            req = MagicMock()
+            req.headers = {"x-session-id": bad}
+            with pytest.raises(HTTPException) as err:
+                derive_session_id(req, [{"role": "user", "content": "hola"}])
+            assert err.value.status_code == 400
+
     def test_same_first_user_message_same_id(self):
         from core.endpoints.chat_engines._common import derive_session_id
 

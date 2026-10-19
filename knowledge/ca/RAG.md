@@ -138,6 +138,18 @@ server-nexe te un sistema de memoria automatica similar a ChatGPT o Claude. El m
 
 **Deduplicacio:** Abans de guardar, comprova la similitud amb entrades existents. Si la similitud > 0.80, l'entrada es considera duplicada i no es guarda.
 
+### Fets amb clau: com es troba un canvi
+
+Una segona passada llegeix el missatge de l'usuari amb el mateix model que ha respost (una crida curta, ~0,5 s en local, uns 1 s amb una API) i en treu fets amb **clau**: de qui parla (`user`, una germana…), de què (`age`, `phone`, `pets`…), el valor tal com l'ha escrit l'usuari i una frase curta. El servidor decideix per la clau, no per la semblança de dues frases:
+- **No hi ha cap fet amb aquesta clau:** es guarda, amb la clau al costat (`entity`, `attribute`, `value`, `value_norm`).
+- **Hi és amb el mateix valor:** no passa res, també si el torn és en un altre idioma («tinc 45 anys» i «I'm 45» són el mateix; un número es compara sense unitat).
+- **Hi és amb un altre valor:** és un canvi. No es canvia res: el servidor pregunta «Encara no he canviat res: tinc apuntat X. Vols que ho canviï per Y? Respon sí per confirmar.» i només el «sí» de l'usuari ho fa (B028). Una clau que admet diversos valors (`pets`, `allergies`…) pregunta igual: un «no» es pot desfer, un segon gos desat en silenci no.
+- Les claus ja desades van al prompt de l'extractor perquè la mateixa cosa tingui sempre el mateix nom. Amb un motor d'API hi van els noms, no els valors.
+- Si la passada no pot llegir el missatge (el model no respon JSON dues vegades, el motor és ocupat), valen els marcadors `[MEM_SAVE:]` com sempre. Un valor que no és al missatge es descarta (invenció).
+- S'apaga amb `NEXE_MEMORY_KEYED=false`. Els fets desats abans no tenen clau: per a ells continua la semblança (0,80).
+
+Provat (19/10) amb 4B, 9B i 27B a Ollama i MLX, DeepSeek i Claude: el canvi d'edat, de telèfon i de nom del gos s'arma, es pregunta i es fa amb tots.
+
 **Flux complet d'un marcador MEM_SAVE:**
 
 ```

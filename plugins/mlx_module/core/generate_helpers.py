@@ -620,6 +620,7 @@ def extract_metrics(
         return {
             "text": text,
             "tokens": len(text) // 4,
+            "usage_estimated": True,  # no mlx-lm counter here: a guess, not a count (core.turn.usage)
             "prompt_tokens": 0,
             "tokens_per_second": 0,
             "prompt_tps": 0,

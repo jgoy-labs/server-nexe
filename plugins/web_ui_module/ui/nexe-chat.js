@@ -72,7 +72,13 @@ NexeUI.extend({
 
     // ── Thinking toggle ────────────────────────────────────────────
     // Mirror of Python THINKING_CAPABLE safelist (ollama_module/core/chat.py)
-    _canThink(model) {
+    // `backend` matters: a hosted model's reasoning is the model's own nature
+    // (a provider's reasoner always reasons; its chat model never takes the
+    // switch), so the per-session toggle is never offered on the API group —
+    // and the name heuristic below must not decide for a model it does not
+    // know.
+    _canThink(model, backend) {
+        if (backend === 'api') return false;
         const THINKING_FAMILIES = [
             'qwen3.5', 'qwen3', 'qwq',
             'deepseek-r1',
@@ -100,7 +106,8 @@ NexeUI.extend({
         if (!cb) return;
         const modelSel = document.getElementById('modelSelect');
         const model = modelSel ? modelSel.value : '';
-        const supported = this._canThink(model);
+        const backendSel = document.getElementById('backendSelect');
+        const supported = this._canThink(model, backendSel ? backendSel.value : '');
         cb.disabled = !supported;
         if (!supported && cb.checked) {
             cb.checked = false;
@@ -135,7 +142,8 @@ NexeUI.extend({
         const enabled = session && session.thinking_enabled === true;
         const modelSel = document.getElementById('modelSelect');
         const model = modelSel ? modelSel.value : '';
-        const supported = this._canThink(model);
+        const backendSel = document.getElementById('backendSelect');
+        const supported = this._canThink(model, backendSel ? backendSel.value : '');
         cb.disabled = !supported;
         cb.checked = supported && enabled;
         cb.title = supported ? this.t('thinking_mode') : this.t('thinking_not_supported');
@@ -154,11 +162,34 @@ NexeUI.extend({
      * StreamGuard), so every `\x00` belongs to a sentinel and they come in
      * pairs: an odd count means the last one opens a sentinel still arriving.
      */
-    _takeSentinelCarry(text) {
+    _takeSentinelCarry(text, final = false) {
         const nuls = (text.match(/\x00/g) || []).length; // eslint-disable-line no-control-regex
         if (nuls % 2 === 0) return { chunk: text, carry: '' };
         const at = text.lastIndexOf('\x00');
+        // #1150: at the end of the stream nothing is coming to finish it. What
+        // was held is shown (without the lone `\x00`), as the CLI does
+        // (`UiStreamReader.close`), instead of being dropped with the reader.
+        if (final) return { chunk: text.slice(0, at) + text.slice(at + 1), carry: '' };
         return { chunk: text.slice(0, at), carry: text.slice(at) };
+    },
+
+    /**
+     * The decoded reads of a streamed reply, each one safe to look for
+     * sentinels in: a sentinel cut between two reads is held for the next one
+     * (`_takeSentinelCarry`), and when the stream ends the decoder and the
+     * carry are flushed as one last chunk (#1150 — the loop used to `break` on
+     * `done` and the held tail was lost).
+     */
+    async *_streamChunks(reader, decoder) {
+        let carry = '';
+        while (true) {
+            const { value, done } = await reader.read();
+            const incoming = done ? decoder.decode() : decoder.decode(value, { stream: true });
+            const taken = this._takeSentinelCarry(carry + incoming, done);
+            carry = taken.carry;
+            yield taken.chunk;
+            if (done) return;
+        }
     },
 
     _cleanModelTags(buf) {
@@ -201,7 +232,7 @@ NexeUI.extend({
     // for the badge, the streaming callers deliberately keep every occurrence.
     _extractMemSave(text) {
         const facts = [];
-        const stripped = text.replace(/\[MEM_SAVE:\s*(.+?)\]\s*/g, (_, f) => {
+        const stripped = this._dropQuotedMemTags(text).replace(/\[MEM_SAVE:\s*(.+?)\]\s*/g, (_, f) => {
             facts.push(f);
             return '';
         });
@@ -506,16 +537,38 @@ NexeUI.extend({
                         .replace('{where}', detail.lease.where || '?')
                         .replace('{time}', timeStr);
                     if (window.confirm(msg)) {
+                        // Kept on the turn itself: a consent asked for after this
+                        // takeover resends the same body, and must still carry it.
+                        chatBody.force_lease = true;
                         response = await this.fetchWithCsrf('/ui/chat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ...chatBody, force_lease: true }),
+                            body: JSON.stringify(chatBody),
                             signal: this.abortController.signal
                         });
                     } else {
                         this.setAiState('idle');
                         return;
                     }
+                }
+            }
+
+            // The cloud gate (API engine): consent is asked, once per session,
+            // and the same turn is sent again with it; the other refusals say
+            // why instead of the generic send error. A decline leaves the turn
+            // unsent, as if the user had not pressed send.
+            if (response.status === 403 || response.status === 400) {
+                const follow = await this._cloudRefusalFollowUp(response, chatBody);
+                if (follow && follow.response) {
+                    response = follow.response;
+                } else if (follow && follow.declined) {
+                    this._undoUnsentTurn(message, pendingImage, continueState);
+                    return;
+                } else if (follow && follow.refused) {
+                    this._undoUnsentTurn(message, pendingImage, continueState);
+                    this.setAiState('error');
+                    this.addMessageToChat('assistant', `❌ ${follow.refused}`);
+                    return;
                 }
             }
 
@@ -548,6 +601,7 @@ NexeUI.extend({
                 let ragItems = [];  // [{col, score}]
                 let usedModel = '';
                 let usedEngine = '';
+                let usedUsage = null;  // {inTok, outTok, cached}: what the engine said the call cost
                 let compactMatch = null;
 
                 const reader = response.body.getReader();
@@ -644,16 +698,110 @@ NexeUI.extend({
 
 
                 // A sentinel cut between two reads would leak as text and never
-                // match: hold everything after an odd \x00 until the next read
-                // (#1139, `_takeSentinelCarry`).
-                let sentinelCarry = '';
-                try {
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
+                // match: `_streamChunks` holds everything after an odd \x00 until
+                // the next read (#1139) and flushes it when the stream ends (#1150).
+                // Per-message footer. Painted when the stream ends and also when the user stops it:
+                // a stopped turn still used a model and tokens, and the footer says who stopped it.
+                const paintFooter = (stopped) => {
+                    // Per-message stats
+                    const elapsed = (Date.now() - this._streamStart) / 1000;
+                    const exact = !stopped && usedUsage !== null && usedUsage.outTok > 0;
+                    const finalTok = exact ? usedUsage.outTok : this._streamTokens;
+                    const finalSpd = elapsed > 0.5 ? (finalTok / elapsed).toFixed(1) : null;
+                    const statsEl = lastMsg.querySelector('.message-stats');
+                    if (statsEl && (finalTok > 0 || stopped)) {
+                        const timeStr = elapsed > 0 ? `${elapsed.toFixed(1)}s` : '';
+                        const spdStr = finalSpd ? ` · ${finalSpd} tok/s` : '';
+                        const modelShort = this._modelFooterLabel(usedModel, usedEngine);
+                        let memBadge = '';
+                        if (memorySaved && memFacts.length > 0) {
+                            const factsHtml = memFacts.map(f => {
+                                const safe = f.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                                return '<div class="mem-fact">' + safe + '</div>';
+                            }).join('');
+                            memBadge = '<span class="stat-item stat-mem mem-expandable">'
+                                + '<i data-lucide="bookmark-check"></i>'
+                                + '<span>' + this.t('saved') + '</span>'
+                                + '<div class="mem-tooltip">' + factsHtml + '</div>'
+                                + '</span>';
+                        } else if (memorySaved) {
+                            memBadge = '<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>' + this.t('saved') + '</span></span>';
+                        }
+                        let delBadge = '';
+                        if (memoryDeleted && deletedFacts.length > 0) {
+                            const delFactsHtml = deletedFacts.map(f => {
+                                const safe = f.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                                return '<div class="mem-fact">' + safe + '</div>';
+                            }).join('');
+                            delBadge = '<span class="stat-item stat-mem-del mem-expandable">'
+                                + '<i data-lucide="trash-2"></i>'
+                                + '<span>esborrat (' + deletedCount + ')</span>'
+                                + '<div class="mem-tooltip mem-del-tooltip">' + delFactsHtml + '</div>'
+                                + '</span>';
+                        } else if (memoryDeleted) {
+                            delBadge = '<span class="stat-item stat-mem-del"><i data-lucide="trash-2"></i><span>esborrat</span></span>';
+                        }
+                        let ragBadge = '';
+                        if (ragCount > 0) {
+                            const pct = ragAvg > 0 ? Math.round(ragAvg * 100) : 0;
+                            const barWidth = 8;
+                            const filled = Math.round(ragAvg * barWidth);
+                            const ragBar = ragAvg > 0
+                                ? `<span class="rag-bar">${'▓'.repeat(filled)}${'░'.repeat(barWidth - filled)}</span> ${pct}%`
+                                : '';
+                            let ragDetail = '';
+                            if (ragItems.length > 0) {
+                                const detailRows = ragItems.map(item => {
+                                    const f = Math.round(item.score * 10);
+                                    const bar = '▓'.repeat(f) + '░'.repeat(10 - f);
+                                    const color = item.score >= 0.8 ? 'rag-high' : item.score >= 0.6 ? 'rag-mid' : 'rag-low';
+                                    return `<div class="rag-detail-row ${color}"><span class="rag-col">${this.escapeHtml(item.col)}</span><span class="rag-detail-bar">${bar}</span><span class="rag-score">${(item.score * 100).toFixed(0)}%</span></div>`;
+                                }).join('');
+                                ragDetail = `<div class="rag-detail" style="display:none">${detailRows}</div>`;
+                            }
+                            const toggleBtn = ragItems.length > 0
+                                ? `<span class="rag-toggle" onclick="this.parentElement.querySelector('.rag-detail').style.display=this.parentElement.querySelector('.rag-detail').style.display==='none'?'block':'none';this.textContent=this.textContent==='▼'?'▲':'▼'">▼</span>`
+                                : '';
+                            ragBadge = `<span class="stat-item stat-rag"><i data-lucide="brain"></i><span>RAG ${ragCount} ${ragBar}</span>${toggleBtn}${ragDetail}</span>`;
+                        }
+                        const compactBadge = compactMatch
+                            ? `<span class="stat-item stat-compact"><i data-lucide="archive"></i><span>ctx ${compactMatch[1]}x</span></span>`
+                            : '';
+                        statsEl.innerHTML = `
+                            <span class="stat-item"><i data-lucide="activity"></i><span title="${this.escapeHtml(this._tokensTitle(exact, usedUsage ? usedUsage.inTok : null, usedUsage ? usedUsage.cached : null))}">${exact ? '' : '~'}${finalTok} tok</span></span>
+                            ${timeStr ? `<span class="stat-item"><i data-lucide="timer"></i><span>${timeStr}${spdStr}</span></span>` : ''}
+                            ${modelShort ? `<span class="stat-item stat-model"><i data-lucide="cpu"></i><span>${this.escapeHtml(modelShort)}</span></span>` : ''}
+                            ${stopped ? `<span class="stat-item stat-stopped"><i data-lucide="square"></i><span>${this.escapeHtml(this.t('stopped_by_user'))}</span></span>` : ''}
+                            ${ragBadge}
+                            ${compactBadge}
+                            ${memBadge}
+                            ${delBadge}
+                            <button class="copy-btn" title="Copy"><i data-lucide="copy"></i></button>
+                        `;  // Safe: all values are server-controlled (token counts, model names, pre-built badge HTML)
+                        const _copyBtn = statsEl.querySelector('.copy-btn');
+                        if (_copyBtn) {
+                            const _textDiv = lastMsg.querySelector('.message-text');
+                            _copyBtn.addEventListener('click', () => {
+                                navigator.clipboard.writeText(_textDiv ? _textDiv.innerText : '').then(() => {
+                                    const checkI = document.createElement('i');
+                                    checkI.setAttribute('data-lucide', 'check');
+                                    _copyBtn.replaceChildren(checkI);
+                                    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [_copyBtn] });
+                                    setTimeout(() => {
+                                        const restoreI = document.createElement('i');
+                                        restoreI.setAttribute('data-lucide', 'copy');
+                                        _copyBtn.replaceChildren(restoreI);
+                                        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [_copyBtn] });
+                                    }, 2000);
+                                }).catch(() => {});
+                            });
+                        }
+                        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsEl] });
+                    }
+                };
 
-                        let chunk;
-                        ({ chunk, carry: sentinelCarry } = this._takeSentinelCarry(sentinelCarry + decoder.decode(value, { stream: true })));
+                try {
+                    for await (let chunk of this._streamChunks(reader, decoder)) {
 
                         // Detect MODEL token (model actually used). A turn answered
                         // by a fallback sends a second one (#1035): the last wins,
@@ -669,6 +817,15 @@ NexeUI.extend({
                         if (engineMatches.length) {
                             usedEngine = engineMatches[engineMatches.length - 1][1];
                             chunk = chunk.replace(/\x00\[ENGINE:[^\]]+\]\x00/g, ''); // eslint-disable-line no-control-regex
+                        }
+
+                        // The engine's own count of the call, sent after the answer: the footer
+                        // shows it as exact; without it the footer estimates and says so (~).
+                        const usageMatch = chunk.match(/\x00\[USAGE:(\d*)\|(\d*)\|(\d*)\]\x00/); // eslint-disable-line no-control-regex
+                        if (usageMatch) {
+                            const num = (v) => (v === '' ? null : parseInt(v, 10));
+                            usedUsage = { inTok: num(usageMatch[1]), outTok: num(usageMatch[2]), cached: num(usageMatch[3]) };
+                            chunk = chunk.replace(/\x00\[USAGE:\d*\|\d*\|\d*\]\x00/, ''); // eslint-disable-line no-control-regex
                         }
 
                         // Detect RAG token (retrieved memories)
@@ -948,99 +1105,7 @@ NexeUI.extend({
                         const notice = lastMsg.querySelector('.trunc-notice:last-of-type');
                         (notice || lastMsg.querySelector('.message-content')).appendChild(contBtn);
                     }
-                    // Per-message stats
-                    const elapsed = (Date.now() - this._streamStart) / 1000;
-                    const finalTok = this._streamTokens;
-                    const finalSpd = elapsed > 0.5 ? (finalTok / elapsed).toFixed(1) : null;
-                    const statsEl = lastMsg.querySelector('.message-stats');
-                    if (statsEl && finalTok > 0) {
-                        const timeStr = elapsed > 0 ? `${elapsed.toFixed(1)}s` : '';
-                        const spdStr = finalSpd ? ` · ${finalSpd} tok/s` : '';
-                        const modelShort = this._modelFooterLabel(usedModel, usedEngine);
-                        let memBadge = '';
-                        if (memorySaved && memFacts.length > 0) {
-                            const factsHtml = memFacts.map(f => {
-                                const safe = f.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                                return '<div class="mem-fact">' + safe + '</div>';
-                            }).join('');
-                            memBadge = '<span class="stat-item stat-mem mem-expandable">'
-                                + '<i data-lucide="bookmark-check"></i>'
-                                + '<span>' + this.t('saved') + '</span>'
-                                + '<div class="mem-tooltip">' + factsHtml + '</div>'
-                                + '</span>';
-                        } else if (memorySaved) {
-                            memBadge = '<span class="stat-item stat-mem"><i data-lucide="bookmark-check"></i><span>' + this.t('saved') + '</span></span>';
-                        }
-                        let delBadge = '';
-                        if (memoryDeleted && deletedFacts.length > 0) {
-                            const delFactsHtml = deletedFacts.map(f => {
-                                const safe = f.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                                return '<div class="mem-fact">' + safe + '</div>';
-                            }).join('');
-                            delBadge = '<span class="stat-item stat-mem-del mem-expandable">'
-                                + '<i data-lucide="trash-2"></i>'
-                                + '<span>esborrat (' + deletedCount + ')</span>'
-                                + '<div class="mem-tooltip mem-del-tooltip">' + delFactsHtml + '</div>'
-                                + '</span>';
-                        } else if (memoryDeleted) {
-                            delBadge = '<span class="stat-item stat-mem-del"><i data-lucide="trash-2"></i><span>esborrat</span></span>';
-                        }
-                        let ragBadge = '';
-                        if (ragCount > 0) {
-                            const pct = ragAvg > 0 ? Math.round(ragAvg * 100) : 0;
-                            const barWidth = 8;
-                            const filled = Math.round(ragAvg * barWidth);
-                            const ragBar = ragAvg > 0
-                                ? `<span class="rag-bar">${'▓'.repeat(filled)}${'░'.repeat(barWidth - filled)}</span> ${pct}%`
-                                : '';
-                            let ragDetail = '';
-                            if (ragItems.length > 0) {
-                                const detailRows = ragItems.map(item => {
-                                    const f = Math.round(item.score * 10);
-                                    const bar = '▓'.repeat(f) + '░'.repeat(10 - f);
-                                    const color = item.score >= 0.8 ? 'rag-high' : item.score >= 0.6 ? 'rag-mid' : 'rag-low';
-                                    return `<div class="rag-detail-row ${color}"><span class="rag-col">${this.escapeHtml(item.col)}</span><span class="rag-detail-bar">${bar}</span><span class="rag-score">${(item.score * 100).toFixed(0)}%</span></div>`;
-                                }).join('');
-                                ragDetail = `<div class="rag-detail" style="display:none">${detailRows}</div>`;
-                            }
-                            const toggleBtn = ragItems.length > 0
-                                ? `<span class="rag-toggle" onclick="this.parentElement.querySelector('.rag-detail').style.display=this.parentElement.querySelector('.rag-detail').style.display==='none'?'block':'none';this.textContent=this.textContent==='▼'?'▲':'▼'">▼</span>`
-                                : '';
-                            ragBadge = `<span class="stat-item stat-rag"><i data-lucide="brain"></i><span>RAG ${ragCount} ${ragBar}</span>${toggleBtn}${ragDetail}</span>`;
-                        }
-                        const compactBadge = compactMatch
-                            ? `<span class="stat-item stat-compact"><i data-lucide="archive"></i><span>ctx ${compactMatch[1]}x</span></span>`
-                            : '';
-                        statsEl.innerHTML = `
-                            <span class="stat-item"><i data-lucide="activity"></i><span>${finalTok} tok</span></span>
-                            ${timeStr ? `<span class="stat-item"><i data-lucide="timer"></i><span>${timeStr}${spdStr}</span></span>` : ''}
-                            ${modelShort ? `<span class="stat-item stat-model"><i data-lucide="cpu"></i><span>${this.escapeHtml(modelShort)}</span></span>` : ''}
-                            ${ragBadge}
-                            ${compactBadge}
-                            ${memBadge}
-                            ${delBadge}
-                            <button class="copy-btn" title="Copy"><i data-lucide="copy"></i></button>
-                        `;  // Safe: all values are server-controlled (token counts, model names, pre-built badge HTML)
-                        const _copyBtn = statsEl.querySelector('.copy-btn');
-                        if (_copyBtn) {
-                            const _textDiv = lastMsg.querySelector('.message-text');
-                            _copyBtn.addEventListener('click', () => {
-                                navigator.clipboard.writeText(_textDiv ? _textDiv.innerText : '').then(() => {
-                                    const checkI = document.createElement('i');
-                                    checkI.setAttribute('data-lucide', 'check');
-                                    _copyBtn.replaceChildren(checkI);
-                                    if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [_copyBtn] });
-                                    setTimeout(() => {
-                                        const restoreI = document.createElement('i');
-                                        restoreI.setAttribute('data-lucide', 'copy');
-                                        _copyBtn.replaceChildren(restoreI);
-                                        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [_copyBtn] });
-                                    }, 2000);
-                                }).catch(() => {});
-                            });
-                        }
-                        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [statsEl] });
-                    }
+                    paintFooter(false);
                 } catch (readError) {
                     if (this._loadingTimer) { clearInterval(this._loadingTimer); this._loadingTimer = null; }
                     if (loadingEl) {
@@ -1050,7 +1115,8 @@ NexeUI.extend({
                     }
                     if (readError.name === 'AbortError') {
                         if (st.tMode === 'thinking') closeThinkBlock();
-                        assistantMessageDiv.innerHTML = this.renderMarkdown(st.fullResponse + `\n\n*[${this.t('generation_stopped')}]*`);
+                        assistantMessageDiv.innerHTML = this.renderMarkdown(st.fullResponse);
+                        paintFooter(true);
                     } else {
                         throw readError;
                     }

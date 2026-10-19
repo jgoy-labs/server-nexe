@@ -10,7 +10,7 @@ www.jgoy.net · https://server-nexe.org
 """
 
 from typing import Dict, Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 import os
 import urllib.request
 import urllib.error
@@ -174,3 +174,11 @@ class NexeClient:
       Chat response dict
     """
     return self._request("POST", "/api/chat", {"message": message})
+
+  def get_providers_status(self) -> Dict[str, Any]:
+    """Key presence per external provider (GET /admin/providers/status)."""
+    return self._request("GET", "/admin/providers/status")
+
+  def check_provider(self, provider_key: str) -> Dict[str, Any]:
+    """Ask the server to test one provider (POST /admin/providers/<key>/check)."""
+    return self._request("POST", f"/admin/providers/{quote(provider_key, safe='')}/check", {})

@@ -16,7 +16,38 @@ www.jgoy.net · https://server-nexe.org
 import asyncio
 import logging
 
+from core.turn.errors import BadRequest
+from core.turn.usage import SENTINEL as USAGE_SENTINEL
+from core.turn.usage import from_engine_result as usage_of_result
+
 logger = logging.getLogger(__name__)
+
+
+def _entry(engine_name: str):
+    """The engine's row in the engine table (`chat_engines/routing.py`).
+    Looked up at call time: `core.endpoints` imports this module's users while
+    it loads."""
+    from core.endpoints.chat_engines.routing import engine_entry
+
+    return engine_entry(engine_name)
+
+
+def _in_process(engine_name: str) -> bool:
+    """Does this engine run inside the server's own process (MLX, llama.cpp)?"""
+    entry = _entry(engine_name)
+    return entry is not None and entry.in_process
+
+
+def _takes_cancel_event(engine_name: str) -> bool:
+    """Is the engine handed the turn's cancel event?
+
+    The in-process engines (a worker thread that would not notice an HTTP
+    disconnect) and the hosted ones (the API: a deadline only SETS the event,
+    it does not cancel the asyncio task, so an HTTP read that nobody tells to
+    stop would run to its own timeout). Ollama is neither: it cancels with its
+    task."""
+    entry = _entry(engine_name)
+    return entry is not None and (entry.in_process or entry.cloud)
 
 
 def start_engine_call(
@@ -46,12 +77,9 @@ def start_engine_call(
     # early instead of running to max_tokens (orphan worker
     # blocking the model — MC-011). Ollama cancels naturally via
     # its httpx async transport when the asyncio task is
-    # cancelled, so it doesn't need the event.
-    cancel_kwargs = (
-        {"cancel_event": cancel_event}
-        if engine_name in ("mlx", "llama_cpp")
-        else {}
-    )
+    # cancelled, so it doesn't need the event. A hosted engine (the API)
+    # gets it too (see `_takes_cancel_event`).
+    cancel_kwargs = {"cancel_event": cancel_event} if _takes_cancel_event(engine_name) else {}
 
     if 'model' in sig.parameters:
         # Ollama-style: chat(model, messages, stream=...)
@@ -70,7 +98,7 @@ def start_engine_call(
                                   **continue_kwargs, **cancel_kwargs, **sampling_kwargs)
     else:
         # MLX/LlamaCpp-style: chat(messages, system=...)
-        if engine_name in ("mlx", "llama_cpp"):
+        if _in_process(engine_name):
             # MLX module requires a callback for streaming
             queue: asyncio.Queue = asyncio.Queue()
 
@@ -96,8 +124,8 @@ def start_engine_call(
             # else that joins this branch.
             _continue_kwargs = {}
             if _continue:
-                if engine_name not in ("mlx", "llama_cpp"):
-                    raise ValueError(
+                if not _in_process(engine_name):
+                    raise BadRequest(
                         "continue is only supported on the MLX and llama.cpp engines"
                     )
                 _continue_kwargs = {"continue_final": True}
@@ -140,6 +168,9 @@ def start_engine_call(
                                 "__nexe_trunc__": True,
                                 "continuable": bool(_res.get("continuable")),
                             }
+                        _said = usage_of_result(_res)
+                        if _said:
+                            yield {USAGE_SENTINEL: _said}
                         break
 
                     # Wait for new tokens with short timeout

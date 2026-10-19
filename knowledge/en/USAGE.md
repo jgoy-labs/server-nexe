@@ -28,6 +28,7 @@ expires: null
   - [Document Upload](#document-upload)
 - [MEM_SAVE — Automatic Memory](#mem_save--automatic-memory)
   - [Full wipe (`CLEAR_ALL`) — 2-turn confirmation](#full-wipe-clear_all--2-turn-confirmation)
+- [External API providers](#external-api-providers-optional)
 - [Encryption](#encryption)
 - [API Usage](#api-usage)
   - [Chat (curl)](#chat-curl)
@@ -151,6 +152,17 @@ If you ask to delete **all** memory ("delete everything", "forget everything", "
 2. **Turn 2:** If you reply `yes`/`confirm`/`ok`, the deletion runs. Any other reply cancels the operation.
 
 This prevents accidental mass wipes caused by an ambiguous message or injection from a document.
+
+## External API providers (optional)
+
+server-nexe is local by default and stays so: nothing leaves your machine unless you turn this on, choose it, and say yes. To chat with DeepSeek or OpenAI:
+
+1. **Approve the module.** `api_module` must be in `NEXE_APPROVED_MODULES` in your `.env` (new installs have it; for an existing one, add it and restart).
+2. **Put the key in `.env`** (never in the UI): `DEEPSEEK_API_KEY=...` or `OPENAI_API_KEY=...`. Check it with `./nexe providers status` (which keys are configured, never the key) and `./nexe providers check deepseek` (one minimal request).
+3. **Turn the global switch on**: `NEXE_ALLOW_CLOUD_ENGINES=1`, or the "Allow cloud engines" switch in the web sidebar. It is off by default, and turning it off stops the next call even of a turn already running.
+4. **Choose it.** In the web UI the **API** group appears in the engine selector only with the switch on and a key configured. The first time a conversation picks it, a dialog says that the conversation, the retrieved documents and the memory will leave your machine for that provider; accepting remembers it for that conversation only, and going back to a local engine forgets it. From `/v1`, send `"engine": "api"`, the provider's `model` and `"nexe_cloud_consent": "deepseek"` in **every** request (see the API reference).
+
+The API never answers in place of a local engine and no local engine answers in its place: if the provider fails you are told so, with the provider's name and the reason (key refused, balance, limit, timeout), and nothing else tries. The footer of an answer says "model · API".
 
 ## Encryption
 

@@ -27,10 +27,19 @@ import pytest
 from fastapi import HTTPException
 
 from core.turn.api_cascade import dispatch_v1
+import httpx
+
 from plugins.ollama_module.core.errors import ModelNotFoundError
 from plugins.web_ui_module.api.wire import _stream_error_notice
 
 from .test_continue_is_a_turn import _cut_session
+
+
+@pytest.fixture(autouse=True)
+def _ollama_has_a_model_of_its_own(monkeypatch):
+    """Ollama answers as a fallback only with a model of its own, said in words
+    (C4.8 B2/D1-x): these tests have it answer behind other engines, so it has one."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "llama3.2:3b")
 
 SERVED = "Qwen3.5-4B-MLX-4bit"
 IMAGE = "aGVsbG8="
@@ -144,11 +153,37 @@ async def test_an_image_continue_from_the_browser_is_answered_by_mlx(turn_lab, s
     assert (call["engine"], call["model"]) == ("mlx", SERVED)
 
 
-async def test_a_missing_ollama_model_from_the_browser_is_answered_by_mlx(turn_lab, session_manager, app_state):
+def _ollama_down() -> Exception:
+    """Ollama's daemon gone: an engine down (N5), worth the next engine at every
+    door. A model the browser asked for that Ollama does not have used to be the
+    trigger of these tests; it is final now for the engine asked for (below)."""
+    return httpx.ConnectError("connection refused")
+
+
+@pytest.mark.parametrize("streaming", [True, False])
+async def test_a_missing_ollama_model_from_the_browser_is_final(turn_lab, app_state, streaming):
+    """N5 (C4.8): a model that is not there, asked of the engine the client
+    named, is the answer at both doors — the web used to retry Ollama's
+    `ModelNotFoundError` and MLX answered, where /v1 said 404."""
+    mlx = _Mlx()
+    app_state.modules = {"ollama_module": _Ollama(ModelNotFoundError("model-que-no-existeix-c4")),
+                         "mlx_module": mlx}
+    body = {"backend": "ollama", "model": "model-que-no-existeix-c4"}
+    if streaming:
+        ctx = await turn_lab.ui(streaming=True, session_id="r1035-missing-1", message="hola", body_extra=body)
+        assert ctx.outcomes["generate"] == "degraded"
+    else:
+        with pytest.raises(HTTPException) as raised:
+            await turn_lab.ui(streaming=False, session_id="r1035-missing-0", message="hola", body_extra=body)
+        assert raised.value.status_code == 404
+    assert mlx.calls == []
+
+
+async def test_ollama_down_from_the_browser_is_answered_by_mlx(turn_lab, session_manager, app_state):
     """(h) of the manual test: the stream, and what is stored names the model
     that answered."""
     mlx = _Mlx()
-    app_state.modules = {"ollama_module": _Ollama(ModelNotFoundError("model-que-no-existeix-c4")),
+    app_state.modules = {"ollama_module": _Ollama(_ollama_down()),
                          "mlx_module": mlx}
     ctx = await turn_lab.ui(streaming=True, session_id="r1035-h", message="hola",
                             body_extra={"backend": "ollama", "model": "model-que-no-existeix-c4"})
@@ -178,7 +213,7 @@ async def test_the_fallbacks_text_is_read_as_its_own_models(turn_lab, app_state)
     """The parser that splits the reasoning from the answer depends on the
     model's name (gpt-oss speaks harmony): it gets the fallback's, not the
     name picked for the engine that failed."""
-    app_state.modules = {"ollama_module": _Ollama(ModelNotFoundError("qwen3.5:4b")),
+    app_state.modules = {"ollama_module": _Ollama(_ollama_down()),
                          "mlx_module": _GptOssMlx(model_path="/models/gpt-oss-20b-MLX-4bit")}
     ctx = await turn_lab.ui(streaming=True, session_id="r1035-harmony", message="hola",
                             body_extra={"backend": "ollama", "model": "qwen3.5:4b"})
@@ -189,7 +224,7 @@ async def test_the_fallbacks_text_is_read_as_its_own_models(turn_lab, app_state)
 
 async def test_the_json_door_falls_back_the_same_way(turn_lab, session_manager, app_state):
     mlx = _Mlx()
-    app_state.modules = {"ollama_module": _Ollama(ModelNotFoundError("model-que-no-existeix-c4")),
+    app_state.modules = {"ollama_module": _Ollama(_ollama_down()),
                          "mlx_module": mlx}
     ctx = await turn_lab.ui(streaming=False, session_id="r1035-json", message="hola",
                             body_extra={"backend": "ollama", "model": "model-que-no-existeix-c4"})
@@ -212,20 +247,20 @@ async def test_the_engine_the_user_picked_still_gets_the_model_they_picked(turn_
 
 
 @pytest.mark.parametrize("image", [None, IMAGE])
-async def test_ollama_as_a_fallback_is_still_asked_for_the_requested_name(turn_lab, app_state, image):
-    """Ollama picks its model per request and has no single loaded one, so a
-    fallback to it carries the requested name, as before (#1035 leaves which
-    model it should run to the C4.8), and it says nothing about seeing: the
-    image guard leaves it alone. Pinned so a change here is deliberate."""
+async def test_ollama_as_a_fallback_is_asked_for_its_own_model_and_not_given_an_image(
+        turn_lab, app_state, monkeypatch, image):
+    """Ollama picks its model per request and has no single loaded one. In
+    reserve it runs its OWN (C4.8 B2/D1-x: `NEXE_OLLAMA_MODEL` first), never the
+    name picked for the engine in front, and it says nothing about seeing: with
+    an image it is passed over, like a fallback that says it cannot."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "qwen3.5:4b")
     ollama = _Ollama()
     app_state.modules = {"mlx_module": _Mlx(fail=RuntimeError("worker died")), "ollama_module": ollama}
     body = {"backend": "mlx", "model": SERVED}
     if image:
         body.update(image_b64=image, image_type="image/png")
     await turn_lab.ui(streaming=True, session_id=f"r1035-ollama-{bool(image)}", message="hola", body_extra=body)
-    # #1144: a turn with an image is followed by its description, asked of the
-    # same engine and model that served (here inline: the lab runs no queue).
-    assert ollama.models == ([SERVED, SERVED] if image else [SERVED])
+    assert ollama.models == ([] if image else ["qwen3.5:4b"])
 
 
 # ── a fallback that cannot see the image does not answer about it ─────────
@@ -236,11 +271,11 @@ async def test_a_text_model_on_a_fallback_is_not_given_an_image(turn_lab, app_st
     """A fallback answers with its own model; a text one, handed a picture,
     would answer as if it saw it. It is skipped, and the first engine's
     failure is what the user gets."""
-    down = ModelNotFoundError("gemma4:e4b")
+    down = _ollama_down()
     mlx = _Mlx(sees=False)
     app_state.modules = {"ollama_module": _Ollama(down), "mlx_module": mlx}
     body = {"backend": "ollama", "model": "gemma4:e4b", "image_b64": IMAGE, "image_type": "image/png"}
-    with caplog.at_level(logging.WARNING, logger="plugins.web_ui_module.api.turn_adapters"):
+    with caplog.at_level(logging.WARNING, logger="core.turn.engine_claim"):
         if streaming:
             ctx = await turn_lab.ui(streaming=True, session_id="r1035-blind-1", message="què hi veus?",
                                     body_extra=body)
@@ -254,12 +289,13 @@ async def test_a_text_model_on_a_fallback_is_not_given_an_image(turn_lab, app_st
                                   body_extra=body)
             assert raised.value.status_code == 503
     assert mlx.calls == []
-    assert any("cannot see the image" in r.getMessage() for r in caplog.records)
+    # Left out when the candidates are chosen, before anything is sent (P2-1 re-review).
+    assert any("does not say it can see the image" in r.getMessage() for r in caplog.records)
 
 
 async def test_a_vision_model_on_a_fallback_answers_the_image(turn_lab, app_state):
     mlx = _Mlx(sees=True)
-    app_state.modules = {"ollama_module": _Ollama(ModelNotFoundError("gemma4:e4b")), "mlx_module": mlx}
+    app_state.modules = {"ollama_module": _Ollama(_ollama_down()), "mlx_module": mlx}
     ctx = await turn_lab.ui(streaming=True, session_id="r1035-sees", message="què hi veus?",
                             body_extra={"backend": "ollama", "model": "gemma4:e4b",
                                         "image_b64": IMAGE, "image_type": "image/png"})
@@ -352,7 +388,7 @@ async def test_a_fallbacks_failure_replayed_as_the_notice_sends_no_second_label(
 # ── /v1: the same rule for a fallback and an image ────────────────────────
 
 
-def _v1_tries(images):
+def _v1_tries(images, *, ollama_sees=None):
     import asyncio
     from unittest.mock import MagicMock, patch
 
@@ -366,7 +402,10 @@ def _v1_tries(images):
     # to do with the image); only a fallback that cannot see is skipped.
     mlx.can_see_images = lambda: False
     llama.can_see_images = lambda: False  # a GGUF with no projector
-    state = _state(mlx=mlx, llama_cpp=llama, ollama=_Engine())
+    ollama = _Engine()
+    if ollama_sees is not None:
+        ollama.can_see_images = lambda: ollama_sees
+    state = _state(mlx=mlx, llama_cpp=llama, ollama=ollama)
     tried: list[str] = []
 
     async def _dispatch(engine, *a, **kw):
@@ -379,14 +418,22 @@ def _v1_tries(images):
     request = MagicMock()
     request.app.state = state
     with patch.object(chat_mod, "_dispatch_to_engine", _dispatch):
-        asyncio.run(dispatch_v1(
-            body, request, [], "hola", "sid", "mlx", None, images=images,
-        ))
+        try:
+            asyncio.run(dispatch_v1(
+                body, request, [], "hola", "sid", "mlx", None, images=images,
+            ))
+        except HTTPException as nobody:
+            tried.append(nobody.status_code)
     return tried
 
 
 def test_v1_skips_a_fallback_that_cannot_see_the_image():
-    assert _v1_tries([IMAGE]) == ["mlx", "ollama"]
+    assert _v1_tries([IMAGE], ollama_sees=True) == ["mlx", "ollama"]
+
+
+def test_v1_skips_a_fallback_that_does_not_say_it_sees_the_image():
+    """B2/D1-x: not saying is not seeing. Nobody left: the 503."""
+    assert _v1_tries([IMAGE]) == ["mlx", 503]
 
 
 def test_v1_without_an_image_asks_the_same_fallback():

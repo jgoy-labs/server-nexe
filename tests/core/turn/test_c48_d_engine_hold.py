@@ -83,13 +83,20 @@ async def test_keep_monitor_leaves_it_running_for_the_persistence_step():
     assert monitor.done()
 
 
-async def test_the_deadline_sets_the_same_event_a_client_leaving_would():
+async def test_the_deadline_is_each_engines_and_sets_the_event_that_engine_was_handed():
+    """#1165/P2-1: the hold says how long; each engine's event (`attempt()`) is
+    set by its own deadline, and the turn's stays clear — the next engine is
+    handed a fresh one, never a deadline another engine used up."""
     gate = EngineGate(slots=1)
     ctx = _ctx(gate, deadline=0.05)
     async with EngineHold(ctx) as hold:
-        assert not hold.cancel_event.is_set()
+        assert hold.cancel_event.deadline_s == 0.05
+        first = hold.cancel_event.attempt()
         await asyncio.sleep(0.2)
-        assert hold.cancel_event.is_set()
+        assert first.is_set() and first.reasons == {"deadline"}
+        assert not hold.cancel_event.is_set()
+        second = hold.cancel_event.attempt()
+        assert not second.is_set() and second.deadline_armed
 
 
 async def test_without_a_deadline_the_event_stays_clear():
@@ -104,7 +111,7 @@ async def test_leaving_the_block_cancels_a_deadline_that_has_not_fired():
     gate = EngineGate(slots=1)
     ctx = _ctx(gate, deadline=0.1)
     async with EngineHold(ctx) as hold:
-        event = hold.cancel_event
+        event = hold.cancel_event.attempt()
     await asyncio.sleep(0.25)
     assert not event.is_set()
 
@@ -135,7 +142,7 @@ async def test_a_busy_gate_is_a_429_and_nothing_is_left_running(monkeypatch):
         assert caught.value.detail == "Server busy, try again in a moment"  # the wording clients see
         await asyncio.sleep(0)
         assert hold.monitor.done()
-        assert hold._deadline.cancelled()
+        assert not hold.cancel_event.deadline_armed
         assert second.gpu_slot is None
     assert len(gate._holders) == 0
 
@@ -405,7 +412,7 @@ async def test_a_cancel_while_waiting_for_the_slot_leaves_nothing_running(monkey
             await waiting
         await asyncio.sleep(0)
         assert hold.monitor.done()
-        assert hold._deadline.cancelled()
+        assert not hold.cancel_event.deadline_armed
     assert len(gate._holders) == 0
 
 

@@ -8,6 +8,13 @@ already sets when the client goes away) is now ALSO set by a timer armed in
 client disconnect already does: the engine notices `cancel_event.is_set()`
 between tokens and returns what it had.
 
+#1165 (live, 07/10): the deadline watches only up to the engine's FIRST BYTE.
+gemma-4-31b at 13 tok/s was cut mid-answer at 90 s and the turn was saved as
+complete. A hung model, a load that never ends, a driver stuck before the
+first token: those are what it is for. An engine that has started answering
+runs to its own end — `max_tokens`, a Stop, a client that leaves — and the
+cascade disarms the timer when it claims the turn (`cancel.first_byte`).
+
 Measured, not guessed (C2.0, `dev-tools/reports/` — see the diari entry for
 2026-09-06): three MLX turns on THIS machine's 128 GB (two local models,
 gemma-4-e4b-4bit and gpt-oss-20b-MLX-8bit) timed `generate` at 14.3s / 23.1s
@@ -27,8 +34,9 @@ DEFAULT_DEADLINE_S = 90.0
 
 
 def resolve_deadline_s() -> float:
-    """Seconds a turn's `generate` step may run before `cancel_event` is set
-    for it. 0 (or an unparsable value) disables the deadline."""
+    """Seconds a turn's engine may take to START answering (its first byte)
+    before `cancel_event` is set for it (#1165). 0 (or an unparsable value)
+    disables the deadline."""
     try:
         return float(os.environ.get(ENV_DEADLINE_S, DEFAULT_DEADLINE_S))
     except ValueError:

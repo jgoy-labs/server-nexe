@@ -18,6 +18,8 @@ from fastapi.responses import StreamingResponse
 
 from ..chat_schemas import ChatCompletionRequest
 from ._common import extract_last_user_msg, separate_messages, derive_session_id, build_openai_response, mark_served_model, resolve_loaded_model_name
+from core.turn.usage import from_engine_result as usage_from_result
+
 from ._streaming import TokenBridge, format_engine_token, stream_end
 
 logger = logging.getLogger(__name__)
@@ -139,7 +141,7 @@ async def _llama_cpp_stream_generator(
             )
             bridge.set_done(result=result)
         except Exception as e:
-            bridge.set_done(error=str(e))
+            bridge.fail(e)
             logger.error("Llama.cpp streaming error: %s", e, exc_info=True)
 
     llama_task = asyncio.create_task(run_llama())
@@ -156,7 +158,7 @@ async def _llama_cpp_stream_generator(
             await llama_task
         except asyncio.CancelledError:
             logger.debug("Llama.cpp stream cancelled (client disconnected)")
-            return
+            raise  # a cancellation leaves: the turn must not see a clean end
         except Exception as e:
             logger.exception("Llama.cpp streaming failed")
             if not got_any_token:
@@ -169,7 +171,7 @@ async def _llama_cpp_stream_generator(
                 # #1036 (C2.4): nothing reached the client yet. This raise is
                 # outside the try/except above on purpose — the cascade's
                 # peek retries it.
-                raise RuntimeError(bridge.error)
+                raise bridge.failure()  # N1: its own class, not a bare RuntimeError
             logger.error("Llama.cpp streaming error surfaced to client: %s", bridge.error)
             yield stream_end(failure=str(bridge.error), truncated=bridge._truncated)
             return
@@ -179,6 +181,7 @@ async def _llama_cpp_stream_generator(
         yield stream_end(
             truncated=bridge._truncated,
             finish_reason=(bridge.result or {}).get("finish_reason"),
+            usage=usage_from_result(bridge.result),
         )
 
     finally:

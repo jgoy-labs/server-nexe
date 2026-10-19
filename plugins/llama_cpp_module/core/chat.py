@@ -575,6 +575,7 @@ class LlamaCppChatNode:
 
         end_time = time.time()
         text = "".join(full_response)
+        counted = completion_tokens > 0 and prompt_tokens > 0  # llama.cpp's own usage reached us
         if completion_tokens == 0:
             completion_tokens = len(text) // 4
         prefill_ms, generation_ms = _split_timing(start_time, first_token_time, end_time)
@@ -582,6 +583,7 @@ class LlamaCppChatNode:
             "text": text,
             "tokens": completion_tokens,
             "prompt_tokens": prompt_tokens,
+            "usage_estimated": not counted,  # a guess is not a count (core.turn.usage)
             "finish_reason": None if cancelled else finish_reason,
             "cancelled": cancelled,
             "timing": {

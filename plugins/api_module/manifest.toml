@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────
+# ModuleID: api_module
+# server-nexe/plugins/api_module/manifest.toml
+# ─────────────────────────────────────────────────────────────
+
+[module]
+name = "api_module"
+version = "0.1.0"
+type = "cloud_llm_option"
+description = "Engine for external OpenAI-compatible API providers (DeepSeek, OpenAI). Opt-in: needs the global switch, a key in .env and a consent per session. Never part of the engine cascade."
+location = "plugins/api_module/"
+permanent = false
+external_tool = "External API provider"
+note = "The key lives only in .env; the UI shows configured yes/no."
+
+[module.metadata]
+author = "Jordi Goy"
+created = "2026-10-06"
+last_updated = "2026-10-06"
+status = "active"
+
+[module.capabilities]
+has_api = false
+has_ui = false
+has_specialist = false
+has_tests = true
+streaming = true
+real_time = true
+
+[module.dependencies]
+modules = ["security"]
+specialists = []
+external_services = ["External API provider (DeepSeek, OpenAI)"]
+
+[module.entry]
+module = "plugins.api_module.module"
+class = "ApiModule"
+
+[module.i18n]
+default_locale = "ca-ES"
+supported_locales = ["ca-ES", "es-ES", "en-US"]

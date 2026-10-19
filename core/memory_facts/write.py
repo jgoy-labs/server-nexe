@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 
 from core.endpoints.chat_engines._common import extract_engine_text
 from core.log_redact import redact_user_content
+from core.memory_facts import intents
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +212,7 @@ async def persist_facts(facts: list, port, session_id: str) -> int:
     return saved
 
 
-async def persist_facts_kept(facts: list, port, session_id: str) -> tuple[int, list]:
+async def persist_facts_kept(facts: list, port, session_id: str, session=None) -> tuple[int, list]:
     """Save filtered facts; return (newly saved, facts that are in memory now).
 
     A duplicate is already remembered, so it is in the second list — what the
@@ -231,10 +232,18 @@ async def persist_facts_kept(facts: list, port, session_id: str) -> tuple[int, l
                 saved_count += 1
                 kept.append(fact)
                 logger.info("MEM_SAVE: %s", redact_user_content(fact))
-            elif result.get("duplicate"):
+            elif result.get("duplicate") and result.get("same", True):
                 # Legitimate no-op: the fact is already stored.
                 kept.append(fact)
                 logger.debug("MEM_SAVE skip (dedup): %s", redact_user_content(fact))
+            elif result.get("duplicate"):
+                # Close to a stored fact but not the same (a value changed): it is
+                # NOT in memory, so it is not "kept" and the reply must not say so.
+                logger.info("MEM_SAVE not kept (similar to a stored fact): %s", redact_user_content(fact))
+                if session is not None and result.get("similar_to"):
+                    # The model is to ask whether to replace it; the user's next
+                    # yes does (intents._replace_confirm). Nothing changes here.
+                    intents.arm_replace(session, result["similar_to"], fact)
             else:
                 # MC-016: a storage error is NOT a dedup skip — make it visible.
                 logger.warning(
@@ -466,5 +475,5 @@ async def write_facts(
             candidates.append(raw)
 
     filtered = filter_facts(candidates, getattr(session, "_recently_deleted_facts", []), user_text_of(session))
-    saved, kept = await persist_facts_kept(filtered, port, session.id)
+    saved, kept = await persist_facts_kept(filtered, port, session.id, session)
     return WriteOutcome(saved=saved, facts=filtered, kept=kept, engine_called=engine_called)

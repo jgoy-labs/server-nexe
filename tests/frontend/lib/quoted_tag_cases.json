@@ -1,0 +1,94 @@
+[
+ {
+  "input": "El format és: `[MEM_SAVE: L'usuari es diu Jordi]`.",
+  "expected": "El format és: ."
+ },
+ {
+  "input": "Mira:\n```\n[MEM_DELETE: L'usuari es diu Jordi]\n```\nAixò és tot.",
+  "expected": "Mira:\n\nAixò és tot."
+ },
+ {
+  "input": "Un `exemple [MEM_SAVE: x] amb més text` aquí",
+  "expected": "Un `exemple  amb més text` aquí"
+ },
+ {
+  "input": "Sense etiqueta `codi` i [MEM_SAVE: real] fora",
+  "expected": "Sense etiqueta `codi` i [MEM_SAVE: real] fora"
+ },
+ {
+  "input": "`[memoria: a]` i `[OBLIT: b]` i `[FORGET: c]`",
+  "expected": " i  i "
+ },
+ {
+  "input": "No tancat `[MEM_SAVE: x] encara",
+  "expected": "No tancat `[MEM_SAVE: x] encara"
+ },
+ {
+  "input": "```[MEM_SAVE: x]```",
+  "expected": ""
+ },
+ {
+  "input": "Tag fora [MEM_SAVE: x] i `codi net`",
+  "expected": "Tag fora [MEM_SAVE: x] i `codi net`"
+ },
+ {
+  "input": "`[MEM_SAVE: a][MEM_SAVE: b]`",
+  "expected": ""
+ },
+ {
+  "input": "`[MEM: 1]` no és una etiqueta de memòria",
+  "expected": "`[MEM: 1]` no és una etiqueta de memòria"
+ },
+ {
+  "input": "Un bloc buit `````` sense etiqueta",
+  "expected": "Un bloc buit `````` sense etiqueta"
+ },
+ {
+  "input": "~~~\n[MEM_SAVE: x]\n~~~",
+  "expected": ""
+ },
+ {
+  "input": "Exemple: ``[MEM_SAVE: x]`` i ja està.",
+  "expected": "Exemple:  i ja està."
+ },
+ {
+  "input": "```python\n[MEM_SAVE: x]\n```",
+  "expected": ""
+ },
+ {
+  "input": "```pythón\n[MEM_SAVE: x]\n```\nfi",
+  "expected": "\nfi"
+ },
+ {
+  "input": "Obert ```\n[MEM_SAVE: x]\nresta del text",
+  "expected": "Obert ```\n\nresta del text"
+ },
+ {
+  "input": "```js\n[MEM_SAVE: x]\nconsole.log(1)\n```",
+  "expected": "```js\n\nconsole.log(1)\n```"
+ },
+ {
+  "input": "~~~\nsense etiqueta\n~~~ i `[OBLIT: a]`",
+  "expected": "~~~\nsense etiqueta\n~~~ i "
+ },
+ {
+  "input": "Dos blocs: ```\n[MEM_SAVE: a]\n``` i ```\ncodi\n```",
+  "expected": "Dos blocs:  i ```\ncodi\n```"
+ },
+ {
+  "input": "Obert ~~~\n[MEM_SAVE: x]\nresta del text",
+  "expected": "Obert ~~~\n\nresta del text"
+ },
+ {
+  "input": "~~~python\n[MEM_SAVE: x]\n~~~",
+  "expected": ""
+ },
+ {
+  "input": "```\n~[MEM_SAVE: x]\n```",
+  "expected": ""
+ },
+ {
+  "input": "Dues ~~~\n[MEM_SAVE: a]\n~~~ i ~~~\n[FORGET: b]\n~~~ fi",
+  "expected": "Dues  i  fi"
+ }
+]

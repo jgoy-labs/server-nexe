@@ -68,6 +68,7 @@ function makeHost(log) {
         // The OLD machine below still runs its own inline regex, so this file
         // now also proves that de-duplication changed nothing.
         _extractMemSave: NexeUI.prototype._extractMemSave,
+        _dropQuotedMemTags: NexeUI.prototype._dropQuotedMemTags,
     };
 }
 

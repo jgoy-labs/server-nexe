@@ -85,7 +85,9 @@ async def _wire(chunks, model):
     with patch("tests.plugins.web_ui_module.test_chat_inner_behavior._mock_request", new=_connected_request):
         h = _Harness(intent="chat")
         engine = _Engine(chunks)
-        body = {"message": "Pensa", "stream": True}
+        # The engine asked for, said: an Ollama that is a fallback runs its own
+        # model (B2), and the harmony parser needs this one's name.
+        body = {"message": "Pensa", "stream": True, "backend": "ollama"}
         if model:
             body["model"] = model
         out = await _join_stream(await h.call(body, server_state=_make_server_state(engine=engine)))

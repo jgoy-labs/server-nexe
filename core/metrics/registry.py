@@ -107,6 +107,41 @@ CHAT_ENGINE_DURATION = Histogram(
   registry=REGISTRY,
 )
 
+# C5 (D7): one record for every step of a turn, at both doors — written by the
+# `MetricsSink` of the TraceSink port, never by a door.
+TURN_STEPS_TOTAL = Counter(
+  "core_turn_steps_total",
+  "Steps of a turn by outcome",
+  ["step", "outcome"],
+  registry=REGISTRY,
+)
+
+# pla-tokens-reals: tokens the engines SAID their calls cost (`kind`: in, out, cached).
+# A call whose engine said nothing adds nothing — no zero, no estimate.
+TURN_TOKENS_TOTAL = Counter(
+  "core_turn_tokens_total",
+  "Tokens engines reported for a turn's calls",
+  ["engine", "kind"],
+  registry=REGISTRY,
+)
+
+TURN_STEP_DURATION = Histogram(
+  "core_turn_step_duration_seconds",
+  "Duration of a step of a turn",
+  ["step"],
+  buckets=[0.001, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 120.0],
+  registry=REGISTRY,
+)
+
+# Phase 2 of the API providers: its own series, so what leaves the machine is
+# counted apart from the local engines (the provider is a key, never a secret).
+API_ENGINE_REQUESTS = Counter(
+  "core_api_engine_requests_total",
+  "Chat requests sent to an external API provider",
+  ["provider", "status"],
+  registry=REGISTRY,
+)
+
 EMBEDDING_OPERATIONS = Counter(
   "core_embedding_operations_total",
   "Total embedding operations",
@@ -155,6 +190,10 @@ def reset_metrics() -> None:
     RAG_SEARCH_DURATION,
     CHAT_ENGINE_REQUESTS,
     CHAT_ENGINE_DURATION,
+    TURN_STEPS_TOTAL,
+    TURN_TOKENS_TOTAL,
+    TURN_STEP_DURATION,
+    API_ENGINE_REQUESTS,
     EMBEDDING_OPERATIONS,
     EMBEDDING_CACHE_HITS,
     EMBEDDING_CACHE_MISSES,

@@ -21,6 +21,7 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from core.ollama_utils import resolve_ollama_url
+from core.turn.usage import from_ollama as usage_from_ollama
 from ..chat_sanitization import _sanitize_sse_token
 from ..chat_schemas import ChatCompletionRequest
 from ._common import mark_served_model
@@ -71,10 +72,17 @@ _OLLAMA_ERRORS = {
 
 
 def _resolve_ollama_model(request, app_state) -> str:
-    """Cascade: request.model → NEXE_OLLAMA_MODEL → NEXE_DEFAULT_MODEL (no URL) → config → 'llama3.2'."""
-    model_name = request.model
-    if not model_name:
-        model_name = os.environ.get("NEXE_OLLAMA_MODEL")
+    """Cascade: request.model → Ollama's own model (`ollama_default_model`)."""
+    return request.model or ollama_default_model(app_state)
+
+
+def ollama_default_model(app_state) -> str:
+    """Ollama's own model: NEXE_OLLAMA_MODEL → NEXE_DEFAULT_MODEL (no URL) → config → 'llama3.2'.
+
+    What Ollama answers with when nobody named a model for it: a request
+    without one, and Ollama in reserve behind another engine (C4.8 B2/D1-x),
+    which is never handed the name the client picked for that other engine."""
+    model_name = os.environ.get("NEXE_OLLAMA_MODEL")
     if not model_name:
         # Legacy: NEXE_DEFAULT_MODEL may be an HF URL or path — ignore it for Ollama.
         # read via runtime_state so a UI selection wins.
@@ -86,6 +94,26 @@ def _resolve_ollama_model(request, app_state) -> str:
         config = getattr(app_state, "config", {}) or {}
         model_name = config.get("plugins", {}).get("models", {}).get("primary")
     return model_name or "llama3.2"
+
+
+def ollama_reserve_model(app_state) -> Optional[str]:
+    """The model Ollama answers with IN RESERVE (B2/D1-x): its own, said in
+    words — `NEXE_OLLAMA_MODEL`, or the default model when Ollama is the
+    configured engine (then the default is one of its tags). None otherwise:
+    a default model is usually an MLX or Hugging Face id, and Ollama without a
+    model of its own is no fallback — it is never given one picked from its
+    tag list."""
+    own = os.environ.get("NEXE_OLLAMA_MODEL")
+    if own:
+        return own
+    from core.endpoints.chat_engines.routing import _get_preferred_engine, _normalize_engine
+    if _normalize_engine(_get_preferred_engine(app_state)) != "ollama":
+        return None
+    from core.runtime_state import get_with_env_fallback
+    default = get_with_env_fallback("NEXE_DEFAULT_MODEL", "")
+    if default and not default.startswith(("http", "/", "~", "storage/")):
+        return default
+    return None
 
 
 async def _fetch_ollama_available_models(host: str) -> list:
@@ -127,7 +155,9 @@ def _resolve_model_name(model_name: str, available_models: list, chat_models: li
 
     _lang = os.getenv("NEXE_LANG", "en").split("-")[0].lower()
     if chat_models:
-        raise HTTPException(
+        # Written for the user, and handed on as it is when it ends the turn (P2-7).
+        from core.turn.errors import UserFacingHTTPException  # deferred: core.turn imports this package
+        raise UserFacingHTTPException(
             status_code=404,
             detail=(
                 f"Model '{model_name}' not found. "
@@ -403,7 +433,7 @@ def _ollama_line_events(data: dict, response_bytes: int) -> tuple[int, list, str
         # `done_reason` is the ceiling cut. Absence is a clean stop, and
         # the turn's emit writes it.
         reason = data.get("done_reason")
-        events.append(stream_end(finish_reason="length" if reason == "length" else None))
+        events.append(stream_end(finish_reason="length" if reason == "length" else None, usage=usage_from_ollama(data)))
         return response_bytes, events, "done"
     return response_bytes, events, "open"
 
@@ -450,8 +480,11 @@ async def _ollama_stream_generator(
                 if not ended:
                     yield stream_end()
     except asyncio.CancelledError:
+        # A client that left cancels this task. Swallowing it made a cut turn
+        # look like a clean end (billed `ok`, a partial answer persisted); the
+        # `async with` above has already closed the connection to the daemon.
         logger.debug("Ollama stream cancelled (client disconnected)")
-        return
+        raise
     except httpx.ConnectError:
         if got_any:
             yield stream_end(failure="ollama_unavailable")

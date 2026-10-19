@@ -110,6 +110,7 @@ class NexeUI {
         s('[data-i18n="col_memory"]', 'col_memory');
         s('[data-i18n="col_knowledge"]', 'col_knowledge');
         s('[data-i18n="col_docs"]', 'col_docs');
+        s('[data-i18n="cloud_allow"]', 'cloud_allow');
         // Collection tooltips (Bug #8: visible ⓘ icon + label fallback)
         const colMemLabel = document.querySelector('[data-i18n="col_memory"]');
         if (colMemLabel) colMemLabel.closest('label').title = this.t('col_memory_tip');

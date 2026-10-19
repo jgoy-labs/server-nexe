@@ -21,7 +21,13 @@ class OllamaSemanticError(Exception):
 
 
 class ModelNotFoundError(OllamaSemanticError):
-    """The requested model does not exist in the Ollama instance (HTTP 404)."""
+    """The requested model does not exist in the Ollama instance (HTTP 404).
+
+    Its message is written for the user («Ollama model not found: X») and reaches
+    the client as it is when it ends the turn (`user_text`, C4.8 P2-7); the
+    other semantic errors carry the daemon's own text, and do not."""
+
+    user_text = True
 
     def __init__(self, model_name: str, message: str = None):  # type: ignore[assignment]  # no_implicit_optional
         self.model_name = model_name

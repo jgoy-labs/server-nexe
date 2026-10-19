@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple, List
 
 from core.endpoints.chat_sanitization import _filter_rag_injection
+from core.log_redact import redact_user_content
 from core.memory_access import KNOWLEDGE_COLLECTION, MEMORY_COLLECTION, get_memory_view
 from core.memory_facts.intent_patterns import (  # noqa: F401 - re-exported for callers and tests
     CLEAR_ALL_CONFIRM_RE,
@@ -45,6 +46,13 @@ logger = logging.getLogger(__name__)
 # MEMORY MANAGEMENT CONFIG
 # ============================================
 MAX_MEMORY_ENTRIES = 500          # Maximum entries in personal_memory
+def same_fact(a: str, b: str) -> bool:
+    """Two facts are the same when only case, accents' spacing or punctuation differ."""
+    def norm(t: str) -> str:
+        return re.sub(r"[\W_]+", " ", t.casefold()).strip()
+    return norm(a) == norm(b)
+
+
 SIMILARITY_THRESHOLD = 0.80       # Do not save if similarity > 80% (lowered from 0.85)
 PRUNE_BATCH_SIZE = 30             # How many entries to remove when the limit is exceeded
 TEMPORAL_DECAY_DAYS = 7           # Days to apply temporal decay (recent = bonus)
@@ -198,6 +206,16 @@ class MemoryHelper:
             logger.warning(f"Duplicate check failed: {e}")
             return False  # When in doubt, save
 
+    async def _stored_text_near(self, content: str, memory) -> Optional[str]:
+        """The stored fact a duplicate matched, or None when it cannot be read."""
+        try:
+            results = await memory.search(query=content, collection=MEMORY_COLLECTION, top_k=1)
+            if results and results[0].score >= SIMILARITY_THRESHOLD:
+                return getattr(results[0], "text", None) or None
+        except Exception as e:
+            logger.debug("Reading the matched duplicate failed: %s", e)
+        return None
+
     def _calculate_retention_score(self, entry) -> float:
         """
         Calculate retention score for an entry (higher = keep, lower = prune).
@@ -307,6 +325,7 @@ class MemoryHelper:
         session_id: str,
         metadata: Optional[Dict[str, Any]] = None,
         collections: Optional[List[str]] = None,
+        force: bool = False,
     ) -> Dict[str, Any]:
         """
         Save content to memory with deduplication and size management.
@@ -315,6 +334,9 @@ class MemoryHelper:
             content: text to save.
             session_id: session id (metadata).
             metadata: extra metadata.
+            force: skip the closeness test. For a caller that already knows by a
+                better test (the fact's key, the user's own yes) that nothing
+                stored is this fact.
             collections: user-selected RAG collections filter (Bug #10). If
                 non-None and does not include 'personal_memory', the save is rejected.
         """
@@ -341,11 +363,24 @@ class MemoryHelper:
             # 1. Check for duplicates - skip if very similar content exists
             # Honest contract: success=False so callers don't show fake "saved" badges
             # (Bug #4 part 2). Use `duplicate=True` flag to distinguish from real errors.
-            if await self._check_duplicate(content, memory):
+            if not force and await self._check_duplicate(content, memory):
+                # Similar is not the same: «codi NEXE_a» and «codi NEXE_b» score
+                # 0.97, and only the value changed. The fact is NOT in memory
+                # then, so a door must not call it kept (TOKENS-20261015-13).
+                stored = await self._stored_text_near(content, memory)
+                same = stored is None or same_fact(content, stored)
+                if not same:
+                    logger.info(
+                        "MEM_SAVE not saved: too close to a stored fact, but not the same "
+                        "(stored: %s | new: %s)",
+                        redact_user_content(stored or ""), redact_user_content(content),
+                    )
                 return {
                     "success": False,
                     "document_id": None,
                     "duplicate": True,
+                    "same": same,
+                    "similar_to": None if same else stored,
                     "message": "Contingut similar ja existeix, no guardat"
                 }
 

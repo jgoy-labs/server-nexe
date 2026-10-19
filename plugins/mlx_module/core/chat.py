@@ -23,7 +23,9 @@ import atexit
 import logging
 import threading
 import time
+from concurrent.futures import CancelledError as _FutureCancelled
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as _FutureTimeout
 from typing import Any, Callable, Dict, List, Optional
 
 from .config import MLXConfig
@@ -145,6 +147,42 @@ def _free_prompt_caches() -> None:
         get_vlm_cache_manager().clear()
     except Exception as e:
         logger.warning("MLXChatNode: error clearing VLM cache manager: %s", e)
+
+
+#: How long `reset_model` waits for the worker to free the memory. A generation
+#: in flight is ahead of it in the queue; the reset is then left queued behind it.
+_RESET_WAIT_S = 10.0
+
+
+def _release_memory() -> None:
+    """What `reset_model` frees through MLX: the prompt caches, the allocator's
+    cache, the garbage. Runs on the MLX worker (#1153), like every MLX op."""
+    _free_prompt_caches()
+    try:
+        import mlx.core as mx
+        mx.clear_cache()  # Replaces mx.metal.clear_cache (deprecated)
+    except Exception as e:
+        logger.warning("MLXChatNode: error clearing cache: %s", e)
+    gc.collect()
+    logger.info("MLXChatNode: model and all caches reset")
+
+
+def _on_the_worker(job: Callable[[], None]) -> None:
+    """Run `job` on the MLX worker and wait for it (bounded), or run it in place
+    when this already IS the worker — waiting on itself would never return."""
+    if threading.current_thread().name.startswith("mlx-worker"):
+        job()
+        return
+    try:
+        future = _MLX_EXECUTOR.submit(job)
+        future.result(timeout=_RESET_WAIT_S)
+    except _FutureTimeout:
+        logger.warning("MLXChatNode: the MLX worker is busy; the memory is freed when it is done")
+    except (RuntimeError, _FutureCancelled):
+        # The executor is already shut down (the process is exiting: its atexit
+        # hook shuts it down and cancels what is queued). The references are
+        # gone; the memory goes with the process.
+        logger.info("MLXChatNode: the MLX worker is gone; nothing left to free")
 
 
 class MLXChatNode:
@@ -690,10 +728,12 @@ class MLXChatNode:
 
     @classmethod
     def reset_model(cls) -> None:
-        """Destroy model, tokenizer and all caches."""
-        with cls._lock:
-            _free_prompt_caches()
+        """Destroy model, tokenizer and all caches.
 
+        The references go here, under the lock; what MLX frees (the caches and
+        the allocator) is queued on the MLX worker (#1153) — outside the lock,
+        which a generation on that same worker may be waiting for."""
+        with cls._lock:
             # Destroy model
             if cls._model is not None:
                 del cls._model
@@ -705,15 +745,7 @@ class MLXChatNode:
 
             cls._config = None
 
-            # Release memory
-            try:
-                import mlx.core as mx
-                mx.clear_cache()  # Replaces mx.metal.clear_cache (deprecated)
-            except Exception as e:
-                logger.warning("MLXChatNode: error clearing cache: %s", e)
-
-            gc.collect()
-            logger.info("MLXChatNode: model and all caches reset")
+        _on_the_worker(_release_memory)
 
     @classmethod
     def get_pool_stats(cls) -> Dict[str, Any]:

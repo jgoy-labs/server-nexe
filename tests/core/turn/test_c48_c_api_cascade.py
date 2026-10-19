@@ -6,6 +6,7 @@ what a client sees at each door is the part 0 matrix.
 from __future__ import annotations
 
 import asyncio
+import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -15,6 +16,13 @@ from fastapi.responses import StreamingResponse
 
 from core.endpoints.chat_engines._streaming import NEXE_END, peek_stream, stream_end
 from core.turn.api_cascade import ApiDoor, ask_again, dispatch_v1
+
+
+@pytest.fixture(autouse=True)
+def _ollama_has_a_model_of_its_own(monkeypatch):
+    """Ollama answers as a fallback only with a model of its own, said in words
+    (C4.8 B2/D1-x): these tests have it answer behind other engines, so it has one."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "llama3.2:3b")
 
 
 # ── the peek ────────────────────────────────────────────────────────────────
@@ -121,15 +129,32 @@ class _Sighted:
         return True
 
 
-def test_only_a_fallback_that_cannot_see_is_skipped_and_only_when_there_is_an_image():
-    with_image = _door(images=["IMG"])
-    assert with_image.skip(1, "llama_cpp", _Blind()) is True
-    assert with_image.skip(0, "mlx", _Blind()) is False           # the one asked for is never skipped
-    assert with_image.skip(1, "llama_cpp", _Sighted()) is False
-    assert with_image.skip(1, "ollama", object()) is False         # an engine that does not say is left to it
-    assert with_image.skip(1, "ollama", None) is False
-    assert _door(images=None).skip(1, "llama_cpp", _Blind()) is False
-    assert _door(images=[]).skip(1, "llama_cpp", _Blind()) is False
+def test_a_fallback_that_does_not_say_it_sees_is_no_candidate_and_only_when_there_is_an_image(monkeypatch):
+    """Decided when the candidates are chosen, before anything is sent (P2-1
+    re-review), not as a door's skip: the engine asked for is always kept."""
+    from types import SimpleNamespace
+
+    from core.turn.engine_claim import live_candidates
+
+    class _Live:
+        _node = object()
+
+        def __init__(self, sees):
+            self.sees = sees
+
+        def chat(self, *a, **k):
+            return None
+
+        def can_see_images(self):
+            return self.sees
+
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "llama3.2:3b")
+    blind, sighted = _Live(False), _Live(True)
+    state = SimpleNamespace(config={}, modules={"mlx_module": blind, "llama_cpp_module": blind, "ollama_module": sighted})
+    assert [n for n, _ in live_candidates("mlx", state, image=True)] == ["mlx", "ollama"]
+    assert [n for n, _ in live_candidates("mlx", state, image=False)] == ["mlx", "llama_cpp", "ollama"]
+    state.modules["ollama_module"] = SimpleNamespace(chat=lambda *a, **k: None)  # does not say
+    assert [n for n, _ in live_candidates("mlx", state, image=True)] == ["mlx"]
 
 
 async def test_each_attempt_asks_the_forwarder_with_the_prompt_the_door_got_and_everything_else():
@@ -169,17 +194,24 @@ async def test_the_prompt_is_fitted_to_this_engines_window_every_time_even_the_f
         return ["FITTED"]
 
     with patch("core.endpoints.chat._fit_v1_messages_to_window", fit), \
-            patch("core.endpoints.chat.get_effective_context_window", lambda name, state: {"mlx": 111}[name]):
+            patch("core.endpoints.chat.get_effective_context_window", lambda name, state, model=None: {"mlx": 111}[name]):
         assert await door.prepare(0, "mlx", object()) == ["FITTED"]
     assert seen == [(door.messages, 111, door.body)]
 
 
-def test_each_attempt_is_counted_under_its_engine_with_its_outcome():
+def test_each_attempt_is_said_on_the_turn_under_its_engine_with_its_outcome():
+    """C5 E: the door no longer counts on its own; it says the attempt on the turn
+    (`ctx.usage["engine_attempts"]`) and the metrics sink writes the series."""
+    from core.turn.context import TurnContext
+
     door = _door()
-    with patch("core.endpoints.chat._record_engine_metrics") as record:
-        door.observe("mlx", True, 12.5)
-        door.observe("ollama", False, 13.5)
-    assert [c.args for c in record.call_args_list] == [("mlx", "success", 12.5), ("ollama", "error", 13.5)]
+    ctx = TurnContext(turn_id="t", entry="api")
+    door.trace_ctx = ctx
+    door.observe("mlx", True, time.time() - 0.0125)
+    door.observe("ollama", False, time.time() - 0.0135)
+    assert [(a["step"], a["engine"], a["ok"]) for a in ctx.usage["engine_attempts"]] == [
+        ("generate", "mlx", True), ("generate", "ollama", False)]
+    assert all(a["ms"] > 0 for a in ctx.usage["engine_attempts"])
 
 
 def test_when_everything_failed_the_door_ends_as_the_core_does_a_503_with_the_first_error_curated():
@@ -229,15 +261,14 @@ async def _asked(state, body, *, resume=False, engine="mlx"):
 
     with patch("core.endpoints.chat._dispatch_to_engine", forward), \
             patch("core.endpoints.chat._fit_v1_messages_to_window", lambda m, w, b: m), \
-            patch("core.endpoints.chat.get_effective_context_window", lambda n, s: 4096), \
-            patch("core.endpoints.chat._record_engine_metrics"):
+            patch("core.endpoints.chat.get_effective_context_window", lambda n, s, m=None: 4096):
         await dispatch_v1(body, request, [], "hi", "s", engine, None, resume=resume)
     return asked
 
 
 async def test_nothing_live_is_a_503_and_no_forwarder_is_asked():
-    """R4 (decided provisionally 06/10: «/v1 without live engines → 503, like the
-    web»). It used to ask the Ollama daemon all the same, registered or not."""
+    """R4 (rule: /v1 without live engines answers a 503, like the
+    web). It used to ask the Ollama daemon all the same, registered or not."""
     asked = []
 
     async def forward(name, *a, **k):
@@ -298,8 +329,7 @@ async def _dispatch(state, answers, *, engine="mlx", preferred=None, body=None, 
 
     with patch("core.endpoints.chat._dispatch_to_engine", forward), \
             patch("core.endpoints.chat._fit_v1_messages_to_window", lambda m, w, b: m), \
-            patch("core.endpoints.chat.get_effective_context_window", lambda n, s: 4096), \
-            patch("core.endpoints.chat._record_engine_metrics"):
+            patch("core.endpoints.chat.get_effective_context_window", lambda n, s, m=None: 4096):
         return await dispatch_v1(body, request, [], "hi", "s1", engine, preferred, lang=lang)
 
 
@@ -326,8 +356,10 @@ async def test_a_fallback_the_resolution_already_made_keeps_its_own_origin():
 
 
 async def test_an_engine_that_was_not_live_and_one_that_broke_are_told_apart():
+    """MLX was asked for and is not live: the `engine` step resolved llama.cpp and
+    named MLX as the switch (`_resolve_engine`); the cascade keeps that reason."""
     state = _state(llama_cpp=_Module())
-    got = await _dispatch(state, {"llama_cpp": {"model": "m"}}, engine="mlx")
+    got = await _dispatch(state, {"llama_cpp": {"model": "m"}}, engine="llama_cpp", preferred="mlx")
     assert got[1:4] == ("llama_cpp", "mlx", "preferred_unavailable")
 
 
@@ -340,22 +372,30 @@ async def test_every_engine_failing_retryably_is_a_503_telling_the_first_error_c
 
 
 async def test_a_final_error_is_the_answer_and_nobody_else_is_asked():
+    """A bad request is bad for every engine (N5): its HTTP answer, as written."""
     state = _state(mlx=_Module(), llama_cpp=_Module())
     asked = []
 
     async def forward(name, *a, **k):
         asked.append(name)
-        raise HTTPException(status_code=502, detail="down")
+        raise HTTPException(status_code=400, detail="bad request")
 
     request = MagicMock()
     request.app.state = state
     with patch("core.endpoints.chat._dispatch_to_engine", forward), \
             patch("core.endpoints.chat._fit_v1_messages_to_window", lambda m, w, b: m), \
-            patch("core.endpoints.chat.get_effective_context_window", lambda n, s: 4096), \
-            patch("core.endpoints.chat._record_engine_metrics"):
+            patch("core.endpoints.chat.get_effective_context_window", lambda n, s, m=None: 4096):
         with pytest.raises(HTTPException) as caught:
             await dispatch_v1(SimpleNamespace(engine="auto", resume=False, model=None), request, [], "hi", "s", "mlx", None)
-    assert (caught.value.status_code, asked) == (502, ["mlx"])
+    assert (caught.value.status_code, asked) == (400, ["mlx"])
+
+
+async def test_an_engine_down_is_passed_over_and_the_next_one_answers():
+    """N5/R2: a forwarder's 502/503 (Ollama's daemon down or sick) is an engine
+    down, whoever is asked; it used to end the turn with a healthy engine behind."""
+    state = _state(mlx=_Module(), llama_cpp=_Module())
+    got = await _dispatch(state, {"mlx": HTTPException(status_code=502, detail="down"), "llama_cpp": {"model": "m"}})
+    assert got[1:4] == ("llama_cpp", "mlx", "execution_failed")
 
 
 async def test_a_cancel_event_does_not_stop_this_door_from_asking_the_next_engine():
@@ -375,8 +415,7 @@ async def test_a_cancel_event_does_not_stop_this_door_from_asking_the_next_engin
 
     with patch("core.endpoints.chat._dispatch_to_engine", forward), \
             patch("core.endpoints.chat._fit_v1_messages_to_window", lambda m, w, b: m), \
-            patch("core.endpoints.chat.get_effective_context_window", lambda n, s: 4096), \
-            patch("core.endpoints.chat._record_engine_metrics"):
+            patch("core.endpoints.chat.get_effective_context_window", lambda n, s, m=None: 4096):
         got = await dispatch_v1(SimpleNamespace(engine="auto", resume=False, model=None), request, [], "hi", "s",
                                 "mlx", None, cancel_event=event)
     assert got[1] == "llama_cpp"
@@ -531,7 +570,7 @@ async def test_the_second_call_is_made_to_the_named_engine_with_its_window_and_n
     fit = MagicMock(return_value=["FITTED"])
     with patch("core.endpoints.chat._dispatch_to_engine", forwarder), \
             patch("core.endpoints.chat._fit_v1_messages_to_window", fit), \
-            patch("core.endpoints.chat.get_effective_context_window", lambda n, s: {"llama_cpp": 777}[n]):
+            patch("core.endpoints.chat.get_effective_context_window", lambda n, s, m=None: {"llama_cpp": 777}[n]):
         got = await ask_again(body, request, ["PROMPT"], "hi", "s1", "llama_cpp")
     assert got == {"choices": []}
     fit.assert_called_once_with(["PROMPT"], 777, body)
@@ -550,7 +589,7 @@ async def test_a_failing_second_call_is_the_callers_to_take_and_no_other_engine_
 
     with patch("core.endpoints.chat._dispatch_to_engine", forward), \
             patch("core.endpoints.chat._fit_v1_messages_to_window", lambda m, w, b: m), \
-            patch("core.endpoints.chat.get_effective_context_window", lambda n, s: 4096):
+            patch("core.endpoints.chat.get_effective_context_window", lambda n, s, m=None: 4096):
         with pytest.raises(RuntimeError, match="worker died"):
             await ask_again(SimpleNamespace(engine="auto"), request, [], "hi", "s", "mlx")
     assert asked == ["mlx"]
@@ -582,24 +621,24 @@ async def test_the_reprompt_call_asks_the_engine_of_the_turn_with_the_prompt_und
 @pytest.mark.parametrize("index, status, passed_over", [
     (1, 404, True),     # in reserve, no such model: try the next engine
     (0, 404, False),    # the engine asked for: the client named a model that is not there
-    (1, 503, False),    # Ollama down is still the answer
-    (1, 400, False),
+    (1, 503, True),     # Ollama down is an engine down (R2/N5): the next one
+    (0, 503, True),     # ... the engine asked for too
+    (1, 400, False),    # a bad request is bad for every engine
     (2, 404, True),
 ])
 async def test_a_404_from_an_engine_in_reserve_is_a_reason_to_try_the_next(index, status, passed_over):
+    """D1-z is the policy's (N5): the door hands the forwarder's answer over as
+    it came, and `should_try_next_engine` reads what it means and whether the
+    engine was the one asked for."""
     from core.endpoints.chat_engines.routing import should_try_next_engine as policy
-    from core.turn.api_cascade import ModelNotOnFallback
 
     door = _door()
     boom = HTTPException(status_code=status, detail="model 'x' not found")
     with patch("core.endpoints.chat._dispatch_to_engine", AsyncMock(side_effect=boom)):
-        with pytest.raises(Exception) as caught:
+        with pytest.raises(HTTPException) as caught:
             await door.read_first(index, "ollama", object(), [])
-    if passed_over:
-        assert isinstance(caught.value, ModelNotOnFallback) and policy(caught.value) is True
-        assert caught.value.__cause__ is boom and "ollama" in str(caught.value)
-    else:
-        assert caught.value is boom and policy(caught.value) is False
+    assert caught.value is boom
+    assert policy(caught.value, in_reserve=index > 0) is passed_over
 
 
 async def test_a_fallback_without_the_model_is_passed_over_and_the_next_engine_answers():
@@ -622,11 +661,13 @@ async def test_the_engine_asked_for_answering_404_ends_the_turn():
 
 # ── what the review of this part found ───────────────────────────────────────
 
-async def test_every_attempt_of_a_cascade_is_counted_under_its_engine_in_order():
+async def test_every_attempt_of_a_cascade_is_said_on_the_turn_in_order():
+    from core.turn.context import TurnContext
+
     state = _state(mlx=_Module(), llama_cpp=_Module())
     request = MagicMock()
     request.app.state = state
-    counted = []
+    ctx = TurnContext(turn_id="t", entry="api")
 
     async def forward(name, *a, **k):
         if name == "mlx":
@@ -635,30 +676,7 @@ async def test_every_attempt_of_a_cascade_is_counted_under_its_engine_in_order()
 
     with patch("core.endpoints.chat._dispatch_to_engine", forward), \
             patch("core.endpoints.chat._fit_v1_messages_to_window", lambda m, w, b: m), \
-            patch("core.endpoints.chat.get_effective_context_window", lambda n, s: 4096), \
-            patch("core.endpoints.chat._record_engine_metrics", lambda *a: counted.append(a[:2])):
-        await dispatch_v1(SimpleNamespace(engine="auto", resume=False, model=None), request, [], "hi", "s", "mlx", None)
-    assert counted == [("mlx", "error"), ("llama_cpp", "success")]
-
-
-@pytest.mark.parametrize("fails, status", [(False, "success"), (True, "error")])
-async def test_the_second_call_is_counted_like_the_first_was(fails, status):
-    request = MagicMock()
-    request.app.state = _state(llama_cpp=_Module())
-    counted = []
-
-    async def forward(name, *a, **k):
-        if fails:
-            raise RuntimeError("died")
-        return {"model": "m"}
-
-    with patch("core.endpoints.chat._dispatch_to_engine", forward), \
-            patch("core.endpoints.chat._fit_v1_messages_to_window", lambda m, w, b: m), \
-            patch("core.endpoints.chat.get_effective_context_window", lambda n, s: 4096), \
-            patch("core.endpoints.chat._record_engine_metrics", lambda *a: counted.append((a[0], a[1], a[2] > 0))):
-        if fails:
-            with pytest.raises(RuntimeError, match="died"):
-                await ask_again(SimpleNamespace(engine="auto"), request, [], "hi", "s", "llama_cpp")
-        else:
-            await ask_again(SimpleNamespace(engine="auto"), request, [], "hi", "s", "llama_cpp")
-    assert counted == [("llama_cpp", status, True)]
+            patch("core.endpoints.chat.get_effective_context_window", lambda n, s, m=None: 4096):
+        await dispatch_v1(SimpleNamespace(engine="auto", resume=False, model=None), request, [], "hi", "s", "mlx", None,
+                          trace_ctx=ctx)
+    assert [(a["engine"], a["ok"]) for a in ctx.usage["engine_attempts"]] == [("mlx", False), ("llama_cpp", True)]

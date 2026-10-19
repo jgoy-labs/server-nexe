@@ -705,6 +705,45 @@ def knowledge_status():
 
     asyncio.run(check_status())
 
+@app.group()
+def providers():
+    """External API providers (optional): key presence and connection test."""
+
+
+def _providers_client(ctx: click.Context):
+    from .client import NexeClient
+    return NexeClient(ctx.obj.get('config', NexeConfig()))
+
+
+@providers.command(name="status")
+@click.pass_context
+def providers_status_cmd(ctx: click.Context):
+    """Show which providers have an API key configured (never the key)."""
+    data = _providers_client(ctx).get_providers_status()
+    if data.get("error"):
+        click.echo(click.style(f"Server error ({data.get('status_code')}): {data.get('message')}", fg="red"))
+        ctx.exit(1)
+    for p in data.get("providers", []):
+        mark = click.style("configured", fg="green") if p["configured"] else "not configured"
+        click.echo(f"{p['key']:<10} {mark}  ({p['env_var']})")
+
+
+@providers.command(name="check")
+@click.argument("provider_key")
+@click.pass_context
+def providers_check_cmd(ctx: click.Context, provider_key: str):
+    """Test the connection to one provider (one minimal request)."""
+    data = _providers_client(ctx).check_provider(provider_key)
+    if data.get("error"):
+        click.echo(click.style(f"Server error ({data.get('status_code')}): {data.get('message')}", fg="red"))
+        ctx.exit(1)
+    if data.get("ok"):
+        click.echo(click.style(f"{provider_key}: ok", fg="green"))
+        return
+    click.echo(click.style(f"{provider_key}: failed ({data.get('reason')})", fg="red"))
+    ctx.exit(1)
+
+
 # Register encryption subcommands
 try:
     from core.crypto.cli import encryption

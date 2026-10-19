@@ -16,6 +16,7 @@ from core.turn.engine_claim import (
     claim_engine, claim_one, live_candidates,
 )
 from core.endpoints.chat_engines.routing import should_try_next_engine
+from core.turn.errors import BadRequest, ModelNotFound
 
 
 class _Engine:
@@ -35,11 +36,10 @@ class _Engine:
 class _Door(CascadeDoor):
     """Scripted: `script[name]` is what `prepare` or `read_first` does for that engine."""
 
-    def __init__(self, prepare=None, first=None, skips=(), stop_when_cancelled=False, announce=None):
+    def __init__(self, prepare=None, first=None, skips=(), announce=None):
         self.prepare_errors = prepare or {}
         self.first = first or {}
         self.skips = set(skips)
-        self.stop_when_cancelled = stop_when_cancelled
         self.announcements = announce or {}
         self.log = []
         self.observed = []
@@ -93,6 +93,7 @@ class _State:
 
 def test_live_candidates_follow_the_cascade_and_name_their_modules(monkeypatch):
     monkeypatch.setenv("NEXE_MODEL_ENGINE", "auto")
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "llama3.2:3b")  # Ollama behind MLX: a fallback with a model of its own
     mlx, ollama = _Engine("mlx"), _Engine("ollama")
     mlx._node = object()
     state = _State({"mlx_module": mlx, "ollama_module": ollama})
@@ -109,6 +110,7 @@ def test_nothing_live_is_a_503(monkeypatch):
 
 def test_a_continue_keeps_only_the_engines_that_can_resume_and_asks_with_the_model(monkeypatch):
     monkeypatch.setenv("NEXE_MODEL_ENGINE", "auto")
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "llama3.2:3b")  # Ollama behind MLX: a fallback with a model of its own
     mlx, ollama = _Engine("mlx", can_continue=False), _Engine("ollama", can_continue=True)
     mlx._node = object()
     state = _State({"mlx_module": mlx, "ollama_module": ollama})
@@ -158,10 +160,9 @@ async def test_an_engine_that_breaks_reading_its_first_event_is_passed_over_too(
 
 
 @pytest.mark.parametrize("error, status", [
-    (ValueError("bad request"), 400),
-    (ValueError("model X not found"), 404),
-    (ConnectionError("refused"), 503),
-    (TimeoutError("slow"), 504),
+    (BadRequest("bad request"), 400),
+    (ModelNotFound("model X not found"), 404),
+    (HTTPException(status_code=422, detail="invalid"), 422),
 ])
 async def test_a_final_error_ends_the_turn_and_no_other_engine_is_asked(error, status):
     door = _Door(prepare={"a": error})
@@ -172,12 +173,88 @@ async def test_a_final_error_ends_the_turn_and_no_other_engine_is_asked(error, s
     assert door.observed == [("a", False)]
 
 
-async def test_an_http_answer_from_an_engine_reaches_the_client_as_written():
-    door = _Door(prepare={"a": HTTPException(status_code=502, detail="down")})
+async def test_an_http_answer_from_an_engine_keeps_its_status_and_is_told_in_curated_words():
+    """P2-7: the status and the headers are the engine's, the words never are."""
+    raw = HTTPException(status_code=400, detail="Ollama said: bad field at http://127.0.0.1:11434", headers={"X-A": "1"})
+    door = _Door(prepare={"a": raw})
+    door.lang = "en"
     with pytest.raises(HTTPException) as caught:
         await claim_one(_engines("a", "b"), door)
-    assert (caught.value.status_code, caught.value.detail) == (502, "down")
+    assert (caught.value.status_code, caught.value.detail) == (400, "The engine could not accept this request.")
+    assert caught.value.headers == {"X-A": "1"} and caught.value.__cause__ is raw
     assert [e[1] for e in door.log if e[0] == "prepare"] == ["a"]
+
+
+@pytest.mark.parametrize("error", [
+    ValueError("cannot reshape array of size 0 into shape (1,4096)"),
+    ValueError("Expecting value: line 1 column 1 (char 0)"),
+])
+async def test_a_value_error_nobody_marked_is_the_engine_failing(error):
+    """P2-7: a `ValueError` from inside an engine (a reshape, a JSON decode) is
+    that engine failing, not a bad request: the next one is asked."""
+    door = _Door(prepare={"a": error})
+    claim = await claim_one(_engines("a", "b"), door)
+    assert claim.engine_name == "b"
+
+
+@pytest.mark.parametrize("error", [
+    ConnectionError("refused"), TimeoutError("slow"), HTTPException(status_code=502, detail="down"),
+    HTTPException(status_code=503, detail="unavailable"),
+])
+async def test_an_engine_down_or_too_slow_is_passed_over(error):
+    """N5: what the failure means, not its class — an engine that cannot be
+    reached or does not answer in time is worth the next one, whoever said so."""
+    door = _Door(prepare={"a": error})
+    claim = await claim_one(_engines("a", "b"), door)
+    assert claim.engine_name == "b" and claim.passed_over[0][0] == "a"
+
+
+async def test_in_reserve_is_by_what_was_asked_not_by_position():
+    """P2-5: the client asked for an engine that is not among the candidates —
+    the first one is a fallback too, and a model missing from it moves on."""
+    missing = HTTPException(status_code=404, detail="no such model")
+    door = _Door(prepare={"a": missing})
+    door.asked = "elsewhere"
+    claim = await claim_one(_engines("a", "b"), door)
+    assert claim.engine_name == "b"
+    door = _Door(prepare={"a": missing})
+    door.asked = "a"
+    with pytest.raises(HTTPException) as caught:
+        await claim_one(_engines("a", "b"), door)
+    assert caught.value.status_code == 404
+
+
+def test_the_engine_asked_for():
+    from types import SimpleNamespace
+
+    from core.endpoints.chat_engines.routing import asked_engine, in_reserve
+    state = SimpleNamespace(config={"plugins": {"models": {"preferred_engine": "llama_cpp"}}})
+    assert asked_engine("MLX", state) == "mlx"
+    assert asked_engine("llama.cpp", state) == "llama_cpp"
+    assert asked_engine("api", state) == "api"
+    assert in_reserve(0, "ollama", "mlx") and not in_reserve(1, "mlx", "mlx")
+    assert not in_reserve(0, "mlx", None) and in_reserve(1, "llama_cpp", None)
+
+
+async def test_a_missing_model_on_a_first_event_in_reserve_moves_on_too():
+    """N5 + D1-z through the other way an engine fails: its first event (the web
+    stream reads one). A reserve whose first event says «no such model» is passed
+    over and the next engine answers; the first failure stays kept for the notice."""
+    missing = HTTPException(status_code=404, detail="no such model")
+    door = _Door(first={"a": ("fail", RuntimeError("x")), "b": ("fail", missing)})
+    claim = await claim_one(_engines("a", "b", "c"), door)
+    assert claim.engine_name == "c" and not claim.kept
+
+
+async def test_a_missing_model_is_final_for_the_engine_asked_for_and_not_for_one_in_reserve():
+    """N5 + D1-z: in reserve, a model that is not there passes the engine over."""
+    missing = HTTPException(status_code=404, detail="no such model")
+    door = _Door(prepare={"b": missing})
+    claim = await claim_one(_engines("a", "b", "c"), _Door(prepare={"a": RuntimeError("x"), "b": missing}))
+    assert claim.engine_name == "c"
+    with pytest.raises(HTTPException) as caught:
+        await claim_one(_engines("b", "c"), door)
+    assert caught.value.status_code == 404 and caught.value.__cause__ is missing
 
 
 async def test_nobody_answering_is_a_503_that_tells_the_first_error_curated():
@@ -242,35 +319,59 @@ async def test_a_skipped_engine_is_not_asked_and_is_not_a_failure():
     assert all(e[1] != "a" for e in door.log)
 
 
-async def test_a_cancelled_turn_asks_no_other_engine_when_the_door_says_so():
-    event = threading.Event()
-    door = _Door(prepare={"a": RuntimeError("x")}, stop_when_cancelled=True)
-    event.set()
+def _cancel(*reasons):
+    from core.turn.cancel import TurnCancel
+    event = TurnCancel()
+    for reason in reasons:
+        event.cancel(reason)
+    return event
+
+
+async def test_a_client_that_left_is_asked_nothing_more_at_any_door():
+    """N4: one rule in the core, no door's flag: the client left, so no other
+    engine is asked for an answer nobody will read."""
+    from core.turn.cancel import CLIENT_GONE
+    door = _Door(prepare={"a": RuntimeError("x")})
     with pytest.raises(HTTPException) as caught:   # engine 0 is always asked; nobody is left
-        await claim_one(_engines("a", "b"), door, cancel_event=event)
+        await claim_one(_engines("a", "b"), door, cancel_event=_cancel(CLIENT_GONE))
     assert caught.value.status_code == 503
     assert [e[1] for e in door.log if e[0] == "prepare"] == ["a"]
 
 
-async def test_a_cancelled_turn_still_asks_the_first_engine():
-    event = threading.Event()
-    event.set()
-    door = _Door(stop_when_cancelled=True)
-    claim = await claim_one(_engines("a"), door, cancel_event=event)
+async def test_a_turn_whose_client_left_still_asks_the_first_engine():
+    from core.turn.cancel import CLIENT_GONE
+    claim = await claim_one(_engines("a"), _Door(), cancel_event=_cancel(CLIENT_GONE))
     assert claim.engine_name == "a"
 
 
-async def test_a_door_that_does_not_stop_keeps_asking_a_cancelled_turn():
-    event = threading.Event()
-    event.set()
-    door = _Door(prepare={"a": RuntimeError("x")}, stop_when_cancelled=False)
-    claim = await claim_one(_engines("a", "b"), door, cancel_event=event)
+async def test_a_turn_that_ran_out_of_time_keeps_asking():
+    """N4: a deadline is not a client that left. The event is set (the engine
+    stops), and the cascade goes on as it would."""
+    from core.turn.cancel import DEADLINE
+    event = _cancel(DEADLINE)
+    assert event.is_set()
+    claim = await claim_one(_engines("a", "b"), _Door(prepare={"a": RuntimeError("x")}), cancel_event=event)
     assert claim.engine_name == "b"
 
 
-async def test_without_an_event_a_stopping_door_just_goes_on():
-    door = _Door(prepare={"a": RuntimeError("x")}, stop_when_cancelled=True)
-    claim = await claim_one(_engines("a", "b"), door, cancel_event=None)
+async def test_a_client_that_leaves_after_the_deadline_is_still_a_client_that_left():
+    from core.turn.cancel import CLIENT_GONE, DEADLINE
+    door = _Door(prepare={"a": RuntimeError("x")})
+    with pytest.raises(HTTPException):
+        await claim_one(_engines("a", "b"), door, cancel_event=_cancel(DEADLINE, CLIENT_GONE))
+    assert [e[1] for e in door.log if e[0] == "prepare"] == ["a"]
+
+
+async def test_an_event_set_for_no_recorded_reason_keeps_asking():
+    """A plain `set()` (the stream byte cap) says nothing about the client."""
+    event = threading.Event()
+    event.set()
+    claim = await claim_one(_engines("a", "b"), _Door(prepare={"a": RuntimeError("x")}), cancel_event=event)
+    assert claim.engine_name == "b"
+
+
+async def test_without_an_event_the_cascade_just_goes_on():
+    claim = await claim_one(_engines("a", "b"), _Door(prepare={"a": RuntimeError("x")}), cancel_event=None)
     assert claim.engine_name == "b"
 
 
@@ -321,7 +422,7 @@ async def test_when_nobody_claims_the_FIRST_failure_is_kept_not_the_last():
 
 
 async def test_a_final_failure_on_the_first_event_stops_the_cascade_and_is_kept():
-    final = ValueError("bad request")
+    final = BadRequest("bad request")
     door = _Door(first={"a": ("fail", final), "b": "ok"})
     claim = await claim_one(_engines("a", "b"), door)
     assert claim.kept and claim.engine_name == "a" and claim.opened.failure is final
@@ -330,7 +431,7 @@ async def test_a_final_failure_on_the_first_event_stops_the_cascade_and_is_kept(
 
 async def test_with_a_notice_in_hand_a_later_final_start_error_keeps_the_notice():
     first = RuntimeError("down")
-    door = _Door(first={"a": ("fail", first)}, prepare={"b": ValueError("cannot take it")})
+    door = _Door(first={"a": ("fail", first)}, prepare={"b": BadRequest("cannot take it")})
     claim = await claim_one(_engines("a", "b", "c"), door)
     assert claim.kept and claim.engine_name == "a" and claim.opened.failure is first
     assert all(e[1] != "c" for e in door.log)
@@ -344,7 +445,7 @@ async def test_with_a_notice_in_hand_a_later_retryable_start_error_goes_on():
 
 
 async def test_without_a_notice_in_hand_a_final_start_error_is_the_http_answer():
-    door = _Door(prepare={"a": ValueError("cannot take it")})
+    door = _Door(prepare={"a": BadRequest("cannot take it")})
     with pytest.raises(HTTPException) as caught:
         await claim_one(_engines("a"), door)
     assert caught.value.status_code == 400
@@ -358,7 +459,7 @@ async def test_claim_one_returns_the_claim_and_drops_the_announcements():
 
 async def test_the_default_door_asks_nothing_of_anyone():
     door = CascadeDoor()
-    assert door.skip(0, "a", None) is False and door.stop_when_cancelled is False
+    assert door.skip(0, "a", None) is False and not hasattr(door, "stop_when_cancelled")
     door.observe("a", True, 0.0)
     assert await door.close("anything") is None   # an abandoned engine, and nothing to do about it
     assert [x async for x in door.announce(0, "a", None, "p")] == []
@@ -554,7 +655,7 @@ async def test_the_stream_door_stands_in_the_first_failure_as_data():
 @pytest.mark.parametrize("follows, switched_to, model_after", [(True, ["qwen"], "qwen"), (False, [], "Loaded-Model")])
 async def test_the_model_of_the_first_engine_follows_the_request_only_where_the_door_says_so(
         turn_lab, fake_engine, monkeypatch, streaming, follows, switched_to, model_after):
-    """D1 (provisional): the web door's picker names the model and the first
+    """D1: the web door's picker names the model and the first
     engine is switched to it; a door that says no gets the model the engine has
     loaded, as a fallback always does (#1035)."""
     from types import SimpleNamespace

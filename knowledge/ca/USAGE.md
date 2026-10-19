@@ -28,6 +28,7 @@ expires: null
   - [Pujada de documents](#pujada-de-documents)
 - [MEM_SAVE — Memoria automatica](#mem_save--memoria-automatica)
   - [Esborrat total (`CLEAR_ALL`) — confirmació 2-torns](#esborrat-total-clear_all--confirmació-2-torns)
+- [Proveïdors d'API externs](#proveïdors-dapi-externs-opcional)
 - [Encriptacio](#encriptacio)
 - [Us de l'API](#us-de-lapi)
   - [Xat (curl)](#xat-curl)
@@ -151,6 +152,17 @@ Si demanes esborrar **tota** la memòria ("esborra-ho tot", "forget everything",
 2. **Torn 2:** Si respons `sí`/`confirma`/`ok`, s'executa l'esborrat. Qualsevol altra resposta cancel·la l'operació.
 
 Aixo evita pèrdues massives accidentals per un missatge ambigu o per injecció des d'un document.
+
+## Proveïdors d'API externs (opcional)
+
+server-nexe és local per defecte i ho continua sent: res no surt de la teva màquina si no ho actives, ho tries i hi dius que sí. Per xatejar amb DeepSeek o OpenAI:
+
+1. **Aprova el mòdul.** `api_module` ha de ser a `NEXE_APPROVED_MODULES` del teu `.env` (les instal·lacions noves ja el porten; en una existent, afegeix-lo i reinicia).
+2. **Posa la clau al `.env`** (mai a la UI): `DEEPSEEK_API_KEY=...` o `OPENAI_API_KEY=...`. Comprova-la amb `./nexe providers status` (quines claus hi ha, mai la clau) i `./nexe providers check deepseek` (una petició mínima).
+3. **Encén l'interruptor global**: `NEXE_ALLOW_CLOUD_ENGINES=1`, o l'interruptor «Permet motors al núvol» de la barra lateral de la web. Per defecte és apagat, i apagar-lo atura la propera crida fins i tot d'un torn que ja corre.
+4. **Tria'l.** A la web, el grup **API** surt al selector de motor només amb l'interruptor encès i una clau configurada. La primera vegada que una conversa el tria, un diàleg diu que la conversa, els documents recuperats i la memòria sortiran de la teva màquina cap a aquell proveïdor; si hi acceptes, es recorda només per a aquella conversa, i tornar a un motor local ho oblida. Des de `/v1`, envia `"engine": "api"`, el `model` del proveïdor i `"nexe_cloud_consent": "deepseek"` a **cada** petició (vegeu la referència de l'API).
+
+L'API no respon mai en lloc d'un motor local ni cap motor local no respon en el seu lloc: si el proveïdor falla, ho veus, amb el nom del proveïdor i el motiu (clau refusada, saldo, límit, temps d'espera), i no ho prova res més. El peu d'una resposta diu «model · API».
 
 ## Encriptacio
 

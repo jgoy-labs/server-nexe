@@ -119,7 +119,9 @@ class TestMemoryCollections:
         store_r = client.post(
             "/v1/memory/store",
             headers=auth_headers,
-            json={"content": content, "metadata": {"collection": "user_knowledge", "source": "test_live"}},
+            # `collection` is a field of the request, not of the metadata: inside
+            # the metadata it is only a label and the text lands in personal_memory.
+            json={"content": content, "collection": "user_knowledge", "metadata": {"source": "test_live"}},
             timeout=15.0,
         )
         assert store_r.status_code in (200, 201), f"Store: {store_r.status_code}"
@@ -138,6 +140,17 @@ class TestMemoryCollections:
             f"Collection isolation FAIL: token '{token}' found in personal_memory "
             f"after storing in user_knowledge. Hits: {cross_hits}"
         )
+
+        # Control: the text IS where it was sent, so the empty result above is
+        # isolation and not a store that went nowhere.
+        own_r = client.post(
+            "/v1/memory/search",
+            headers=auth_headers,
+            json={"query": f"fotosíntesi_{token}", "collection": "user_knowledge", "limit": 5},
+            timeout=15.0,
+        )
+        assert own_r.status_code == 200
+        assert any(token in str(r) for r in _result_list(own_r.json())), "stored text not in user_knowledge"
 
     def test_nexe_documentation_auto_ingested(
         self, client: httpx.Client, auth_headers: dict[str, str]

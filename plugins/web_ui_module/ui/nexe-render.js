@@ -13,6 +13,27 @@
  */
 /* global NexeUI */
 NexeUI.extend({
+    /**
+     * A memory tag inside code is a quotation, and the span goes with it (#1135
+     * on the server, `core/memory_facts/extract.py::_drop_quoted_tags`; the same
+     * rule here, so the live answer reads like the saved one — #1151). Stripping
+     * only the tag left «El format és: ``.» on screen. Code is a ``` or ~~~ fence
+     * (an unclosed one runs to the end, as in CommonMark), ``double`` or `single`
+     * backticks. A span that holds more than the tag keeps the rest; one that
+     * holds nothing else, not even a fence's language, goes whole.
+     * The two sides share their cases (tests/frontend/lib/quoted_tag_cases.json).
+     */
+    _dropQuotedMemTags(text) {
+        const spans = /```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|``[^`\n]+``|`[^`\n]+`/g;
+        const tag = /\[(?:MEM_SAVE|MEM_DELETE|MEMORIA|OBLIT|OLVIDA|FORGET)\s*:[^[\]\n\r\t]{0,250}\]/gi;
+        const fence = /(?:```|~~~)[\p{L}\p{N}_+-]*/gu;
+        return text.replace(spans, (span) => {
+            if (span.search(tag) < 0) return span;
+            const rest = span.replace(tag, '');
+            return rest.replace(fence, '').replace(/^[`~ \n]+|[`~ \n]+$/g, '') === '' ? '' : rest;
+        });
+    },
+
     renderMarkdown(text) {
         if (!text) return '';
 
@@ -24,7 +45,7 @@ NexeUI.extend({
         // streaming-path stripper never sees them. Also hits loadSession
         // (persisted messages re-rendered from disk). Central strip here
         // = single source of truth for every render path.
-        const cleaned = text
+        const cleaned = this._dropQuotedMemTags(text)
             .replace(/\x00/g, '') // eslint-disable-line no-control-regex
             .replace(/\[MODEL:[^\]]+\]/g, '')          // [MODEL:nexe-system]
             .replace(/\[ENGINE:[^\]]+\]/g, '')         // [ENGINE:mlx] (#1146)

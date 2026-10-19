@@ -138,6 +138,18 @@ server-nexe has an automatic memory system similar to ChatGPT or Claude. The mod
 
 **Deduplication:** Before saving, checks similarity with existing entries. If similarity > 0.80, the entry is considered duplicate and not saved.
 
+### Facts with a key: how a change is found
+
+A second pass reads the user's message with the same model that answered (one short call, ~0.5 s locally, ~1 s with an API) and takes out facts with a **key**: who it is about (`user`, a sister…), what (`age`, `phone`, `pets`…), the value as the user wrote it and a short sentence. The server decides by the key, not by how much two sentences look alike:
+- **No fact holds that key:** it is saved, with the key beside it (`entity`, `attribute`, `value`, `value_norm`).
+- **It is there with the same value:** nothing happens, even if the turn is in another language («tinc 45 anys» and «I'm 45» are the same; a number is compared without its unit).
+- **It is there with another value:** it is a change. Nothing is changed: the server asks «I have not changed anything yet: I have X noted. Do you want me to change it to Y? Reply yes to confirm.» and only the user's yes does it (B028). A key that holds several values (`pets`, `allergies`…) asks the same: a no can be undone, a second dog saved in silence cannot.
+- The keys already stored go into the extractor's prompt so the same thing always gets the same name. With an API engine the names go, not the values.
+- If the pass cannot read the message (the model does not answer JSON twice, the engine is busy), the `[MEM_SAVE:]` markers work as always. A value that is not in the message is dropped (invention).
+- Switch off with `NEXE_MEMORY_KEYED=false`. Facts saved before have no key: closeness (0.80) still applies to them.
+
+Tested (19/10) with 4B, 9B and 27B on Ollama and MLX, DeepSeek and Claude: the change of age, phone and dog's name is armed, asked and done with all of them.
+
 **Complete MEM_SAVE flow:**
 
 ```

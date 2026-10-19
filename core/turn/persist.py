@@ -20,6 +20,23 @@ from core.turn.text import clean as text_clean
 logger = logging.getLogger(__name__)
 
 
+def _name_the_last_engine(message: dict, stats: Any) -> None:
+    """#1152: a Continue served by another engine leaves the saved footer naming
+    the one that wrote the first half, while the live footer (which reads the
+    tokens of the stream that just ended) names the one that finished it. The
+    merged message takes the model and engine of the stream that merged, so the
+    reload shows what the screen showed. Only what the new stream says: a stats
+    dict without them (an engine that reported none) leaves the old ones."""
+    if not isinstance(stats, dict):
+        return
+    kept = message.get("stats")
+    for key in ("model", "engine"):
+        if stats.get(key):
+            if not isinstance(kept, dict):
+                kept = message["stats"] = {}
+            kept[key] = stats[key]
+
+
 def persist_assistant_turn(
     session: Any,
     clean_response: str,
@@ -46,6 +63,7 @@ def persist_assistant_turn(
         # the first half of the answer.
         _last = session.messages[-1]
         _last["content"] += clean_response
+        _name_the_last_engine(_last, stats)
         if trunc and trunc_continuable:
             # Chained continue (truncated again): extend the raw so
             # the NEXT continue prompt stays an exact token prefix.
@@ -67,6 +85,7 @@ def persist_assistant_turn(
 
 def persist_partial_assistant(
     session: Any, session_mgr: Any, full_response: str, message: str, *, resume: bool = False,
+    stats: Any = None,
 ) -> None:
     """Best-effort persist of an interrupted turn (MC-116), for the `finally`.
 
@@ -84,6 +103,7 @@ def persist_partial_assistant(
             # path (add_message would trip the consecutive-role dedupe).
             _last = session.messages[-1]
             _last["content"] += _partial_clean
+            _name_the_last_engine(_last, stats)  # #1152: a cut Continue too
             # The answer is still cut. Keep the raw prefix so the NEXT
             # Continue stays an exact token prefix — the same rule as a
             # truncated merge. Dropping gen_raw here made that next resume

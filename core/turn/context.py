@@ -37,7 +37,7 @@ class TurnContext:
     # instead of answering a new user message (FD-S6, the web door's
     # Continue). A property of the turn, not of the door: the steps read it.
     resume: bool = False
-    # C4.8 (D1, provisional): does the model the request names become the model
+    # C4.8 (D1): does the model the request names become the model
     # of the FIRST engine? The web door says yes (its picker names the model and
     # the engine is switched to it); `/v1` says no (an engine runs the model it
     # has loaded, B075-C3, and a fallback always does). A property the door
@@ -63,18 +63,29 @@ class TurnContext:
     prompt: list = field(default_factory=list)
     response: str = ""
     facts: list = field(default_factory=list)
+    #: What `emit` adds to a JSON reply AFTER its persistence was queued (`question`: the
+    #: server's change question); the queued task reads it when it runs.
+    late_suffix: dict = field(default_factory=dict)
 
     # --- Control ---
     cancel_token: Optional[Any] = None
     deadline: Optional[float] = None
-    trace_id: Optional[str] = None
 
     # --- Resources ---
     engine: Optional[Any] = None                 # the engine that serves (name today; a port handle later)
+    #: Its NAME, at both doors (C5 B): `engine` holds the module at the web door and the
+    #: name at `/v1`, so whoever must say WHICH engine (the trace, the metrics) reads this.
+    engine_name: Optional[str] = None
     gpu_slot: Optional[Any] = None
     context_window: Optional[int] = None         # the serving engine's window, sizes the budget
     engine_fallback_from: Optional[str] = None   # the engine asked for, when another one answered
     engine_fallback_reason: str = "preferred_unavailable"
+    #: The engine that serves is a hosted one: the conversation, what was retrieved
+    #: and the memory LEFT this machine for a provider. Written by `engine` (from
+    #: the engine's own declaration, never from a name alone), read by the trace
+    #: and by whatever C5's TraceSink makes of it. Nothing about the answer's
+    #: text: only where it was asked.
+    left_machine: bool = False
 
     # --- Result: what run_turn fills and TraceSink (C5) will read ---
     wire: Any = None        # the door's payload built by `emit` (non-streaming)
@@ -86,7 +97,8 @@ class TurnContext:
     # PARTIAL rather than complete. `error` classifies it (ADR-007 §8):
     # {"step", "class", "message"} with class in {UserFixable, Retryable,
     # Fatal}. A partial turn is persisted as such and queues no memory.write
-    # (facts extracted from a broken reply are not trustworthy).
+    # (facts extracted from a broken reply are not trustworthy), no
+    # describe_image (#1144) and no compact (#1149): the engine broke on it.
     partial: bool = False
     error: Optional[dict] = None
 

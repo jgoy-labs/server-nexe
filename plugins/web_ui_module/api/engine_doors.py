@@ -36,21 +36,20 @@ if TYPE_CHECKING:  # an annotation only: no import-time edge to core.turn.contex
 logger = logging.getLogger(__name__)
 
 
-def _model_on_fallback(engine, requested: str) -> str:
-    """#1035: the model a fallback engine answers with — the one it has loaded.
+def _model_on_fallback(engine, requested: str, engine_name: str | None = None, app_state=None) -> str:
+    """#1035: the model a fallback engine answers with — its own (`model_in_reserve`).
 
-    A model name belongs to one engine: an MLX directory is not a .gguf, and
-    neither is an Ollama tag. The web doors used to ask the next engine in the
-    cascade to load the name picked for another one; its validation raised
-    ValueError("not found"), final for the cascade policy, so with a model
-    selected in the UI (always) no fallback ever answered. `/v1` already runs
-    a fallback with its loaded model; the web doors do the same now. An engine
-    with no single loaded model (Ollama picks one per request) gets the
-    requested name, as before.
+    The web doors used to ask the next engine in the cascade to load the name
+    picked for another one; its validation raised ValueError("not found"),
+    final for the cascade policy, so with a model selected in the UI (always)
+    no fallback ever answered. MLX and llama.cpp answer with the model they have
+    loaded, Ollama with its own default (C4.8 B2/D1-x), as at `/v1`. Without
+    `engine_name` (the first engine of a door that does not pick the model, D1)
+    it is what the engine has loaded, and the name asked for when it has none.
     """
     # Deferred: a plugin must not pull core at import time (layering gate, #471).
-    from core.endpoints.chat_engines._common import resolve_loaded_model_name
-    return resolve_loaded_model_name(engine, requested)
+    from core.endpoints.chat_engines._common import model_in_reserve
+    return model_in_reserve(engine_name, engine, requested, app_state)
 
 
 class _CannotSeeTheImage(RuntimeError):
@@ -61,45 +60,50 @@ class _CannotSeeTheImage(RuntimeError):
 
 def _require_sight(engine, engine_name: str, model_name: str) -> None:
     """A fallback answers with its own model (#1035), and a text model given a
-    turn with an image would answer as if it saw it. An engine that says it
-    cannot see is skipped; one that does not say (it takes the requested
-    model, Ollama) is left as before."""
+    turn with an image would answer as if it saw it. A fallback that does not
+    say it can see is skipped: one that says it cannot, and one that does not
+    say (Ollama, whose own default model nobody vouches for, C4.8 B2/D1-x)."""
     from core.endpoints.chat_engines.routing import engine_can_see_images  # deferred, as above
-    if engine_can_see_images(engine) is False:
-        raise _CannotSeeTheImage(f"{engine_name} runs {model_name}, which cannot see the image")
+    if engine_can_see_images(engine) is not True:
+        raise _CannotSeeTheImage(f"{engine_name} runs {model_name}, which cannot see the image (or does not say it can)")
 
 
 def _refit_for(engine, system_prompt: str, messages: list) -> list:
     """#976 on a fallback engine: the prompt was fitted to the window of the
     engine that was resolved; another one may hold less."""
     from core.context_window import ask_engine_window
-    from core.context_budget import fit_prompt_to_window
-    from core.endpoints.chat_sanitization import CHARS_PER_TOKEN_ESTIMATE, DEFAULT_CONTEXT_WINDOW
+    from core.context_budget import fit_prompt_to_window, reply_reserve_tokens
+    from core.endpoints.chat_sanitization import DEFAULT_CONTEXT_WINDOW
     window = ask_engine_window(engine) or DEFAULT_CONTEXT_WINDOW
-    fitted, _ = fit_prompt_to_window(
-        system_prompt, messages, window, reply_budget_tokens=500 // CHARS_PER_TOKEN_ESTIMATE,
-    )
+    # The web sends no max_tokens: the default reserve, the same rule as /v1 (B1).
+    fitted, _ = fit_prompt_to_window(system_prompt, messages, window, reply_budget_tokens=reply_reserve_tokens())
     return fitted
 
 
 async def prepare_call(ctx: TurnContext, ui: dict, index: int, engine_name: str, engine_obj,
-                       cancel_event, *, stream: bool):
+                       cancel_event, *, stream: bool, reserve: bool):
     """One engine attempt's setup: its model, signature, prompt refit, start.
 
     The first candidate was switched to the requested model in `engine`; a
-    fallback answers with the model it has loaded (#1035), and only if
-    that model can see the turn's image when there is one. The model comes
+    fallback answers with its own model (#1035, `model_in_reserve`), and only
+    if that model says it can see the turn's image when there is one. The model comes
     back last: this attempt's text is parsed, recorded and stored as its."""
-    follows = index == 0 and ctx.model_follows_request
-    model_name = ui["model_name"] if follows else _model_on_fallback(engine_obj, ui["model_name"])
+    if not reserve:
+        # D1: a door whose picker names the model switches the engine asked for
+        # to it; one that does not runs what the engine has loaded.
+        model_name = ui["model_name"] if ctx.model_follows_request else _model_on_fallback(engine_obj, ui["model_name"])
+    else:
+        model_name = _model_on_fallback(engine_obj, ui["model_name"], engine_name, ctx.app_state)
     image_b64 = ctx.attachments.get("image_b64")
     if image_b64 and ctx.attachments.get("image_reattached"):
         # #1144: a re-attached image is a help, never a reason to pass an
         # engine over — one that cannot see answers from the image's note.
+        # A fallback that does not say it sees is not handed it either (B2/D1-x).
         from core.endpoints.chat_engines.routing import engine_can_see_images  # deferred, as in _require_sight
-        if engine_can_see_images(engine_obj) is False:
+        sees = engine_can_see_images(engine_obj)
+        if sees is False or (reserve and sees is not True):
             image_b64 = None
-    elif index > 0 and image_b64:
+    elif reserve and image_b64:
         _require_sight(engine_obj, engine_name, model_name)
     thinking_enabled = getattr(ctx.session, "thinking_enabled", False)
     sig = inspect.signature(engine_obj.chat)
@@ -121,6 +125,7 @@ class JsonReply:
     text: str
     prepared: tuple
     started: float
+    usage: "dict | None" = None  # what the engine said the call cost
 
 
 class JsonDoor(CascadeDoor):
@@ -129,12 +134,15 @@ class JsonDoor(CascadeDoor):
 
     def __init__(self, ctx: TurnContext, ui: dict, cancel_event, *, on_capped: Callable[[], None]) -> None:
         self.ctx, self.ui, self.cancel_event, self.on_capped = ctx, ui, cancel_event, on_capped
+        self.asked = ui.get("asked_engine")
+        self.trace_ctx = ctx
         self.lang = ctx.lang
         self._started = 0.0
 
     async def prepare(self, index, name, engine):
         self._started = time.monotonic()
-        prepared = await prepare_call(self.ctx, self.ui, index, name, engine, self.cancel_event, stream=False)
+        prepared = await prepare_call(self.ctx, self.ui, index, name, engine, self.cancel_event, stream=False,
+                                      reserve=self.in_reserve(index, name))
         chat_result, sig, messages, thinking_enabled, model_name = prepared
         # C4.5: how this door asks the engine once more, if the turn cleans
         # down to nothing but tags (`postprocess`).
@@ -145,12 +153,16 @@ class JsonDoor(CascadeDoor):
 
     async def read_first(self, index, name, engine, prepared) -> Opened:
         chunks: list[str] = []
-        if await engine_call._accumulate_nonstreaming_response(prepared[0], chunks):
+        # #1165: the deadline watches up to the engine's first chunk, not the whole answer
+        # (the turn's event owns it: `TurnCancel.disarm_deadline`).
+        started = getattr(self.cancel_event, "disarm_deadline", None)
+        said: dict = {}
+        if await engine_call._accumulate_nonstreaming_response(prepared[0], chunks, on_first_chunk=started, said=said):
             self.on_capped()
         text = "".join(chunks)
         if not text:
             raise EmptyReply(f"{name} answered nothing")
-        return Opened(JsonReply(text, prepared, self._started))
+        return Opened(JsonReply(text, prepared, self._started, said.get("usage")))
 
 
 async def _no_events():
@@ -174,14 +186,15 @@ class StreamDoor(CascadeDoor):
     failure on that first event is carried, not raised — the 200 is already
     out (#1117)."""
 
-    stop_when_cancelled = True
-
     def __init__(self, ctx: TurnContext, ui: dict, cancel_event) -> None:
         self.ctx, self.ui, self.cancel_event = ctx, ui, cancel_event
+        self.asked = ui.get("asked_engine")
+        self.trace_ctx = ctx
         self.announced = False
 
     async def prepare(self, index, name, engine):
-        return await prepare_call(self.ctx, self.ui, index, name, engine, self.cancel_event, stream=True)
+        return await prepare_call(self.ctx, self.ui, index, name, engine, self.cancel_event, stream=True,
+                                  reserve=self.in_reserve(index, name))
 
     async def announce(self, index, name, engine, prepared):
         # After `prepare`: it says which model this attempt runs (a fallback's

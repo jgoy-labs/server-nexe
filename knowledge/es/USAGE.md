@@ -28,6 +28,7 @@ expires: null
   - [Subida de documentos](#subida-de-documentos)
 - [MEM_SAVE — Memoria automatica](#mem_save--memoria-automatica)
   - [Borrado total (`CLEAR_ALL`) — confirmacion 2-turnos](#borrado-total-clear_all--confirmacion-2-turnos)
+- [Proveedores de API externos](#proveedores-de-api-externos-opcional)
 - [Encriptacion](#encriptacion)
 - [Uso de la API](#uso-de-la-api)
   - [Chat (curl)](#chat-curl)
@@ -151,6 +152,17 @@ Si pides borrar **toda** la memoria ("borralo todo", "forget everything", "olvid
 2. **Turno 2:** Si respondes `si`/`confirma`/`ok`, se ejecuta el borrado. Cualquier otra respuesta cancela la operacion.
 
 Esto evita perdidas masivas accidentales por un mensaje ambiguo o por inyeccion desde un documento.
+
+## Proveedores de API externos (opcional)
+
+server-nexe es local por defecto y lo sigue siendo: nada sale de tu máquina si no lo activas, lo eliges y dices que sí. Para chatear con DeepSeek u OpenAI:
+
+1. **Aprueba el módulo.** `api_module` debe estar en `NEXE_APPROVED_MODULES` de tu `.env` (las instalaciones nuevas ya lo traen; en una existente, añádelo y reinicia).
+2. **Pon la clave en el `.env`** (nunca en la UI): `DEEPSEEK_API_KEY=...` o `OPENAI_API_KEY=...`. Compruébala con `./nexe providers status` (qué claves hay, nunca la clave) y `./nexe providers check deepseek` (una petición mínima).
+3. **Enciende el interruptor global**: `NEXE_ALLOW_CLOUD_ENGINES=1`, o el interruptor «Permitir motores en la nube» de la barra lateral de la web. Por defecto está apagado, y apagarlo detiene la próxima llamada incluso de un turno que ya corre.
+4. **Elígelo.** En la web, el grupo **API** aparece en el selector de motor solo con el interruptor encendido y una clave configurada. La primera vez que una conversación lo elige, un diálogo dice que la conversación, los documentos recuperados y la memoria saldrán de tu máquina hacia ese proveedor; si aceptas, se recuerda solo para esa conversación, y volver a un motor local lo olvida. Desde `/v1`, envía `"engine": "api"`, el `model` del proveedor y `"nexe_cloud_consent": "deepseek"` en **cada** petición (véase la referencia de la API).
+
+La API nunca responde en lugar de un motor local ni ningún motor local responde en su lugar: si el proveedor falla, lo ves, con el nombre del proveedor y el motivo (clave rechazada, saldo, límite, tiempo de espera), y nada más lo intenta. El pie de una respuesta dice «modelo · API».
 
 ## Encriptacion
 

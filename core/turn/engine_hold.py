@@ -8,16 +8,18 @@ Description: What a turn holds while its engine runs: a slot of the engine
              acquire-and-release (the web door's `generate_json` and
              `generate_stream`, the API door's `generate` and
              `_open_stream_call`). The monitor and the timer set the SAME
-             cancel event, so an engine cannot tell a client that left from a
-             turn that ran out of time.
+             cancel event, so an engine stops alike for a client that left and
+             for a turn that ran out of time; the event records which
+             (`TurnCancel`), for the cascade (N4). The deadline is each
+             engine's, up to its first byte (#1165): the hold says how long,
+             the cascade arms it per engine and disarms it.
 
 www.jgoy.net · https://server-nexe.org
 ------------------------------------
 """
 
-import asyncio
 import logging
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable
 
 from fastapi import HTTPException
 
@@ -63,7 +65,6 @@ class EngineHold:
         self._keep_monitor = keep_monitor
         self._gate: Any = None
         self._slot: Any = None
-        self._deadline: Optional[asyncio.TimerHandle] = None
         self._released = False
         self._handed = False
         self.cancel_event: Any = None
@@ -71,11 +72,13 @@ class EngineHold:
 
     async def open(self) -> "EngineHold":
         ctx = self._ctx
-        self._gate = gate_for(ctx.app_state)
+        self._gate = gate_for(ctx.app_state, ctx.engine)
         self.cancel_event, self.monitor = start_disconnect_monitor(ctx.request)
         ctx.cancel_token = (self.cancel_event, self.monitor)
         if ctx.deadline:
-            self._deadline = asyncio.get_running_loop().call_later(ctx.deadline, self.cancel_event.set)
+            # Each engine's, up to its first byte (#1165): `engine_claim` arms
+            # it on the event it hands that engine, and disarms it then.
+            self.cancel_event.deadline_s = ctx.deadline
         try:
             self._slot = await self._gate.acquire(
                 Priority.USER_TURN, holder=ctx.turn_id, cancel_event=self.cancel_event, timeout=_gate_wait_s(),
@@ -92,8 +95,7 @@ class EngineHold:
         return self
 
     def _stop(self, *, monitor: bool) -> None:
-        if self._deadline is not None:
-            self._deadline.cancel()
+        self.cancel_event.disarm_deadline()
         if monitor and not self.monitor.done():
             self.monitor.cancel()
 

@@ -363,20 +363,80 @@ def _collect_llamacpp_gguf_paths(models_dir: "Path") -> "list[dict]":
     return gguf_list
 
 
+def _scan_api_backend(module_manager=None) -> "Optional[dict]":
+    """The "API" group of the selector, or None.
+
+    Present only when the global switch is on, the API engine module is
+    loaded (otherwise nothing could serve a request) and at least one
+    provider has its key configured. The key is never read here beyond "is it
+    there": a model carries its provider's name and whether it sees images
+    (the selector's heuristic cannot know that for a hosted model).
+    """
+    from core.providers.cloud import cloud_engines_allowed
+    from core.providers.registry import PROVIDERS, is_configured, model_can_see_images
+
+    if not cloud_engines_allowed():
+        return None
+    try:
+        if module_manager is not None:
+            reg = module_manager.registry.get_module("api_module")
+            if not (reg and reg.instance):
+                return None
+        models = [
+            {"name": model, "size_gb": 0, "provider": p.key, "provider_name": p.name,
+             "vision": model_can_see_images(p, model)}
+            for p in PROVIDERS if is_configured(p) for model in p.suggested_models
+        ]
+    except Exception as e:
+        logger.debug(f"API backend scan failed: {e}")
+        return None
+    if not models:
+        return None
+    return {"id": "api", "name": "API", "models": models, "active": False, "connected": True, "cloud": True}
+
+
+def _cloud_state() -> dict:
+    """What the selector needs to draw the switch: whether it is on and, per
+    provider, whether its key is configured. Presence only, never a key."""
+    from core.providers.cloud import cloud_engines_allowed
+    from core.providers.registry import PROVIDERS, is_configured
+
+    return {
+        "allowed": cloud_engines_allowed(),
+        "providers": [{"key": p.key, "name": p.name, "configured": is_configured(p)} for p in PROVIDERS],
+    }
+
+
 # The dropdown answers a different question from the chat — which backend to
 # show as active, judged on what the scan listed and whether it is connected,
 # not on whether a module has a live node — but the ORDER is the same order, and
 # it was a third hand-aligned copy of it (its comment still pointed at
 # routes_chat._resolve_engines, deleted in F-D block 5). Derived now, so the day
 # the cascade changes it changes here too.
-# Backend ids (dropdown spelling), not canonical engine names.
-_BACKEND_IDS = {"mlx": "mlx", "llama_cpp": "llamacpp", "ollama": "ollama"}
+# Backend ids (dropdown spelling), not canonical engine names: read off the
+# engine table (`chat_engines/routing.py`), where the spelling is a field.
+def _backend_ids() -> dict:
+    from core.endpoints.chat_engines.routing import ENGINE_TABLE
+
+    return {entry.name: entry.ui_id for entry in ENGINE_TABLE}
+
+
+def _backend_aliases() -> dict:
+    """Every spelling the dropdown's `POST /backend` accepts → its backend id."""
+    from core.endpoints.chat_engines.routing import ENGINE_TABLE
+
+    out = {"auto": "auto"}
+    for entry in ENGINE_TABLE:
+        for spelling in (entry.name, entry.module_key, entry.ui_id, *entry.aliases):
+            out[spelling] = entry.ui_id
+    return out
 
 
 def _auto_backend_cascade() -> tuple:
     from core.endpoints.chat_engines.routing import ENGINE_CASCADE
 
-    return tuple(_BACKEND_IDS[name] for name in ENGINE_CASCADE if name in _BACKEND_IDS)
+    ids = _backend_ids()
+    return tuple(ids[name] for name in ENGINE_CASCADE if name in ids)
 
 
 def _mark_active_backend(backends: list, current_backend: str) -> str:
@@ -515,7 +575,18 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         current_model = get_with_env_fallback("NEXE_DEFAULT_MODEL", "")
         current_backend = _mark_active_backend(backends, current_backend)
 
-        return {"backends": backends, "current_backend": current_backend, "current_model": current_model}
+        # After the active mark, never before: `_mark_active_backend` falls back
+        # to "the first connected backend with models" and persists it — the API
+        # group must not be a candidate for that, or a dead local engine would
+        # make the cloud the default.
+        api = _scan_api_backend(module_manager)
+        if api:
+            backends.append(api)
+
+        return {
+            "backends": backends, "current_backend": current_backend, "current_model": current_model,
+            "cloud": _cloud_state(),
+        }
 
     # -- POST /backend --
 
@@ -523,21 +594,9 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
     # old `.env` files may use `llama_cpp`/`llama-cpp`/`llama_cpp_module`
     # while the API expected `llamacpp`. We accept all of these and
     # translate them to the canonical name without breaking backwards-compat.
-    _BACKEND_ALIASES = {
-        "ollama": "ollama",
-        "ollama_module": "ollama",
-        "mlx": "mlx",
-        "mlx_module": "mlx",
-        "llamacpp": "llamacpp",
-        "llama_cpp": "llamacpp",
-        "llama-cpp": "llamacpp",
-        "llama_cpp_module": "llamacpp",
-        "auto": "auto",
-    }
-
     def _normalize_backend_name(name: str) -> str:
         """Returns the canonical backend name or '' if invalid."""
-        return _BACKEND_ALIASES.get((name or "").lower().strip(), "")
+        return _backend_aliases().get((name or "").lower().strip(), "")
 
     async def _backend_model_exists(canonical_backend: str, model_name: str) -> bool:
         """Best-effort verification that the model exists for the indicated backend.
@@ -653,6 +712,41 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         if persist:
             _persist_env_vars(persist)
 
+    def _select_api_backend(model: str) -> dict:
+        """Picking the API in the selector. The choice is the browser's, per
+        chat, and is NOT persisted: nothing is written to `NEXE_MODEL_ENGINE`
+        or `NEXE_DEFAULT_MODEL`, because a persisted "api" would make the
+        cloud the engine of every request that names none. The server only
+        says whether the choice can work; consent is asked at the first turn."""
+        from core.providers.cloud import CloudRefusal, require_cloud_selection
+
+        try:
+            provider = require_cloud_selection(model)
+        except CloudRefusal as refusal:
+            raise HTTPException(status_code=refusal.status, detail=refusal.detail()) from None
+        return {
+            "status": "ok", "backend": "api", "model": model, "provider": provider.key,
+            "provider_name": provider.name, "persisted": False, "ollama_started": False,
+        }
+
+    @router.post("/cloud-engines", operation_id="webui_set_cloud_engines")
+    async def set_cloud_engines(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
+        """Turn "Allow cloud engines" on or off (`NEXE_ALLOW_CLOUD_ENGINES`).
+
+        Strictly a boolean: a string like "false" is refused instead of read as
+        truthy. Runtime override + persisted like the other UI parameters."""
+        from core.providers.cloud import ALLOW_CLOUD_ENV, cloud_engines_allowed
+        from core.runtime_state import set_override
+
+        enabled = request.get("enabled")
+        if not isinstance(enabled, bool):
+            raise HTTPException(status_code=400, detail="'enabled' must be true or false")
+        value = "1" if enabled else "0"
+        set_override(ALLOW_CLOUD_ENV, value)
+        _persist_env_vars({ALLOW_CLOUD_ENV: value})
+        logger.info("Cloud engines %s", "allowed" if enabled else "not allowed")
+        return {"status": "ok", "allowed": cloud_engines_allowed()}
+
     @router.post("/backend", operation_id="webui_set_backend")
     async def set_backend(request: Dict[str, Any], _auth=Depends(require_ui_auth)):
         """Change the active backend and/or model at runtime. Starts Ollama if needed."""
@@ -669,8 +763,11 @@ def register_auth_routes(router: APIRouter, *, require_ui_auth, session_mgr):
         if raw_backend and not canonical:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid backend '{raw_backend}'. Valid backends: ollama, mlx, llamacpp, llama_cpp, auto",
+                detail=f"Invalid backend '{raw_backend}'. Valid backends: ollama, mlx, llamacpp, llama_cpp, auto, api",
             )
+
+        if canonical == "api":
+            return _select_api_backend(model)
 
         ollama_started = False
         if canonical == "ollama":

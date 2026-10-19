@@ -92,7 +92,7 @@ Chat completion compatible amb OpenAI amb suport RAG i streaming.
 
 - `model`: null per defecte (no "auto"). Per a **Ollama** un valor passat selecciona el model amb fallback per nom parcial (p. ex. `llama3` → `llama3.1:8b`); 404 només si cap model de chat hi encaixa. Per a **MLX / llama.cpp** el valor s'**ignora** — corren l'únic model configurat — i la resposta reporta el nom del model realment carregat, mai el demanat
 - `use_rag`: true per defecte — cerca en 3 col·leccions Qdrant
-- `engine`: "auto" (per defecte), "ollama", "mlx", "llama_cpp"
+- `engine`: "auto" (per defecte), "ollama", "mlx", "llama_cpp", o "api" (un proveïdor extern: opt-in explícit, vegeu a sota)
 - `stream`: true retorna flux SSE amb marcadors
 - `temperature`: 0.0-2.0 (per defecte 0.7)
 - `top_p`: 0 < top_p ≤ 1 (null per defecte) — nucleus sampling; null deixa que cada motor usi el seu propi default (≈ 0.9)
@@ -128,6 +128,52 @@ distingeix amb `x_nexe_truncation` (a l'arrel del chunk, extensio propia, no Ope
 El camp **no hi es** quan no s'ha tallat res. Si passen les dues coses alhora mana `"overflow"`.
 
 **Bloc `[IMATGE ADJUNTA]`:** Quan un missatge inclou una imatge (backend VLM), l'endpoint de xat injecta un bloc `[IMATGE ADJUNTA]` que **prioritza la imatge sobre el context RAG**. El model processa la imatge directament i el RAG queda relegat a context secundari, evitant que documents recuperats distreguin la descripcio visual.
+
+### Traça d'un torn (què ha fet un torn recent)
+
+Cada resposta de xat porta l'id del torn a la capçalera **`X-Nexe-Turn-Id`** (en flux o JSON; el cos JSON també conserva `turn_id`).
+`GET /v1/turns/{turn_id}/trace` (cal la clau d'API) torna els passos d'aquell torn: el resultat, la durada, el motor, el codi
+d'error i el motiu de cancel·lació de cada pas, les crides al LLM que ha fet (`outcome`: `ok` o `cancelled`), i `final` quan no
+queda res pendent (les feines de després, `compact` i `describe_image`, s'afegeixen al mateix registre quan acaben). Un torn
+en curs ja hi és, amb els passos que porta fets. Es guarda en memòria per als **últims 256 torns** del servidor que corre; `404`
+si l'id és desconegut o més antic. Mai conté el que has escrit ni el que ha contestat el model. El registre durador és el log:
+una línia `turn.trace` quan es tanca la connexió i una de curta, `turn.step`, per cada feina de després.
+
+Cada crida al LLM de la traça porta `tokens_in`, `tokens_out` i `cached_in` (els tokens que el **motor** diu que ha gastat, i els de la caché del prefix que ha reaprofitat). El que un motor no diu és `null`, **mai `0`**: MLX diu entrada, sortida i caché; llama.cpp, Ollama i les APIs (DeepSeek, OpenAI) diuen entrada i sortida. El peu del missatge a la web mostra aquest recompte tal qual; si el motor no el dona, mostra una estimació amb un `~` davant. `/metrics` suma el total a `core_turn_tokens_total{engine,kind}` (`kind`: `in`, `out`, `cached`).
+
+`/metrics` compta els motors igual a les dues portes: `core_chat_engine_requests_total{engine,status}` i
+`core_chat_engine_duration_seconds{engine}` (temps fins al primer esdeveniment del motor, una fila per motor demanat, el
+re-prompt inclòs), més `core_turn_steps_total{step,outcome}` i `core_turn_step_duration_seconds{step}`.
+
+### Proveïdors d'API externs (opt-in)
+
+`"engine": "api"` envia la petició a un proveïdor extern compatible amb OpenAI (DeepSeek o OpenAI) en lloc d'un motor local. És un **opt-in explícit** i mai un recanvi: l'API només respon quan la demanes pel nom. Un motor local que falla no el respon l'API, i un proveïdor que falla no el respon un motor local. `"engine": "auto"`, o un `NEXE_MODEL_ENGINE=api` oblidat a l'entorn, no arriba mai al núvol.
+
+El que surt de la màquina: la conversa, els documents recuperats i la memòria d'aquella petició, més els passos interns que corren al mateix motor (compactar la conversa, descriure una imatge, el re-prompt de memòria). Res més, i mai la clau.
+
+Una petició amb `"engine": "api"` es refusa si no es compleix **tot** això:
+
+1. `api_module` és a `NEXE_APPROVED_MODULES` (si no, `503`: el motor API no està carregat; les comprovacions de sota es fan primer).
+2. L'interruptor global és encès: `NEXE_ALLOW_CLOUD_ENGINES=1` (apagat per defecte; és l'interruptor «Permet motors al núvol» de la web, i es torna a llegir a cada petició). Apagat: `403` `cloud_engines_disabled`.
+3. `model` és un model d'un proveïdor amb la clau configurada al servidor: `deepseek-chat` o `deepseek-reasoner` (`DEEPSEEK_API_KEY`), o `gpt-*` (`OPENAI_API_KEY`). La clau viu només al `.env` del servidor: el client no l'envia mai i res no la mostra. Sense model, o un model local: `400` `cloud_model_not_allowed`. Sense clau: `400` `cloud_provider_not_configured`.
+4. La petició porta el seu propi consentiment: `"nexe_cloud_consent": "<clau del proveïdor>"` (`"deepseek"` o `"openai"`). `/v1` no té sessió on recordar-lo, així que es demana a **cada** petició, per a un sol proveïdor. Si falta, o és el d'un altre proveïdor: `403` `cloud_consent_required`.
+
+```bash
+curl -X POST http://127.0.0.1:9119/v1/chat/completions \
+  -H "X-API-Key: LA_TEVA_CLAU" -H "Content-Type: application/json" \
+  -d '{"engine": "api", "model": "deepseek-chat", "nexe_cloud_consent": "deepseek",
+       "messages": [{"role": "user", "content": "Hola"}]}'
+```
+
+Amb l'SDK d'OpenAI: `extra_body={"engine": "api", "nexe_cloud_consent": "deepseek"}`. El cos d'un refús és `{"code", "message", "provider"}`, mai una clau. Una petició que la porta refusa (els `400` i `403` d'aquí a dalt) no desa res i no envia res.
+
+- La resposta porta `X-Nexe-Engine: api` (`nexe_engine` en un cos JSON), `model` és el que has dit, i no hi ha capçalera de recanvi.
+- `temperature` i `max_tokens` **no** es reenvien (alguns models dels proveïdors els renomenen o els refusen): valen els valors per defecte del proveïdor. Sí que van `top_p` i les imatges (per a un model que sap llegir-les: `gpt-4o`, `gpt-4.1`, `gpt-5`). `reasoning_effort` no canvia res del que s'envia (que un model del proveïdor raoni és la seva naturalesa): només decideix si el raonament que torna es retorna, com a `reasoning`. `resume` (Continua) es refusa amb `400`: un proveïdor no pot reprendre a mig frase.
+- Errors: una clau refusada (401/403) és `502`; un saldo (402), un límit de peticions (429), qualsevol 5xx o una petició que el proveïdor rebutja és `503`; un temps d'espera és `504` (`NEXE_API_TIMEOUT`, segons entre dos trossos, 120 per defecte). El text diu el proveïdor i l'estat HTTP, mai la clau ni el cos del proveïdor.
+- Té una porta de concurrència pròpia (`NEXE_CLOUD_ENGINE_SLOTS`, 4 per defecte): una resposta del núvol no ocupa mai el lloc dels motors locals. Un límit de temps, o un client que se'n va, atura la lectura HTTP.
+- La línia de traça del torn, i un missatge de la web desat d'un proveïdor, porten `left_machine: true`.
+
+Admin: `GET /admin/providers/status` (quines claus hi ha, mai la clau) i `POST /admin/providers/{provider}/check` (una petició mínima). CLI: `nexe providers status` i `nexe providers check <proveïdor>`.
 
 ### Informacio del sistema
 

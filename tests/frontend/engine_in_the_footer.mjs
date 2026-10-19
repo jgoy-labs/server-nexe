@@ -39,18 +39,28 @@ const ui = Object.create(sandbox.__NexeUI.prototype);
 ui.t = (k) => k;
 
 // ── 1. The label ────────────────────────────────────────────────────────────
-assert.strictEqual(ui._modelFooterLabel('Qwen3.5-9B-MLX-4bit', 'mlx'), 'Qwen3.5-9B-MLX-4bit · MLX');
-assert.strictEqual(ui._modelFooterLabel('qwen3.5:9b', 'ollama'), 'qwen3.5:9b · Ollama');
+assert.strictEqual(ui._modelFooterLabel('Qwen3.5-9B-MLX-4bit', 'mlx'), 'MLX · Qwen3.5-9B-MLX-4bit');
+assert.strictEqual(ui._modelFooterLabel('qwen3.5:9b', 'ollama'), 'Ollama · qwen3.5:9b');
 assert.strictEqual(ui._modelFooterLabel('/models/Qwen_Qwen3-30B-A3B-Q4_K_M.gguf', 'llama_cpp'),
-    'Qwen_Qwen3-30B-A3B-Q4_K_M.gguf · llama.cpp');
+    'llama.cpp · Qwen_Qwen3-30B-A3B-Q4_K_M.gguf');
+assert.strictEqual(ui._modelFooterLabel('deepseek-chat', 'api'), 'API · deepseek-chat', 'the API engine has its own name');
 assert.strictEqual(ui._modelFooterLabel('nexe-system', undefined), 'nexe-system', 'no engine: the model alone');
 assert.strictEqual(ui._modelFooterLabel('', 'mlx'), '', 'no model: nothing');
+
+// #1155: the footer box is 160px wide and cuts the END with an ellipsis, so the
+// engine has to come first: a long name used to hide «· llama.cpp», which is the
+// case the footer exists for (a reserve engine answering).
+{
+    const long = ui._modelFooterLabel('/models/Qwen_Qwen3-30B-A3B-Instruct-2507-Q4_K_M-00001-of-00002.gguf', 'llama_cpp');
+    assert.ok(long.startsWith('llama.cpp · '), long);
+    assert.ok(long.indexOf('llama.cpp') + 'llama.cpp'.length < 20, 'the engine sits where the box still shows it');
+}
 
 // ── 2. The footer a reload paints ───────────────────────────────────────────
 const texts = (n) => [n.textContent, ...n.children.flatMap(texts)].filter(Boolean);
 const stats = make('div');
 ui._renderSavedStats(stats, { tokens: 30, elapsed: 1.2, model: 'Qwen3.5-9B-MLX-4bit', engine: 'mlx' }, make('div'));
-assert.ok(texts(stats).includes('Qwen3.5-9B-MLX-4bit · MLX'), JSON.stringify(texts(stats)));
+assert.ok(texts(stats).includes('MLX · Qwen3.5-9B-MLX-4bit'), JSON.stringify(texts(stats)));
 
 // ── 3. The live footer uses the same label ──────────────────────────────────
 const chat = readFileSync(new URL('../../plugins/web_ui_module/ui/nexe-chat.js', import.meta.url), 'utf8');

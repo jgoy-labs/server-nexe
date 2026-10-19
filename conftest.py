@@ -110,7 +110,7 @@ _install_nexe_flow_mock()
 # Configure environment for tests
 os.environ.setdefault("NEXE_ENV", "test")
 os.environ.setdefault("NEXE_LOG_LEVEL", "WARNING")
-os.environ.setdefault("NEXE_APPROVED_MODULES", "security,rag,memory,ollama_module,mlx_module,llama_cpp_module,web_ui_module")
+os.environ.setdefault("NEXE_APPROVED_MODULES", "security,rag,memory,ollama_module,mlx_module,llama_cpp_module,web_ui_module,api_module")
 os.environ.setdefault("NEXE_AUTOSTART_QDRANT", "false")
 os.environ.setdefault("NEXE_AUTOSTART_OLLAMA", "false")
 os.environ.setdefault("NEXE_AUTO_INGEST_KNOWLEDGE", "false")
@@ -451,3 +451,92 @@ def _reset_shared_embedders():
     reset_shared_embedders()
     yield
     reset_shared_embedders()
+
+
+def _forget_operational_state():
+    from core.operational_state import OperationalState, clear_refusals
+    from core.state_watcher import watcher
+
+    clear_refusals()
+    watcher._confirmed = OperationalState.NORMAL
+    watcher._candidate = OperationalState.NORMAL
+    watcher._streak = 0
+    watcher.last_signals = ()
+
+
+@pytest.fixture(autouse=True)
+def _no_operational_state_leaks_between_tests():
+    """No test hands its operational state to the next one.
+
+    The recorded refusals (`core.operational_state`) and the state watcher
+    (`core.state_watcher.watcher`) are process-wide. Measured on 07/10: a test
+    that builds the app in production without an allowlist records a refusal
+    and leaves it; a later test whose TestClient runs the lifespan primes the
+    watcher with it; and the /status contract test, files later, reads
+    «refused». Each link passed on its own.
+
+    Before and after every test: no refusal, and the watcher at what a fresh
+    process starts with (NORMAL). Its polling task is not touched — a lifespan
+    stops its own.
+    """
+    _forget_operational_state()
+    yield
+    _forget_operational_state()
+
+
+#: What the engine choice reads, and production code writes into os.environ
+#: itself (`OnboardingState.apply_to_env`), out of monkeypatch's sight.
+_ENGINE_CHOICE_ENV = (
+    "NEXE_MODEL_ENGINE", "NEXE_DEFAULT_MODEL", "NEXE_OLLAMA_MODEL", "NEXE_MLX_MODEL",
+    "NEXE_LLAMA_CPP_MODEL", "NEXE_STORAGE_PATH", "HF_TOKEN",
+)
+
+
+@pytest.fixture(autouse=True)
+def _no_engine_choice_leaks_between_tests():
+    """No test hands the next one the engine it chose.
+
+    The selector's choices are process-wide `core.runtime_state` overrides that
+    outrank the environment, and `apply_to_env` writes the environment itself.
+    A test that left either decided, for every test after it, which engine a
+    turn asked for — and with it which engine is a fallback (C4.8 P2-5) and
+    whether Ollama has a model of its own (P2-4). The overrides are cleared and
+    those variables put back as they were, before and after every test.
+    """
+    from core import runtime_state
+
+    saved = {key: os.environ.get(key) for key in _ENGINE_CHOICE_ENV}
+    runtime_state.reset()
+    yield
+    runtime_state.reset()
+    for key, value in saved.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+
+@pytest.fixture(autouse=True)
+def _no_test_asks_ollama_how_big_its_model_is(monkeypatch):
+    """The turn reads the answering model's size (`core.turn.model_size`) and, for
+    Ollama, asks `/api/show`. Under a test that is one more call on the transport
+    the engine fake is standing in for — the matrix counted it as a second
+    attempt. Tests of the size itself patch `_ollama_show` over this."""
+    from core.turn import model_size
+
+    async def _unreachable(model):
+        raise OSError("no Ollama under test")
+
+    monkeypatch.setattr(model_size, "_ollama_show", _unreachable)
+    model_size.forget_cache()
+    yield
+    model_size.forget_cache()
+
+
+@pytest.fixture(autouse=True)
+def _no_test_pays_for_the_keyed_memory_pass(monkeypatch):
+    """`memory.write` reads the user's message with the answering engine
+    (`core.turn.keyed_pass`): one more `engine.chat` per turn. Tests that count the
+    engine's calls, or stand a fake in for it, did not ask for that. The tests of
+    the pass itself switch it back on."""
+    monkeypatch.setenv("NEXE_MEMORY_KEYED", "false")

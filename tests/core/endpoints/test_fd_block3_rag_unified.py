@@ -256,7 +256,9 @@ class TestLabelledSections:
         assert "[DOCUMENTACIO DEL SISTEMA]" in context
         assert "[MEMORIA DE L'USUARI]" in context
         assert "[Font: nexe_documentation]" in context
-        assert "[Font: personal_memory]" in context
+        # A stated fact is a line the user said, not a document with a source label.
+        assert "[Font: personal_memory]" not in context
+        assert "mem text" in context.split("[MEMORIA DE L'USUARI]")[1].split("[DOCUMENTACIO")[0]
         # No section header for a collection with no results this turn.
         assert "[DOCUMENTACIO TECNICA]" not in context
 

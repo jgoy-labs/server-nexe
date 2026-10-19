@@ -72,7 +72,11 @@ class _MlxShaped:
     async def chat(self, messages, system="", session_id="default", stream_callback=None, **kwargs):
         self.calls.append(kwargs)
         if self.cancels:
-            kwargs["cancel_event"].set()
+            # The client leaves while this engine runs: what the disconnect monitor
+            # does to the turn's event (N4), which reaches this engine's own.
+            from core.turn.cancel import CLIENT_GONE
+            event = kwargs["cancel_event"]
+            (event.turn or event).cancel(CLIENT_GONE)
         if self.delay:
             await asyncio.sleep(self.delay)
         if self.fail is not None:
@@ -153,7 +157,8 @@ async def test_a_model_that_loads_on_the_first_read_is_announced_before_it(turn_
 async def test_an_error_every_engine_would_repeat_is_not_cascaded(turn_lab, app_state):
     """A bad request is bad for every engine (`should_try_next_engine`): no
     other engine is asked, and the notice is written in the open stream."""
-    exc = ValueError("continue requires the last message to be an assistant turn")
+    from core.turn.errors import BadRequest
+    exc = BadRequest("continue requires the last message to be an assistant turn")
     mlx = _MlxShaped(loaded=True)
     app_state.modules = {"ollama_module": _OllamaShaped(exc), "mlx_module": mlx}
     ctx = await turn_lab.ui(streaming=True, session_id="r1117-term", message="hola",
@@ -234,7 +239,8 @@ async def test_a_client_that_left_is_not_offered_to_another_engine(turn_lab, app
 
 class _StartRefusesTheRequest:
     """An engine whose `chat(model, …)` rejects the request as it is called,
-    before any generator exists: a ValueError, final for the cascade policy.
+    before any generator exists: a bad request said on purpose (`BadRequest`),
+    final for the cascade policy.
     (Until #1035 the real case was a fallback asked to load a model that was
     not its own; a fallback no longer switches, so this stands in for it.)"""
 
@@ -244,7 +250,8 @@ class _StartRefusesTheRequest:
 
     def chat(self, model, messages, stream=False, **kwargs):
         self.calls += 1
-        raise ValueError("bad request: this engine cannot take it")
+        from core.turn.errors import BadRequest
+        raise BadRequest("bad request: this engine cannot take it")
 
 
 async def test_a_fallback_that_cannot_start_keeps_the_notice_in_hand(turn_lab, app_state, caplog):

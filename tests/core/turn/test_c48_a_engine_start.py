@@ -243,3 +243,15 @@ def test_the_shape_follows_the_signature_not_the_name():
     eng = _Generic()
     _start(eng, "ollama", cancel=ev)
     assert eng.got["system"] == "SYS" and eng.got["cancel_event"] is None
+
+
+def test_a_hosted_engine_is_handed_the_cancel_event_like_the_in_process_ones():
+    """The API engine: a deadline only sets the event, so the engine must be given it to stop its HTTP read."""
+    ev = threading.Event()
+    eng = _OllamaShaped()
+    _start(eng, "api", cancel=ev)
+    assert eng.got["cancel_event"] is ev
+    # An engine the table does not know is handed nothing, whatever its signature says.
+    eng = _OllamaShaped()
+    _start(eng, "somebody_else", cancel=ev)
+    assert eng.got["cancel_event"] is None

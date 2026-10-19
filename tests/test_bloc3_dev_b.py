@@ -106,13 +106,18 @@ def test_bug18_read_file_undecodable_returns_empty(tmp_path: Path):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def test_bug27_routes_auth_has_backend_aliases():
-    """The routes_auth file must contain the aliases dict for Bug 27."""
+    """The aliases of Bug 27 are accepted by the backend normaliser.
+
+    Since phase 3 of the API providers they are not a literal dict in routes_auth any more: they are read
+    off the one engine table (`chat_engines/routing.py`, `ENGINE_TABLE`), so the source no longer spells
+    them out. What Bug 27 promised is what is checked: every spelling still maps to the dropdown's id."""
     src = (_ROOT / "plugins/web_ui_module/api/routes_auth.py").read_text()
-    # _BACKEND_ALIASES must be present with the expected keys
-    assert "_BACKEND_ALIASES" in src, "Bug 27: _BACKEND_ALIASES no present"
-    for alias in ("llama_cpp", "llama-cpp", "llama_cpp_module", "llamacpp"):
-        assert f'"{alias}"' in src, f"Bug 27: alies {alias!r} no present a _BACKEND_ALIASES"
+    assert "_backend_aliases" in src, "Bug 27: the alias map is not read from the engine table"
     assert "_normalize_backend_name" in src, "Bug 27: normalizer no present"
+    from plugins.web_ui_module.api.routes_auth import _backend_aliases
+    aliases = _backend_aliases()
+    for alias in ("llama_cpp", "llama-cpp", "llama_cpp_module", "llamacpp"):
+        assert aliases[alias] == "llamacpp", f"Bug 27: alias {alias!r} no longer maps to llamacpp"
 
 
 def test_bug26_routes_auth_has_model_exists_check():

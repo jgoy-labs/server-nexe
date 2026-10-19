@@ -92,7 +92,7 @@ OpenAI-compatible chat completion with RAG and streaming support.
 
 - `model`: null by default (not "auto"). For **Ollama** a passed value selects the model with a partial-name fallback (e.g. `llama3` → `llama3.1:8b`); 404 only if no chat model matches. For **MLX / llama.cpp** the value is **ignored** — they run the single configured model — and the response reports the actual loaded model's name, never the requested one
 - `use_rag`: true by default — searches 3 Qdrant collections
-- `engine`: "auto" (default), "ollama", "mlx", "llama_cpp"
+- `engine`: "auto" (default), "ollama", "mlx", "llama_cpp", or "api" (an external provider: explicit opt-in, see below)
 - `stream`: true returns SSE stream with markers
 - `temperature`: 0.0-2.0 (default 0.7)
 - `top_p`: 0 < top_p ≤ 1 (null by default) — nucleus sampling; null lets each engine use its own default (≈ 0.9)
@@ -128,6 +128,52 @@ with `x_nexe_truncation` (at the root of the chunk; our own extension, not OpenA
 The field is **absent** when nothing was cut. If both happen at once, `"overflow"` wins.
 
 **`[ATTACHED IMAGE]` block:** When a message includes an image (VLM backend), the chat endpoint injects an `[ATTACHED IMAGE]` block that **prioritises the image over the RAG context**. The model processes the image directly and RAG is relegated to secondary context, preventing retrieved documents from distracting from the visual description.
+
+### Turn trace (what a recent turn did)
+
+Every chat answer carries its turn id in the **`X-Nexe-Turn-Id`** header (streamed or JSON; JSON bodies keep `turn_id` too).
+`GET /v1/turns/{turn_id}/trace` (API key required) returns that turn's steps: each step's outcome, duration, engine, error code
+and cancel reason, the LLM calls it made (`outcome`: `ok` or `cancelled`), and `final` once nothing is pending (the
+post-commit jobs, `compact` and `describe_image`, join the same record when they end). A turn in progress is already there,
+with the steps it has done. It is kept in memory for the **last 256 turns** of the running server; `404` for an unknown or
+older id. It never contains what you wrote or what the model answered. The durable record is the log: one `turn.trace` line
+when the wire closes and a short `turn.step` line per post-commit job.
+
+Each LLM call in the trace carries `tokens_in`, `tokens_out` and `cached_in` (the tokens the **engine** says it spent, and the prefix-cache tokens it reused). What an engine does not say is `null`, **never `0`**: MLX reports input, output and cache; llama.cpp, Ollama and the APIs (DeepSeek, OpenAI) report input and output. The web message footer shows that count as it is; when the engine gives none, it shows an estimate with a `~` in front. `/metrics` totals it in `core_turn_tokens_total{engine,kind}` (`kind`: `in`, `out`, `cached`).
+
+`/metrics` counts the engines the same at both doors: `core_chat_engine_requests_total{engine,status}` and
+`core_chat_engine_duration_seconds{engine}` (time up to the engine's first event, one row per engine asked, the re-prompt
+included), plus `core_turn_steps_total{step,outcome}` and `core_turn_step_duration_seconds{step}`.
+
+### External API providers (opt-in)
+
+`"engine": "api"` sends the request to an external OpenAI-compatible provider (DeepSeek or OpenAI) instead of a local engine. It is an **explicit opt-in** and never a fallback: the API answers only when you ask for it by name. A local engine that fails is not answered by the API, and a provider that fails is not answered by a local engine. `"engine": "auto"`, or a `NEXE_MODEL_ENGINE=api` left in the environment, never reaches the cloud.
+
+What leaves the machine: the conversation, the retrieved documents and the memory of that request, plus the internal steps that run on the same engine (conversation compaction, image description, the memory re-prompt). Nothing else, and never the key.
+
+A request for `"engine": "api"` is refused unless **all** of this holds:
+
+1. `api_module` is in `NEXE_APPROVED_MODULES` (otherwise `503`: the API engine is not loaded; the checks below are made first).
+2. The global switch is on: `NEXE_ALLOW_CLOUD_ENGINES=1` (off by default; it is the web UI's "Allow cloud engines" switch, and it is read again at every request). Off: `403` `cloud_engines_disabled`.
+3. `model` is a model of a provider whose key is configured on the server: `deepseek-chat` or `deepseek-reasoner` (`DEEPSEEK_API_KEY`), or `gpt-*` (`OPENAI_API_KEY`). The key lives in the server's `.env` only: the client never sends it, and nothing ever shows it. No model, or a local one: `400` `cloud_model_not_allowed`. No key: `400` `cloud_provider_not_configured`.
+4. The request carries its own consent: `"nexe_cloud_consent": "<provider key>"` (`"deepseek"` or `"openai"`). `/v1` has no session to remember a consent, so it is asked on **every** request, for one provider. Missing, or another provider's: `403` `cloud_consent_required`.
+
+```bash
+curl -X POST http://127.0.0.1:9119/v1/chat/completions \
+  -H "X-API-Key: YOUR_KEY" -H "Content-Type: application/json" \
+  -d '{"engine": "api", "model": "deepseek-chat", "nexe_cloud_consent": "deepseek",
+       "messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+With the OpenAI SDK: `extra_body={"engine": "api", "nexe_cloud_consent": "deepseek"}`. The body of a refusal is `{"code", "message", "provider"}`, never a key. A request the gate refuses (the `400`s and `403`s above) stores nothing and sends nothing.
+
+- The answer carries `X-Nexe-Engine: api` (`nexe_engine` in a JSON body), `model` is the one you named, and there is no fallback header.
+- `temperature` and `max_tokens` are **not** forwarded (some provider models rename or refuse them): the provider's defaults apply. `top_p` and images (for a model that can read them: `gpt-4o`, `gpt-4.1`, `gpt-5`) are. `reasoning_effort` changes nothing in what is sent (whether a provider's model reasons is its own nature): it only decides whether the reasoning that comes back is returned, as `reasoning`. `resume` (Continue) is refused with `400`: a provider cannot resume mid-sentence.
+- Errors: a refused key (401/403) is `502`; a balance (402), a rate limit (429), any 5xx or a request the provider rejects is `503`; a timeout is `504` (`NEXE_API_TIMEOUT`, seconds between two chunks, default 120). The text names the provider and the HTTP status, never the key or the provider's body.
+- It has a concurrency gate of its own (`NEXE_CLOUD_ENGINE_SLOTS`, default 4), so a cloud answer never holds the local engines' slot. A deadline, or a client that leaves, stops the HTTP read.
+- The turn's trace line, and a web message saved from a provider, carry `left_machine: true`.
+
+Admin: `GET /admin/providers/status` (which keys are configured, never the key) and `POST /admin/providers/{provider}/check` (one minimal request). CLI: `nexe providers status` and `nexe providers check <provider>`.
 
 ### System Info
 

@@ -94,6 +94,14 @@ async def switch_engine_model(engine: Any, engine_name: str, model_name: str) ->
     clean 404, which is how the ghost-directory incident (8 GB M1, 2026-07-23)
     stopped being a raw FileNotFoundError mid-answer.
     """
+    from core.endpoints.chat_engines.routing import engine_is_cloud  # deferred: routing imports this package
+
+    if engine_is_cloud(engine) or engine_is_cloud(engine_name):
+        # A hosted model is a name the provider owns, not a file under the models
+        # directory: nothing is loaded, nothing is swapped, and the local path
+        # lookup (which would answer "not found" for it) is never made. The turn
+        # carries its model itself (`ApiModule.for_model`).
+        return False
     switcher = getattr(engine, "switch_model_by_path", None)
     if not callable(switcher):
         logger.info(

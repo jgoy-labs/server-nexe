@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 import logging
+import asyncio
 import time
 from typing import Any, Optional
 
@@ -60,8 +61,10 @@ from core.endpoints.chat_engines._streaming import (
 from core.memory_facts import intents
 from core.memory_facts.deletes import arm_pending_deletes
 from core.memory_facts.write import note_kept, write_facts
-from core.turn import api_cascade, policy
-from core.turn.budget import record_llm_call
+from core.turn.replace_ask import question_for as replace_question_for
+from core.turn import api_cascade, keyed_pass, policy
+from core.turn.budget import note_usage, record_llm_call
+from core.turn.usage import from_response as usage_from_response
 from core.turn.context import TurnContext
 from core.turn.deadline import resolve_deadline_s
 from core.turn.engine_hold import EngineHold
@@ -320,6 +323,8 @@ def _engine_prefix(engine: Optional[str]) -> str:
         return "llamacpp"
     if name == "mlx":
         return "mlx"
+    if name == "api":
+        return "api"
     return "ollama"
 
 
@@ -408,15 +413,16 @@ async def _open_stream_call(ctx: TurnContext):
             ctx.session_id, ctx.engine, ctx.engine_fallback_from,
             cancel_event=hold.cancel_event,
             images=[image] if image else None,
-            resume=ctx.resume, lang=ctx.lang,
+            resume=ctx.resume, lang=ctx.lang, trace_ctx=ctx,
         )
     except BaseException:
         await hold.release()
         raise
     ctx.usage["served_model"] = served_model or ""
     if served_by != ctx.engine:
-        ctx.context_window = chat.get_effective_context_window(served_by, ctx.app_state)
-    ctx.engine = served_by
+        ctx.context_window = chat.get_effective_context_window(
+            served_by, ctx.app_state, getattr(ctx.body, "model", None))
+    ctx.engine = ctx.engine_name = served_by
     ctx.engine_fallback_from = fallback_from
     ctx.engine_fallback_reason = reason
     return response, served_by, served_model, hold, started
@@ -491,6 +497,18 @@ def _keep_description(key: str, description: str, cancel) -> None:
         image_memory.note_failed_attempt(key)
 
 
+def _engine_module_of(ctx: TurnContext) -> Any:
+    """The live module of the engine that served this request, for the steps that
+    call it again (compaction, image description). `ctx.engine` is its NAME at
+    this door; a hosted engine comes back bound to the request's own model, so it
+    answers its window and its sight for that model and compacts with it."""
+    from core.endpoints.chat_engines.routing import bind_to_model, get_engine_module  # deferred
+
+    if not isinstance(ctx.engine, str):
+        return ctx.engine
+    return bind_to_model(get_engine_module(ctx.engine, ctx.app_state), getattr(ctx.body, "model", None))
+
+
 def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> Adapters:
     """The adapter table for one request. Built per request because
     `persist_assistant_turn` needs this request's `BackgroundTasks`.
@@ -550,6 +568,11 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
 
     async def session(ctx: TurnContext) -> None:
         chat = _chat()
+        # Before the lease and before the mirror stores anything: a request for
+        # the API that may not go leaves nothing behind (the `engine` step asks
+        # again, as the step that opens the way).
+        from core.endpoints.chat_engines.routing import cloud_request_ok  # deferred: endpoints → turn
+        cloud_request_ok(ctx.body)
         ctx.session_id = derive_session_id(ctx.request, ctx.body.messages)
         if ctx.resume:
             # The language stays the one the cut answer was written in. Detecting
@@ -610,8 +633,18 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
 
     async def engine(ctx: TurnContext) -> None:
         chat = _chat()
-        ctx.engine, ctx.engine_fallback_from = chat._resolve_engine(ctx.body.engine, ctx.app_state)
-        ctx.context_window = chat.get_effective_context_window(ctx.engine, ctx.app_state)
+        # The step that opens the way to a provider asks the cloud gate itself,
+        # whatever `session` already did. `/v1` is not the web door: the consent
+        # is this request's own (`nexe_cloud_consent`), never a session's.
+        from core.endpoints.chat_engines.routing import cloud_request_ok, engine_is_cloud  # deferred: endpoints → turn
+        ctx.engine, ctx.engine_fallback_from = chat._resolve_engine(
+            ctx.body.engine, ctx.app_state, cloud_ok=cloud_request_ok(ctx.body),
+        )
+        ctx.context_window = chat.get_effective_context_window(
+            ctx.engine, ctx.app_state, getattr(ctx.body, "model", None),
+        )
+        ctx.engine_name = ctx.engine
+        ctx.left_machine = engine_is_cloud(ctx.engine)
         ctx.deadline = resolve_deadline_s() or None
 
     async def recall(ctx: TurnContext) -> None:
@@ -718,14 +751,19 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         async with EngineHold(ctx) as hold:
             _gen_started = time.monotonic()
             _image_b64 = ctx.attachments.get("image_b64")
-            response, served_by, fallback_from, reason, served_model = await api_cascade.dispatch_v1(
-                ctx.body, ctx.request, ctx.prompt, ctx.message or None,
-                ctx.session_id, ctx.engine, ctx.engine_fallback_from,
-                cancel_event=hold.cancel_event,
-                # #1081: same shape as the UI door's `_images_arg`.
-                images=[_image_b64] if _image_b64 else None,
-                resume=ctx.resume, lang=ctx.lang,
-            )
+            try:
+                response, served_by, fallback_from, reason, served_model = await api_cascade.dispatch_v1(
+                    ctx.body, ctx.request, ctx.prompt, ctx.message or None,
+                    ctx.session_id, ctx.engine, ctx.engine_fallback_from,
+                    cancel_event=hold.cancel_event,
+                    # #1081: same shape as the UI door's `_images_arg`.
+                    images=[_image_b64] if _image_b64 else None,
+                    resume=ctx.resume, lang=ctx.lang, trace_ctx=ctx,
+                )
+            except asyncio.CancelledError:
+                # C5 C: stopped while the engine was answering — still on the bill.
+                record_llm_call(ctx, step="generate", engine=ctx.engine_name or ctx.engine or "", ms=(time.monotonic() - _gen_started) * 1000.0, outcome="cancelled")
+                raise
             # I8 (C2.5): the cascade may have tried more than one engine, but
             # `served_by` is the one that actually generated — a retry that
             # failed before any token spent no inference worth counting here.
@@ -735,12 +773,14 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
                 ctx, step="generate", engine=served_by, model=served_model,
                 ms=(time.monotonic() - _gen_started) * 1000.0,
             )
+            note_usage(ctx, usage_from_response(response))  # a JSON reply says it now; a stream, at its end
             ctx.wire = response
             if served_by != ctx.engine:
                 # C4.4: a fallback engine answered — its window is the turn's
                 # now (`context_window` is the SERVING engine's, context.py).
-                ctx.context_window = chat.get_effective_context_window(served_by, ctx.app_state)
-            ctx.engine = served_by
+                ctx.context_window = chat.get_effective_context_window(
+                    served_by, ctx.app_state, getattr(ctx.body, "model", None))
+            ctx.engine = ctx.engine_name = served_by
             ctx.engine_fallback_from = fallback_from
             ctx.engine_fallback_reason = reason
             ctx.response = _content_of(response)
@@ -776,7 +816,7 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         # text is known — the forwarders no longer persist (C4.6-b).
         _chat()._persist_v1_turn_from_response(
             ctx.wire, background_tasks, ctx.app_state, ctx.session_id,
-            resume=ctx.resume,
+            resume=ctx.resume, suffix=ctx.late_suffix,
         )
 
     async def intent(ctx: TurnContext) -> None:
@@ -873,14 +913,22 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         (C3.2 stopped that); reading them without ever storing them would have
         been the same silence with better manners.
         """
-        if not ctx.facts:
-            return
         session_mgr = getattr(ctx.app_state, "session_manager", None)
         helper = getattr(ctx.app_state, "memory_helper", None)
         if session_mgr is None or helper is None:
-            ctx.usage.setdefault("degraded", {})["memory.write"] = "no session_manager/memory_helper on app_state"
+            if ctx.facts:
+                ctx.usage.setdefault("degraded", {})["memory.write"] = "no session_manager/memory_helper on app_state"
             return
         session = session_mgr.get_or_create_session(ctx.session_id)
+        keyed_out = await keyed_pass.run(
+            ctx, engine=_engine_module_of(ctx), engine_name=str(ctx.engine or ""),
+            model_name=ctx.usage.get("served_model") or served_model_of(ctx.wire) or getattr(ctx.body, "model", "") or "",
+            session=session, port=helper, rag_collections=getattr(ctx.body, "rag_collections", None),
+        )
+        if keyed_out.handled:
+            note_kept(ctx.usage, keyed_out.saved, keyed_out.kept)
+        if not ctx.facts:  # the tags the keyed facts do not account for still go the old way
+            return
         started = time.monotonic()
         # No engine: /v1 does not spend an extra LLM call to atomise a fact.
         outcome = await write_facts(
@@ -906,12 +954,12 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         where it is no longer the most recent image, its note carries the
         description (`_peel_content_parts`). One that comes back empty is
         tried `MAX_DESCRIBE_ATTEMPTS` times."""
-        from core.endpoints.chat_engines.routing import engine_can_see_images, get_engine_module  # deferred
+        from core.endpoints.chat_engines.routing import engine_can_see_images  # deferred
 
         key, image_b64 = _image_to_describe(ctx)
         if key is None:
             return
-        engine_module = get_engine_module(ctx.engine, ctx.app_state) if isinstance(ctx.engine, str) else ctx.engine
+        engine_module = _engine_module_of(ctx)
         if engine_module is None or not hasattr(engine_module, "chat"):
             return
         if engine_can_see_images(engine_module) is False:
@@ -939,7 +987,6 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
             return
         # Deferred: core.sessions imports back into core.turn, and this module
         # is imported while core.turn is still initialising.
-        from core.endpoints.chat_engines.routing import get_engine_module
         from core.sessions.compactor import compact_session
 
         # `ctx.engine` is the engine's NAME at this door (`served_by`, a str),
@@ -947,7 +994,7 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         # name straight through raised AttributeError inside compact_session,
         # where a broad `except Exception` turned it into a warning: /v1 looked
         # like it compacted and never did.
-        engine_module = get_engine_module(ctx.engine, ctx.app_state) if isinstance(ctx.engine, str) else ctx.engine
+        engine_module = _engine_module_of(ctx)
         if engine_module is None or not hasattr(engine_module, "chat"):
             ctx.usage.setdefault("degraded", {})["compact"] = f"no live module for engine {ctx.engine!r}"
             return
@@ -971,16 +1018,28 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         the whole generation, not the wait for that first token."""
         ctx.response = ""
         response, served_by, served_model, hold, started = await _open_stream_call(ctx)
+        unbilled = "failed"  # what the call is billed as if the stream does not end well
         try:
             yield format_sse_role(served_model or served_by, _engine_prefix(served_by))
             cleaner = SseCleaner(served_model, keep_reasoning=_wants_reasoning(ctx))
             async for out in _drain_engine(ctx, response, cleaner):
                 yield out
+            unbilled = None
             record_llm_call(
                 ctx, step="generate", engine=served_by, model=served_model or "",
                 ms=(time.monotonic() - started) * 1000.0,
             )
+            # The stream said what the call cost with its last word, after which the call is billed.
+            note_usage(ctx, (ctx.usage.get("stream_end") or {}).get("usage"))
+        except (asyncio.CancelledError, GeneratorExit):
+            unbilled = "cancelled"  # C5 C: the client stopped it; the call is still on the bill
+            raise
         finally:
+            if unbilled:
+                record_llm_call(
+                    ctx, step="generate", engine=served_by, model=served_model or "",
+                    ms=(time.monotonic() - started) * 1000.0, outcome=unbilled,
+                )
             await hold.release()
 
     async def postprocess_stream(ctx: TurnContext):
@@ -1019,6 +1078,23 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         if cancelled:
             _release(ctx)
 
+    async def _ask_replace(ctx: TurnContext) -> str:
+        """The question for a change waiting on the user's yes, when the model
+        answering is one the server accompanies (pla-comportament-segons-mida-model, C).
+        Nothing for a memory command: no engine answered it."""
+        session_mgr = getattr(ctx.app_state, "session_manager", None)
+        if session_mgr is None or not ctx.session_id or ctx.outcomes.get("generate") == "skipped":
+            return ""
+        session = session_mgr.get_or_create_session(ctx.session_id)
+        question = await replace_question_for(
+            ctx, session, ctx.engine, _served_model(ctx), getattr(ctx.app_state, "config", None),
+        )
+        if question:
+            session_mgr._save_session_to_disk(session)  # the history now carries it too
+            # A JSON reply queued its persistence before this question existed: it reads it late.
+            ctx.late_suffix["question"] = question
+        return question
+
     async def emit_stream(ctx: TurnContext):
         """The final chunk, then `[DONE]`, then the lease. A memory command
         never ran `generate`, so its text leaves from here, as SSE."""
@@ -1034,6 +1110,9 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         else:
             model = _served_model(ctx)
             prefix = _engine_prefix(ctx.engine)
+            question = await _ask_replace(ctx)
+            if question:
+                yield format_sse_chunk(f"\n\n{question}", model, prefix)
         end = ctx.usage.get("stream_end") or {}
         yield format_sse_done(
             model, prefix,
@@ -1045,6 +1124,13 @@ def api_adapters(background_tasks: BackgroundTasks, streaming: bool = False) -> 
         _release(ctx)
 
     async def emit(ctx: TurnContext) -> None:
+        if isinstance(ctx.wire, dict):
+            question = await _ask_replace(ctx)
+            if question:
+                message = ((ctx.wire.get("choices") or [{}])[0]).get("message")
+                if isinstance(message, dict):
+                    message["content"] = f"{message.get('content') or ''}\n\n{question}".lstrip()
+                    ctx.response = message["content"]
         ctx.wire = _chat()._inject_response_headers(
             ctx.wire, ctx.engine, ctx.recall_text, ctx.engine_fallback_from, ctx.engine_fallback_reason
         )

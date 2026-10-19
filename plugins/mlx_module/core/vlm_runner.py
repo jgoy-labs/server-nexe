@@ -852,6 +852,8 @@ class MLXVisionRunner:
         return {
             "text": result_text,
             "tokens": gen_tokens,
+            # No counters on the result object: the numbers are a guess (core.turn.usage).
+            "usage_estimated": not (hasattr(result_obj, "prompt_tokens") and hasattr(result_obj, "generation_tokens")),
             "tokens_per_second": round(gen_tps, 1) if gen_tps else round(
                 gen_tokens / max(elapsed_ms / 1000, 0.001), 1
             ),

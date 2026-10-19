@@ -48,6 +48,7 @@ Cada MEM_SAVE ha de ser UNA frase auto-continguda per UN fet atòmic. Només fet
 
 CONFIRMACIÓ DE MEMÒRIA: Quan emets [MEM_SAVE: ...], confirma-ho breument i de forma natural: "He recordat que [fet]." o "Anotado, ho recordaré." Una sola frase, sense llistar tots els tags.
 OBLIT DE MEMÒRIA: Si l'usuari demana oblidar o esborrar un fet («oblida que em dic ‹nom›», «esborra-ho»), PRIMER identifica el fet exacte i demana confirmació: "Vols que esborri '[fet concret]'? Respon sí per confirmar." NOMÉS emet [MEM_DELETE: descripció del fet] al torn SEGÜENT si l'usuari confirma amb sí/yes/sí. El sistema l'esborrarà automàticament. Confirma: "He oblidat que [fet]. Ja no ho recordaré."
+CANVI D'UN FET: Si l'usuari et diu un valor que contradiu un fet que ja tens a la memòria, NO diguis només «Ho recordaré»: pregunta-li si vol canviar-lo («Tinc apuntat que ‹fet vell›; vols que ho canviï per ‹fet nou›?») i escriu el [MEM_SAVE] amb el fet nou. Si l'usuari respon que sí, el sistema fa el canvi; no l'emetis una altra vegada.
 Si acabes d'esborrar un fet, NO l'emetis com a MEM_SAVE al torn següent.
 Si l'usuari pregunta "Què recordes de mi?" o "Quines memòries tens?", el sistema mostrarà la llista automàticament — no cal que la generis tu.
 
@@ -98,6 +99,7 @@ Cada MEM_SAVE debe ser UNA frase autocontenida por UN hecho atómico. Solo hecho
 
 CONFIRMACIÓN DE MEMORIA: Cuando emites [MEM_SAVE: ...], confírmalo brevemente y de forma natural: "He recordado que [hecho]." o "Anotado, lo recordaré." Una sola frase, sin listar los tags.
 OLVIDO DE MEMORIA: Si el usuario pide olvidar o borrar un hecho («olvida que me llamo ‹nombre›», «bórralo»), PRIMERO identifica el hecho exacto y pide confirmación: "¿Quieres que borre '[hecho concreto]'? Responde sí para confirmar." SOLO emite [MEM_DELETE: descripción del hecho] en el turno SIGUIENTE si el usuario confirma. El sistema lo borrará automáticamente. Confirma: "He olvidado que [hecho]. Ya no lo recordaré."
+CAMBIO DE UN HECHO: Si el usuario te dice un valor que contradice un hecho que ya tienes en la memoria, NO digas solo «Lo recordaré»: pregúntale si quiere cambiarlo («Tengo apuntado que ‹hecho viejo›; ¿quieres que lo cambie por ‹hecho nuevo›?») y escribe el [MEM_SAVE] con el hecho nuevo. Si el usuario responde que sí, el sistema hace el cambio; no lo emitas otra vez.
 Si acabas de borrar un hecho, NO lo emitas como MEM_SAVE en el turno siguiente.
 Si el usuario pregunta "¿Qué recuerdas de mí?" o "¿Qué memorias tienes?", el sistema mostrará la lista automáticamente — no necesitas generarla tú.
 
@@ -149,6 +151,7 @@ Each MEM_SAVE must be ONE self-contained sentence per ONE atomic fact. Only new 
 
 MEMORY CONFIRMATION: When you emit [MEM_SAVE: ...], confirm it briefly and naturally in your response: "I've remembered that [fact]." or "Got it, I'll keep that in mind." One sentence, no tag listing.
 MEMORY DELETION: If the user asks to forget or delete a fact («forget that my name is ‹name›», «delete it»), FIRST identify the exact fact and ask for confirmation: "Do you want me to delete '[specific fact]'? Reply yes to confirm." ONLY emit [MEM_DELETE: description] in the NEXT turn if the user confirms with yes/sí/sí. The system will delete it automatically. Confirm: "I've forgotten that [fact]. I won't remember it anymore."
+CHANGING A FACT: If the user tells you a value that contradicts a fact you already have in memory, do NOT just say «I'll remember it»: ask whether they want to change it («I have noted that ‹old fact›; do you want me to change it to ‹new fact›?») and write the [MEM_SAVE] with the new fact. If the user answers yes, the system makes the change; do not emit it again.
 If you just deleted a fact, do NOT emit it as MEM_SAVE in the next turn.
 If the user asks "What do you remember about me?" or "List my memories", the system will show the list automatically — you don't need to generate it.
 
@@ -186,7 +189,7 @@ cors_headers = [ "Content-Type", "Authorization", "X-API-Key", "Accept", "Accept
 max_request_size = 104857600
 
 [plugins.modules]
-enabled = [ "security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module",]
+enabled = [ "security", "rag", "ollama_module", "mlx_module", "llama_cpp_module", "web_ui_module", "api_module",]
 
 # D-M — manager veto on memory collections. Default is access to all.
 # A deny here always wins over the plugin's [module.memory] deny.

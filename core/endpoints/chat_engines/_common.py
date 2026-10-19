@@ -20,7 +20,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import Request
+from fastapi import HTTPException, Request
+
+from core.sessions.session_manager import SessionManager
 
 from ..chat_sanitization import _sanitize_sse_token
 
@@ -222,6 +224,10 @@ def derive_session_id(req: Request, messages=None) -> str:
     """
     header = req.headers.get("x-session-id")
     if header:
+        # The id names a file on disk; one with a dot or a slash is a client
+        # error, a clean 400 like the upload route gives, never a 500 later.
+        if not SessionManager.is_valid_session_id(header):
+            raise HTTPException(status_code=400, detail="Invalid X-Session-Id")
         candidate = header
     else:
         first_user_msg = extract_first_user_msg(messages)
@@ -394,6 +400,40 @@ def resolve_loaded_model_name(module, fallback: str) -> str:
     return fallback
 
 
+def model_in_reserve(engine_name: Optional[str], module, requested: Optional[str], app_state) -> Optional[str]:
+    """The model an engine answers with when it is IN RESERVE: its own (#1035, C4.8 B2/D1-x).
+
+    A model name belongs to one engine: an MLX directory is not a .gguf, and
+    neither is an Ollama tag. One rule for both doors:
+
+    * MLX and llama.cpp: the model they have loaded (`resolve_loaded_model_name`);
+    * Ollama, which picks its model per request: its own (`ollama_reserve_model`),
+      never the name the client picked for the engine in front — that name was
+      almost never one of its tags, so it passed over. None when it has none
+      of its own: then it is no fallback, and the doors skip it;
+    * a hosted engine (never in reserve, but the rule is written here and not
+      left to a lookup that happens to agree): the name asked for is the model.
+    """
+    from core.endpoints.chat_engines.routing import engine_is_cloud  # deferred: routing is the policy above this
+    if engine_is_cloud(module):
+        return requested
+    if engine_name == "ollama":
+        from core.endpoints.chat_engines.ollama import ollama_reserve_model  # deferred: ollama imports this module
+        return ollama_reserve_model(app_state)
+    return resolve_loaded_model_name(module, requested)
+
+
+def no_model_of_its_own(engine_name: Optional[str], app_state) -> bool:
+    """An engine in reserve with no model of its own to answer with: Ollama,
+    which picks its model per request, without one said in words
+    (`ollama_reserve_model`). The doors skip it rather than hand it a name
+    that is not its own. MLX and llama.cpp always have theirs: what they run."""
+    if engine_name != "ollama":
+        return False
+    from core.endpoints.chat_engines.ollama import ollama_reserve_model  # deferred: ollama imports this module
+    return ollama_reserve_model(app_state) is None
+
+
 #: Where a forwarder writes the model it is serving a STREAM with. An internal
 #: attribute on the response object, deliberately not a header: the name
 #: already travels inside every SSE chunk, and a second public spelling of it
@@ -451,7 +491,7 @@ def build_openai_response(result: dict, model_name: str, engine_prefix: str) -> 
     }
     if result.get("thinking"):
         message["reasoning"] = _sanitize_sse_token(result["thinking"])
-    return {
+    body = {
         "id": f"{engine_prefix}-{uuid.uuid4().hex}",
         "object": "chat.completion",
         "created": int(time.time()),
@@ -486,5 +526,10 @@ def build_openai_response(result: dict, model_name: str, engine_prefix: str) -> 
             "total_tokens": result.get("context_used", 0),
         },
     }
+    cached = result.get("cached_tokens")
+    if cached is not None and not result.get("usage_estimated"):
+        # OpenAI's own place for the prefix-cache count; written only when the engine said it.
+        body["usage"]["prompt_tokens_details"] = {"cached_tokens": cached}
+    return body
 
 

@@ -152,8 +152,12 @@ def tidy(text: str) -> str:
 
 
 def _is_ollama(engine: Any) -> bool:
+    """Ollama's call shape: by name, or by the signature (`chat(model, …)`) —
+    a hosted engine takes its model per request the same way."""
+    from core.endpoints.chat_engines.routing import engine_takes_model  # deferred: endpoints → turn
+
     kind = f"{type(engine).__module__}.{type(engine).__name__}".lower()
-    return "ollama" in kind
+    return "ollama" in kind or engine_takes_model(engine)
 
 
 def _text_of(result: Any) -> str:

@@ -30,7 +30,7 @@ async def test_v1_fallback_refreshes_the_window(turn_lab):
 
     with patch("core.turn.api_cascade.dispatch_v1", _cascade), \
          patch("core.endpoints.chat.get_effective_context_window",
-               lambda engine, _state: WINDOWS.get(engine, 1)):
+               lambda engine, _state, _model=None: WINDOWS.get(engine, 1)):
         ctx = await turn_lab.api(session_id="s-c44-window")
 
     assert ctx.engine == "llama_cpp"

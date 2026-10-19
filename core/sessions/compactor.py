@@ -31,15 +31,21 @@ def _clean_for_compact(txt: str) -> str:
 
 def _is_ollama_engine(engine) -> bool:
     """Detects if the engine is OllamaModule (needs model + messages, no system kwarg)."""
+    from core.endpoints.chat_engines.routing import engine_takes_model  # deferred: endpoints → sessions
+
     cls_name = type(engine).__name__
     module_name = type(engine).__module__ or ""
-    return "ollama" in cls_name.lower() or "ollama" in module_name.lower()
+    return "ollama" in cls_name.lower() or "ollama" in module_name.lower() or engine_takes_model(engine)
 
 
 async def _call_engine_ollama(engine, messages, system_msg) -> str:
     """Calls Ollama engine and consumes the async-generator response."""
     from core.runtime_state import get_with_env_fallback  # import for runtime fallback
-    model_name = get_with_env_fallback("NEXE_DEFAULT_MODEL", "llama3.2:3b")
+    # An engine that was told which model the turn runs (a hosted one) answers
+    # for that model; the local default name would be sent to a provider that
+    # does not have it.
+    chosen = getattr(engine, "model_in_use", None)
+    model_name = chosen if isinstance(chosen, str) and chosen else get_with_env_fallback("NEXE_DEFAULT_MODEL", "llama3.2:3b")
     full_messages = [{"role": "system", "content": system_msg}] + messages
     result = engine.chat(model=model_name, messages=full_messages, stream=False)
     summary = ""
@@ -103,12 +109,13 @@ async def compact_session(session, engine, session_manager, *, cancel_event=None
         engine: LLM engine with chat() method
         session_manager: SessionManager for save_to_disk
         cancel_event: (C2.2) set by the engine gate when a user turn has to
-            wait for this background job's slot. Checked ONLY after the LLM
+            wait for this background job's slot. Checked after the LLM
             call returns — the summary was already paid for, but a preempted
             compaction is never APPLIED: `apply_compaction` would otherwise
             race a user turn that appended new messages while this call was
             in flight, resumming a slice of the conversation that no longer
-            matches `get_messages_to_compact()`'s current view.
+            matches `get_messages_to_compact()`'s current view. Before the call
+            too, for a hosted engine (phase 3 of the API providers).
     """
     # #965: ask the engine that is about to serve the turn how much it can hold,
     # so the same history compacts on a 4096-token model and does not on a 32768.
@@ -119,6 +126,14 @@ async def compact_session(session, engine, session_manager, *, cancel_event=None
 
     to_compact = session.get_messages_to_compact()
     if not to_compact:
+        return
+
+    from core.endpoints.chat_engines.routing import engine_is_cloud  # deferred: endpoints → sessions
+
+    if cancel_event is not None and cancel_event.is_set() and engine_is_cloud(engine):
+        # Not after: a hosted engine is a request that leaves the machine, and a job a user turn
+        # already signalled must not send the conversation and only then be told to discard the summary.
+        logger.info("Session %s: compaction preempted before it was sent", session.id[:8])
         return
 
     try:

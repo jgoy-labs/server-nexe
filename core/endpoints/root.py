@@ -51,13 +51,13 @@ def _get_qdrant_status() -> bool:
     return False
 
 def _normalize_engine(engine: str) -> str:
-  """Normalize engine name to its canonical snake_case form."""
-  if not engine:
-    return ""
-  value = engine.strip().lower()
-  if value in {"llama.cpp", "llama-cpp", "llamacpp"}:
-    return "llama_cpp"
-  return value
+  """Normalize engine name to its canonical snake_case form ("" for none).
+
+  The spellings live in the engine table (`chat_engines/routing.py`): this was
+  the second copy of its alias list.
+  """
+  from core.endpoints.chat_engines.routing import _normalize_engine as _canonical
+  return _canonical(engine) or ""
 
 def _required_modules_from_config(config: dict) -> set:
   """Determine which modules are required based on config and environment."""
@@ -66,7 +66,8 @@ def _required_modules_from_config(config: dict) -> set:
   # configured for one. Marking a modelless engine as required made the
   # whole UI bail with status=unhealthy — unusable first-run UX. Only the
   # actively-selected engine (preferred_engine) stays required.
-  OPTIONAL_ENGINES = {"mlx_module", "llama_cpp_module", "ollama_module"}
+  from core.endpoints.chat_engines.routing import ENGINE_MODULE_KEYS
+  OPTIONAL_ENGINES = set(ENGINE_MODULE_KEYS.values())
 
   required = set()
   modules_cfg = config.get("plugins", {}).get("modules", {})
@@ -84,15 +85,10 @@ def _required_modules_from_config(config: dict) -> set:
   preferred_engine = _normalize_engine(
     config.get("plugins", {}).get("models", {}).get("preferred_engine", "")
   )
-  engine_map = {
-    "ollama": "ollama_module",
-    "mlx": "mlx_module",
-    "llama_cpp": "llama_cpp_module",
-  }
   # Require the preferred engine if explicitly configured.
   # "auto" or empty → no engine required (user can pick at runtime).
-  if preferred_engine in engine_map:
-    required.add(engine_map[preferred_engine])
+  if preferred_engine in ENGINE_MODULE_KEYS:
+    required.add(ENGINE_MODULE_KEYS[preferred_engine])
 
   return required
 
@@ -284,10 +280,12 @@ async def server_status(
   # B260: availability is node-aware and sourced from the SINGLE canonical
   # definition the chat router uses (routing._engine_available), so /status can
   # never drift from what a real chat call resolves.
-  from core.endpoints.chat_engines.routing import _engine_available, _resolve_engine
-  mlx_available = _engine_available("mlx", request.app.state)
-  llama_cpp_available = _engine_available("llama_cpp", request.app.state)
-  ollama_available = _engine_available("ollama", request.app.state)
+  from core.endpoints.chat_engines.routing import ENGINE_CASCADE, _engine_available, _resolve_engine
+  # The engines of the automatic chain, by the table (the API engine is an
+  # opt-in the status does not list as something a turn can fall to).
+  engines_available = {name: _engine_available(name, request.app.state) for name in ENGINE_CASCADE}
+  mlx_available = engines_available["mlx"]
+  llama_cpp_available = engines_available["llama_cpp"]
 
   # Determine actual engine based on what's available
   if env_engine == "mlx" and not mlx_available:
@@ -311,11 +309,7 @@ async def server_status(
     "resolved_engine": resolved_engine,
     "model": env_model,
     "modules_loaded": list(modules.keys()),
-    "engines_available": {
-      "mlx": mlx_available,
-      "llama_cpp": llama_cpp_available,
-      "ollama": ollama_available
-    },
+    "engines_available": engines_available,
     "qdrant_available": getattr(request.app.state, "qdrant_available", False) if hasattr(request.app.state, "qdrant_available") else _get_qdrant_status(),
     "timestamp": datetime.now(timezone.utc).isoformat(),
     "minimal_mode": bool(getattr(request.app.state, "minimal_mode", False)),

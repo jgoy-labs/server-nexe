@@ -146,6 +146,9 @@ def app_state(session_manager, memory_helper, fake_engine, monkeypatch) -> State
     # is exactly what made `usage_llm_models` an accidental value instead of
     # a known one before this line existed.
     monkeypatch.setenv("NEXE_DEFAULT_MODEL", "llama3.2:3b")
+    # Determinism (C4.8 B2/D1-x): Ollama in reserve answers with its own model,
+    # `NEXE_OLLAMA_MODEL` first, and a developer's `.env` may well name one.
+    monkeypatch.delenv("NEXE_OLLAMA_MODEL", raising=False)
     state = State()
     state.config = {}
     state.i18n = None
@@ -153,6 +156,7 @@ def app_state(session_manager, memory_helper, fake_engine, monkeypatch) -> State
     state.memory_helper = memory_helper
     state.modules = {"ollama_module": fake_engine}
     state.engine_gate = EngineGate(slots=100)
+    state.cloud_engine_gate = EngineGate(slots=100)
     state.post_commit_queue = None
     return state
 

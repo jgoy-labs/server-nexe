@@ -148,11 +148,16 @@ CATALOG: tuple[KeyDecl, ...] = (
        description="Concurrent generation slots across ALL engines and doors (ADR-007 §7, C2.1) — "
                     "raised past 1 only with a measured reason: two LLM calls in parallel on this "
                     "machine's GPU already crashed Metal once"),
+    _k("cloud_engine_slots", "NEXE_CLOUD_ENGINE_SLOTS", "env", 4,
+       description="Concurrent answers from a hosted engine (the API providers) — a gate of its own, "
+                    "so a cloud answer never holds the local slot nor waits for it. No GPU of this "
+                    "machine is involved; the bound keeps a client from opening unlimited paid requests"),
     _k("engine_gate_wait_s", "NEXE_ENGINE_GATE_WAIT_S", "env", 5.0,
        description="Seconds a user turn waits for an engine slot before the door answers 429 "
                     "(C2.1; replaces the old per-router Semaphore(2) timeout)"),
     _k("engine_deadline_s", "NEXE_ENGINE_DEADLINE_S", "env", 90.0,
-       description="Seconds a turn's generate step may run before it is cut short (#1041, C2.5); "
+       description="Seconds a turn's engine may take up to its first byte before it is cut short "
+                    "(#1041, C2.5); once it has started answering it runs to its end (#1165). "
                     "0 disables it. Measured 2026-09-06 on a 128 GB machine (two local MLX models, "
                     "dev-tools/reports/): generate took 14.3s/23.1s/24.1s — min(300, ceil(3×24.1)) "
                     "rounded up to 30s. A LOWER bound; re-measured at the 8 GB DMG live-test stage",

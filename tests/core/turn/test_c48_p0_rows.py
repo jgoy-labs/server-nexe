@@ -8,7 +8,7 @@ failed, `[MODEL:]` / `[ENGINE:]`, and an image at `/v1` that skips the engines
 that cannot see it.
 
 Every test says which row it is. Each states what the doors do TODAY, door by
-door, so a later part of C4.8 changes exactly the test whose row Jordi decided:
+door, so a later part of C4.8 changes exactly the test whose row was decided:
 B1-B7 (the body of the loop), R1-R4 (re-prompt, `/v1` 404, empty answer,
 `/v1` without live engines), Q (no engine answers), D2/D3 (what is shown).
 
@@ -77,51 +77,47 @@ async def _fallback_prompt(lab, door: str, max_tokens: int | None) -> int:
 
 
 @pytest.mark.parametrize("door", V1)
-async def test_b1_v1_refits_a_fallback_with_a_reserve_of_max_tokens(turn_lab, door):
-    """ROW B1. `/v1`: the reply reserve is what the client asked for."""
+async def test_b1_v1_holds_back_more_of_a_fallback_when_the_client_asks_for_a_longer_reply(turn_lab, door):
+    """ROW B1. `/v1`: the reply reserve is what the client asked for; a bigger
+    one leaves the 2048-token fallback less of the history, and both fit."""
     unbounded = await _fallback_prompt(turn_lab, door, None)
     asked_1000 = await _fallback_prompt(turn_lab, door, 1000)
-    assert unbounded <= 2048 * 4
-    # 1000 tokens held back for the reply, ~4 chars each, come out of the prompt
-    assert unbounded - asked_1000 >= 3500
+    assert asked_1000 < unbounded <= 2048 * 4
 
 
-@pytest.mark.parametrize("door", UI)
-async def test_b1_web_refits_a_fallback_with_a_fixed_reserve_of_125_tokens(turn_lab, door):
-    """ROW B1. Web: `_refit_for` holds back 500 chars (125 tokens) whatever the
-    reply may need, and only fallbacks are refitted (the first engine's prompt
-    was fitted by `budget`). Between the two `/v1` cases above: more than the one
-    that reserves 1000 tokens, and it still fits the window."""
-    web = await _fallback_prompt(turn_lab, door, None)
-    v1_reserving_1000 = await _fallback_prompt(turn_lab, "v1_json", 1000)
-    assert web <= 2048 * 4
-    assert web > v1_reserving_1000
-
-
-async def _reserves_at_2048(lab, door: str, max_tokens: int | None) -> list:
-    """The reply reserve (tokens) each refit of the 2048-token fallback asked for."""
+async def _reserves(lab, door: str, max_tokens: int | None) -> list:
+    """`(window, reply reserve in tokens)` of every fit the turn asked for, in order."""
     import core.context_budget as budget
 
-    real, reserves = budget.fit_prompt_to_window, []
+    real, seen = budget.fit_prompt_to_window, []
 
     def _spy(system, turns, window_tokens, *args, **kwargs):
-        if window_tokens == 2048:
-            reserves.append(kwargs.get("reply_budget_tokens"))
+        seen.append((window_tokens, kwargs.get("reply_budget_tokens")))
         return real(system, turns, window_tokens, *args, **kwargs)
 
     with patch.object(budget, "fit_prompt_to_window", _spy):
         await _fallback_prompt(lab, door, max_tokens)
-    return reserves
+    return seen
 
 
 @pytest.mark.parametrize("door,max_tokens,reserve", [
-    ("v1_json", None, 0), ("v1_json", 1000, 1000), ("v1_stream", 1000, 1000),
+    ("v1_json", None, 125), ("v1_stream", None, 125), ("v1_json", 1000, 1000), ("v1_stream", 1000, 1000),
     ("ui_json", None, 125), ("ui_stream", None, 125),
 ])
-async def test_b1_the_reserve_each_door_holds_back_for_the_reply(turn_lab, door, max_tokens, reserve):
-    """ROW B1, in tokens. `/v1` holds back what the client asked for (`max_tokens`, 0
-    when it did not); the web holds back 500 // 4 = 125, always."""
-    assert await _reserves_at_2048(turn_lab, door, max_tokens) == [reserve]
+async def test_b1_one_reply_reserve_for_both_doors_and_every_engine(turn_lab, door, max_tokens, reserve):
+    """ROW B1, in tokens: one rule (`reply_reserve_tokens`). What the client asked
+    for (`max_tokens`) when it said, 500 // 4 = 125 when it did not — `/v1` used to
+    hold back nothing — for the engine in front (32k) and the fallback (2048)
+    alike. The web sends no `max_tokens`, so it always holds back 125."""
+    seen = await _reserves(turn_lab, door, max_tokens)
+    assert {window for window, _ in seen} >= {32768, 2048}, seen
+    assert {held for _, held in seen} == {reserve}, seen
+
+
+def test_b1_the_rule_itself():
+    from core.context_budget import DEFAULT_REPLY_RESERVE_TOKENS, reply_reserve_tokens
+    assert DEFAULT_REPLY_RESERVE_TOKENS == 125
+    assert [reply_reserve_tokens(), reply_reserve_tokens(None), reply_reserve_tokens(1000)] == [125, 125, 1000]
 
 
 # ───────────────────────────────────────────────────────────────────── B2 ──
@@ -141,7 +137,7 @@ async def test_b2_the_first_engine_is_switched_to_the_requested_model_only_on_th
 
 @pytest.mark.parametrize("door", DOORS)
 async def test_b2_a_fallback_keeps_its_own_loaded_model_at_both_doors(turn_lab, door):
-    """ROW B2 (#1035, decided 02/10): the engine behind answers with the model it
+    """ROW B2 (#1035): the engine behind answers with the model it
     has loaded, and is never asked to load the one picked for the engine in front."""
     world = build_world({"llama_cpp": "pre_byte"}, live=["llama_cpp", "mlx"])
     await run_door(turn_lab, world, door, backend="llama_cpp", sid=f"b2b-{door}",
@@ -151,17 +147,79 @@ async def test_b2_a_fallback_keeps_its_own_loaded_model_at_both_doors(turn_lab, 
 
 
 @pytest.mark.parametrize("door", DOORS)
-async def test_b2_ollama_as_a_fallback_is_asked_for_the_requested_name_at_both_doors(turn_lab, door):
-    """ROW B2 (D1-x, still open): Ollama picks its model per request, so as a
-    fallback it gets the name the client asked for — through the module on the
-    web, in the daemon's payload on `/v1`."""
+async def test_b2_ollama_in_reserve_is_asked_for_its_own_model_at_both_doors(turn_lab, monkeypatch, door):
+    """ROW B2 (D1-x = y): Ollama picks its model per request; in reserve it is
+    asked for its OWN (`NEXE_OLLAMA_MODEL` first), never the name the client picked
+    for the engine in front — through the module on the web, in the daemon's
+    payload on `/v1` — and it answers."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "qwen3.5:4b")
     world = build_world({"mlx": "pre_byte"}, live=["mlx", "ollama"])
-    world.daemon.models = [MLX_NAME]
-    await run_door(turn_lab, world, door, backend="mlx", sid=f"b2c-{door}", extra={"model": MLX_NAME})
+    world.daemon.models = ["qwen3.5:4b"]
+    seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"b2c-{door}", extra={"model": MLX_NAME})
+    assert (seen.status, seen.answered) == (200, "ollama")
     if door.startswith("ui"):
-        assert world.engines["ollama"].models == [MLX_NAME]
+        assert world.engines["ollama"].models == ["qwen3.5:4b"]
     else:
-        assert [p["model"] for p in world.daemon.payloads if p] == [MLX_NAME]
+        assert [p["model"] for p in world.daemon.payloads if p] == ["qwen3.5:4b"]
+
+
+@pytest.mark.parametrize("door", DOORS)
+async def test_b2_the_first_live_engine_is_a_fallback_when_the_one_asked_for_is_not_live(turn_lab, monkeypatch, door):
+    """P2-5: «in reserve» is by what was asked, not by position. The client asks
+    for MLX, which is not live; Ollama is first and runs its own model — at /v1
+    it was asked for the MLX name and answered a final 404, at the web it was
+    handed the picker's name."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "qwen3.5:4b")
+    world = build_world(live=["ollama"])
+    world.daemon.models = ["qwen3.5:4b"]
+    seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"p25-{door}", extra={"model": MLX_NAME})
+    assert (seen.status, seen.answered) == (200, "ollama")
+    if door.startswith("ui"):
+        assert world.engines["ollama"].models == ["qwen3.5:4b"]
+    else:
+        assert [p["model"] for p in world.daemon.payloads if p] == ["qwen3.5:4b"]
+
+
+@pytest.mark.parametrize("door", UI)
+async def test_b2_a_first_engine_that_is_a_fallback_is_not_switched_to_the_pickers_model(turn_lab, door):
+    """P2-5 at the web's `engine` step: the picker's model is the engine asked
+    for's. MLX asked for and not live, llama.cpp first: it is not switched to
+    the MLX name (a «not found» that ended the turn), it runs its own."""
+    world = build_world(live=["llama_cpp"])
+    seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"p25-sw-{door}", extra={"model": MLX_NAME})
+    assert world.engines["llama_cpp"].switched_to is None
+    assert (seen.status, seen.answered) == (200, "llama_cpp")
+
+
+@pytest.mark.parametrize("door", DOORS)
+async def test_b2_ollama_without_a_model_of_its_own_is_no_fallback(turn_lab, monkeypatch, door):
+    """P2-4, without what the lab's conftest sets: MLX configured, its model as
+    the default, no NEXE_OLLAMA_MODEL. Ollama behind a failing MLX used to be
+    asked for the MLX id; now it is skipped — never asked, never given a model
+    picked from its tags — and nobody answers."""
+    monkeypatch.setenv("NEXE_MODEL_ENGINE", "mlx")
+    monkeypatch.setenv("NEXE_DEFAULT_MODEL", MLX_NAME)
+    monkeypatch.delenv("NEXE_OLLAMA_MODEL", raising=False)
+    world = build_world({"mlx": "pre_byte"}, live=["mlx", "ollama"])
+    seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"p24-{door}", extra={"model": MLX_NAME})
+    assert seen.asked == ("mlx",)
+    assert world.engines["ollama"].models == [] and not [p for p in world.daemon.payloads if p]
+    assert world.daemon.requests == [], "not even its tag list is asked for a model to pick"
+    assert seen.status == (200 if door == "ui_stream" else 503) and not seen.saved
+
+
+@pytest.mark.parametrize("door", DOORS)
+async def test_b2_ollama_asked_for_is_still_asked_for_the_name_the_client_picked(turn_lab, monkeypatch, door):
+    """D1-x touches the reserve only: the engine the client asked for (index 0)
+    runs the model the client named, whatever Ollama's own default is."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "qwen3.5:4b")
+    world = build_world(live=["ollama"])
+    world.daemon.models = ["qwen3.5:4b", "gemma4:e4b"]
+    await run_door(turn_lab, world, door, backend="ollama", sid=f"b2d-{door}", extra={"model": "gemma4:e4b"})
+    if door.startswith("ui"):
+        assert world.engines["ollama"].models == ["gemma4:e4b"]
+    else:
+        assert [p["model"] for p in world.daemon.payloads if p] == ["gemma4:e4b"]
 
 
 # ───────────────────────────────────────────────────────────────────── B3 ──
@@ -184,19 +242,31 @@ def _able(engine, yes: bool) -> None:
 async def test_b3_an_engine_that_cannot_continue_is_not_asked_and_the_next_one_answers(
         turn_lab, session_manager, door):
     """ROW B3. Both doors drop the engines that cannot resume (the web at its
-    `engine` step, `/v1` inside the loop) and the next answers. DIFFERENCE (N6) in what
-    the client is told: `/v1` calls it a fallback from the engine that was never
-    asked (`preferred_unavailable`); the web says nothing of it (no header, no field)."""
+    `engine` step, `/v1` inside the loop) and the next answers. N6: neither door
+    calls it a fallback — the engine left out was never asked, so `/v1` sends no
+    `X-Nexe-Fallback-*` for it, as the web says nothing of it."""
     world = build_world(live=["mlx", "llama_cpp"])
     _able(world.engines["mlx"], False)
     _able(world.engines["llama_cpp"], True)
     sid = f"b3a-{door}"
     seen = await run_door(turn_lab, world, door, backend="mlx", sid=sid, **_resume(session_manager, door, sid))
     assert (seen.status, seen.answered, seen.asked) == (200, "llama_cpp", ("llama_cpp",))
-    if door.startswith("v1"):
-        assert seen.fallback == ("mlx", "preferred_unavailable")
-    else:
-        assert seen.fallback == (None, None)
+    assert seen.fallback == (None, None)
+
+
+@pytest.mark.parametrize("door", V1)
+async def test_n6_a_continue_whose_first_asked_engine_fails_names_that_one(turn_lab, session_manager, door):
+    """N6, the other half: the switch is still told when there is one. The
+    Continue leaves MLX out; llama.cpp, the first engine asked, breaks before its
+    first byte; Ollama answers — the fallback is from llama.cpp, not from MLX."""
+    world = build_world({"llama_cpp": "pre_byte"}, live=["mlx", "llama_cpp", "ollama"])
+    _able(world.engines["mlx"], False)
+    _able(world.engines["llama_cpp"], True)
+    _able(world.engines["ollama"], True)
+    sid = f"n6-{door}"
+    seen = await run_door(turn_lab, world, door, backend="mlx", sid=sid, **_resume(session_manager, door, sid))
+    assert (seen.status, seen.answered) == (200, "ollama")
+    assert seen.fallback == ("llama_cpp", "execution_failed")
 
 
 @pytest.mark.parametrize("door", DOORS)
@@ -233,8 +303,8 @@ def _bare_http_app(app_state, world: World) -> FastAPI:
 
 @pytest.mark.parametrize("stream", [False, True])
 def test_q_v1_with_every_engine_retryable_answers_a_503_with_the_first_error_curated(turn_lab, app_state, stream):
-    """ROW Q / D3 (decided provisionally 06/10: «show the FIRST error, curated, at every
-    door»). It was the only cell of the review's matrix verified by reading, `chat.py`
+    """ROW Q / D3 (rule: show the FIRST error, curated, at every
+    door). It was the only cell of the review's matrix verified by reading, `chat.py`
     `raise last_exc`: MLX then llama.cpp, both failing in a way the cascade retries, and the
     last exception left the route as the framework's 500 — plain text, no engine message,
     no SSE even when it asked for a stream. It is now a 503 in JSON (also when a stream was
@@ -260,8 +330,8 @@ def test_q_v1_with_every_engine_retryable_answers_a_503_with_the_first_error_cur
 
 @pytest.mark.parametrize("engine", ["mlx", "llama_cpp"])
 async def test_q_the_web_json_tells_the_curated_text_of_the_first_engine_like_the_stream(turn_lab, engine):
-    """ROW Q / D2 (decided provisionally 06/10: «503 with the curated text of the
-    first error»; it was a generic «No AI engine available» that lost the notice).
+    """ROW Q / D2 (rule: a 503 with the curated text of the
+    first error; it was a generic «No AI engine available» that lost the notice).
     Every engine runs out of memory: the web stream writes the OOM notice of the
     FIRST engine inside the chat (#1117); the web JSON answers a 503 with the same
     words, without the chat's decoration."""
@@ -282,20 +352,24 @@ async def test_q_the_web_json_tells_the_curated_text_of_the_first_engine_like_th
 
 
 @pytest.mark.parametrize("door", ["v1_json", "ui_json"])
-async def test_q_a_terminal_error_reaches_a_json_client_with_the_engines_own_text(turn_lab, door):
-    """ROW Q (terminal column), JSON doors: 503 and the raw message of the engine
-    ("Cannot connect to mlx: refused")."""
-    world = build_world({"mlx": "unreachable"}, live=["mlx", "llama_cpp"])
+async def test_q_a_terminal_error_reaches_a_json_client_with_the_words_written_for_the_user(turn_lab, door):
+    """ROW Q (terminal column), JSON doors: a final error (a bad request, N5) is its
+    HTTP answer with the message written for the user (P2-7), and the engine behind is not asked.
+    (An engine that cannot be reached used to be the example: it is an engine
+    down now, worth the next one.)"""
+    world = build_world({"mlx": "bad_request"}, live=["mlx", "llama_cpp"])
     seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"qt-{door}")
-    assert (seen.status, seen.detail) == (503, "Cannot connect to mlx: refused")
+    # A bad request said on purpose (`BadRequest`): its message, written for the user, arrives whole.
+    assert (seen.status, seen.detail) == (400, "bad request: this engine cannot take it")
+    assert seen.asked == ("mlx",)
 
 
 async def test_q_a_terminal_error_in_the_web_stream_is_the_generic_notice_never_the_text(turn_lab):
     """ROW Q (terminal column), web stream: a 200 whose notice is curated (MC-133)."""
-    world = build_world({"mlx": "unreachable"}, live=["mlx", "llama_cpp"])
+    world = build_world({"mlx": "bad_request"}, live=["mlx", "llama_cpp"])
     seen = await run_door(turn_lab, world, "ui_stream", backend="mlx", sid="qt-stream")
     assert (seen.status, seen.notice) == (200, "error")
-    assert "refused" not in seen.text
+    assert "cannot take it" not in seen.text
 
 
 class _StartRefused(OllamaModule):
@@ -308,7 +382,7 @@ class _StartRefused(OllamaModule):
 
 
 async def test_q_the_web_stream_where_no_engine_reaches_its_first_event_shows_the_first_error(turn_lab):
-    """ROW Q (web stream, last cell) / D3 (decided provisionally 06/10). It used to
+    """ROW Q (web stream, last cell) / D3. It used to
     raise the 503 INSIDE the already-open stream: the client got its 200 and then
     a dropped connection, with no notice. The first failure is now written in the
     chat, curated, like a failure on a first event; nothing is saved. The JSON
@@ -339,23 +413,26 @@ def _count(engine: str, status: str) -> float:
 @pytest.mark.parametrize("door", DOORS)
 async def test_b5_what_each_door_records_about_the_engine_that_answered(turn_lab, door):
     """ROW B5. MLX fails, llama.cpp answers.
-    Both doors: one `generate` record in the turn's usage (engine and model).
-    `/v1` only: the Prometheus counter per attempt, `nexe_engine` / `nexe_fallback`
-    in the body or `X-Nexe-Engine` / `X-Nexe-Fallback-*` in the headers.
+    Both doors: one `generate` record in the turn's usage (engine and model) and, since C5 E,
+    the Prometheus counter per attempt (the `MetricsSink`; it used to be `/v1` alone).
+    `/v1` only: `nexe_engine` / `nexe_fallback` in the body or `X-Nexe-Engine` /
+    `X-Nexe-Fallback-*` in the headers.
     Web only: the engine and model in the stats of the saved answer (the footer a
     reload paints). DIFFERENCE: the web JSON body carries neither engine nor model."""
+    from core.turn.metrics_sink import MetricsSink
+
+    turn_lab.app_state.trace_sinks = (MetricsSink(),)
     before = {(e, s): _count(e, s) for e in ("mlx", "llama_cpp") for s in ("error", "success")}
     world = build_world({"mlx": "pre_byte"}, live=["mlx", "llama_cpp"])
     seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"b5-{door}")
     moved = {k: _count(*k) - v for k, v in before.items() if _count(*k) != v}
     generate = [c for c in seen.ctx.usage["llm"]["calls"] if c["step"] == "generate"]
     assert [(c["engine"], c["model"]) for c in generate] == [("llama_cpp", GGUF_NAME)]
+    assert moved == {("mlx", "error"): 1.0, ("llama_cpp", "success"): 1.0}
     if door.startswith("v1"):
-        assert moved == {("mlx", "error"): 1.0, ("llama_cpp", "success"): 1.0}
         assert seen.fallback == ("mlx", "execution_failed")
         assert seen.saved_stats == {}
     else:
-        assert moved == {}
         assert (seen.saved_stats["engine"], seen.saved_stats["model"]) == ("llama_cpp", GGUF_NAME)
 
 
@@ -466,8 +543,8 @@ def _two(first, second) -> World:
 
 @pytest.mark.parametrize("door", V1)
 async def test_r1_the_v1_reprompt_goes_to_the_engine_that_answered_and_to_nobody_else(turn_lab, door):
-    """ROW R1 (decided provisionally 06/10: «the /v1 re-prompt goes to the same engine,
-    as the web»). The answer is only a memory tag, so the door asks again. It used to
+    """ROW R1 (rule: the /v1 re-prompt goes to the same engine,
+    as the web). The answer is only a memory tag, so the door asks again. It used to
     ask the cascade from the top (MLX a SECOND time, and llama.cpp answering when that
     failed); now the second call goes to MLX alone: when it fails nobody else is asked
     and the neutral stand-in is the answer. It is still made without the turn's
@@ -575,6 +652,213 @@ async def test_n4_a_client_that_leaves_while_the_engine_stops_cleanly_keeps_the_
     assert first.calls[0]["cancel_event"].is_set()
 
 
+def _slow_to_start_world() -> World:
+    """MLX takes 0.25 s to start and then breaks before its first byte; llama.cpp
+    behind it answers at once."""
+    first = InProc("mlx", fail=RuntimeError("worker died"), delay=0.25)
+    other = InProc("llama_cpp")
+    return World(modules={"mlx_module": first, "llama_cpp_module": other}, daemon=FakeOllamaDaemon(),
+                 engines={"mlx": first, "llama_cpp": other})
+
+
+@pytest.mark.parametrize("door", DOORS)
+async def test_n4_a_turn_that_ran_out_of_time_is_not_a_client_that_left(turn_lab, monkeypatch, door):
+    """N4: the deadline sets the same event as a client that leaves (the engine
+    stops alike), but the event says why, and only a client that left ends the
+    cascade. A 50 ms deadline, MLX failing before its first byte after it: every
+    door goes on to llama.cpp.
+
+    P2-1: llama.cpp is handed an event of its own, with its own deadline. It
+    used to be handed the one MLX's deadline had already fired: the real loop
+    (and the lab's, which follows it) answered ONE token and stopped, and the
+    turn kept «Hola» as if it were the whole answer."""
+    monkeypatch.setenv("NEXE_ENGINE_DEADLINE_S", "0.05")
+    world = _slow_to_start_world()
+    seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"n4-dl-{door}")
+    first = world.engines["mlx"].calls[0]["cancel_event"]
+    behind = world.engines["llama_cpp"].calls[0]["cancel_event"]
+    assert first.is_set() and first.reasons == {"deadline"}
+    assert behind is not first and not behind.is_set()
+    assert (seen.status, seen.answered, seen.asked) == (200, "llama_cpp", ("mlx", "llama_cpp"))
+    assert seen.saved_text == "Hola de llama_cpp."
+
+
+# ──────────────────────────── P2-6: a refusal is final only when the error says so ──
+
+@pytest.mark.parametrize("door", DOORS)
+async def test_p26_an_engine_that_answers_401_is_an_engine_failing_and_its_text_stays_home(turn_lab, door):
+    """Ollama behind a proxy that wants a key answers 401. It used to be a final
+    «refused»: the web JSON door answered HTTP 401 with «Client error '401
+    Unauthorized' for url 'http://127.0.0.1:11434/api/chat'». An engine that
+    refuses is an engine failing: the next one answers, and neither the code
+    nor the engine's words reach the client."""
+    world = build_world({"ollama": "unauthorized"}, live=["ollama", "mlx"])
+    seen = await run_door(turn_lab, world, door, backend="ollama", sid=f"p26-{door}")
+    assert (seen.status, seen.answered) == (200, "mlx")
+    told = (seen.detail or "") + seen.text
+    assert "401" not in told and "Unauthorized" not in told and "11434" not in told
+
+
+def test_p26_only_an_error_that_says_so_is_a_deliberate_no():
+    import httpx
+    from fastapi import HTTPException
+
+    from core.endpoints.chat_engines.routing import DOWN, REFUSED, classify, should_try_next_engine
+    request = httpx.Request("POST", "http://127.0.0.1:11434/api/chat")
+    for status in (401, 403, 405, 409, 408, 429, 500, 503):
+        assert classify(HTTPException(status_code=status)) == DOWN, status
+        assert classify(httpx.HTTPStatusError("x", request=request, response=httpx.Response(status, request=request))) == DOWN
+    said = HTTPException(status_code=502)
+    said.fault = REFUSED
+    assert classify(said) == REFUSED and not should_try_next_engine(said)
+
+
+@pytest.mark.parametrize("door", DOORS)
+async def test_p27_a_value_error_from_inside_an_engine_is_that_engine_failing(turn_lab, door):
+    """P2-7: MLX breaks with a `ValueError` nobody marked (a reshape inside the
+    model). It used to be a final «bad request» with its own words for a body;
+    it is MLX failing now: llama.cpp answers, and the words stay in the log."""
+    first = InProc("mlx", fail=ValueError("[reshape] Cannot reshape array of size 0 into shape (1,4096)"))
+    other = InProc("llama_cpp")
+    world = World(modules={"mlx_module": first, "llama_cpp_module": other}, daemon=FakeOllamaDaemon(),
+                  engines={"mlx": first, "llama_cpp": other})
+    seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"p27-{door}")
+    assert (seen.status, seen.answered) == (200, "llama_cpp")
+    assert "reshape" not in (seen.detail or "") + seen.text
+
+
+@pytest.mark.parametrize("door", DOORS)
+async def test_p27_a_missing_ollama_model_is_told_with_the_words_nexe_wrote(turn_lab, door):
+    """P2-7 keeps what nexe writes for the user: Ollama asked for a model it does
+    not have. /v1 answers 404 with the forwarder's own sentence and the models
+    that ARE there; the web JSON door with the plugin's; the web stream says it in
+    its curated notice, as every failure in an open stream."""
+    world = build_world({"ollama": "not_found"}, live=["ollama", "mlx"])
+    seen = await run_door(turn_lab, world, door, backend="ollama", sid=f"p27nf-{door}",
+                          extra={"model": "model-que-no-existeix"})
+    if door.startswith("v1"):
+        assert seen.status == 404
+        assert "Model 'model-que-no-existeix' not found" in seen.detail
+        assert "Available chat models: other-model:1b" in seen.detail
+    elif door == "ui_json":
+        assert (seen.status, seen.detail) == (404, "Ollama model not found: model-que-no-existeix")
+    else:
+        assert seen.notice == "error"
+
+
+# ─────────────── P2-1 re-review: every live engine left out is said before the 200 ──
+
+def _said(table: dict) -> set:
+    return set(table.values())
+
+
+@pytest.mark.parametrize("door", DOORS)
+async def test_engines_live_and_none_can_answer_is_a_503_that_says_why_before_anything_is_sent(
+        turn_lab, monkeypatch, door):
+    """An MLX installation whose MLX does not load: the client asks for MLX, only
+    Ollama is live, and it has no model of its own. Ollama is no fallback, and no
+    engine is left. At the web stream that used to be decided inside the cascade,
+    after the 200: no failure to show, a 503 that cut the connection, nothing
+    saved. It is decided with the candidates now: a 503 at every door, before
+    anything is sent, that says why."""
+    from core.turn.errors import _NO_ENGINE_CAN_ANSWER, NO_OWN_MODEL
+    monkeypatch.setenv("NEXE_MODEL_ENGINE", "mlx")
+    monkeypatch.setenv("NEXE_DEFAULT_MODEL", MLX_NAME)
+    monkeypatch.delenv("NEXE_OLLAMA_MODEL", raising=False)
+    world = build_world(live=["ollama"])
+    seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"none-able-{door}", extra={"model": MLX_NAME})
+    assert (seen.status, seen.saved, seen.asked, seen.cut) == (503, False, (), None)
+    assert seen.detail in _said(_NO_ENGINE_CAN_ANSWER[NO_OWN_MODEL])
+    assert world.daemon.requests == [] and world.engines["ollama"].models == []
+
+
+@pytest.mark.usefixtures("_fresh_image_memory")
+@pytest.mark.parametrize("door", DOORS)
+async def test_an_image_and_no_live_engine_that_can_see_it_is_a_503_that_says_so(turn_lab, monkeypatch, door):
+    """MLX asked for and not live; llama.cpp runs a text model and Ollama does not
+    say whether its model sees. With an image, neither stands in: a 503 before
+    anything is sent, saying no available engine can see the image."""
+    from core.turn.errors import _NO_ENGINE_CAN_ANSWER, CANNOT_SEE
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "llama3.2:3b")
+    world = build_world(live=["llama_cpp", "ollama"], llama_cpp={"sees": False})
+    seen = await _turn_with_image(turn_lab, world, door, f"none-sees-{door}")
+    assert (seen.status, seen.saved, seen.asked, seen.cut) == (503, False, (), None)
+    assert seen.detail in _said(_NO_ENGINE_CAN_ANSWER[CANNOT_SEE])
+
+
+# ─────────────────────────────── #1165: the deadline watches up to the first byte ──
+
+class _StartsThenTakesItsTime(InProc):
+    """The real MLX loop at 13 tok/s: the first token at once, the rest well past
+    the deadline, the cancel event checked between tokens (as `generate_helpers`
+    and `vlm_runner` do). JSON-mode (`/v1`, no callback) runs the same loop."""
+
+    WORDS = ("Una ", "resposta ", "llarga ", "i ", "sencera.")
+
+    async def chat(self, messages, system="", session_id="default", stream_callback=None, **kwargs):
+        self.calls.append(kwargs)
+        if self.log is not None:
+            self.log.append(self.name)
+        cancel = kwargs["cancel_event"]
+        said = []
+        for word in self.WORDS:
+            if cancel.is_set():
+                break
+            if stream_callback is not None:
+                stream_callback(word)
+            said.append(word)
+            await asyncio.sleep(0.06)
+        if stream_callback is None:
+            return {"response": "".join(said), "finish_reason": "stop", "tokens": len(said)}
+        return {"finish_reason": "stop"}
+
+
+def _slow_answer_world() -> World:
+    first, other = _StartsThenTakesItsTime("mlx"), InProc("llama_cpp")
+    return World(modules={"mlx_module": first, "llama_cpp_module": other}, daemon=FakeOllamaDaemon(),
+                 engines={"mlx": first, "llama_cpp": other})
+
+
+@pytest.mark.parametrize("door", ("v1_stream", "ui_json", "ui_stream"))
+async def test_1165_an_engine_that_started_in_time_is_not_cut_by_the_deadline(turn_lab, monkeypatch, door):
+    """#1165, live 07/10: gemma-4-31b at 13 tok/s was cut mid-answer by the
+    90 s deadline, and the turn was saved as complete. The deadline now watches
+    an engine that does not START: past its first byte the engine runs to its
+    end. A 0.1 s deadline, an answer of 0.3 s: whole, not partial, no cancel."""
+    monkeypatch.setenv("NEXE_ENGINE_DEADLINE_S", "0.1")
+    world = _slow_answer_world()
+    seen = await run_door(turn_lab, world, door, backend="mlx", sid=f"r1165-{door}")
+    event = world.engines["mlx"].calls[0]["cancel_event"]
+    assert not event.is_set() and event.reasons == set()
+    assert (seen.status, seen.asked, seen.saved) == (200, ("mlx",), True)
+    assert seen.saved_text == "Una resposta llarga i sencera."
+    assert seen.ctx is None or not seen.ctx.partial
+
+
+async def test_1165_v1_json_sees_no_first_byte_and_the_deadline_still_covers_the_answer(turn_lab, monkeypatch):
+    """The exception, pinned so it is a known one: `/v1` without streaming asks
+    MLX and llama.cpp for their whole answer (`_forward_to_mlx` passes no
+    callback), so no first byte reaches the turn before the end and the
+    deadline still watches the whole generation — the answer is cut."""
+    monkeypatch.setenv("NEXE_ENGINE_DEADLINE_S", "0.1")
+    world = _slow_answer_world()
+    seen = await run_door(turn_lab, world, "v1_json", backend="mlx", sid="r1165-v1-json")
+    event = world.engines["mlx"].calls[0]["cancel_event"]
+    assert event.reasons == {"deadline"}
+    assert seen.status == 200 and seen.saved_text != "Una resposta llarga i sencera."
+
+
+@pytest.mark.parametrize("door", DOORS)
+async def test_1165_an_engine_that_does_not_start_in_time_is_still_the_deadlines(turn_lab, monkeypatch, door):
+    """Before the first byte nothing changes: an engine that has not started when
+    the deadline comes is told to stop (its event is set for the deadline)."""
+    monkeypatch.setenv("NEXE_ENGINE_DEADLINE_S", "0.05")
+    world = build_world(live=["mlx"], delay=0.25)
+    await run_door(turn_lab, world, door, backend="mlx", sid=f"r1165-late-{door}")
+    event = world.engines["mlx"].calls[0]["cancel_event"]
+    assert event.is_set() and event.reasons == {"deadline"}
+
+
 # ───────────────────────────────────────── the wording of what the chat shows ──
 
 def test_the_notices_the_chat_shows_are_these_words():
@@ -657,15 +941,28 @@ async def test_e_a_turn_that_broke_midway_describes_nothing(turn_lab, door):
 @pytest.mark.usefixtures("_fresh_image_memory")
 @pytest.mark.parametrize("door", DOORS)
 async def test_e_an_image_skips_a_fallback_that_cannot_see_at_both_doors(turn_lab, door):
-    """§E (#1144 / #1035). MLX fails; llama.cpp runs a text model; Ollama does not
-    say. The blind fallback is skipped (never asked) and the next answers, at
-    `/v1` and at the web alike."""
+    """§E (#1144 / #1035). MLX fails; llama.cpp runs a vision model, Ollama does
+    not say. The fallback that sees answers, at `/v1` and at the web alike."""
+    world = build_world({"mlx": "pre_byte"}, live=["mlx", "llama_cpp", "ollama"], mlx={"sees": True},
+                        llama_cpp={"sees": True})
+    seen = await _turn_with_image(turn_lab, world, door, f"e-skip-{door}")
+    assert (seen.status, seen.answered) == (200, "llama_cpp")
+    assert seen.asked[:2] == ("mlx", "llama_cpp")
+
+
+@pytest.mark.usefixtures("_fresh_image_memory")
+@pytest.mark.parametrize("door", DOORS)
+async def test_e_an_image_skips_a_fallback_that_does_not_say_it_sees_at_both_doors(turn_lab, door):
+    """§E + B2/D1-x. MLX fails; llama.cpp runs a text model; Ollama does not say
+    (in reserve it runs its own default, which nobody vouches for). Neither is
+    asked: not saying is not seeing. Nobody answers — `/v1` and the web JSON a
+    503, the web stream the first failure as its notice."""
     world = build_world({"mlx": "pre_byte"}, live=["mlx", "llama_cpp", "ollama"], mlx={"sees": True},
                         llama_cpp={"sees": False})
-    seen = await _turn_with_image(turn_lab, world, door, f"e-skip-{door}")
-    # The third call is the post-commit description: Ollama does not say whether its model
-    # sees, so it is asked (the blind llama.cpp never is).
-    assert (seen.status, seen.answered, seen.asked) == (200, "ollama", ("mlx", "ollama", "ollama"))
+    seen = await _turn_with_image(turn_lab, world, door, f"e-unsaid-{door}")
+    assert seen.asked == ("mlx",)
+    assert seen.answered is None
+    assert seen.status == (200 if door == "ui_stream" else 503)
 
 
 @pytest.mark.usefixtures("_fresh_image_memory")
@@ -703,23 +1000,24 @@ async def test_e_compact_is_handed_the_engine_that_served(turn_lab, door):
     assert (seen.answered, names) == ("llama_cpp", ["llama_cpp"])
 
 
-async def test_e_compact_runs_against_the_engine_that_failed_when_the_web_stream_writes_its_notice(turn_lab):
-    """§E (verified: the review wrote «plausible»). Every engine fails before a byte:
-    the web stream answers 200 with the first one's notice, `ctx.engine` is left
-    pointing at that engine (`_serve_with`), and `compact` — which no partial turn
-    skips — is queued against it. The other three doors abort with an error and
-    run no step after `generate`."""
+async def test_e_compact_is_not_queued_when_the_web_stream_writes_a_failure_notice(turn_lab):
+    """§E (#1149). Every engine fails before a byte: the web stream answers 200 with the
+    first one's notice and the turn is partial. `ctx.engine` is left pointing at an engine
+    that failed, so `compact` is not queued against it (a partial turn skips it); the next
+    clean turn compacts, by size. The other three doors abort with an error and run no step
+    after `generate`."""
     faults = {"mlx": "pre_byte", "llama_cpp": "pre_byte"}
     seen, names = await _compact_got(turn_lab, "ui_stream", faults, ["mlx", "llama_cpp"], "e-c2-stream")
-    assert (seen.status, seen.notice, names) == (200, "error", ["mlx"])
+    assert (seen.status, seen.notice, names) == (200, "error", [])
     for door in ("v1_json", "v1_stream", "ui_json"):
         seen, names = await _compact_got(turn_lab, door, faults, ["mlx", "llama_cpp"], f"e-c2-{door}")
         assert (seen.status >= 500, names) == (True, [])
 
 
-async def test_e_compact_after_a_stream_cut_midway_is_handed_the_engine_that_cut(turn_lab):
+async def test_e_compact_is_not_queued_after_a_stream_cut_midway(turn_lab):
+    """§E (#1149). The engine that cut the stream is not asked to summarise the session."""
     seen, names = await _compact_got(turn_lab, "ui_stream", {"mlx": "mid_stream"}, ["mlx", "llama_cpp"], "e-c3")
-    assert (seen.notice, names) == ("error", ["mlx"])
+    assert (seen.notice, names) == ("error", [])
 
 
 # ─────────────────────────────────────── §E the labels of the answer ──
@@ -741,8 +1039,8 @@ async def test_e_the_labels_the_client_reads_name_the_engine_that_answered(turn_
 
 @pytest.mark.parametrize("door", V1)
 async def test_b2_ollama_in_reserve_without_the_requested_model_is_passed_over_at_v1(turn_lab, door):
-    """ROW B2 / R2 (D1-z, decided provisionally 06/10: «a model that is not on Ollama is
-    reason enough to try the next engine, only for the engines in reserve»). MLX fails and
+    """ROW B2 / R2 (D1-z, rule: a model that is not on Ollama is
+    reason enough to try the next engine, only for the engines in reserve). MLX fails and
     Ollama, behind it, does not have the name the client sent. The web already passed it
     over (`ModelNotFoundError` is retryable: the `not_found` cells of the matrix); `/v1`
     answered the daemon's 404 as if the client had named a bad model for the engine it

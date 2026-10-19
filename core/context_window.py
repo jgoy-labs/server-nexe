@@ -14,7 +14,7 @@ www.jgoy.net · https://server-nexe.org
 import logging
 from typing import Any, Optional
 
-from core.endpoints.chat_engines.routing import get_engine_module
+from core.endpoints.chat_engines.routing import bind_to_model, get_engine_module
 from core.endpoints.chat_sanitization import DEFAULT_CONTEXT_WINDOW
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ def ask_engine_window(engine_module: Any) -> Optional[int]:
     return value
 
 
-def resolve_context_window(engine: str, app_state: Any = None) -> int:
+def resolve_context_window(engine: str, app_state: Any = None, model: Optional[str] = None) -> int:
     """How many tokens the engine serving this turn can actually hold.
 
     Deliberately free of per-engine branches: each module knows its own memory
@@ -58,9 +58,12 @@ def resolve_context_window(engine: str, app_state: Any = None) -> int:
     no app_state, module not loaded, engine that predates the contract, or a
     module that raises. Detection is a convenience: it must never be the reason
     a chat turn fails.
+
+    `model` is the model of the turn: a hosted engine's window is per model, and
+    it is asked bound to that one (`bind_to_model`; any other engine ignores it).
     """
     module = get_engine_module(engine, app_state) if app_state is not None else None
-    window = ask_engine_window(module)
+    window = ask_engine_window(bind_to_model(module, model))
     if window is None:
         logger.debug(
             "Engine %s could not report a context window, using default %d",

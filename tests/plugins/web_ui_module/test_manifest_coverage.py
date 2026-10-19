@@ -18,6 +18,13 @@ from plugins.web_ui_module.manifest import get_module_instance
 
 
 @pytest.fixture(autouse=True)
+def _ollama_has_a_model_of_its_own(monkeypatch):
+    """Ollama answers as a fallback only with a model of its own, said in words
+    (C4.8 B2/D1-x): these tests have it answer behind other engines, so it has one."""
+    monkeypatch.setenv("NEXE_OLLAMA_MODEL", "llama3.2:3b")
+
+
+@pytest.fixture(autouse=True)
 def set_api_key(monkeypatch):
     monkeypatch.setenv("NEXE_PRIMARY_API_KEY", "test-cover-key")
     monkeypatch.delenv("NEXE_ADMIN_API_KEY", raising=False)
@@ -381,9 +388,11 @@ class TestChatStreamEngineIntegration:
 class TestSessionCleanupLoop:
     """Test lines 834-839: _session_cleanup_loop error handling."""
 
-    def test_cleanup_loop_handles_exception(self):
+    def test_cleanup_loop_handles_exception(self, monkeypatch):
         """Lines 837-839: cleanup_inactive raises exception."""
         from core.sessions.cleanup import _session_cleanup_loop
+
+        monkeypatch.setenv("NEXE_SESSION_RETENTION_DAYS", "1")  # without it the loop never calls
 
         async def run():
             mock_sm = MagicMock()
@@ -393,12 +402,15 @@ class TestSessionCleanupLoop:
                     await _session_cleanup_loop(mock_sm)
                 except asyncio.CancelledError:
                     pass
+            mock_sm.cleanup_inactive.assert_called_once_with(max_age_hours=24)  # it did try, and survived
 
         asyncio.run(run())
 
-    def test_cleanup_loop_removes_sessions(self):
+    def test_cleanup_loop_removes_sessions(self, monkeypatch):
         """Lines 835-837: successful cleanup removes sessions."""
         from core.sessions.cleanup import _session_cleanup_loop
+
+        monkeypatch.setenv("NEXE_SESSION_RETENTION_DAYS", "1")
 
         async def run():
             mock_sm = MagicMock()

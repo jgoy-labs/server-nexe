@@ -410,7 +410,7 @@ async def test_error_mid_stream_persists_a_partial_turn():
     still runs inline exactly as every pre-C2.2 caller does — the "a partial
     turn's memory.write is SKIPPED rather than queued" half of #1040 only
     applies when a real queue is attached, and is covered at the run.py level
-    in test_post_commit_queue.py::test_partial_turn_queues_no_memory_write_but_still_queues_compact.
+    in test_post_commit_queue.py::test_partial_turn_queues_neither_memory_write_nor_compact.
     """
     h = _Harness(intent="chat")
     result = await h.call({"message": "hola", "stream": True},

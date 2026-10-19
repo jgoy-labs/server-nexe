@@ -20,6 +20,10 @@ from core.endpoints.chat_sanitization import _sanitize_sse_token
 from core.turn.errors import StreamCapExceeded
 from core.turn.text.chunks import parse_chunk
 from core.turn.text.tags import TagStreamFilter
+from core.turn.usage import SENTINEL as USAGE_SENTINEL
+from core.turn.usage import from_chunk as usage_of_chunk
+from core.turn.usage import from_engine_result as usage_of_result
+from core.turn.usage import merge as usage_merge
 from core.turn.text.think import StreamThinkParser
 
 
@@ -83,6 +87,30 @@ class StreamFlags:
     # error is already committed to the wire by the time this is read, so the
     # turn cannot be retried, only recorded as broken.
     error: "Exception | None" = None
+    #: What the engine said the call cost (`core.turn.usage`), or None if it said nothing.
+    usage: "dict | None" = None
+
+
+def apply_usage(chunk: Any, flags: StreamFlags) -> bool:
+    """Read what a chunk says the call cost onto `flags`. True = the chunk was only
+    the bridge's usage sentinel, which carries no text and is skipped."""
+    flags.usage = usage_merge(flags.usage, usage_of_chunk(chunk))
+    return isinstance(chunk, dict) and USAGE_SENTINEL in chunk
+
+
+def add_chunk_usage(said: dict, chunk: Any) -> None:
+    """The same reading for a door that collects the reply itself (`said["usage"]`)."""
+    said["usage"] = usage_merge(said.get("usage"), usage_of_chunk(chunk))
+
+
+def add_result_usage(said: dict, result: Any) -> None:
+    """What an in-process engine's whole result says the call cost, onto `said["usage"]`."""
+    said["usage"] = usage_merge(said.get("usage"), usage_of_result(result))
+
+
+def apply_sentinels(chunk: Any, flags: StreamFlags) -> bool:
+    """Both in-band readings (what the call cost, why it stopped). True = skip the chunk."""
+    return apply_usage(chunk, flags) or apply_trunc_sentinels(chunk, flags)
 
 
 def apply_trunc_sentinels(chunk: Any, flags: StreamFlags) -> bool:
@@ -173,7 +201,7 @@ async def engine_events(chat_result: Any, model_name: "str | None", flags: Strea
             # from them and strips them itself.
             labels = TagStreamFilter(memory=False, labels=True)
             async for chunk in chat_result:
-                if apply_trunc_sentinels(chunk, flags):
+                if apply_sentinels(chunk, flags):
                     continue
                 content, thinking = guard.take(*parse_chunk(chunk))
                 if first:
@@ -192,6 +220,7 @@ async def engine_events(chat_result: Any, model_name: "str | None", flags: Strea
         else:
             yield Ready()
             result = await chat_result if inspect.iscoroutine(chat_result) else chat_result
+            flags.usage = usage_merge(flags.usage, usage_of_result(result))
             content, _ = guard.take(extract_engine_text(result) or "", "")
             if content:
                 yield Whole(content)

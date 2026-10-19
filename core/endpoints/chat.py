@@ -11,12 +11,11 @@ www.jgoy.net · https://server-nexe.org
 """
 
 import logging
-import time
 from collections import OrderedDict
 from uuid import uuid4
 from typing import Any, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from core.security.auth_dependencies import require_api_key
 from core.security.input_sanitizers import validate_string_input
@@ -47,6 +46,7 @@ from .chat_engines.routing import (
     _engine_available,
     _resolve_engine,
 )
+from core.providers.cloud import CLOUD_ENGINE
 from .chat_engines.ollama import (
     _forward_to_ollama,
     _ollama_stream_generator,
@@ -55,6 +55,7 @@ from .chat_engines.ollama import (
     _OLLAMA_STREAM_TIMEOUT,
     _OLLAMA_ERRORS,
 )
+from .chat_engines.api import _forward_to_api
 from .chat_engines.mlx import _forward_to_mlx, _mlx_stream_generator
 from .chat_engines.llama_cpp import _forward_to_llama_cpp, _llama_cpp_stream_generator
 from .chat_engines._common import persist_v1_turn
@@ -267,7 +268,7 @@ def _system_prompt_for_turn(body: ChatCompletionRequest, app_state: Any, server_
     )
 
 
-def get_effective_context_window(engine: str, app_state: Any = None) -> int:
+def get_effective_context_window(engine: str, app_state: Any = None, model: Optional[str] = None) -> int:
     """MC-090: the RAG token budget must reflect the context window the serving
     engine actually uses, not a fixed 8192.
 
@@ -281,10 +282,11 @@ def get_effective_context_window(engine: str, app_state: Any = None) -> int:
     adjusted at all before this; now all three answer for themselves.
 
     ``app_state`` is optional: without it there is no live module to ask and the
-    documented default stands.
+    documented default stands. ``model`` is the request's: a hosted engine's
+    window is per model.
     """
     from core.context_window import resolve_context_window
-    return resolve_context_window(engine, app_state)
+    return resolve_context_window(engine, app_state, model)
 
 
 #: Chars held back for the model's reply in this door's budget. Named because
@@ -610,7 +612,7 @@ async def _dispatch_to_engine(
     request: Request, app_state: Any, last_user_msg: Optional[str], session_id: Optional[str] = None,
     cancel_event: Any = None, images: Optional[list[str]] = None,
 ) -> Any:
-    """Route the chat request to the resolved backend engine (Ollama, MLX, or llama.cpp).
+    """Route the chat request to the resolved backend engine (Ollama, MLX, llama.cpp or the API).
 
     ``session_id`` (F-C) is only threaded to Ollama here: MLX and llama.cpp
     derive it themselves from the RAW client request (they need it either
@@ -625,23 +627,36 @@ async def _dispatch_to_engine(
     the UI door's `start_engine_call` has always passed — which engine
     actually reads it is that engine's own decision, never this door's.
     """
-    if engine.lower() == "ollama":
+    name = _normalize_engine(engine) or ""
+    if name == "ollama":
         return await _forward_to_ollama(
             messages, body, app_state, last_user_msg, session_id=session_id, images=images,
         )
-    elif engine.lower() == "mlx":
+    elif name == "mlx":
         return await _forward_to_mlx(messages, body, request, cancel_event=cancel_event, images=images)
-    elif engine.lower() in ["llama_cpp", "llama.cpp", "llamacpp"]:
+    elif name == "llama_cpp":
         return await _forward_to_llama_cpp(messages, body, request, cancel_event=cancel_event, images=images)
+    elif name == CLOUD_ENGINE:
+        # Explicit, and before the default below: the API is answered by itself
+        # or refused (its forwarder asks the cloud gate), never by Ollama.
+        return await _forward_to_api(messages, body, request, cancel_event=cancel_event, images=images)
     else:
         return await _forward_to_ollama(
             messages, body, app_state, last_user_msg, session_id=session_id, images=images,
         )
 
 
+def _persist_with_late_suffix(app_state: Any, session_id: str, content: str, suffix: dict, **kwargs: Any) -> None:
+    """Persist the reply plus what the server added to it AFTER this task was queued
+    (the change question of `emit`), read now that the task runs — a client that
+    sends the history back must find the same text it was given."""
+    question = (suffix or {}).get("question") or ""
+    persist_v1_turn(app_state, session_id, f"{content}\n\n{question}" if question else content, **kwargs)
+
+
 def _persist_v1_turn_from_response(
     response: Any, background_tasks: BackgroundTasks, app_state: Any, session_id: str,
-    *, resume: bool = False,
+    *, resume: bool = False, suffix: Optional[dict] = None,
 ) -> None:
     """Queue the assistant's reply to be mirrored into its /v1 session (F-C).
 
@@ -668,21 +683,11 @@ def _persist_v1_turn_from_response(
                 content = response.get("message", {}).get("content", "")
         if content:
             background_tasks.add_task(
-                persist_v1_turn, app_state, session_id, content,
+                _persist_with_late_suffix, app_state, session_id, content, suffix if suffix is not None else {},
                 resume=resume, truncated=truncated,
             )
     except Exception as e:
         logger.error("Failed to schedule /v1 session mirror: %s", e, exc_info=True)
-
-
-def _record_engine_metrics(engine: str, engine_status: str, start_time: float) -> None:
-    """Emit Prometheus counters and histogram for the chat engine invocation."""
-    try:
-        from core.metrics.registry import CHAT_ENGINE_REQUESTS, CHAT_ENGINE_DURATION
-        CHAT_ENGINE_REQUESTS.labels(engine=engine, status=engine_status).inc()
-        CHAT_ENGINE_DURATION.labels(engine=engine).observe(time.time() - start_time)
-    except Exception as e:
-        logger.debug("Chat engine metrics update failed: %s", e)
 
 
 def _inject_response_headers(
@@ -726,15 +731,16 @@ def _fit_v1_messages_to_window(
     both doors enforce the same invariant with the same function instead of two
     lookalikes.
 
-    The reply reserve is what the client asked for (``max_tokens``); a client
-    asking for more than the engine holds is clamped inside the shared function,
-    not here.
+    The reply reserve is the one rule both doors use (`reply_reserve_tokens`):
+    what the client asked for (``max_tokens``), the default reserve when it
+    did not; a client asking for more than the engine holds is clamped inside
+    the shared function, not here.
 
     Deferred import for the cycle documented in _inject_rag_context_into_messages.
     """
     if not messages:
         return messages
-    from core.context_budget import fit_prompt_to_window
+    from core.context_budget import fit_prompt_to_window, reply_reserve_tokens
 
     system_msg = messages[0] if messages[0].get("role") == "system" else None
     turns = messages[1:] if system_msg else messages
@@ -742,7 +748,7 @@ def _fit_v1_messages_to_window(
         (system_msg.get("content") or "") if system_msg else "",
         turns,
         window_tokens or DEFAULT_CONTEXT_WINDOW,
-        reply_budget_tokens=body.max_tokens or 0,
+        reply_budget_tokens=reply_reserve_tokens(body.max_tokens),
     )
     return ([system_msg] + fitted) if system_msg else fitted
 
@@ -751,7 +757,9 @@ def _fit_v1_messages_to_window(
 
 @router.post("/chat/completions", dependencies=[Depends(require_api_key)], summary="Chat completion with RAG support and engine auto-routing", operation_id="chat_completions")
 @limiter.limit("20/minute")
-async def chat_completions(body: ChatCompletionRequest, request: Request, background_tasks: BackgroundTasks) -> Any:
+async def chat_completions(
+    body: ChatCompletionRequest, request: Request, background_tasks: BackgroundTasks, response: Response = None,
+) -> Any:
     """
     Unified Chat Completion endpoint.
     Supports:
@@ -819,6 +827,9 @@ async def chat_completions(body: ChatCompletionRequest, request: Request, backgr
         # A stream that already returned is released by `releasing` instead.
         release_turn_lease(session_mgr, ctx)
         raise
+    if response is not None:
+        # C5 F: the id the trace is asked by, also on a JSON answer (it was in the body only).
+        response.headers["X-Nexe-Turn-Id"] = ctx.turn_id
     return ctx.wire
 
 

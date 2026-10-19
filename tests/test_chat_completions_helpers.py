@@ -7,7 +7,6 @@ from fastapi.responses import StreamingResponse
 from core.endpoints.chat import (
     _dispatch_to_engine,
     _inject_response_headers,
-    _record_engine_metrics,
     _validate_chat_request,
 )
 from core.endpoints.chat_schemas import ChatCompletionRequest, Message
@@ -148,16 +147,13 @@ class TestTheV1PromptAssembly:
 
     async def test_system_prompt_carries_the_date_phrase(self):
         from datetime import datetime, timezone, timedelta
-        from unittest.mock import patch as _patch
-        import datetime as _datetime_mod
+        from tests.frozen_clock import frozen_datetime
 
         body = _make_body(use_rag=False)
         app_state = MagicMock()
         app_state.config = {}
         fixed = datetime(2026, 5, 21, 21, 52, 22, tzinfo=timezone(timedelta(hours=2)))
-        mock_cls = MagicMock()
-        mock_cls.now.return_value.astimezone.return_value = fixed
-        with _patch.object(_datetime_mod, "datetime", mock_cls):
+        with frozen_datetime(fixed):
             messages, _ = await _v1_prompt(body, app_state, lang="ca")
         assert "dijous, 21 de maig de 2026" in messages[0]["content"], (
             "F-D: /v1's system prompt must carry the same natural-language "
@@ -170,18 +166,15 @@ class TestTheV1PromptAssembly:
         the ONE shared core.chat_prompt — not two copies that can drift,
         the exact bug #854/B007 patterns exist to prevent."""
         from datetime import datetime, timezone, timedelta
-        from unittest.mock import patch as _patch
-        import datetime as _datetime_mod
+        from tests.frozen_clock import frozen_datetime
         from core.turn.prompt import _build_system_prompt_with_time
 
         body = _make_body(use_rag=False)
         app_state = MagicMock()
         app_state.config = {}
         fixed = datetime(2026, 8, 27, 9, 0, 0, tzinfo=timezone(timedelta(hours=2)))
-        mock_cls = MagicMock()
-        mock_cls.now.return_value.astimezone.return_value = fixed
 
-        with _patch.object(_datetime_mod, "datetime", mock_cls):
+        with frozen_datetime(fixed):
             v1_messages, _ = await _v1_prompt(body, app_state, lang="es")
             ui_prompt, _ = _build_system_prompt_with_time("hola", lang_hint="es")
 
@@ -247,26 +240,6 @@ class TestDispatchToEngine:
             result = await _dispatch_to_engine("mlx", [], body, request, app_state, None)
         mock_mlx.assert_called_once()
         assert result == {"mlx": True}
-
-
-# ─── _record_engine_metrics ──────────────────────────────────────────────────
-
-class TestRecordEngineMetrics:
-    def test_does_not_raise_when_metrics_unavailable(self):
-        with patch("builtins.__import__", side_effect=ImportError("no metrics")):
-            _record_engine_metrics("ollama", "success", 0.0)
-
-    def test_records_metrics_when_available(self):
-        mock_requests = MagicMock()
-        mock_duration = MagicMock()
-        with patch.dict("sys.modules", {
-            "core.metrics.registry": MagicMock(
-                CHAT_ENGINE_REQUESTS=mock_requests,
-                CHAT_ENGINE_DURATION=mock_duration,
-            )
-        }):
-            _record_engine_metrics("ollama", "success", 0.0)
-        mock_requests.labels.assert_called_once_with(engine="ollama", status="success")
 
 
 # ─── _inject_response_headers ────────────────────────────────────────────────

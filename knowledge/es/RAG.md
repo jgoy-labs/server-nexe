@@ -138,6 +138,18 @@ server-nexe tiene un sistema de memoria automatica similar a ChatGPT o Claude. E
 
 **Deduplicacion:** Antes de guardar, comprueba similitud con entradas existentes. Si similitud > 0.80, la entrada se considera duplicada y no se guarda.
 
+### Hechos con clave: cómo se encuentra un cambio
+
+Una segunda pasada lee el mensaje del usuario con el mismo modelo que ha respondido (una llamada corta, ~0,5 s en local, ~1 s con una API) y saca hechos con **clave**: de quién habla (`user`, una hermana…), de qué (`age`, `phone`, `pets`…), el valor tal como lo escribió el usuario y una frase corta. El servidor decide por la clave, no por el parecido de dos frases:
+- **No hay ningún hecho con esa clave:** se guarda, con la clave al lado (`entity`, `attribute`, `value`, `value_norm`).
+- **Está con el mismo valor:** no pasa nada, aunque el turno sea en otro idioma («tengo 45 años» e «I'm 45» son lo mismo; un número se compara sin unidad).
+- **Está con otro valor:** es un cambio. No se cambia nada: el servidor pregunta «Todavía no he cambiado nada: tengo anotado X. ¿Quieres que lo cambie por Y? Responde sí para confirmar.» y solo el «sí» del usuario lo hace (B028). Una clave que admite varios valores (`pets`, `allergies`…) pregunta igual: un «no» se puede deshacer, un segundo perro guardado en silencio no.
+- Las claves ya guardadas van al prompt del extractor para que la misma cosa tenga siempre el mismo nombre. Con un motor de API van los nombres, no los valores.
+- Si la pasada no puede leer el mensaje (el modelo no responde JSON dos veces, el motor está ocupado), valen los marcadores `[MEM_SAVE:]` como siempre. Un valor que no está en el mensaje se descarta (invención).
+- Se apaga con `NEXE_MEMORY_KEYED=false`. Los hechos guardados antes no tienen clave: para ellos sigue la semejanza (0,80).
+
+Probado (19/10) con 4B, 9B y 27B en Ollama y MLX, DeepSeek y Claude: el cambio de edad, de teléfono y de nombre del perro se arma, se pregunta y se hace con todos.
+
 **Flujo completo de un marcador MEM_SAVE:**
 
 ```

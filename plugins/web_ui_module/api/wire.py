@@ -26,6 +26,18 @@ if TYPE_CHECKING:  # an annotation only: no import-time edge to core.memory_fact
 logger = logging.getLogger(__name__)
 
 
+def _with_left_machine(stats: dict, engine_name: "str | None") -> dict:
+    """`left_machine: True` is written ONLY when the answer came from a hosted
+    engine — the record of where a message was asked, for the day someone asks
+    "what did I send to a provider?". A local message keeps the stats it has
+    always had."""
+    from core.endpoints.chat_engines.routing import engine_is_cloud  # deferred (layering gate, #471)
+
+    if engine_name and engine_is_cloud(str(engine_name)):
+        stats["left_machine"] = True
+    return stats
+
+
 def _build_mem_stats(
     session: Any,
     rag_count: int,
@@ -36,6 +48,7 @@ def _build_mem_stats(
     mem_saved_count: int,
     mem_saves: list,
     engine_name: "str | None" = None,
+    usage: "dict | None" = None,
 ) -> dict:
     """Build the stats dict for session.add_message."""
     est_tokens = max(1, full_response_len // 4)
@@ -44,8 +57,8 @@ def _build_mem_stats(
         rag_avg_val = round(sum(s for _, s in rag_items) / len(rag_items), 2)
     saved_facts = [f.strip() for f in mem_saves if f.strip() and len(f.strip()) >= 5] if mem_saved_count > 0 else None
     saved_rag_items = [[str(c)[:30], round(s, 2)] for c, s in rag_items] if rag_items else None
-    return {
-        "tokens": est_tokens,
+    stats = {
+        **token_stats(usage, est_tokens),
         "elapsed": elapsed,
         "model": str(model_name)[:100] if model_name else None,
         "engine": str(engine_name)[:30] if engine_name else None,
@@ -55,6 +68,31 @@ def _build_mem_stats(
         "mem_saved": mem_saved_count if mem_saved_count > 0 else None,
         "mem_facts": saved_facts,
     }
+    return _with_left_machine(stats, engine_name)
+
+
+def token_stats(usage: "dict | None", estimate: int) -> dict:
+    """The footer's numbers: what the engine said when it said it
+    (`tokens_exact`), else the estimate, which the footer marks with a `~`.
+    The input and cache counts are written only when known, never as 0."""
+    said = usage or {}
+    if said.get("tokens_out"):
+        stats = {"tokens": said["tokens_out"], "tokens_exact": True}
+    else:
+        stats = {"tokens": estimate}
+    for key in ("tokens_in", "cached_in"):
+        if said.get(key) is not None:
+            stats[key] = said[key]
+    return stats
+
+
+def usage_token(usage: "dict | None") -> str:
+    """The USAGE token: what the engine said the call cost, `in|out|cached`
+    with an empty field for what it did not say. Nothing said, no token."""
+    if not usage or usage.get("tokens_out") is None:
+        return ""
+    fields = (usage.get("tokens_in"), usage.get("tokens_out"), usage.get("cached_in"))
+    return "\x00[USAGE:" + "|".join("" if v is None else str(int(v)) for v in fields) + "]\x00"
 
 
 def model_token(model_name) -> str:

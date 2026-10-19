@@ -78,7 +78,8 @@ def refuse_continue_unless_assistant(messages: List[Dict[str, str]], continue_fi
         return
     last = messages[-1] if messages else None
     if not isinstance(last, dict) or last.get("role") != "assistant":
-        raise ValueError("continue requires the last message to be an assistant turn")
+        from core.turn.errors import BadRequest  # deferred: a plugin pulls no core at import time (#471)
+        raise BadRequest("continue requires the last message to be an assistant turn")
 
 
 def chunk_is_continuable(model: str, chunk: Dict[str, Any], num_ctx: int, ceiling: int) -> bool:
@@ -122,7 +123,8 @@ class OllamaChat:
 
     def _build_payload(self, model: str, messages: List[Dict[str, str]], stream: bool,
                        images: Optional[List[str]] = None, thinking_enabled: bool = False,
-                       top_p: Optional[float] = None, continue_final: bool = False) -> Dict[str, Any]:
+                       top_p: Optional[float] = None, continue_final: bool = False,
+                       response_schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Builds the /api/chat payload."""
         # A resume must end inside the cut answer. think:true opens a new
         # reasoning channel and the prefix stops being the one that was cut,
@@ -154,6 +156,8 @@ class OllamaChat:
         # so omitting it preserves the prior payload (Ollama uses its own default).
         if top_p is not None:
             payload["options"]["top_p"] = top_p
+        if response_schema:
+            payload["format"] = response_schema
         if images:
             # Ollama /api/chat: images must go inside the last user message
             # (not at the top-level — that is the format of /api/generate, not /api/chat)
@@ -269,6 +273,7 @@ class OllamaChat:
         self, model: str, messages: List[Dict[str, str]], stream: bool = True,
         images: Optional[List[str]] = None, thinking_enabled: bool = False,
         top_p: Optional[float] = None, continue_final: bool = False,
+        response_schema: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         """Chat with Ollama model (streaming or direct). images: optional base64 strings.
 
@@ -290,7 +295,8 @@ class OllamaChat:
         # Build payload outside try so it's always bound in the except clause.
         payload = self._build_payload(model, messages, stream, images=images,
                                       thinking_enabled=thinking_enabled, top_p=top_p,
-                                      continue_final=continue_final)
+                                      continue_final=continue_final,
+                                      response_schema=response_schema)
         num_ctx = int(payload["options"]["num_ctx"])
         ceiling = int(payload["options"]["num_predict"])
         try:
