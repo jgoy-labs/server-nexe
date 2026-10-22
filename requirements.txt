@@ -26,7 +26,7 @@ pyyaml==6.0.3
 # numpy: transitiva MLX/opencv; >=2 requerit per mlx-vlm>=0.4.4 via opencv-python>=4.12 [refresh 2026-05-16]
 numpy==2.4.6
 slowapi==0.1.10
-prometheus-client==0.25.0
+prometheus-client==0.26.0
 psutil==5.9.8
 # huggingface_hub: transitiva mlx-lm/fastembed; transformers 5.x requereix >=1.5.0;
 # F2.A11 va intentar pinar a 1.15.0 però pip-audit detecta conflicte amb typer==0.9.4
